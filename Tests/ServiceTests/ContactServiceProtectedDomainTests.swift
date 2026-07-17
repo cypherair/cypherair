@@ -117,7 +117,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Post Auth Load",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
 
@@ -143,7 +143,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Post Auth Block",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         XCTAssertFalse(contactService.testContactKeyRecords.isEmpty)
@@ -266,7 +266,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Protected Corruption",
             email: "protected-corruption@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
         try await opened.service.relockProtectedData()
@@ -312,7 +312,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Missing Wrapped DMK",
             email: "missing-wrapped-dmk@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
         try await opened.service.relockProtectedData()
@@ -356,7 +356,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Corrupt Wrapped DMK",
             email: "corrupt-wrapped-dmk@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
         try await opened.service.relockProtectedData()
@@ -422,7 +422,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Protected Mutation",
             email: "protected-mutation@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try protectedService.importContact(
@@ -481,7 +481,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Corrupt Current",
             email: "corrupt-current@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
         try await protectedService.relockProtectedData()
@@ -540,7 +540,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Missing Current",
             email: "missing-current@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
         try await protectedService.relockProtectedData()
@@ -577,7 +577,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Missing Bootstrap",
             email: "missing-bootstrap@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4MissingBootstrap",
@@ -634,7 +634,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
     func test_protectedDomainRelockClearsContactsRuntimeState() async throws {
         let generated = try engine.generateKey(
             name: "Relock", email: "relock@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
@@ -733,7 +733,7 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
             name: "Auth Bypass Contact",
             email: "auth-bypass@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let result = try container.contactService.importContact(publicKeyData: generated.publicKeyData)
 

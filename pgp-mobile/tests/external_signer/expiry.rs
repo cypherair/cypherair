@@ -114,10 +114,10 @@ fn test_external_signer_runtime_modify_expiry_recovers_expired_public_cert_for_v
 #[test]
 fn test_software_modify_expiry_preserves_profile_binding_hashes() {
     for (label, profile) in [
-        ("Universal", keys::KeyProfile::Universal),
-        ("Advanced", keys::KeyProfile::Advanced),
+        ("Legacy", keys::KeySuite::Ed25519LegacyCurve25519Legacy),
+        ("Ed448X448", keys::KeySuite::Ed448X448),
     ] {
-        let generated = keys::generate_key_with_profile(
+        let generated = keys::generate_key_with_suite(
             format!("Software Hash Preservation {label}"),
             Some(format!(
                 "software-hash-preservation-{}@example.test",
@@ -161,11 +161,11 @@ fn test_software_modify_expiry_preserves_signing_subkey_backsig_hash() {
 
 #[test]
 fn test_software_modify_expiry_refreshes_transport_subkey_binding() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Expiring Software".to_string(),
         Some("expiring-software@example.test".to_string()),
         Some(60),
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let original_subkey_expiry = first_transport_subkey_expiry(&generated.public_key_data);
@@ -183,10 +183,10 @@ fn test_software_modify_expiry_refreshes_transport_subkey_binding() {
 #[test]
 fn test_software_modify_expiry_recovers_expired_transport_subkey_binding() {
     for (label, profile) in [
-        ("Universal", keys::KeyProfile::Universal),
-        ("Advanced", keys::KeyProfile::Advanced),
+        ("Legacy", keys::KeySuite::Ed25519LegacyCurve25519Legacy),
+        ("Ed448X448", keys::KeySuite::Ed448X448),
     ] {
-        let generated = keys::generate_key_with_profile(
+        let generated = keys::generate_key_with_suite(
             format!("Expired Software {label}"),
             Some(format!(
                 "expired-software-{}@example.test",
@@ -217,11 +217,11 @@ fn test_software_modify_expiry_recovers_expired_transport_subkey_binding() {
 
 #[test]
 fn test_modify_expiry_rejects_revoked_software_certificate() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Revoked Software".to_string(),
         Some("revoked-software@example.test".to_string()),
         Some(60),
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let revoked_secret = insert_key_revocation(&generated.cert_data, &generated.revocation_cert);
@@ -368,11 +368,11 @@ fn test_external_signer_runtime_modify_expiry_rejects_mismatched_fingerprint() {
 
 #[test]
 fn test_external_signer_runtime_modify_expiry_rejects_secret_non_p256_and_wrong_role_inputs() {
-    let secret = keys::generate_key_with_profile(
+    let secret = keys::generate_key_with_suite(
         "Software Secret".to_string(),
         Some("software-secret@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let secret_result = keys::modify_expiry_with_external_p256_signer(

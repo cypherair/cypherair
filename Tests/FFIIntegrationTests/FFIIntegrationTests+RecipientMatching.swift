@@ -7,7 +7,7 @@ extension FFIIntegrationTests {
     /// Verify Phase 1 (parseRecipients) returns key IDs for Legacy ciphertext.
     func test_parseRecipients_legacy_returnsMatchingKeyIDs() throws {
         let engine = try XCTUnwrap(self.engine)
-        let key = try engine.generateKey(name: "Phase1 A", email: nil, expirySeconds: nil, profile: .universal)
+        let key = try engine.generateKey(name: "Phase1 A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
         let ciphertext = try engine.encrypt(
             plaintext: Data("Phase 1 test".utf8),
             recipients: [key.publicKeyData],
@@ -21,9 +21,9 @@ extension FFIIntegrationTests {
     /// Verify Phase 1 (parseRecipients) returns key IDs for Modern High ciphertext.
     func test_parseRecipients_modernHigh_returnsMatchingKeyIDs() throws {
         let engine = try XCTUnwrap(self.engine)
-        let key = try engine.generateKey(name: "Phase1 B", email: nil, expirySeconds: nil, profile: .advanced)
+        let key = try engine.generateKey(name: "Phase1 B", email: nil, expirySeconds: nil, suite: .ed448X448)
         let ciphertext = try engine.encrypt(
-            plaintext: Data("Phase 1 advanced".utf8),
+            plaintext: Data("Phase 1 Ed448".utf8),
             recipients: [key.publicKeyData],
             signingKey: nil,
             encryptToSelf: nil
@@ -35,8 +35,8 @@ extension FFIIntegrationTests {
     /// Phase 1 succeeds (no auth), Phase 2 fails with wrong key.
     func test_twoPhaseDecrypt_noMatchingKey_phase1SucceedsPhase2Fails() throws {
         let engine = try XCTUnwrap(self.engine)
-        let encryptKey = try engine.generateKey(name: "Encrypt Key", email: nil, expirySeconds: nil, profile: .universal)
-        let wrongKey = try engine.generateKey(name: "Wrong Key", email: nil, expirySeconds: nil, profile: .universal)
+        let encryptKey = try engine.generateKey(name: "Encrypt Key", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
+        let wrongKey = try engine.generateKey(name: "Wrong Key", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
 
         let ciphertext = try engine.encrypt(
             plaintext: Data("secret message".utf8),
@@ -68,8 +68,8 @@ extension FFIIntegrationTests {
     /// Multi-recipient: both recipients can decrypt (Phase 1 shows ≥2 IDs, Phase 2 works for each).
     func test_twoPhaseDecrypt_multiRecipient_bothCanDecrypt() throws {
         let engine = try XCTUnwrap(self.engine)
-        let alice = try engine.generateKey(name: "Alice Multi", email: nil, expirySeconds: nil, profile: .universal)
-        let bob = try engine.generateKey(name: "Bob Multi", email: nil, expirySeconds: nil, profile: .universal)
+        let alice = try engine.generateKey(name: "Alice Multi", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
+        let bob = try engine.generateKey(name: "Bob Multi", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
 
         let plaintext = "multi-recipient message"
         let ciphertext = try engine.encrypt(
@@ -97,7 +97,7 @@ extension FFIIntegrationTests {
     /// matchRecipients returns primary fingerprint for Legacy (v4) key.
     func test_matchRecipients_legacy_returnsPrimaryFingerprint() throws {
         let engine = try XCTUnwrap(self.engine)
-        let key = try engine.generateKey(name: "Match A", email: nil, expirySeconds: nil, profile: .universal)
+        let key = try engine.generateKey(name: "Match A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
 
         let ciphertext = try engine.encrypt(
             plaintext: Data("match test".utf8),
@@ -119,7 +119,7 @@ extension FFIIntegrationTests {
     /// matchRecipients returns primary fingerprint for Modern High (v6) key.
     func test_matchRecipients_modernHigh_returnsPrimaryFingerprint() throws {
         let engine = try XCTUnwrap(self.engine)
-        let key = try engine.generateKey(name: "Match B", email: nil, expirySeconds: nil, profile: .advanced)
+        let key = try engine.generateKey(name: "Match B", email: nil, expirySeconds: nil, suite: .ed448X448)
 
         let ciphertext = try engine.encrypt(
             plaintext: Data("match test B".utf8),
@@ -141,8 +141,8 @@ extension FFIIntegrationTests {
     /// matchRecipients throws NoMatchingKey when no local cert matches.
     func test_matchRecipients_wrongCert_throwsNoMatchingKey() throws {
         let engine = try XCTUnwrap(self.engine)
-        let encryptKey = try engine.generateKey(name: "Encrypt", email: nil, expirySeconds: nil, profile: .universal)
-        let wrongKey = try engine.generateKey(name: "Wrong", email: nil, expirySeconds: nil, profile: .universal)
+        let encryptKey = try engine.generateKey(name: "Encrypt", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
+        let wrongKey = try engine.generateKey(name: "Wrong", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
 
         let ciphertext = try engine.encrypt(
             plaintext: Data("no match".utf8),
@@ -172,8 +172,8 @@ extension FFIIntegrationTests {
     /// matchRecipients with multi-recipient message returns all matching certs.
     func test_matchRecipients_multiRecipient_returnsAllMatches() throws {
         let engine = try XCTUnwrap(self.engine)
-        let alice = try engine.generateKey(name: "Alice MR", email: nil, expirySeconds: nil, profile: .universal)
-        let bob = try engine.generateKey(name: "Bob MR", email: nil, expirySeconds: nil, profile: .universal)
+        let alice = try engine.generateKey(name: "Alice MR", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
+        let bob = try engine.generateKey(name: "Bob MR", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy)
 
         let ciphertext = try engine.encrypt(
             plaintext: Data("multi-recipient".utf8),

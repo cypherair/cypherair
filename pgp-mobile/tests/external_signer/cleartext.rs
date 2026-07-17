@@ -169,11 +169,11 @@ fn test_external_signer_runtime_cleartext_rejects_mismatched_fingerprint() {
 
 #[test]
 fn test_external_signer_runtime_cleartext_rejects_secret_non_p256_and_wrong_role_inputs() {
-    let secret = keys::generate_key_with_profile(
+    let secret = keys::generate_key_with_suite(
         "Software Secret".to_string(),
         Some("software-secret@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let secret_result = sign::sign_cleartext_with_external_p256_signer(

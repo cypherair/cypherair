@@ -12,9 +12,9 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             name: "Software Recipient",
             email: "software-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
-        let identity = try softwareIdentity(from: generated, profile: .universal, isDefault: true)
+        let identity = try softwareIdentity(from: generated, suite: .ed25519LegacyCurve25519Legacy, isDefault: true)
         let router = StaticPrivateKeyOperationRouter(
             route: .softwareSecretCertificate(
                 SoftwareSecretCertificateRoute(identity: identity, operation: .decrypt)
@@ -50,27 +50,27 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
 
     func test_secureEnclaveRouteDecryptsV4MessageWithoutUnwrappingSecretCertificate() async throws {
         try await assertSecureEnclaveRouteDecrypts(
-            configurationIdentity: .compatibleP256V4,
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             plaintext: "secure enclave v4 decrypt 🔐"
         )
     }
 
     func test_secureEnclaveRouteDecryptsV6MessageWithoutUnwrappingSecretCertificate() async throws {
         try await assertSecureEnclaveRouteDecrypts(
-            configurationIdentity: .modernP256V6,
+            family: .deviceBoundEcdsaNistP256EcdhNistP256,
             plaintext: "secure enclave v6 decrypt 🛡️"
         )
     }
 
     func test_secureEnclaveSignedMessageFoldsSignatureVerification() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let signer = try engine.generateKey(
             name: "Folding Signer",
             email: "folding-signer@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
-        let signerIdentity = try softwareIdentity(from: signer, profile: .universal)
+        let signerIdentity = try softwareIdentity(from: signer, suite: .ed25519LegacyCurve25519Legacy)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let ciphertext = try await messageAdapter.encrypt(
             plaintext: Data("signed secure enclave message".utf8),
@@ -102,7 +102,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveMessageDecryptUsesRealCatalogRouterAndSharedHandleStore() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
@@ -140,7 +140,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_blockingPolicyBlocksSecureEnclaveDecryptWithoutUnwrap() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
@@ -206,7 +206,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_signerRouteThrowsRoleMismatchWithoutUnwrapping() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let router = StaticPrivateKeyOperationRouter(
             route: .secureEnclaveSigner(
                 SecureEnclaveSignerRoute(
@@ -237,7 +237,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveCallbackFailureMapsToUnavailableCategoryWithoutSoftwareFallback() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let ciphertext = try await messageAdapter.encrypt(
             plaintext: Data("callback failure".utf8),
@@ -274,8 +274,8 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveRecipientMismatchFailsClosedWithoutUnwrapping() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
-        let otherFixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
+        let otherFixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         // Encrypt to a DIFFERENT Secure Enclave-shaped recipient than the route binds.
         let ciphertext = try await messageAdapter.encrypt(
@@ -309,22 +309,22 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveTamperedV4CiphertextHardFailsWithoutPlaintext() async throws {
-        try await assertSecureEnclaveTamperHardFails(configurationIdentity: .compatibleP256V4)
+        try await assertSecureEnclaveTamperHardFails(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
     }
 
     func test_secureEnclaveTamperedV6CiphertextHardFailsWithoutPlaintext() async throws {
-        try await assertSecureEnclaveTamperHardFails(configurationIdentity: .modernP256V6)
+        try await assertSecureEnclaveTamperHardFails(family: .deviceBoundEcdsaNistP256EcdhNistP256)
     }
 
     // MARK: - Mixed recipients, repeated operations
 
     func test_secureEnclaveRouteDecryptsMixedRecipientMessageWithoutUnwrap() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let otherRecipient = try engine.generateKey(
             name: "Other Recipient",
             email: "other-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let plaintext = "secure enclave mixed-recipient decrypt 🔐"
@@ -358,7 +358,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveRepeatedMessageDecryptsStayConsistentWithoutUnwrap() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let plaintext = "secure enclave repeated decrypt"
         let ciphertext = try await messageAdapter.encrypt(
@@ -393,10 +393,10 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     // MARK: - Shared assertions
 
     private func assertSecureEnclaveRouteDecrypts(
-        configurationIdentity: PGPKeyConfiguration.Identity,
+        family: PGPKeyFamily,
         plaintext: String
     ) async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: configurationIdentity)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: family)
         let router = StaticPrivateKeyOperationRouter(route: .secureEnclaveKeyAgreement(fixture.route))
         let unwrapper = RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
@@ -424,9 +424,9 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     }
 
     private func assertSecureEnclaveTamperHardFails(
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: configurationIdentity)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: family)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let ciphertext = try await messageAdapter.encrypt(
             plaintext: Data("tamper target plaintext".utf8),
@@ -473,7 +473,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     // MARK: - Helpers
 
     func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let ciphertext = try await messageAdapter.encrypt(
             plaintext: Data("authorized decrypt".utf8),
@@ -571,13 +571,12 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
 
     private func softwareIdentity(
         from generated: GeneratedKey,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         isDefault: Bool = false
     ) throws -> PGPKeyIdentity {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
-            keyVersion: UInt8(keyInfo.keyVersion),
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -589,13 +588,13 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: profile.openPGPConfiguration.identity,
+            keyFamily: suite.portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 
     private func makeSecureEnclaveDecryptFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws -> SecureEnclaveDecryptFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
@@ -607,13 +606,12 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             name: "Secure Enclave Decrypt",
             email: "secure-decrypt@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -625,7 +623,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

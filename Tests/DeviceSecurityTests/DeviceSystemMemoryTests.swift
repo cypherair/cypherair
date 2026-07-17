@@ -30,12 +30,11 @@ final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
 
         // Generate and export a Modern High key.
         let key = try engine.generateKey(
-            name: "Device Argon2id", email: nil, expirySeconds: nil, profile: .advanced
+            name: "Device Argon2id", email: nil, expirySeconds: nil, suite: .ed448X448
         )
         let exported = try engine.exportSecretKey(
             certData: key.certData,
-            passphrase: "device-test-pass",
-            profile: .advanced
+            passphrase: "device-test-pass"
         )
 
         // Parse S2K params and run the guard with real memory info.

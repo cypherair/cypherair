@@ -214,11 +214,11 @@ fn test_external_signer_runtime_selective_revocations_use_sha256_hash() {
 
 #[test]
 fn test_software_selective_revocations_keep_default_hash() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Software Selective Revocation Hash".to_string(),
         Some("software-selective-revocation-hash@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let subkey_fingerprint = first_subkey_fingerprint(&generated.public_key_data);
@@ -309,11 +309,11 @@ fn test_external_signer_runtime_selective_revocation_requires_certification_capa
 
 #[test]
 fn test_external_signer_runtime_selective_revocation_rejects_secret_input_before_callback() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Secret Selective Revocation".to_string(),
         Some("secret-selective-revocation@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
 

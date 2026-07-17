@@ -22,7 +22,7 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile
+        suite: PGPKeySuite
     ) async throws -> PGPSelfTestGeneratedKey {
         do {
             return try await Self.performGenerateKey(
@@ -30,7 +30,7 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                profile: profile
+                suite: suite
             )
         } catch {
             throw PGPErrorMapper.map(error) { .keyGenerationFailed(reason: $0) }
@@ -39,15 +39,13 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
 
     func exportSecretKey(
         certData: Data,
-        passphrase: String,
-        profile: PGPKeyProfile
+        passphrase: String
     ) async throws -> Data {
         do {
             return try await Self.performExportSecretKey(
                 engine: engine,
                 certData: certData,
-                passphrase: passphrase,
-                profile: profile
+                passphrase: passphrase
             )
         } catch {
             throw PGPErrorMapper.map(error) { .invalidKeyData(reason: $0) }
@@ -99,13 +97,13 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile
+        suite: PGPKeySuite
     ) async throws -> PGPSelfTestGeneratedKey {
         var generated = try engine.generateKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            profile: profile.ffiValue
+            suite: suite.ffiValue
         )
         // Self-test never stores the revocation certificate, so per the
         // GeneratedKey contract the sole in-memory copy is zeroized here.
@@ -121,13 +119,11 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
     private static func performExportSecretKey(
         engine: PgpEngine,
         certData: Data,
-        passphrase: String,
-        profile: PGPKeyProfile
+        passphrase: String
     ) async throws -> Data {
         try engine.exportSecretKey(
             certData: certData,
-            passphrase: passphrase,
-            profile: profile.ffiValue
+            passphrase: passphrase
         )
     }
 

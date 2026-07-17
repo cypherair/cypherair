@@ -1,16 +1,16 @@
 import Foundation
 
-/// FFI-owned mapping for generated key metadata and profile values.
+/// FFI-owned mapping for generated key metadata and suite values.
 enum PGPKeyMetadataAdapter {
     static func metadata(from keyInfo: KeyInfo) -> PGPKeyMetadata {
-        metadata(from: keyInfo, profile: keyInfo.profile)
+        metadata(from: keyInfo, suite: keyInfo.suite)
     }
 
-    /// `profile: nil` means the certificate's suite has no portable software
-    /// profile (P-256 Secure Enclave custody), not a classification failure.
+    /// `suite: nil` means the certificate has no software suite classification
+    /// (P-256 Secure Enclave custody), not a classification failure.
     static func metadata(
         from keyInfo: KeyInfo,
-        profile: KeyProfile?
+        suite: KeySuite?
     ) -> PGPKeyMetadata {
         PGPKeyMetadata(
             fingerprint: keyInfo.fingerprint,
@@ -19,7 +19,7 @@ enum PGPKeyMetadataAdapter {
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
             isExpired: keyInfo.isExpired,
-            profile: profile?.appProfile,
+            suite: suite?.appSuite,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryTimestamp: keyInfo.expiryTimestamp
@@ -29,30 +29,30 @@ enum PGPKeyMetadataAdapter {
     static func metadata(
         from validation: PublicCertificateValidationResult
     ) -> PGPKeyMetadata {
-        metadata(from: validation.keyInfo, profile: validation.profile)
+        metadata(from: validation.keyInfo, suite: validation.suite)
     }
 }
 
-extension PGPKeyProfile {
-    var ffiValue: KeyProfile {
+extension PGPKeySuite {
+    var ffiValue: KeySuite {
         switch self {
-        case .universal: .universal
-        case .modern: .modern
-        case .advanced: .advanced
-        case .postQuantum: .postQuantum
-        case .postQuantumHigh: .postQuantumHigh
+        case .ed25519LegacyCurve25519Legacy: .ed25519LegacyCurve25519Legacy
+        case .ed25519X25519: .ed25519X25519
+        case .ed448X448: .ed448X448
+        case .mlDsa65Ed25519MlKem768X25519: .mlDsa65Ed25519MlKem768X25519
+        case .mlDsa87Ed448MlKem1024X448: .mlDsa87Ed448MlKem1024X448
         }
     }
 }
 
-extension KeyProfile {
-    var appProfile: PGPKeyProfile {
+extension KeySuite {
+    var appSuite: PGPKeySuite {
         switch self {
-        case .universal: .universal
-        case .modern: .modern
-        case .advanced: .advanced
-        case .postQuantum: .postQuantum
-        case .postQuantumHigh: .postQuantumHigh
+        case .ed25519LegacyCurve25519Legacy: .ed25519LegacyCurve25519Legacy
+        case .ed25519X25519: .ed25519X25519
+        case .ed448X448: .ed448X448
+        case .mlDsa65Ed25519MlKem768X25519: .mlDsa65Ed25519MlKem768X25519
+        case .mlDsa87Ed448MlKem1024X448: .mlDsa87Ed448MlKem1024X448
         }
     }
 }

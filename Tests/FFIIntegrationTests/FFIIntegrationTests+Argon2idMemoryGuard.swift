@@ -8,12 +8,11 @@ extension FFIIntegrationTests {
     /// Uses real Modern High key export/parseS2kParams, but mocks memory to ensure success.
     func test_argon2idGuard_modernHigh_512MB_8GBDevice_passes() throws {
         let key = try engine.generateKey(
-            name: "Argon2id Test", email: nil, expirySeconds: nil, profile: .advanced
+            name: "Argon2id Test", email: nil, expirySeconds: nil, suite: .ed448X448
         )
         let exported = try engine.exportSecretKey(
             certData: key.certData,
-            passphrase: "test-pass-123",
-            profile: .advanced
+            passphrase: "test-pass-123"
         )
 
         let s2kInfo = try engine.parseS2kParams(armoredData: exported)
@@ -141,12 +140,11 @@ extension FFIIntegrationTests {
     /// Legacy (Iterated+Salted) — guard is a no-op even with minimal memory.
     func test_argon2idGuard_legacy_iteratedSalted_alwaysPasses() throws {
         let key = try engine.generateKey(
-            name: "Legacy Test", email: nil, expirySeconds: nil, profile: .universal
+            name: "Legacy Test", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let exported = try engine.exportSecretKey(
             certData: key.certData,
-            passphrase: "test-pass-456",
-            profile: .universal
+            passphrase: "test-pass-456"
         )
         let s2kInfo = try engine.parseS2kParams(armoredData: exported)
 

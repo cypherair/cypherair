@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::streaming::{self, StreamingProgressReporter};
 
 /// Test progress reporter that records callback data.
@@ -57,15 +57,15 @@ impl StreamingProgressReporter for TestProgressReporter {
     }
 }
 
-fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(name.to_string(), None, None, profile)
+fn gen_key(name: &str, profile: KeySuite) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(name.to_string(), None, None, profile)
         .expect("Key generation should succeed")
 }
 
 #[test]
 fn test_decrypt_file_tampered_legacy() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let plaintext = b"Tamper test Legacy";
     let input_path = dir.path().join("input.txt");
@@ -115,7 +115,7 @@ fn test_decrypt_file_tampered_legacy() {
 #[test]
 fn test_decrypt_file_tampered_modern_high() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Bob", KeyProfile::Advanced);
+    let key = gen_key("Bob", KeySuite::Ed448X448);
 
     let plaintext = b"Tamper test Modern High AEAD";
     let input_path = dir.path().join("input.txt");
@@ -154,7 +154,7 @@ fn test_decrypt_file_tampered_modern_high() {
 #[test]
 fn test_streaming_decrypt_tampered_modern_high_returns_specific_error() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Bob", KeyProfile::Advanced);
+    let key = gen_key("Bob", KeySuite::Ed448X448);
 
     let plaintext = b"AEAD error reclassification test for M2 fix";
     let input_path = dir.path().join("input.txt");
@@ -198,7 +198,7 @@ fn test_streaming_decrypt_tampered_modern_high_returns_specific_error() {
 #[test]
 fn test_streaming_decrypt_tampered_legacy_returns_specific_error() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let plaintext = b"MDC error reclassification test for M2 fix";
     let input_path = dir.path().join("input.txt");
@@ -242,7 +242,7 @@ fn test_streaming_decrypt_tampered_legacy_returns_specific_error() {
 #[test]
 fn test_verify_detached_file_cancellation_returns_operation_cancelled() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let data = vec![0x42u8; 256 * 1024];
     let data_path = dir.path().join("document.bin");
@@ -270,7 +270,7 @@ fn test_verify_detached_file_cancellation_returns_operation_cancelled() {
 #[test]
 fn test_progress_reporter_called() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let data = vec![0x42u8; 128 * 1024];
     let input_path = dir.path().join("input.bin");
@@ -308,7 +308,7 @@ fn test_progress_reporter_called() {
 #[test]
 fn test_cancellation_returns_error() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let data = vec![0x42u8; 256 * 1024];
     let input_path = dir.path().join("input.bin");

@@ -369,6 +369,44 @@ actor AsyncFlag {
     }
 }
 
+/// Test-only resolver policy shapes. Production code ships only
+/// `PGPKeyCapabilityResolver.Policy.production`; the route and generation
+/// tests construct these reduced shapes to pin resolver ordering and
+/// per-operation-class mapping.
+extension PGPKeyCapabilityResolver.Policy {
+    /// All Secure Enclave supports blocked — pins the resolver-before-handle-store
+    /// ordering in route tests.
+    static let testSecureEnclaveOperationsBlocked = PGPKeyCapabilityResolver.Policy(
+        secureEnclaveGenerationSupport: .unavailable,
+        secureEnclaveSigningOperationSupport: .unavailable,
+        secureEnclaveKeyAgreementOperationSupport: .unavailable
+    )
+
+    static let testSecureEnclavePrivateOperations = PGPKeyCapabilityResolver.Policy(
+        secureEnclaveGenerationSupport: .unavailable,
+        secureEnclaveSigningOperationSupport: .notImplemented,
+        secureEnclaveKeyAgreementOperationSupport: .notImplemented
+    )
+
+    static let testSecureEnclaveGeneration = PGPKeyCapabilityResolver.Policy(
+        secureEnclaveGenerationSupport: .supported,
+        secureEnclaveSigningOperationSupport: .notImplemented,
+        secureEnclaveKeyAgreementOperationSupport: .notImplemented
+    )
+
+    static let testSecureEnclaveSigningRoutes = PGPKeyCapabilityResolver.Policy(
+        secureEnclaveGenerationSupport: .unavailable,
+        secureEnclaveSigningOperationSupport: .supported,
+        secureEnclaveKeyAgreementOperationSupport: .notImplemented
+    )
+
+    static let testSecureEnclaveKeyAgreementRoutes = PGPKeyCapabilityResolver.Policy(
+        secureEnclaveGenerationSupport: .unavailable,
+        secureEnclaveSigningOperationSupport: .notImplemented,
+        secureEnclaveKeyAgreementOperationSupport: .supported
+    )
+}
+
 final class HiddenGenerationTestCertificateBuilder: SecureEnclaveCustodyCertificateBuilding, @unchecked Sendable {
     let result: PGPSecureEnclaveCustodyGeneratedMaterial
 
@@ -380,7 +418,7 @@ final class HiddenGenerationTestCertificateBuilder: SecureEnclaveCustodyCertific
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
@@ -833,7 +871,7 @@ class KeyManagementServiceTestCase: XCTestCase {
                 hasEncryptionSubkey: true,
                 isRevoked: false,
                 isExpired: false,
-                profile: keyVersion == 4 ? .universal : .advanced,
+                suite: keyVersion == 4 ? .ed25519LegacyCurve25519Legacy : .ed448X448,
                 primaryAlgo: "ECDSA P-256",
                 subkeyAlgo: "ECDH P-256",
                 expiryTimestamp: nil
@@ -852,7 +890,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         let material = hiddenGenerationMaterial(fingerprint: fingerprint, keyVersion: keyVersion)
         return PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -864,7 +901,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: nil,
-            openPGPConfigurationIdentity: keyVersion == 4 ? .compatibleP256V4 : .modernP256V6,
+            keyFamily: keyVersion == 4 ? .deviceBoundEcdsaNistP256EcdhNistP256V4 : .deviceBoundEcdsaNistP256EcdhNistP256,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
     }
@@ -876,7 +913,7 @@ class KeyManagementServiceTestCase: XCTestCase {
     }
 
     func generatedHiddenCustodyExportFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws -> HiddenCustodyExportFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let signingPublicKeyX963 = custodyMaterial.signingPublicKeyX963
@@ -884,17 +921,16 @@ class KeyManagementServiceTestCase: XCTestCase {
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
         let adapter = PGPSecureEnclaveCustodyGenerationAdapter(engine: engine)
         let material = try await adapter.generatePublicCertificate(
-            name: "Hidden Export \(configurationIdentity.rawValue)",
+            name: "Hidden Export \(family.rawValue)",
             email: "hidden-export@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let metadata = material.metadata
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
-            keyVersion: metadata.keyVersion,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -906,7 +942,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         return HiddenCustodyExportFixture(
@@ -959,7 +995,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         // exercised by `test_selectionCatalog_duplicateSameBytesFixture_preservesPerOccurrenceState`.
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
-            keyVersion: metadata.keyVersion,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -971,7 +1006,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: try XCTUnwrap(metadata.profile).openPGPConfiguration.identity,
+            keyFamily: try XCTUnwrap(metadata.suite).portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
         try storeIdentity(identity)

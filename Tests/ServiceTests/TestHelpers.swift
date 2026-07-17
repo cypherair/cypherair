@@ -157,7 +157,7 @@ enum TestHelpers {
     @discardableResult
     static func generateAndStoreKey(
         service: KeyManagementService,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         name: String = "Test User",
         email: String? = "test@example.com"
     ) async throws -> PGPKeyIdentity {
@@ -165,7 +165,7 @@ enum TestHelpers {
             name: name,
             email: email,
             expirySeconds: nil,
-            profile: profile
+            suite: suite
         )
     }
 
@@ -176,7 +176,7 @@ enum TestHelpers {
         name: String = "Alice",
         email: String? = "alice@example.com"
     ) async throws -> PGPKeyIdentity {
-        try await generateAndStoreKey(service: service, profile: .universal, name: name, email: email)
+        try await generateAndStoreKey(service: service, suite: .ed25519LegacyCurve25519Legacy, name: name, email: email)
     }
 
     /// Generate a Modern High key and return its identity.
@@ -186,7 +186,7 @@ enum TestHelpers {
         name: String = "Bob",
         email: String? = "bob@example.com"
     ) async throws -> PGPKeyIdentity {
-        try await generateAndStoreKey(service: service, profile: .advanced, name: name, email: email)
+        try await generateAndStoreKey(service: service, suite: .ed448X448, name: name, email: email)
     }
 
     /// Provision an unencrypted secret-cert fixture into the mock-backed key management stack
@@ -221,7 +221,6 @@ enum TestHelpers {
 
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
-            keyVersion: metadata.keyVersion,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -233,7 +232,7 @@ enum TestHelpers {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: try XCTUnwrap(metadata.profile).openPGPConfiguration.identity,
+            keyFamily: try XCTUnwrap(metadata.suite).portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
 

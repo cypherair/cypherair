@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use pgp_mobile::armor;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile, UserIdSelectorInput};
+use pgp_mobile::keys::{self, KeySuite, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 use openpgp::cert::prelude::*;
@@ -15,8 +15,8 @@ use openpgp::serialize::Serialize;
 use openpgp::types::ReasonForRevocation;
 use openpgp::Packet;
 
-fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
         None,
@@ -25,7 +25,7 @@ fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
     .expect("key generation should succeed")
 }
 
-fn generate_backdated_universal_secret_cert(name: &str, creation_time: SystemTime) -> Vec<u8> {
+fn generate_backdated_legacy_secret_cert(name: &str, creation_time: SystemTime) -> Vec<u8> {
     let (cert, _) = CertBuilder::general_purpose(Some(format!(
         "{} <{}@example.com>",
         name,
@@ -276,7 +276,7 @@ fn first_user_id_text(cert_data: &[u8]) -> String {
 
 #[test]
 fn test_discover_certificate_selectors_legacy_generated_cert_exposes_selectors() {
-    let generated = generate_key(KeyProfile::Universal, "SelectorA");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorA");
 
     let discovered = keys::discover_certificate_selectors(&generated.public_key_data)
         .expect("selector discovery should succeed");
@@ -330,7 +330,7 @@ fn test_discover_certificate_selectors_legacy_generated_cert_exposes_selectors()
 
 #[test]
 fn test_discover_certificate_selectors_modern_high_public_and_secret_match() {
-    let generated = generate_key(KeyProfile::Advanced, "SelectorB");
+    let generated = generate_key(KeySuite::Ed448X448, "SelectorB");
 
     let from_public = keys::discover_certificate_selectors(&generated.public_key_data)
         .expect("public selector discovery should succeed");
@@ -343,7 +343,7 @@ fn test_discover_certificate_selectors_modern_high_public_and_secret_match() {
 
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_preserve_order_and_occurrence_indexes() {
-    let generated = generate_key(KeyProfile::Universal, "Duplicate User");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Duplicate User");
     let secret_cert = duplicate_userid_raw(
         &generated.cert_data,
         "Duplicate User <duplicate user@example.com>",
@@ -366,7 +366,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_order_and_occ
 
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrence_primary_state() {
-    let generated = generate_key(KeyProfile::Universal, "Duplicate Primary");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Duplicate Primary");
     let original_user_id = first_user_id_text(&generated.cert_data);
     let secret_cert = duplicate_userid_raw(&generated.cert_data, &original_user_id);
 
@@ -391,7 +391,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrenc
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrence_revocation_state()
 {
-    let generated = generate_key(KeyProfile::Universal, "Duplicate Revoked");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Duplicate Revoked");
     let original_user_id = first_user_id_text(&generated.cert_data);
     let duplicated = duplicate_userid_raw(&generated.cert_data, &original_user_id);
     let revoked = revoke_userid_occurrence(&duplicated, 1);
@@ -417,7 +417,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrenc
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_binding_is_not_current() {
     let now = SystemTime::now();
-    let generated = generate_backdated_universal_secret_cert(
+    let generated = generate_backdated_legacy_secret_cert(
         "Duplicate Future Primary",
         now - Duration::from_secs(14_400),
     );
@@ -444,7 +444,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_binding_i
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_revocation_is_not_current() {
     let now = SystemTime::now();
-    let generated = generate_backdated_universal_secret_cert(
+    let generated = generate_backdated_legacy_secret_cert(
         "Duplicate Future Revocation",
         now - Duration::from_secs(14_400),
     );
@@ -470,7 +470,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_revocatio
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_expired_binding_is_not_current() {
     let now = SystemTime::now();
-    let generated = generate_backdated_universal_secret_cert(
+    let generated = generate_backdated_legacy_secret_cert(
         "Duplicate Expired Primary",
         now - Duration::from_secs(14_400),
     );
@@ -497,7 +497,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_expired_binding_is_not
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_expired_revocation_is_not_current() {
     let now = SystemTime::now();
-    let generated = generate_backdated_universal_secret_cert(
+    let generated = generate_backdated_legacy_secret_cert(
         "Duplicate Expired Revocation",
         now - Duration::from_secs(14_400),
     );
@@ -523,7 +523,7 @@ fn test_discover_certificate_selectors_duplicate_user_ids_expired_revocation_is_
 #[test]
 fn test_discover_certificate_selectors_newer_binding_clears_older_revocation() {
     let now = SystemTime::now();
-    let generated = generate_backdated_universal_secret_cert(
+    let generated = generate_backdated_legacy_secret_cert(
         "Duplicate Binding Clears Revocation",
         now - Duration::from_secs(14_400),
     );
@@ -555,7 +555,7 @@ fn test_discover_certificate_selectors_newer_binding_clears_older_revocation() {
 #[test]
 fn test_discover_certificate_selectors_newer_revocation_beats_older_binding() {
     let now = SystemTime::now();
-    let generated = generate_backdated_universal_secret_cert(
+    let generated = generate_backdated_legacy_secret_cert(
         "Duplicate Revocation Beats Binding",
         now - Duration::from_secs(14_400),
     );
@@ -641,7 +641,7 @@ fn test_discover_certificate_selectors_multiple_subkeys_preserve_native_order() 
 
 #[test]
 fn test_discover_certificate_selectors_catalog_selectors_drive_revocation_apis() {
-    let generated = generate_key(KeyProfile::Universal, "SelectorRevocations");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorRevocations");
     let discovered = keys::discover_certificate_selectors(&generated.public_key_data)
         .expect("selector discovery should succeed");
 
@@ -664,7 +664,7 @@ fn test_discover_certificate_selectors_catalog_selectors_drive_revocation_apis()
 
 #[test]
 fn test_discover_certificate_selectors_binary_only_armored_input_rejected() {
-    let generated = generate_key(KeyProfile::Universal, "SelectorArmor");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorArmor");
     let armored = armor::armor_public_key(&generated.public_key_data)
         .expect("armoring public cert should succeed");
 
@@ -697,7 +697,7 @@ fn test_discover_certificate_selectors_secret_and_public_builder_outputs_match()
 
 #[test]
 fn test_discover_certificate_selectors_unbound_user_id_is_not_self_certified() {
-    let generated = generate_key(KeyProfile::Universal, "Binding Holder");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Binding Holder");
     let extended = append_unbound_userid_raw(
         &generated.cert_data,
         "Injected Identity <injected@example.com>",

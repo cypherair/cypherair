@@ -35,7 +35,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
                 name: "Hidden Relock Drain",
                 email: "hidden-drain@example.com",
                 expirySeconds: nil,
-                configurationIdentity: .compatibleP256V4
+                family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
         }
 
@@ -163,7 +163,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
 
     func test_deleteSecureEnclaveCustodyKeyDeletesHandlesAndMetadata() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let pair = try seedCustodyHandles(
@@ -189,7 +189,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
 
     func test_deleteSecureEnclaveCustodyKeyHandleFailureStillRemovesMetadataAndReportsPartialDeletion() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let pair = try seedCustodyHandles(
@@ -238,7 +238,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
 
     func test_deleteSecureEnclaveCustodyKeyMetadataAssociationMismatchStillRemovesMetadataAndReportsPartialDeletion() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         _ = try seedCustodyHandles(
@@ -247,11 +247,14 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             handleSetIdentifier: "de1e7e02"
         )
         // Desync the stored identity from its public-binding inspection: same public-key
-        // bytes and fingerprint, but a key version the inspector will not match → the
-        // handle-deletion guard returns .metadataAssociationMismatch before any delete.
+        // bytes and fingerprint, but the other P-256 family — its computed key version
+        // will not match the inspected certificate → the handle-deletion guard returns
+        // .metadataAssociationMismatch before any delete.
         let desyncedIdentity = makeIdentity(
             from: fixture.identity,
-            keyVersion: fixture.identity.keyVersion == 4 ? 6 : 4
+            family: fixture.identity.keyFamily == .deviceBoundEcdsaNistP256EcdhNistP256V4
+                ? .deviceBoundEcdsaNistP256EcdhNistP256
+                : .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         let metadataPersistence = RecordingKeyMetadataPersistence()
         metadataPersistence.seed([desyncedIdentity])
@@ -280,7 +283,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
 
     func test_deleteSecureEnclaveCustodyKeyMissingHandlesIsCleanDeletion() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         let keyStore = MockSecureEnclaveCustodyKeyStore() // no handles seeded → already missing
         let metadataPersistence = RecordingKeyMetadataPersistence()
@@ -342,12 +345,12 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
     }
 
     func test_exportPublicKey_hiddenSecureEnclaveCustody_returnsStoredPublicCertificate() async throws {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256
         ] {
             let fixture = try await generatedHiddenCustodyExportFixture(
-                configurationIdentity: configurationIdentity
+                family: family
             )
             try storeIdentity(fixture.identity)
             try service.loadKeys()
@@ -369,7 +372,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
 
     func test_exportKey_hiddenSecureEnclaveCustody_isUnsupportedAndDoesNotUnwrapOrMarkBackedUp() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         try storeIdentity(fixture.identity)
         try service.loadKeys()
@@ -406,12 +409,12 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
     }
 
     func test_exportRevocationCertificate_hiddenSecureEnclaveCustody_returnsStoredRevocationArtifact() async throws {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256
         ] {
             let fixture = try await generatedHiddenCustodyExportFixture(
-                configurationIdentity: configurationIdentity
+                family: family
             )
             try storeIdentity(fixture.identity)
             try service.loadKeys()
@@ -426,17 +429,12 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             XCTAssertEqual(binary, fixture.identity.revocationCert)
             XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
             XCTAssertEqual(mockKC.saveCallCount, saveCountBefore)
-            let validation = try engine.parseRevocationCert(
-                revData: binary,
-                certData: fixture.identity.publicKeyData
-            )
-            XCTAssertTrue(validation.lowercased().contains(fixture.identity.fingerprint.lowercased()))
         }
     }
 
     func test_exportRevocationCertificate_hiddenSecureEnclaveCustody_missingArtifactFailsClosed() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .modernP256V6
+            family: .deviceBoundEcdsaNistP256EcdhNistP256
         )
         var identity = fixture.identity
         identity.revocationCert = Data()
@@ -464,7 +462,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         // resolver, but a container without the expiry-mutation routing service
         // must still fail closed (never fall back to software custody paths).
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         try storeIdentity(fixture.identity)
         try service.loadKeys()
@@ -490,7 +488,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         // custody arm in SelectiveRevocationService is the load-bearing
         // fail-closed barrier — pin it (mirror of the modify-expiry case).
         let fixture = try await generatedHiddenCustodyExportFixture(
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
         try storeIdentity(fixture.identity)
         try service.loadKeys()
@@ -523,7 +521,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
                 name: "Unwired",
                 email: nil,
                 expirySeconds: nil,
-                configurationIdentity: .compatibleP256V4
+                family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
             XCTFail("Expected unwired Secure Enclave custody generation to fail closed")
         } catch CypherAirError.keyOperationUnavailable(let category) {
@@ -583,13 +581,13 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         )
     }
 
-    /// Rebuilds an identity with a different key version to simulate a stored
-    /// metadata ↔ public-binding desync. The inspector derives the real version from
-    /// `publicKeyData`, so the altered `keyVersion` forces the deletion mismatch guard.
-    private func makeIdentity(from base: PGPKeyIdentity, keyVersion: UInt8) -> PGPKeyIdentity {
+    /// Rebuilds an identity under a different family to simulate a stored
+    /// metadata ↔ public-binding desync. The inspector derives the real version
+    /// from `publicKeyData` and `keyVersion` is computed from the family, so a
+    /// flipped-version family forces the deletion mismatch guard.
+    private func makeIdentity(from base: PGPKeyIdentity, family: PGPKeyFamily) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: base.fingerprint,
-            keyVersion: keyVersion,
             userId: base.userId,
             hasEncryptionSubkey: base.hasEncryptionSubkey,
             isRevoked: base.isRevoked,
@@ -601,7 +599,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             primaryAlgo: base.primaryAlgo,
             subkeyAlgo: base.subkeyAlgo,
             expiryDate: base.expiryDate,
-            openPGPConfigurationIdentity: base.openPGPConfigurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: base.privateKeyCustodyKind
         )
     }

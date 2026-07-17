@@ -1,20 +1,20 @@
 //! Portable Modern key lifecycle tests (v6 Ed25519+X25519, RFC 9580).
 //! Covers generation shape, algorithm-aware profile classification (an Ed25519
-//! primary distinguishes Modern from the Ed448 Advanced tier), passphrase
+//! primary distinguishes the baseline Ed25519 suite from the Ed448 high tier), passphrase
 //! export/import (Argon2id, like every v6 profile), and profile-mismatch guards.
 
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::PublicKeyAlgorithm;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use sequoia_openpgp as openpgp;
 
 fn generate_modern() -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+    keys::generate_key_with_suite(
         "Modern Lifecycle".to_string(),
         Some("modern@lifecycle.example".to_string()),
         None,
-        KeyProfile::Modern,
+        KeySuite::Ed25519X25519,
     )
     .expect("Modern key gen should succeed")
 }
@@ -53,15 +53,15 @@ fn test_generate_modern_cert_shape() {
 }
 
 #[test]
-fn test_detect_profile_classifies_modern() {
+fn test_detect_suite_classifies_modern() {
     let key = generate_modern();
     assert_eq!(
-        keys::detect_profile(&key.public_key_data).expect("detect"),
-        KeyProfile::Modern
+        keys::detect_suite(&key.public_key_data).expect("detect"),
+        KeySuite::Ed25519X25519
     );
 
     let info = keys::parse_key_info(&key.public_key_data).expect("parse_key_info");
-    assert_eq!(info.profile, KeyProfile::Modern);
+    assert_eq!(info.suite, KeySuite::Ed25519X25519);
     assert_eq!(info.key_version, 6);
 }
 
@@ -69,7 +69,7 @@ fn test_detect_profile_classifies_modern() {
 fn test_export_import_roundtrip_modern_uses_argon2id() {
     let key = generate_modern();
 
-    let exported = keys::export_secret_key(&key.cert_data, "correct horse", KeyProfile::Modern)
+    let exported = keys::export_secret_key(&key.cert_data, "correct horse")
         .expect("Modern export should succeed");
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
@@ -100,38 +100,5 @@ fn test_export_import_roundtrip_modern_uses_argon2id() {
     let imported = keys::import_secret_key(&exported, "correct horse").expect("Modern import");
     let imported_info = keys::parse_key_info(&imported).expect("info");
     assert_eq!(imported_info.fingerprint, key.fingerprint);
-    assert_eq!(imported_info.profile, KeyProfile::Modern);
-}
-
-/// Negative: a Modern (v6 Ed25519) cert exported under Universal must be
-/// rejected — the guard is algorithm-aware, so v6 material never takes the v4
-/// iterated-salted path.
-#[test]
-fn test_export_wrong_profile_modern_cert_as_universal_fails() {
-    let key = generate_modern();
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::Universal);
-    match result {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // this controlled wrong-profile export reaches it only through the
-        // profile/key-version mismatch, so the prose reason adds nothing.
-        Err(pgp_mobile::error::PgpError::S2kError { .. }) => {}
-        other => panic!("Expected S2kError profile mismatch, got: {other:?}"),
-    }
-}
-
-/// Negative: the Modern (Ed25519) and Advanced (Ed448) classical tiers must not
-/// be interchangeable — exporting an Advanced cert as Modern is a mismatch,
-/// proving the guard distinguishes the two v6 classical curves.
-#[test]
-fn test_export_wrong_profile_advanced_cert_as_modern_fails() {
-    let key = keys::generate_key_with_profile("B".to_string(), None, None, KeyProfile::Advanced)
-        .expect("gen Advanced");
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::Modern);
-    match result {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // this controlled wrong-profile export reaches it only through the
-        // profile/key-version mismatch, so the prose reason adds nothing.
-        Err(pgp_mobile::error::PgpError::S2kError { .. }) => {}
-        other => panic!("Expected S2kError profile mismatch, got: {other:?}"),
-    }
+    assert_eq!(imported_info.suite, KeySuite::Ed25519X25519);
 }

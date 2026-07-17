@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Conforms to `Codable` for serialization into the protected key-metadata
 /// domain. All fields are strict: records must persist explicit
-/// configuration identity and custody kind.
+/// key family and custody kind.
 struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Unique identifier — the full fingerprint in lowercase hex.
     var id: String { fingerprint }
@@ -14,11 +14,8 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Full key fingerprint (lowercase hex, no spaces).
     let fingerprint: String
 
-    /// Key version (4 for the v4 Legacy family, 6 for the v6 families).
-    let keyVersion: UInt8
-
-    /// The authoritative OpenPGP configuration identity for this key.
-    let openPGPConfigurationIdentity: PGPKeyConfiguration.Identity
+    /// The authoritative key family for this identity.
+    let keyFamily: PGPKeyFamily
 
     /// Private-key custody model for this local identity.
     let privateKeyCustodyKind: PGPPrivateKeyCustodyKind
@@ -63,16 +60,17 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         IdentityPresentation.shortKeyId(from: fingerprint)
     }
 
-    var openPGPConfiguration: PGPKeyConfiguration {
-        openPGPConfigurationIdentity.configuration
+    /// OpenPGP key version, computed from the family (4 for the two V4-form
+    /// families, 6 for the rest).
+    var keyVersion: UInt8 {
+        keyFamily.keyVersion
     }
 
-    /// The portable software profile this identity's configuration maps onto,
-    /// or nil for Secure Enclave custody configurations. Software-only
-    /// operations (secret-key export) require it; everything else reads the
-    /// authoritative `openPGPConfigurationIdentity` instead.
-    var softwareProfile: PGPKeyProfile? {
-        openPGPConfigurationIdentity.equivalentSoftwareProfile
+    /// The software suite this identity's family generates with, or nil for
+    /// the device-bound families. Software-only operations (secret-key export)
+    /// gate on it; everything else reads the authoritative `keyFamily`.
+    var softwareSuite: PGPKeySuite? {
+        keyFamily.softwareGenerationSuite
     }
 
     /// Fingerprints of software-custody identities — the keys with SE-wrapped
@@ -91,7 +89,6 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
 
     init(
         fingerprint: String,
-        keyVersion: UInt8,
         userId: String?,
         hasEncryptionSubkey: Bool,
         isRevoked: Bool,
@@ -103,12 +100,11 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         primaryAlgo: String,
         subkeyAlgo: String?,
         expiryDate: Date?,
-        openPGPConfigurationIdentity: PGPKeyConfiguration.Identity,
+        keyFamily: PGPKeyFamily,
         privateKeyCustodyKind: PGPPrivateKeyCustodyKind
     ) {
         self.fingerprint = fingerprint
-        self.keyVersion = keyVersion
-        self.openPGPConfigurationIdentity = openPGPConfigurationIdentity
+        self.keyFamily = keyFamily
         self.privateKeyCustodyKind = privateKeyCustodyKind
         self.userId = userId
         self.hasEncryptionSubkey = hasEncryptionSubkey

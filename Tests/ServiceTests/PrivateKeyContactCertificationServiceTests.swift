@@ -14,7 +14,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             name: "Software Certification Signer",
             email: "software-certification-signer@example.invalid"
         )
-        let target = try generatedTarget(profile: .universal)
+        let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
         let selectedUserId = try selectedUserId(
             service: stack.certificateSignatureService,
             targetCert: target.publicKeyData
@@ -53,7 +53,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
             digestSigner: UnexpectedCertificationDigestSigner()
         )
-        let target = try generatedTarget(profile: .universal)
+        let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
         let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
 
         do {
@@ -76,14 +76,14 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
     func test_secureEnclaveCertificationUsesRealCatalogRouterAndSharedHandleStoreForV4AndV6()
         async throws
     {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6,
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256,
         ] {
             let stack = await TestHelpers.makeServiceStack(engine: engine)
             defer { stack.cleanup() }
             let fixture = try await makeSecureEnclaveRouteFixture(
-                configurationIdentity: configurationIdentity
+                family: family
             )
             try stack.metadataPersistence.save(fixture.identity)
             try stack.keyManagement.loadKeys()
@@ -96,7 +96,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
                 digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
             )
-            let target = try generatedTarget(profile: .universal)
+            let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
             let contactKey = try importedContactKey(
                 publicKeyData: target.publicKeyData,
                 contactService: stack.contactService
@@ -128,8 +128,8 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             XCTAssertEqual(verification.signingKeyFingerprint, nil)
             XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
             XCTAssertEqual(validation.verification.status, .valid)
-            XCTAssertEqual(fixture.identity.keyVersion, configurationIdentity.configuration.keyVersion)
-            XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, configurationIdentity)
+            XCTAssertEqual(fixture.identity.keyVersion, family.keyVersion)
+            XCTAssertEqual(fixture.identity.keyFamily, family)
             XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
             XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
             assertNoCatalogOrKeychainMutation(stack: stack, before: snapshot)
@@ -152,7 +152,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
             digestSigner: UnexpectedCertificationDigestSigner()
         )
-        let target = try generatedTarget(profile: .universal)
+        let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
         let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
         let mismatchedSelector = UserIdSelectionOption(
             occurrenceIndex: selectedUserId.occurrenceIndex,
@@ -211,7 +211,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
                 digestSigner: UnexpectedCertificationDigestSigner()
             )
-            let target = try generatedTarget(profile: .universal)
+            let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
             let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
 
             do {
@@ -262,7 +262,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
                 digestSigner: ThrowingCertificationDigestSigner(error: signingError)
             )
-            let target = try generatedTarget(profile: .universal)
+            let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
             let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
 
             do {
@@ -297,7 +297,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         keyStore.insert(fixture.route.signingHandle)
         keyStore.insert(fixture.keyAgreementHandle)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        let target = try generatedTarget(profile: .universal)
+        let target = try generatedTarget(suite: .ed25519LegacyCurve25519Legacy)
         let targetInfo = try engine.parseKeyInfo(keyData: target.publicKeyData)
         let selectedUserId = try XCTUnwrap(
             certificateAdapter.validatedCatalog(
@@ -348,12 +348,12 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         XCTAssertEqual(stub.context.invalidateCount, 2)
     }
 
-    private func generatedTarget(profile: KeyProfile) throws -> GeneratedKey {
+    private func generatedTarget(suite: KeySuite) throws -> GeneratedKey {
         try engine.generateKey(
             name: "Certification Target",
             email: "certification-target@example.invalid",
             expirySeconds: nil,
-            profile: profile
+            suite: suite
         )
     }
 
@@ -431,7 +431,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
     }
 
     private func makeSecureEnclaveRouteFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
+        family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4
     ) async throws -> ContactCertificationSecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
@@ -443,13 +443,12 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             name: "Secure Enclave Contact Certification",
             email: "secure-contact-certification@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -461,7 +460,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

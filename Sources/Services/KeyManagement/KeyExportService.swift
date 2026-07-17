@@ -30,11 +30,13 @@ final class KeyExportService {
         guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnsupportedForCustody)
         }
-        // Software custody implies a portable software family (enforced by the
-        // key-metadata domain contract); guard before unwrapping any secret.
-        guard let softwareProfile = identity.softwareProfile else {
+        // Software custody implies a portable family with a software suite
+        // (enforced by the key-metadata domain contract); guard before
+        // unwrapping any secret. The engine derives the export S2K mode from
+        // the certificate itself, so the suite value is a gate, not an input.
+        guard identity.softwareSuite != nil else {
             throw CypherAirError.internalError(
-                reason: "Secret-key export requires a portable software profile."
+                reason: "Secret-key export requires a portable family."
             )
         }
 
@@ -45,8 +47,7 @@ final class KeyExportService {
 
         let exported = try await keyAdapter.exportSecretKey(
             certData: secretKey,
-            passphrase: passphrase,
-            profile: softwareProfile
+            passphrase: passphrase
         )
 
         if markBackedUp {

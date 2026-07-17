@@ -1951,9 +1951,9 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func decryptWithPassword(ciphertext: Data, password: String, verificationKeys: [Data]) throws  -> PasswordDecryptResult
 
     /**
-     * Detect the profile of a key (Universal or Advanced).
+     * Detect the suite of a key based on its version and algorithms.
      */
-    func detectProfile(certData: Data) throws  -> KeyProfile
+    func detectSuite(certData: Data) throws  -> KeySuite
 
     /**
      * Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
@@ -2069,17 +2069,24 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
 
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
-     * Portable Legacy → Iterated+Salted S2K. Portable Modern · High → Argon2id.
+     * The S2K mode follows the certificate's classified suite: the legacy
+     * suite → Iterated+Salted, every v6 suite → Argon2id.
      */
-    func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfile) throws  -> Data
+    func exportSecretKey(certData: Data, passphrase: String) throws  -> Data
 
     /**
-     * Generate a new key pair with the specified profile.
+     * Generate a new software key pair with the specified suite.
      *
-     * - Portable Legacy (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
-     * - Portable Modern · High (Advanced): v6 key, Ed448+X448, RFC 9580.
+     * - `Ed25519LegacyCurve25519Legacy`: v4 key, Ed25519Legacy+Curve25519Legacy
+     * under RFC 4880, GnuPG compatible.
+     * - `Ed25519X25519`: v6 key, Ed25519+X25519, RFC 9580.
+     * - `Ed448X448`: v6 key, Ed448+X448, RFC 9580.
+     * - `MlDsa65Ed25519MlKem768X25519`: v6 key, RFC 9980 composite
+     * ML-DSA-65+Ed25519 / ML-KEM-768+X25519.
+     * - `MlDsa87Ed448MlKem1024X448`: v6 key, RFC 9980 composite
+     * ML-DSA-87+Ed448 / ML-KEM-1024+X448 (NIST level 5).
      */
-    func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile) throws  -> GeneratedKey
+    func generateKey(name: String, email: String?, expirySeconds: UInt64?, suite: KeySuite) throws  -> GeneratedKey
 
     /**
      * Generate a key-level revocation signature from an existing secret certificate.
@@ -2177,11 +2184,6 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * certificate through an external P-256 signing provider.
      */
     func generateUserIdRevocationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, userIdSelector: UserIdSelectorInput) throws  -> Data
-
-    /**
-     * Get the key version from binary certificate data.
-     */
-    func getKeyVersion(certData: Data) throws  -> UInt8
 
     /**
      * Import a passphrase-protected secret key.
@@ -2288,11 +2290,6 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * key fingerprints. For matching against local keys, use `match_recipients` instead.
      */
     func parseRecipients(ciphertext: Data) throws  -> [String]
-
-    /**
-     * Parse and cryptographically verify a revocation certificate against the target key.
-     */
-    func parseRevocationCert(revData: Data, certData: Data) throws  -> String
 
     /**
      * Parse S2K parameters from a passphrase-protected key without importing it.
@@ -2663,11 +2660,11 @@ open func decryptWithPassword(ciphertext: Data, password: String, verificationKe
 }
 
     /**
-     * Detect the profile of a key (Universal or Advanced).
+     * Detect the suite of a key based on its version and algorithms.
      */
-open func detectProfile(certData: Data)throws  -> KeyProfile  {
-    return try  FfiConverterTypeKeyProfile_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_detect_profile(
+open func detectSuite(certData: Data)throws  -> KeySuite  {
+    return try  FfiConverterTypeKeySuite_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_detect_suite(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),$0
     )
@@ -3008,33 +3005,39 @@ open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: St
 
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
-     * Portable Legacy → Iterated+Salted S2K. Portable Modern · High → Argon2id.
+     * The S2K mode follows the certificate's classified suite: the legacy
+     * suite → Iterated+Salted, every v6 suite → Argon2id.
      */
-open func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfile)throws  -> Data  {
+open func exportSecretKey(certData: Data, passphrase: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_export_secret_key(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),
-        FfiConverterString.lower(passphrase),
-        FfiConverterTypeKeyProfile_lower(profile),$0
+        FfiConverterString.lower(passphrase),$0
     )
 })
 }
 
     /**
-     * Generate a new key pair with the specified profile.
+     * Generate a new software key pair with the specified suite.
      *
-     * - Portable Legacy (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
-     * - Portable Modern · High (Advanced): v6 key, Ed448+X448, RFC 9580.
+     * - `Ed25519LegacyCurve25519Legacy`: v4 key, Ed25519Legacy+Curve25519Legacy
+     * under RFC 4880, GnuPG compatible.
+     * - `Ed25519X25519`: v6 key, Ed25519+X25519, RFC 9580.
+     * - `Ed448X448`: v6 key, Ed448+X448, RFC 9580.
+     * - `MlDsa65Ed25519MlKem768X25519`: v6 key, RFC 9980 composite
+     * ML-DSA-65+Ed25519 / ML-KEM-768+X25519.
+     * - `MlDsa87Ed448MlKem1024X448`: v6 key, RFC 9980 composite
+     * ML-DSA-87+Ed448 / ML-KEM-1024+X448 (NIST level 5).
      */
-open func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile)throws  -> GeneratedKey  {
+open func generateKey(name: String, email: String?, expirySeconds: UInt64?, suite: KeySuite)throws  -> GeneratedKey  {
     return try  FfiConverterTypeGeneratedKey_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_generate_key(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(name),
         FfiConverterOptionString.lower(email),
         FfiConverterOptionUInt64.lower(expirySeconds),
-        FfiConverterTypeKeyProfile_lower(profile),$0
+        FfiConverterTypeKeySuite_lower(suite),$0
     )
 })
 }
@@ -3296,18 +3299,6 @@ open func generateUserIdRevocationBySelectorWithExternalP256Signer(publicCert: D
 }
 
     /**
-     * Get the key version from binary certificate data.
-     */
-open func getKeyVersion(certData: Data)throws  -> UInt8  {
-    return try  FfiConverterUInt8.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_get_key_version(
-            self.uniffiCloneHandle(),
-        FfiConverterData.lower(certData),$0
-    )
-})
-}
-
-    /**
      * Import a passphrase-protected secret key.
      * Auto-detects S2K mode (Iterated+Salted or Argon2id).
      */
@@ -3523,19 +3514,6 @@ open func parseRecipients(ciphertext: Data)throws  -> [String]  {
     uniffi_pgp_mobile_fn_method_pgpengine_parse_recipients(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),$0
-    )
-})
-}
-
-    /**
-     * Parse and cryptographically verify a revocation certificate against the target key.
-     */
-open func parseRevocationCert(revData: Data, certData: Data)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_parse_revocation_cert(
-            self.uniffiCloneHandle(),
-        FfiConverterData.lower(revData),
-        FfiConverterData.lower(certData),$0
     )
 })
 }
@@ -4968,13 +4946,13 @@ public struct GeneratedKey: Equatable, Hashable {
      */
     public var fingerprint: String
     /**
-     * Key version (4 for Portable Legacy, 6 for Portable Modern · High).
+     * Key version (4 for the legacy suite, 6 for the v6 suites).
      */
     public var keyVersion: UInt8
     /**
-     * The profile used to generate this key.
+     * The suite used to generate this key.
      */
-    public var profile: KeyProfile
+    public var suite: KeySuite
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -4994,17 +4972,17 @@ public struct GeneratedKey: Equatable, Hashable {
          * Key fingerprint as lowercase hex string.
          */fingerprint: String,
         /**
-         * Key version (4 for Portable Legacy, 6 for Portable Modern · High).
+         * Key version (4 for the legacy suite, 6 for the v6 suites).
          */keyVersion: UInt8,
         /**
-         * The profile used to generate this key.
-         */profile: KeyProfile) {
+         * The suite used to generate this key.
+         */suite: KeySuite) {
         self.certData = certData
         self.publicKeyData = publicKeyData
         self.revocationCert = revocationCert
         self.fingerprint = fingerprint
         self.keyVersion = keyVersion
-        self.profile = profile
+        self.suite = suite
     }
 
 
@@ -5028,7 +5006,7 @@ public struct FfiConverterTypeGeneratedKey: FfiConverterRustBuffer {
                 revocationCert: FfiConverterData.read(from: &buf),
                 fingerprint: FfiConverterString.read(from: &buf),
                 keyVersion: FfiConverterUInt8.read(from: &buf),
-                profile: FfiConverterTypeKeyProfile.read(from: &buf)
+                suite: FfiConverterTypeKeySuite.read(from: &buf)
         )
     }
 
@@ -5038,7 +5016,7 @@ public struct FfiConverterTypeGeneratedKey: FfiConverterRustBuffer {
         FfiConverterData.write(value.revocationCert, into: &buf)
         FfiConverterString.write(value.fingerprint, into: &buf)
         FfiConverterUInt8.write(value.keyVersion, into: &buf)
-        FfiConverterTypeKeyProfile.write(value.profile, into: &buf)
+        FfiConverterTypeKeySuite.write(value.suite, into: &buf)
     }
 }
 
@@ -5087,9 +5065,9 @@ public struct KeyInfo: Equatable, Hashable {
      */
     public var isExpired: Bool
     /**
-     * Detected profile based on key version and algorithms.
+     * Detected suite based on key version and algorithms.
      */
-    public var profile: KeyProfile
+    public var suite: KeySuite
     /**
      * Primary key algorithm name (e.g., "Ed25519", "Ed448").
      */
@@ -5125,8 +5103,8 @@ public struct KeyInfo: Equatable, Hashable {
          * Whether the key has expired.
          */isExpired: Bool,
         /**
-         * Detected profile based on key version and algorithms.
-         */profile: KeyProfile,
+         * Detected suite based on key version and algorithms.
+         */suite: KeySuite,
         /**
          * Primary key algorithm name (e.g., "Ed25519", "Ed448").
          */primaryAlgo: String,
@@ -5142,7 +5120,7 @@ public struct KeyInfo: Equatable, Hashable {
         self.hasEncryptionSubkey = hasEncryptionSubkey
         self.isRevoked = isRevoked
         self.isExpired = isExpired
-        self.profile = profile
+        self.suite = suite
         self.primaryAlgo = primaryAlgo
         self.subkeyAlgo = subkeyAlgo
         self.expiryTimestamp = expiryTimestamp
@@ -5170,7 +5148,7 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
                 hasEncryptionSubkey: FfiConverterBool.read(from: &buf),
                 isRevoked: FfiConverterBool.read(from: &buf),
                 isExpired: FfiConverterBool.read(from: &buf),
-                profile: FfiConverterTypeKeyProfile.read(from: &buf),
+                suite: FfiConverterTypeKeySuite.read(from: &buf),
                 primaryAlgo: FfiConverterString.read(from: &buf),
                 subkeyAlgo: FfiConverterOptionString.read(from: &buf),
                 expiryTimestamp: FfiConverterOptionUInt64.read(from: &buf)
@@ -5184,7 +5162,7 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.hasEncryptionSubkey, into: &buf)
         FfiConverterBool.write(value.isRevoked, into: &buf)
         FfiConverterBool.write(value.isExpired, into: &buf)
-        FfiConverterTypeKeyProfile.write(value.profile, into: &buf)
+        FfiConverterTypeKeySuite.write(value.suite, into: &buf)
         FfiConverterString.write(value.primaryAlgo, into: &buf)
         FfiConverterOptionString.write(value.subkeyAlgo, into: &buf)
         FfiConverterOptionUInt64.write(value.expiryTimestamp, into: &buf)
@@ -5811,9 +5789,9 @@ public struct PublicCertificateValidationResult: Equatable, Hashable {
      */
     public var keyInfo: KeyInfo
     /**
-     * Detected profile of the validated public certificate.
+     * Detected suite of the validated public certificate.
      */
-    public var profile: KeyProfile
+    public var suite: KeySuite
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5825,11 +5803,11 @@ public struct PublicCertificateValidationResult: Equatable, Hashable {
          * Parsed key metadata for the validated public certificate.
          */keyInfo: KeyInfo,
         /**
-         * Detected profile of the validated public certificate.
-         */profile: KeyProfile) {
+         * Detected suite of the validated public certificate.
+         */suite: KeySuite) {
         self.publicCertData = publicCertData
         self.keyInfo = keyInfo
-        self.profile = profile
+        self.suite = suite
     }
 
 
@@ -5850,14 +5828,14 @@ public struct FfiConverterTypePublicCertificateValidationResult: FfiConverterRus
             try PublicCertificateValidationResult(
                 publicCertData: FfiConverterData.read(from: &buf),
                 keyInfo: FfiConverterTypeKeyInfo.read(from: &buf),
-                profile: FfiConverterTypeKeyProfile.read(from: &buf)
+                suite: FfiConverterTypeKeySuite.read(from: &buf)
         )
     }
 
     public static func write(_ value: PublicCertificateValidationResult, into buf: inout [UInt8]) {
         FfiConverterData.write(value.publicCertData, into: &buf)
         FfiConverterTypeKeyInfo.write(value.keyInfo, into: &buf)
-        FfiConverterTypeKeyProfile.write(value.profile, into: &buf)
+        FfiConverterTypeKeySuite.write(value.suite, into: &buf)
     }
 }
 
@@ -8394,42 +8372,38 @@ public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: Ex
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * Encryption profile selection.
- * Portable Legacy (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
- * Modern: v6, Ed25519+X25519, SEIPDv2 AEAD OCB, Argon2id S2K.
- * Portable Modern · High (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
- * Post-Quantum: v6, RFC 9980 composite ML-DSA-65+Ed25519 signing and
- * ML-KEM-768+X25519 encryption, SEIPDv2, Argon2id S2K.
- * Post-Quantum · High: v6, RFC 9980 composite ML-DSA-87+Ed448 signing and
- * ML-KEM-1024+X448 encryption, SEIPDv2, Argon2id S2K.
+ * Software key-generation suite, named by its RFC 9580/9980 registered
+ * signing + encryption algorithms and ordered by ascending security tier.
+ * Suites map 1:1 onto the portable key families; device-bound custody
+ * certificates are built through the Secure Enclave paths instead.
  */
 
-public enum KeyProfile: Equatable, Hashable {
+public enum KeySuite: Equatable, Hashable {
 
     /**
-     * Portable Legacy: Universal compatible. v4 keys, GnuPG compatible.
+     * v4 Ed25519Legacy (EdDSALegacy, 22) + Curve25519Legacy (ECDH, 18) under
+     * RFC 4880. SEIPDv1, Iterated+Salted S2K, GnuPG compatible.
      */
-    case universal
+    case ed25519LegacyCurve25519Legacy
     /**
-     * Portable Modern · High: Advanced security. v6 Ed448+X448 keys, RFC 9580. Presented to
-     * the user as "Modern · High"; the baseline v6 classical tier is `Modern`.
+     * v6 Ed25519 (27) + X25519 (25) under RFC 9580 — the baseline v6
+     * classical suite. SEIPDv2 AEAD OCB, Argon2id S2K.
      */
-    case advanced
+    case ed25519X25519
     /**
-     * Modern: v6 Ed25519+X25519 keys, RFC 9580. The baseline v6 classical
-     * profile — Curve25519 under RFC 9580, i.e. Ed25519 (27) + X25519 (25).
-     * Not GnuPG compatible (v6 format).
+     * v6 Ed448 (28) + X448 (26) under RFC 9580. SEIPDv2 AEAD OCB, Argon2id S2K.
      */
-    case modern
+    case ed448X448
     /**
-     * Post-Quantum: RFC 9980 composite algorithms on v6 keys. Not GnuPG compatible.
+     * v6 RFC 9980 composite ML-DSA-65+Ed25519 (30) signing +
+     * ML-KEM-768+X25519 (35) encryption. SEIPDv2, Argon2id S2K.
      */
-    case postQuantum
+    case mlDsa65Ed25519MlKem768X25519
     /**
-     * Post-Quantum · High: RFC 9980 composite ML-DSA-87+Ed448 signing and
-     * ML-KEM-1024+X448 encryption on v6 keys (NIST level 5). Not GnuPG compatible.
+     * v6 RFC 9980 composite ML-DSA-87+Ed448 (31) signing +
+     * ML-KEM-1024+X448 (36) encryption (NIST level 5). SEIPDv2, Argon2id S2K.
      */
-    case postQuantumHigh
+    case mlDsa87Ed448MlKem1024X448
 
 
 
@@ -8438,54 +8412,54 @@ public enum KeyProfile: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension KeyProfile: Sendable {}
+extension KeySuite: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
-    typealias SwiftType = KeyProfile
+public struct FfiConverterTypeKeySuite: FfiConverterRustBuffer {
+    typealias SwiftType = KeySuite
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeyProfile {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeySuite {
         let variant: Int32 = try readInt(&buf)
         switch variant {
 
-        case 1: return .universal
+        case 1: return .ed25519LegacyCurve25519Legacy
 
-        case 2: return .advanced
+        case 2: return .ed25519X25519
 
-        case 3: return .modern
+        case 3: return .ed448X448
 
-        case 4: return .postQuantum
+        case 4: return .mlDsa65Ed25519MlKem768X25519
 
-        case 5: return .postQuantumHigh
+        case 5: return .mlDsa87Ed448MlKem1024X448
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
-    public static func write(_ value: KeyProfile, into buf: inout [UInt8]) {
+    public static func write(_ value: KeySuite, into buf: inout [UInt8]) {
         switch value {
 
 
-        case .universal:
+        case .ed25519LegacyCurve25519Legacy:
             writeInt(&buf, Int32(1))
 
 
-        case .advanced:
+        case .ed25519X25519:
             writeInt(&buf, Int32(2))
 
 
-        case .modern:
+        case .ed448X448:
             writeInt(&buf, Int32(3))
 
 
-        case .postQuantum:
+        case .mlDsa65Ed25519MlKem768X25519:
             writeInt(&buf, Int32(4))
 
 
-        case .postQuantumHigh:
+        case .mlDsa87Ed448MlKem1024X448:
             writeInt(&buf, Int32(5))
 
         }
@@ -8496,15 +8470,15 @@ public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeKeyProfile_lift(_ buf: RustBuffer) throws -> KeyProfile {
-    return try FfiConverterTypeKeyProfile.lift(buf)
+public func FfiConverterTypeKeySuite_lift(_ buf: RustBuffer) throws -> KeySuite {
+    return try FfiConverterTypeKeySuite.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeKeyProfile_lower(_ value: KeyProfile) -> RustBuffer {
-    return FfiConverterTypeKeyProfile.lower(value)
+public func FfiConverterTypeKeySuite_lower(_ value: KeySuite) -> RustBuffer {
+    return FfiConverterTypeKeySuite.lower(value)
 }
 
 
@@ -9584,7 +9558,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 33951) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile() != 25919) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_suite() != 54277) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_discover_certificate_selectors() != 2777) {
@@ -9644,10 +9618,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_p256_signer() != 13100) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 34421) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 12917) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 50547) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 3689) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 32937) {
@@ -9698,9 +9672,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_p256_signer() != 47447) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version() != 2783) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 53716) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -9741,9 +9712,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 20) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert() != 24404) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 26152) {

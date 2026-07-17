@@ -145,7 +145,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
             armoredData: exported,
             passphrase: "test-pass"
         )
-        XCTAssertEqual(imported.softwareProfile, .universal)
+        XCTAssertEqual(imported.softwareSuite, .ed25519LegacyCurve25519Legacy)
     }
 
 }

@@ -4,7 +4,7 @@ use super::*;
 #[test]
 fn test_verify_direct_key_signature_issuer_guided_rejects_signing_only_subkey() {
     let (signer_cert, signer_public_bytes) = signing_only_subkey_signer();
-    let target = generated_key(KeyProfile::Universal, "IssuerGuidedDirectTarget");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "IssuerGuidedDirectTarget");
     let target_cert = parse_cert(&target.public_key_data);
     let signature_with_issuer =
         direct_key_signature_from_signing_only_subkey(&signer_cert, &target_cert, false);
@@ -48,7 +48,7 @@ fn test_generate_user_id_certification_prefers_primary_over_certification_subkey
         .add_certification_subkey()
         .generate()
         .expect("signer should generate");
-    let target = generated_key(KeyProfile::Universal, "PrimaryTarget");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "PrimaryTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
 

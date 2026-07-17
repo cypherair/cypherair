@@ -34,7 +34,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             configuration: KeyGenerationView.Configuration(
                 prefilledName: "Alice",
                 prefilledEmail: "alice@example.com",
-                lockedFamily: .modernSoftwareV6,
+                lockedFamily: .portableEd25519X25519,
                 lockedExpiryMonths: 36,
                 postGenerationBehavior: .suppressPrompt
             )
@@ -44,21 +44,21 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.name, "Alice")
         XCTAssertEqual(model.email, "alice@example.com")
-        XCTAssertEqual(model.selectedFamily, .modernSoftwareV6)
+        XCTAssertEqual(model.selectedFamily, .portableEd25519X25519)
         XCTAssertEqual(model.expiryMonths, 36)
     }
 
     func test_selectFamily_isIgnoredWhenFamilyIsLocked() {
         let model = makeModel(
             configuration: KeyGenerationView.Configuration(
-                lockedFamily: .modernSoftwareV6
+                lockedFamily: .portableEd25519X25519
             )
         )
         model.handleAppear()
 
-        model.selectFamily(.compatibleSoftwareV4)
+        model.selectFamily(.portableEd25519LegacyCurve25519Legacy)
 
-        XCTAssertEqual(model.selectedFamily, .modernSoftwareV6)
+        XCTAssertEqual(model.selectedFamily, .portableEd25519X25519)
     }
 
     func test_presentFamilyDetail_doesNotSelectFamilyAndCanDismiss() {
@@ -66,12 +66,12 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
             isSecureEnclaveGenerationAvailable: true
         )
-        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
+        XCTAssertEqual(model.selectedFamily, .portableMlDsa65Ed25519MlKem768X25519)
 
-        model.presentFamilyDetail(.modernP256V6)
+        model.presentFamilyDetail(.deviceBoundEcdsaNistP256EcdhNistP256)
 
-        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
-        XCTAssertEqual(model.presentedFamilyDetail, .modernP256V6)
+        XCTAssertEqual(model.selectedFamily, .portableMlDsa65Ed25519MlKem768X25519)
+        XCTAssertEqual(model.presentedFamilyDetail, .deviceBoundEcdsaNistP256EcdhNistP256)
 
         model.dismissFamilyDetail()
 
@@ -81,17 +81,17 @@ final class KeyGenerationScreenModelTests: XCTestCase {
     func test_presentFamilyDetail_stillWorksWhenFamilySelectionIsLocked() {
         let model = makeModel(
             configuration: KeyGenerationView.Configuration(
-                lockedFamily: .modernSoftwareV6
+                lockedFamily: .portableEd25519X25519
             ),
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
             isSecureEnclaveGenerationAvailable: true
         )
         model.handleAppear()
 
-        model.presentFamilyDetail(.compatibleP256V4)
+        model.presentFamilyDetail(.deviceBoundEcdsaNistP256EcdhNistP256V4)
 
-        XCTAssertEqual(model.selectedFamily, .modernSoftwareV6)
-        XCTAssertEqual(model.presentedFamilyDetail, .compatibleP256V4)
+        XCTAssertEqual(model.selectedFamily, .portableEd25519X25519)
+        XCTAssertEqual(model.presentedFamilyDetail, .deviceBoundEcdsaNistP256EcdhNistP256V4)
     }
 
     func test_availableFamilies_productionPolicyExposesDeviceBoundFamiliesWhenServiceWired() {
@@ -101,7 +101,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         let defaultModel = makeModel()
         XCTAssertEqual(
             defaultModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6, .postQuantumHighSoftwareV6]
+            [.portableEd25519LegacyCurve25519Legacy, .portableEd25519X25519, .portableEd448X448, .portableMlDsa65Ed25519MlKem768X25519, .portableMlDsa87Ed448MlKem1024X448]
         )
 
         // Production policy + wired service: all nine families are offered, in
@@ -113,15 +113,15 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(
             availableServiceModel.availableFamilies,
             [
-                .compatibleSoftwareV4,
-                .modernSoftwareV6,
-                .modernHighSoftwareV6,
-                .postQuantumSoftwareV6,
-                .postQuantumHighSoftwareV6,
-                .compatibleP256V4,
-                .modernP256V6,
-                .deviceBoundPostQuantumV6,
-                .deviceBoundPostQuantumHighV6
+                .portableEd25519LegacyCurve25519Legacy,
+                .portableEd25519X25519,
+                .portableEd448X448,
+                .portableMlDsa65Ed25519MlKem768X25519,
+                .portableMlDsa87Ed448MlKem1024X448,
+                .deviceBoundEcdsaNistP256EcdhNistP256V4,
+                .deviceBoundEcdsaNistP256EcdhNistP256,
+                .deviceBoundMlDsa65Ed25519MlKem768X25519,
+                .deviceBoundMlDsa87Ed448MlKem1024X448
             ]
         )
     }
@@ -134,15 +134,15 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(
             exposedModel.availableFamilies,
             [
-                .compatibleSoftwareV4,
-                .modernSoftwareV6,
-                .modernHighSoftwareV6,
-                .postQuantumSoftwareV6,
-                .postQuantumHighSoftwareV6,
-                .compatibleP256V4,
-                .modernP256V6,
-                .deviceBoundPostQuantumV6,
-                .deviceBoundPostQuantumHighV6
+                .portableEd25519LegacyCurve25519Legacy,
+                .portableEd25519X25519,
+                .portableEd448X448,
+                .portableMlDsa65Ed25519MlKem768X25519,
+                .portableMlDsa87Ed448MlKem1024X448,
+                .deviceBoundEcdsaNistP256EcdhNistP256V4,
+                .deviceBoundEcdsaNistP256EcdhNistP256,
+                .deviceBoundMlDsa65Ed25519MlKem768X25519,
+                .deviceBoundMlDsa87Ed448MlKem1024X448
             ]
         )
 
@@ -153,7 +153,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
         XCTAssertEqual(
             unwiredModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6, .postQuantumHighSoftwareV6]
+            [.portableEd25519LegacyCurve25519Legacy, .portableEd25519X25519, .portableEd448X448, .portableMlDsa65Ed25519MlKem768X25519, .portableMlDsa87Ed448MlKem1024X448]
         )
     }
 
@@ -163,18 +163,18 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         // Enclave generation service, because every row renders disabled and
         // generation never leaves the locked family.
         let lockedModel = makeModel(
-            configuration: KeyGenerationView.Configuration(lockedFamily: .modernSoftwareV6),
+            configuration: KeyGenerationView.Configuration(lockedFamily: .portableEd25519X25519),
             isSecureEnclaveGenerationAvailable: false
         )
         XCTAssertEqual(
             lockedModel.availableFamilies,
-            PGPKeyConfiguration.Identity.orderedFamilies
+            PGPKeyFamily.orderedFamilies
         )
     }
 
     func test_generate_deviceBoundFamilyRequiresCommitmentConfirmation() async {
         let identity = makeKeyRouteTestIdentity(fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
-        var capturedFamily: PGPKeyConfiguration.Identity?
+        var capturedFamily: PGPKeyFamily?
         var actionCallCount = 0
         let model = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
@@ -186,7 +186,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             }
         )
         model.name = "Alice"
-        model.selectFamily(.compatibleP256V4)
+        model.selectFamily(.deviceBoundEcdsaNistP256EcdhNistP256V4)
 
         model.generate()
 
@@ -208,7 +208,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(actionCallCount, 1)
-        XCTAssertEqual(capturedFamily, .compatibleP256V4)
+        XCTAssertEqual(capturedFamily, .deviceBoundEcdsaNistP256EcdhNistP256V4)
     }
 
     func test_confirmDeviceBoundGeneration_withoutPendingCommitmentDoesNothing() async {
@@ -231,7 +231,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         var generatedIdentity: PGPKeyIdentity?
         var capturedName: String?
         var capturedEmail: String?
-        var capturedFamily: PGPKeyConfiguration.Identity?
+        var capturedFamily: PGPKeyFamily?
         var capturedExpirySeconds: UInt64?
         var configuration = KeyGenerationView.Configuration()
         configuration.onGenerated = { identity in
@@ -250,7 +250,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
         model.name = "  Alice  "
         model.email = " alice@example.com "
-        model.selectFamily(.modernSoftwareV6)
+        model.selectFamily(.portableEd25519X25519)
 
         model.generate()
 
@@ -263,7 +263,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(generatedIdentity, identity)
         XCTAssertEqual(capturedName, "Alice")
         XCTAssertEqual(capturedEmail, "alice@example.com")
-        XCTAssertEqual(capturedFamily, .modernSoftwareV6)
+        XCTAssertEqual(capturedFamily, .portableEd25519X25519)
         XCTAssertNotNil(capturedExpirySeconds)
         XCTAssertFalse(model.isGenerating)
         XCTAssertFalse(model.showError)
@@ -330,12 +330,12 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             isSecureEnclaveGenerationAvailable: true
         )
         model.name = "Alice"
-        model.selectFamily(.modernP256V6)
+        model.selectFamily(.deviceBoundEcdsaNistP256EcdhNistP256)
         model.generate()
         XCTAssertTrue(model.deviceBoundCommitmentPending)
 
-        model.presentFamilyDetail(.modernP256V6)
-        XCTAssertEqual(model.presentedFamilyDetail, .modernP256V6)
+        model.presentFamilyDetail(.deviceBoundEcdsaNistP256EcdhNistP256)
+        XCTAssertEqual(model.presentedFamilyDetail, .deviceBoundEcdsaNistP256EcdhNistP256)
 
         model.handleContentClearGenerationChange()
 
@@ -364,8 +364,8 @@ final class KeyGenerationScreenModelTests: XCTestCase {
     func test_defaultSelection_isRecommendedPortablePostQuantum() {
         let model = makeModel()
 
-        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
-        XCTAssertEqual(model.selectedFamily, PGPKeyConfiguration.Identity.recommendedDefault)
+        XCTAssertEqual(model.selectedFamily, .portableMlDsa65Ed25519MlKem768X25519)
+        XCTAssertEqual(model.selectedFamily, PGPKeyFamily.recommendedDefault)
         XCTAssertTrue(model.selectedFamily.isRecommended)
         XCTAssertEqual(model.selectedCustody, .portable)
         XCTAssertNil(model.detailFamily)
@@ -373,15 +373,15 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
     func test_continueToDetails_pushesSelectedFamily() {
         let model = makeModel()
-        model.selectFamily(.modernSoftwareV6)
+        model.selectFamily(.portableEd25519X25519)
 
         model.continueToDetails()
-        XCTAssertEqual(model.detailFamily, .modernSoftwareV6)
+        XCTAssertEqual(model.detailFamily, .portableEd25519X25519)
     }
 
     func test_continueToDetails_clearsStaleGenerationFlags() {
         let model = makeModel()
-        model.selectFamily(.modernSoftwareV6)
+        model.selectFamily(.portableEd25519X25519)
         model.deviceBoundCommitmentPending = true
         model.generatedIdentity = makeKeyRouteTestIdentity(
             fingerprint: "1111111111111111111111111111111111111111"
@@ -389,7 +389,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
         model.continueToDetails()
 
-        XCTAssertEqual(model.detailFamily, .modernSoftwareV6)
+        XCTAssertEqual(model.detailFamily, .portableEd25519X25519)
         XCTAssertFalse(model.deviceBoundCommitmentPending)
         XCTAssertNil(model.generatedIdentity)
     }
@@ -403,12 +403,12 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
         // Device-bound has no recommended family, so it lands on the first offered.
         model.selectCustody(.deviceBound)
-        XCTAssertEqual(model.selectedFamily, .compatibleP256V4)
+        XCTAssertEqual(model.selectedFamily, .deviceBoundEcdsaNistP256EcdhNistP256V4)
         XCTAssertEqual(model.selectedCustody, .deviceBound)
 
         // Portable has a recommended family (Portable Post-Quantum).
         model.selectCustody(.portable)
-        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
+        XCTAssertEqual(model.selectedFamily, .portableMlDsa65Ed25519MlKem768X25519)
     }
 
     func test_selectCustody_isNoOpForSameCustodyOrWhenLocked() {
@@ -416,18 +416,18 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
             isSecureEnclaveGenerationAvailable: true
         )
-        model.selectFamily(.compatibleSoftwareV4)
+        model.selectFamily(.portableEd25519LegacyCurve25519Legacy)
         model.selectCustody(.portable) // already portable
-        XCTAssertEqual(model.selectedFamily, .compatibleSoftwareV4)
+        XCTAssertEqual(model.selectedFamily, .portableEd25519LegacyCurve25519Legacy)
 
         let lockedModel = makeModel(
-            configuration: KeyGenerationView.Configuration(lockedFamily: .modernSoftwareV6),
+            configuration: KeyGenerationView.Configuration(lockedFamily: .portableEd25519X25519),
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
             isSecureEnclaveGenerationAvailable: true
         )
         lockedModel.handleAppear()
         lockedModel.selectCustody(.deviceBound)
-        XCTAssertEqual(lockedModel.selectedFamily, .modernSoftwareV6)
+        XCTAssertEqual(lockedModel.selectedFamily, .portableEd25519X25519)
     }
 
     func test_availableCustodies_reflectOfferedFamilies() {
@@ -441,7 +441,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(fullModel.availableCustodies, [.portable, .deviceBound])
         XCTAssertEqual(
             fullModel.families(for: .deviceBound),
-            [.compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6]
+            [.deviceBoundEcdsaNistP256EcdhNistP256V4, .deviceBoundEcdsaNistP256EcdhNistP256, .deviceBoundMlDsa65Ed25519MlKem768X25519, .deviceBoundMlDsa87Ed448MlKem1024X448]
         )
     }
 
@@ -477,7 +477,6 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 func makeKeyRouteTestIdentity(fingerprint: String) -> PGPKeyIdentity {
     PGPKeyIdentity(
         fingerprint: fingerprint,
-        keyVersion: 6,
         userId: "Alice <alice@example.com>",
         hasEncryptionSubkey: true,
         isRevoked: false,
@@ -489,7 +488,7 @@ func makeKeyRouteTestIdentity(fingerprint: String) -> PGPKeyIdentity {
         primaryAlgo: "Ed448",
         subkeyAlgo: "X448",
         expiryDate: nil,
-        openPGPConfigurationIdentity: .modernHighSoftwareV6,
+        keyFamily: .portableEd448X448,
         privateKeyCustodyKind: .softwareSecretCertificate
     )
 }

@@ -57,7 +57,7 @@ final class KeyProvisioningService {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -65,7 +65,7 @@ final class KeyProvisioningService {
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            profile: profile,
+            suite: suite,
             authMode: authMode,
             invalidationToken: token
         )
@@ -75,7 +75,7 @@ final class KeyProvisioningService {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -86,7 +86,7 @@ final class KeyProvisioningService {
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            profile: profile
+            suite: suite
         )
         defer {
             generated.certData.resetBytes(in: 0..<generated.certData.count)
@@ -106,7 +106,6 @@ final class KeyProvisioningService {
         let fingerprint = generated.metadata.fingerprint
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: generated.metadata.keyVersion,
             userId: generated.metadata.userId,
             hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -118,7 +117,7 @@ final class KeyProvisioningService {
             primaryAlgo: generated.metadata.primaryAlgo,
             subkeyAlgo: generated.metadata.subkeyAlgo,
             expiryDate: generated.metadata.expiryDate,
-            openPGPConfigurationIdentity: profile.openPGPConfiguration.identity,
+            keyFamily: suite.portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
 
@@ -189,16 +188,16 @@ final class KeyProvisioningService {
 
         let fingerprint = imported.metadata.fingerprint
         // Imports are always portable software certificates, so the engine's
-        // detected profile must be present; its absence means the certificate
-        // has no portable software profile and cannot become an owned software key.
-        guard let detectedProfile = imported.metadata.profile else {
+        // detected suite must be present; its absence means the certificate
+        // has no software suite classification and cannot become an owned
+        // software key.
+        guard let detectedSuite = imported.metadata.suite else {
             throw CypherAirError.invalidKeyData(
-                reason: "Imported certificate has no portable software profile."
+                reason: "Imported certificate has no software suite classification."
             )
         }
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: imported.metadata.keyVersion,
             userId: imported.metadata.userId,
             hasEncryptionSubkey: imported.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -210,7 +209,7 @@ final class KeyProvisioningService {
             primaryAlgo: imported.metadata.primaryAlgo,
             subkeyAlgo: imported.metadata.subkeyAlgo,
             expiryDate: imported.metadata.expiryDate,
-            openPGPConfigurationIdentity: detectedProfile.openPGPConfiguration.identity,
+            keyFamily: detectedSuite.portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
 

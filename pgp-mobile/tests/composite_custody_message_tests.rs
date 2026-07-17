@@ -23,7 +23,7 @@ use openpgp::types::{AEADAlgorithm, PublicKeyAlgorithm, SymmetricAlgorithm};
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
     self, ExternalCompositeKeyAgreementError, ExternalCompositeKeyAgreementFailureCategory,
-    ExternalMlKem768DecapsulationProvider, ExternalMlKem768DecapsulationRequest, KeyProfile,
+    ExternalMlKem768DecapsulationProvider, ExternalMlKem768DecapsulationRequest, KeySuite,
     MlKem768KeyShare,
 };
 use pgp_mobile::signature_details::SignatureVerificationState;
@@ -103,11 +103,11 @@ fn encrypt_hidden_recipients(recipient_cert_data: &[&[u8]], plaintext: &[u8]) ->
 #[test]
 fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
     let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let legacy = keys::generate_key_with_profile(
-        "Hidden Universal Peer".to_string(),
+    let legacy = keys::generate_key_with_suite(
+        "Hidden Legacy Peer".to_string(),
         None,
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("legacy generates");
 
@@ -232,11 +232,11 @@ fn engine_encrypts_and_signs_to_foreign_pq_recipient() {
 #[test]
 fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
     let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let legacy = keys::generate_key_with_profile(
-        "Universal Peer".to_string(),
+    let legacy = keys::generate_key_with_suite(
+        "Legacy Peer".to_string(),
         None,
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("legacy generates");
 

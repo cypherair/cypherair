@@ -13,7 +13,7 @@ protocol SecureEnclaveCustodyCertificateBuilding: Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial
@@ -30,7 +30,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
@@ -40,7 +40,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                configuration: configuration,
+                family: family,
                 signingPublicKeyX963: handlePair.signing.binding.publicKeyRaw,
                 keyAgreementPublicKeyX963: handlePair.keyAgreement.binding.publicKeyRaw,
                 signingProvider: PGPExternalP256SigningProviderBridge(
@@ -59,26 +59,26 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         signingPublicKeyX963: Data,
         keyAgreementPublicKeyX963: Data,
         signingProvider: ExternalP256SigningProvider
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
         let version: SecureEnclaveCertificateVersion
-        switch configuration.identity {
-        case .compatibleP256V4:
+        switch family {
+        case .deviceBoundEcdsaNistP256EcdhNistP256V4:
             version = .v4
-        case .modernP256V6:
+        case .deviceBoundEcdsaNistP256EcdhNistP256:
             version = .v6
-        case .compatibleSoftwareV4,
-             .modernSoftwareV6,
-             .modernHighSoftwareV6,
-             .postQuantumSoftwareV6,
-             .postQuantumHighSoftwareV6,
-             .deviceBoundPostQuantumV6,
-             .deviceBoundPostQuantumHighV6:
+        case .portableEd25519LegacyCurve25519Legacy,
+             .portableEd25519X25519,
+             .portableEd448X448,
+             .portableMlDsa65Ed25519MlKem768X25519,
+             .portableMlDsa87Ed448MlKem1024X448,
+             .deviceBoundMlDsa65Ed25519MlKem768X25519,
+             .deviceBoundMlDsa87Ed448MlKem1024X448:
             throw CypherAirError.invalidKeyData(
-                reason: "Secure Enclave custody generation requires a P-256 configuration."
+                reason: "Secure Enclave custody generation requires a P-256 family."
             )
         }
 
@@ -95,10 +95,10 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
             signer: signingProvider
         )
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-        // P-256 Secure Enclave certificates have no portable software profile.
+        // P-256 Secure Enclave certificates have no software suite classification.
         let metadata = PGPKeyMetadataAdapter.metadata(
             from: keyInfo,
-            profile: nil
+            suite: nil
         )
 
         return PGPSecureEnclaveCustodyGeneratedMaterial(

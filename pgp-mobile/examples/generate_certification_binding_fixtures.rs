@@ -8,7 +8,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Marshal;
 use openpgp::types::{KeyFlags, SignatureType};
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use sequoia_openpgp as openpgp;
 
 fn strip_issuer_metadata(signature: &mut openpgp::packet::Signature) {
@@ -33,11 +33,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_certification_subkey()
         .generate()?;
 
-    let target = keys::generate_key_with_profile(
+    let target = keys::generate_key_with_suite(
         "FFI Fallback Target".to_string(),
         Some("ffi-fallback-target@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let target_cert = openpgp::Cert::from_bytes(&target.public_key_data)?;
 
@@ -83,11 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut signature_bytes = Vec::new();
     openpgp::Packet::from(signature).serialize(&mut signature_bytes)?;
 
-    let direct_key = keys::generate_key_with_profile(
+    let direct_key = keys::generate_key_with_suite(
         "FFI Direct Key".to_string(),
         Some("ffi-direct@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let direct_key_cert = openpgp::Cert::from_bytes(&direct_key.public_key_data)?;
     let direct_key_signature = direct_key_cert

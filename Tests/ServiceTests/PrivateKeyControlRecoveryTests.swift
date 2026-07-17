@@ -467,7 +467,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             name: "Post Unlock",
             email: "post-unlock@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
         try privateKeyControlStore.markRewrapCommitRequired()
@@ -515,7 +515,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             name: "Post Unlock Warning",
             email: "post-unlock-warning@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
         try privateKeyControlStore.markRewrapCommitRequired()

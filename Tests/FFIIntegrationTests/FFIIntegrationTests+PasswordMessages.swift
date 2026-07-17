@@ -66,7 +66,7 @@ extension FFIIntegrationTests {
             name: "Password FFI Signer",
             email: nil,
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let plaintext = Data("Password SEIPDv2 signed via FFI".utf8)
 
@@ -95,7 +95,7 @@ extension FFIIntegrationTests {
             name: "No SKESK Recipient",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let ciphertext = try engine.encryptBinary(

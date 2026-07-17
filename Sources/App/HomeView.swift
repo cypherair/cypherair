@@ -102,7 +102,7 @@ struct HomeView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(defaultKey.openPGPConfigurationIdentity.familyDisplayName)
+                                Text(defaultKey.keyFamily.familyDisplayName)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

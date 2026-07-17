@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 /// Tests for EncryptionService — text encryption orchestration,
-/// encrypt-to-self, and cross-profile behavior.
+/// encrypt-to-self, and cross-suite behavior.
 final class EncryptionServiceTests: XCTestCase {
 
     private var stack: TestHelpers.ServiceStack!
@@ -22,12 +22,12 @@ final class EncryptionServiceTests: XCTestCase {
 
     /// Generate a key and register it as a contact, returning the identity.
     private func generateKeyAndContact(
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         name: String = "Test"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: profile,
+            suite: suite,
             name: name
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -45,7 +45,7 @@ final class EncryptionServiceTests: XCTestCase {
             name: name,
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         defer {
             recipientKey.certData.zeroize()
@@ -59,7 +59,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Text Encryption: Legacy
 
     func test_encryptText_legacy_producesNonEmptyCiphertext() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Hello, Legacy!",
@@ -77,7 +77,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Text Encryption: Modern High
 
     func test_encryptText_modernHigh_producesNonEmptyCiphertext() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Hello, Modern High!",
@@ -136,7 +136,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Signing
 
     func test_encryptText_withSignature_succeeds() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Signed message",
@@ -163,8 +163,8 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Encrypt-to-Self
 
     func test_encryptText_encryptToSelf_canDecryptWithOwnKey() async throws {
-        let sender = try await generateKeyAndContact(profile: .universal, name: "Sender")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let sender = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Sender")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Encrypt to self test",
@@ -188,8 +188,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
-        let sender = try await generateKeyAndContact(profile: .universal, name: "Sender")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let sender = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Sender")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "No self-encryption",
@@ -223,8 +223,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_modernHigh_encryptToSelf_canDecryptWithOwnKey() async throws {
-        let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
-        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let sender = try await generateKeyAndContact(suite: .ed448X448, name: "Sender B")
+        let recipient = try await generateKeyAndContact(suite: .ed448X448, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Modern High encrypt to self test",
@@ -248,8 +248,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_modernHigh_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
-        let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
-        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let sender = try await generateKeyAndContact(suite: .ed448X448, name: "Sender B")
+        let recipient = try await generateKeyAndContact(suite: .ed448X448, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Modern High no self-encryption",
@@ -284,11 +284,11 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Cross-Profile
 
     func test_encryptText_modernHighSender_legacyRecipient_succeeds() async throws {
-        let sender = try await generateKeyAndContact(profile: .advanced, name: "ModernHigh Sender")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Legacy Recipient")
+        let sender = try await generateKeyAndContact(suite: .ed448X448, name: "ModernHigh Sender")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Legacy Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
-            "Cross-profile message",
+            "Cross-suite message",
             recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: sender.fingerprint,
             encryptToSelf: false
@@ -306,13 +306,13 @@ final class EncryptionServiceTests: XCTestCase {
         )
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
-        XCTAssertEqual(decryptedText, "Cross-profile message")
+        XCTAssertEqual(decryptedText, "Cross-suite message")
     }
 
     func test_encryptText_mixedRecipients_v4AndV6_bothCanDecrypt() async throws {
         // PRD §3.3 / TDD §1.4: mixed v4+v6 recipients → SEIPDv1 (lowest common denominator)
-        let keyV4 = try await generateKeyAndContact(profile: .universal, name: "RecipientV4")
-        let keyV6 = try await generateKeyAndContact(profile: .advanced, name: "RecipientV6")
+        let keyV4 = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "RecipientV4")
+        let keyV6 = try await generateKeyAndContact(suite: .ed448X448, name: "RecipientV6")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Mixed recipients message",
@@ -351,7 +351,7 @@ final class EncryptionServiceTests: XCTestCase {
     func test_encryptText_encryptToSelf_noDefaultKey_throwsNoKeySelected() async {
         // Create a recipient contact directly (no own key generated → no default key)
         let recipientKey = try! PgpEngine().generateKey(
-            name: "Recipient", email: nil, expirySeconds: nil, profile: .universal
+            name: "Recipient", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         try! stack.contactService.importContact(publicKeyData: recipientKey.publicKeyData)
         let info = try! PgpEngine().parseKeyInfo(keyData: recipientKey.publicKeyData)
@@ -381,7 +381,7 @@ final class EncryptionServiceTests: XCTestCase {
     func test_encryptText_signingRequested_noDefaultEncryptToSelf_doesNotUnwrapSigner() async throws {
         let signer = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Signer"
         )
         try stack.keyManagement.setDefaultKey(fingerprint: "missing-default-for-test")
@@ -414,7 +414,7 @@ final class EncryptionServiceTests: XCTestCase {
     func test_encryptFileStreaming_signingRequested_noDefaultEncryptToSelf_doesNotUnwrapSigner() async throws {
         let signer = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Streaming Signer"
         )
         try stack.keyManagement.setDefaultKey(fingerprint: "missing-default-for-test")
@@ -451,9 +451,9 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptText_encryptToSelfWithSpecificKey_canDecryptWithThatKey() async throws {
         // Generate two keys — first becomes default, second is non-default
-        let defaultKey = try await generateKeyAndContact(profile: .universal, name: "Default")
-        let specificKey = try await generateKeyAndContact(profile: .universal, name: "Specific")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let defaultKey = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Default")
+        let specificKey = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Specific")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         // Encrypt-to-self using the non-default key
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -500,8 +500,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_staleEncryptToSelfFingerprint_throwsInsteadOfSilentFallback() async throws {
-        _ = try await generateKeyAndContact(profile: .universal, name: "Default")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        _ = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Default")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         do {
             _ = try await stack.encryptionService.encryptText(
@@ -521,9 +521,9 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptText_encryptToSelfFingerprintNil_usesDefaultKey() async throws {
         // Generate two keys — first becomes default
-        let defaultKey = try await generateKeyAndContact(profile: .universal, name: "Default")
-        _ = try await generateKeyAndContact(profile: .universal, name: "Other")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let defaultKey = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Default")
+        _ = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Other")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         // Encrypt-to-self with nil fingerprint — should fall back to default key
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -549,9 +549,9 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_encryptToSelfWithSpecificKey_modernHigh() async throws {
-        let defaultKey = try await generateKeyAndContact(profile: .advanced, name: "Default B")
-        let specificKey = try await generateKeyAndContact(profile: .advanced, name: "Specific B")
-        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let defaultKey = try await generateKeyAndContact(suite: .ed448X448, name: "Default B")
+        let specificKey = try await generateKeyAndContact(suite: .ed448X448, name: "Specific B")
+        let recipient = try await generateKeyAndContact(suite: .ed448X448, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Modern High specific key",
@@ -599,7 +599,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Unknown Recipient: Improved Error
 
     func test_encryptText_partialUnknownRecipient_throwsInvalidKeyData() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         do {
             _ = try await stack.encryptionService.encryptText(
@@ -623,8 +623,8 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Multiple Recipients
 
     func test_encryptText_multipleRecipients_bothCanDecrypt() async throws {
-        let keyA = try await generateKeyAndContact(profile: .universal, name: "RecipientA")
-        let keyB = try await generateKeyAndContact(profile: .universal, name: "RecipientB")
+        let keyA = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "RecipientA")
+        let keyB = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "RecipientB")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Multi-recipient message",

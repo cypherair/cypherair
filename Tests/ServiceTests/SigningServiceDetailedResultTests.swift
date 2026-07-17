@@ -165,7 +165,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
     func test_verifyDetachedStreamingDetailed_cancellation_throwsOperationCancelled() async throws {
         let signer = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Detailed Cancel Signer"
         )
 

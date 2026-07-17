@@ -469,7 +469,7 @@ final class KeyMutationService {
         guard let secureEnclaveCustodyDeletionContext else {
             return []
         }
-        guard let tier = identity.openPGPConfiguration.identity.deviceBoundCustodyTier else {
+        guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
             return [CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)]
         }
         switch tier {

@@ -68,7 +68,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
                 name: "Provision Composition",
                 email: nil,
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
         await fulfillment(of: [gate.suspendedExpectation], timeout: 30)
@@ -110,7 +110,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
             name: "Import Composition",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let passphrase = "import-composition-pass"
         let exported = try await fixture.service.exportKey(
@@ -169,7 +169,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
                 name: "Provision Outside Prompt",
                 email: nil,
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
         await fulfillment(of: [gate.suspendedExpectation], timeout: 30)

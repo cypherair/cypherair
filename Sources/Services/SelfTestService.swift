@@ -1,6 +1,6 @@
 import Foundation
 
-/// One-tap self-diagnostic covering all software profiles:
+/// One-tap self-diagnostic covering all software suites:
 /// key generation → encrypt/decrypt → sign/verify → tamper detection → QR round-trip.
 ///
 /// Results are kept as an in-memory export-only report.
@@ -11,7 +11,7 @@ final class SelfTestService {
     struct TestResult: Identifiable {
         let id = UUID()
         let name: String
-        let profile: PGPKeyProfile?
+        let suite: PGPKeySuite?
         let passed: Bool
         let message: String
         let duration: TimeInterval
@@ -50,7 +50,7 @@ final class SelfTestService {
 
     // MARK: - Run Self-Test
 
-    /// Run the complete self-test suite for all software profiles.
+    /// Run the complete self-test pass for all software suites.
     /// Heavy crypto work is delegated to FFI adapters so progress
     /// updates remain responsive while crypto stays off the main actor.
     func runAllTests() async {
@@ -60,19 +60,19 @@ final class SelfTestService {
         let selfTestAdapter = self.selfTestAdapter
         let messageAdapter = self.messageAdapter
         var results: [TestResult] = []
-        let profiles = PGPKeyProfile.allCases
-        let totalTests = profiles.count * 5 + 1 // 5 tests per profile + 1 QR test
+        let suites = PGPKeySuite.allCases
+        let totalTests = suites.count * 5 + 1 // 5 tests per suite + 1 QR test
         var completedTests = 0
 
-        for profile in profiles {
+        for suite in suites {
             // Test 1: Key generation
             let genResult = await runTest(
                 name: String(localized: "selftest.name.keyGeneration", defaultValue: "Key Generation"),
-                profile: profile
+                suite: suite
             ) {
                 try await Self.runKeyGenerationTest(
                     selfTestAdapter: selfTestAdapter,
-                    profile: profile
+                    suite: suite
                 )
             }
             results.append(genResult.result)
@@ -89,7 +89,7 @@ final class SelfTestService {
             // Test 2: Encrypt/Decrypt round-trip
             let encDecResult = await runTest(
                 name: String(localized: "selftest.name.encryptDecrypt", defaultValue: "Encrypt/Decrypt"),
-                profile: profile
+                suite: suite
             ) {
                 try await Self.runEncryptDecryptTest(
                     messageAdapter: messageAdapter,
@@ -103,7 +103,7 @@ final class SelfTestService {
             // Test 3: Sign/Verify round-trip
             let signResult = await runTest(
                 name: String(localized: "selftest.name.signVerify", defaultValue: "Sign/Verify"),
-                profile: profile
+                suite: suite
             ) {
                 try await Self.runSignVerifyTest(
                     messageAdapter: messageAdapter,
@@ -117,7 +117,7 @@ final class SelfTestService {
             // Test 4: Tamper detection (1-bit flip)
             let tamperResult = await runTest(
                 name: String(localized: "selftest.name.tamperDetection", defaultValue: "Tamper Detection"),
-                profile: profile
+                suite: suite
             ) {
                 try await Self.runTamperDetectionTest(
                     messageAdapter: messageAdapter,
@@ -131,12 +131,11 @@ final class SelfTestService {
             // Test 5: Key export/import round-trip
             let exportResult = await runTest(
                 name: String(localized: "selftest.name.exportImport", defaultValue: "Export/Import"),
-                profile: profile
+                suite: suite
             ) {
                 try await Self.runExportImportTest(
                     selfTestAdapter: selfTestAdapter,
-                    generated: generated,
-                    profile: profile
+                    generated: generated
                 )
             }
             results.append(exportResult.result)
@@ -144,10 +143,10 @@ final class SelfTestService {
             state = .running(progress: Double(completedTests) / Double(totalTests))
         }
 
-        // QR URL round-trip test (profile-agnostic, use first generated key)
+        // QR URL round-trip test (suite-agnostic, use first generated key)
         let qrResult = await runTest(
             name: String(localized: "selftest.name.qrRoundTrip", defaultValue: "QR URL Encode/Decode"),
-            profile: nil
+            suite: nil
         ) {
             try await Self.runQrRoundTripTest(selfTestAdapter: selfTestAdapter)
         }
@@ -173,7 +172,7 @@ final class SelfTestService {
 
     private func runTest<T>(
         name: String,
-        profile: PGPKeyProfile?,
+        suite: PGPKeySuite?,
         operation: () async throws -> T
     ) async -> TestOutput<T> {
         let start = Date()
@@ -182,7 +181,7 @@ final class SelfTestService {
             let duration = Date().timeIntervalSince(start)
             let result = TestResult(
                 name: name,
-                profile: profile,
+                suite: suite,
                 passed: true,
                 message: String(localized: "selftest.result.passed", defaultValue: "Passed"),
                 duration: duration
@@ -192,7 +191,7 @@ final class SelfTestService {
             let duration = Date().timeIntervalSince(start)
             let result = TestResult(
                 name: name,
-                profile: profile,
+                suite: suite,
                 passed: false,
                 message: error.localizedDescription,
                 duration: duration
@@ -203,17 +202,17 @@ final class SelfTestService {
 
     private static func runKeyGenerationTest(
         selfTestAdapter: PGPSelfTestOperationAdapter,
-        profile: PGPKeyProfile
+        suite: PGPKeySuite
     ) async throws -> PGPSelfTestGeneratedKey {
         let generated = try await selfTestAdapter.generateKey(
             name: "Self-Test",
             email: "test@cypherair.local",
             expirySeconds: 3600,
-            profile: profile
+            suite: suite
         )
-        guard generated.keyVersion == profile.keyVersion else {
+        guard generated.keyVersion == suite.keyVersion else {
             throw CypherAirError.corruptData(
-                reason: "Wrong key version: expected \(profile.keyVersion), got \(generated.keyVersion)"
+                reason: "Wrong key version: expected \(suite.keyVersion), got \(generated.keyVersion)"
             )
         }
         return generated
@@ -318,14 +317,12 @@ final class SelfTestService {
 
     private static func runExportImportTest(
         selfTestAdapter: PGPSelfTestOperationAdapter,
-        generated: PGPSelfTestGeneratedKey,
-        profile: PGPKeyProfile
+        generated: PGPSelfTestGeneratedKey
     ) async throws -> PGPKeyMetadata {
         let passphrase = "self-test-passphrase-2024"
         var exported = try await selfTestAdapter.exportSecretKey(
             certData: generated.certData,
-            passphrase: passphrase,
-            profile: profile
+            passphrase: passphrase
         )
         var imported = try await selfTestAdapter.importSecretKey(
             armoredData: exported,
@@ -350,7 +347,7 @@ final class SelfTestService {
             name: "QR-Test",
             email: nil,
             expirySeconds: 3600,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         defer {
             generated.zeroizeSensitiveMaterial()
@@ -383,9 +380,9 @@ final class SelfTestService {
         let generalStr = String(localized: "selftest.report.general", defaultValue: "General")
 
         for result in results {
-            let profileStr = result.profile.map(localizedProfileName(for:)) ?? generalStr
+            let suiteStr = result.suite.map(localizedSuiteName(for:)) ?? generalStr
             let statusStr = result.passed ? passStr : failStr
-            report += "[\(statusStr)] \(profileStr) — \(result.name)"
+            report += "[\(statusStr)] \(suiteStr) — \(result.name)"
             report += " (\(String(format: "%.3f", result.duration))s)"
             if !result.passed {
                 report += "\n  " + String(localized: "selftest.report.error", defaultValue: "Error: \(result.message)")
@@ -399,9 +396,9 @@ final class SelfTestService {
         )
     }
 
-    private static func localizedProfileName(for profile: PGPKeyProfile) -> String {
-        // Derive from the family vocabulary so new profiles are covered
+    private static func localizedSuiteName(for suite: PGPKeySuite) -> String {
+        // Derive from the family vocabulary so new suites are covered
         // automatically and the report name never drifts from the picker.
-        profile.openPGPConfiguration.identity.familyDisplayName
+        suite.portableFamily.familyDisplayName
     }
 }

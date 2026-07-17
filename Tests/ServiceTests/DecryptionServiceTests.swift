@@ -34,14 +34,14 @@ final class DecryptionServiceTests: XCTestCase {
     /// Generate a key, add it as a contact, and encrypt a message to it.
     /// Returns the identity, binary ciphertext, and a Phase1Result with the correct matchedKey.
     private func encryptAndPreparePhase1(
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         plaintext: String = "Hello, encrypted world!",
         sign: Bool = true
     ) async throws -> (identity: PGPKeyIdentity, ciphertext: Data, phase1: DecryptionPhase1Result) {
         let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: profile,
-            name: profile == .universal ? "Alice" : "Bob"
+            suite: suite,
+            name: suite == .ed25519LegacyCurve25519Legacy ? "Alice" : "Bob"
         )
 
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -223,7 +223,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decrypt_phase2_legacy_returnsPlaintext() async throws {
         let plaintext = "Legacy secret message 🔐"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
-            profile: .universal, plaintext: plaintext
+            suite: .ed25519LegacyCurve25519Legacy, plaintext: plaintext
         )
 
         let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
@@ -235,7 +235,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decrypt_phase2_modernHigh_returnsPlaintext() async throws {
         let plaintext = "Modern High secret message 🛡️"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
-            profile: .advanced, plaintext: plaintext
+            suite: .ed448X448, plaintext: plaintext
         )
 
         let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
@@ -246,7 +246,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decrypt_phase2_withSignature_returnsValidVerification() async throws {
         let (_, _, phase1) = try await encryptAndPreparePhase1(
-            profile: .universal, sign: true
+            suite: .ed25519LegacyCurve25519Legacy, sign: true
         )
 
         let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
@@ -256,7 +256,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_decrypt_phase2_triggersSeUnwrap() async throws {
-        let (_, _, phase1) = try await encryptAndPreparePhase1(profile: .universal)
+        let (_, _, phase1) = try await encryptAndPreparePhase1(suite: .ed25519LegacyCurve25519Legacy)
 
         let unwrapCountBefore = stack.mockSE.unwrapCallCount
 
@@ -289,7 +289,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decrypt_legacy_tamperedCiphertext_throwsIntegrityError() async throws {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Flip one bit near the middle of the ciphertext
@@ -333,7 +333,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decrypt_modernHigh_tamperedCiphertext_throwsAEADError() async throws {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .advanced
+            suite: .ed448X448
         )
 
         // Flip one bit near the middle of the ciphertext
@@ -380,7 +380,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_encryptDecrypt_legacy_fullRoundTrip() async throws {
         let plaintext = "Full round-trip Legacy 你好"
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .universal, plaintext: plaintext
+            suite: .ed25519LegacyCurve25519Legacy, plaintext: plaintext
         )
 
         // Unwrap the private key and decrypt directly via engine
@@ -401,7 +401,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_encryptDecrypt_modernHigh_fullRoundTrip() async throws {
         let plaintext = "Full round-trip Modern High 加密"
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .advanced, plaintext: plaintext
+            suite: .ed448X448, plaintext: plaintext
         )
 
         var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
@@ -420,7 +420,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_encryptDecrypt_unicodePreserved() async throws {
         let plaintext = "Unicode: 你好世界 🔐🛡️ Ñoño café ü∑ß"
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .universal, plaintext: plaintext
+            suite: .ed25519LegacyCurve25519Legacy, plaintext: plaintext
         )
 
         var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
@@ -441,7 +441,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptViaService_legacy_fullFlow() async throws {
         let plaintext = "Service layer decrypt Legacy"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
-            profile: .universal, plaintext: plaintext, sign: true
+            suite: .ed25519LegacyCurve25519Legacy, plaintext: plaintext, sign: true
         )
 
         let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
@@ -454,7 +454,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptViaService_modernHigh_fullFlow() async throws {
         let plaintext = "Service layer decrypt Modern High"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
-            profile: .advanced, plaintext: plaintext, sign: true
+            suite: .ed448X448, plaintext: plaintext, sign: true
         )
 
         let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
@@ -505,13 +505,13 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptDetailed_validOwnKeySigner_resolvesOwnKey() async throws {
         let sender = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Detailed Sender",
             email: "detailed-sender@example.com"
         )
         let recipient = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Detailed Recipient",
             email: "detailed-recipient@example.com"
         )
@@ -634,7 +634,7 @@ final class DecryptionServiceTests: XCTestCase {
             name: "Unknown Detailed Signer",
             email: "unknown-detailed@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let plaintext = Data("Unknown signer detailed decrypt".utf8)
 
@@ -681,7 +681,7 @@ final class DecryptionServiceTests: XCTestCase {
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         var tampered = binaryCiphertext
         tampered[tampered.count / 2] ^= 0x01
@@ -710,7 +710,7 @@ final class DecryptionServiceTests: XCTestCase {
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
@@ -741,7 +741,7 @@ final class DecryptionServiceTests: XCTestCase {
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
-            profile: .advanced
+            suite: .ed448X448
         )
         var tampered = binaryCiphertext
         tampered[tampered.count / 2] ^= 0x01
@@ -839,7 +839,7 @@ final class DecryptionServiceTests: XCTestCase {
             name: "Unknown File Detailed Signer",
             email: "unknown-file-detailed@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let plaintext = Data("Unknown signer detailed file decrypt".utf8)
         let ciphertext = try stack.engine.encryptBinary(
@@ -1134,7 +1134,7 @@ final class DecryptionServiceTests: XCTestCase {
     // MARK: - High Security Biometrics Blocking
 
     func test_decrypt_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
-        let (_, _, phase1) = try await encryptAndPreparePhase1(profile: .universal)
+        let (_, _, phase1) = try await encryptAndPreparePhase1(suite: .ed25519LegacyCurve25519Legacy)
 
         // Simulate High Security mode with biometrics unavailable
         stack.mockSE.simulatedAuthMode = .highSecurity

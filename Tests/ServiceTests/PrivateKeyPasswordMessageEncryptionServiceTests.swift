@@ -37,7 +37,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             name: "Password Software Signer",
             email: "password-software@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         defer { signer.certData.resetBytes(in: 0..<signer.certData.count) }
         let identity = try identity(from: signer, isDefault: true)
@@ -101,9 +101,9 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveV6RouteSignsPasswordMessage() async throws {
-        let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
+        let fixture = try await makeSecureEnclaveRouteFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
+        XCTAssertEqual(fixture.identity.keyFamily, .deviceBoundEcdsaNistP256EcdhNistP256)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         let router = StaticPasswordPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
         let unwrapper = RecordingPasswordSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
@@ -453,7 +453,6 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
-            keyVersion: UInt8(keyInfo.keyVersion),
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -465,7 +464,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: .modernHighSoftwareV6,
+            keyFamily: .portableEd448X448,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
@@ -483,26 +482,25 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
     }
 
     private func makeSecureEnclaveRouteFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
+        family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4
     ) async throws -> PasswordSecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
         let signingHandle = handlePair.signing
         let keyAgreementHandle = handlePair.keyAgreement
-        let label = configurationIdentity == .modernP256V6 ? "v6" : "v4"
+        let label = family == .deviceBoundEcdsaNistP256EcdhNistP256 ? "v6" : "v4"
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
         ).generatePublicCertificate(
             name: "Secure Enclave Password \(label)",
             email: "secure-password-\(label)@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -514,7 +512,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

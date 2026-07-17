@@ -1,5 +1,5 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, CertificateMergeOutcome, KeyProfile};
+use pgp_mobile::keys::{self, CertificateMergeOutcome, KeySuite};
 use sequoia_openpgp as openpgp;
 use std::fs;
 use std::path::PathBuf;
@@ -13,8 +13,8 @@ use openpgp::serialize::Serialize;
 use openpgp::types::{KeyFlags, SignatureType};
 use openpgp::Packet;
 
-fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
         None,
@@ -127,7 +127,7 @@ fn make_subkey_update(secret_cert: &[u8]) -> Vec<u8> {
 
 #[test]
 fn test_merge_public_certificate_duplicate_no_op_legacy() {
-    let generated = generate_key(KeyProfile::Universal, "DuplicateA");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "DuplicateA");
 
     let result = keys::merge_public_certificate_update(
         &generated.public_key_data,
@@ -142,7 +142,7 @@ fn test_merge_public_certificate_duplicate_no_op_legacy() {
 
 #[test]
 fn test_merge_public_certificate_duplicate_no_op_modern_high() {
-    let generated = generate_key(KeyProfile::Advanced, "DuplicateB");
+    let generated = generate_key(KeySuite::Ed448X448, "DuplicateB");
 
     let result = keys::merge_public_certificate_update(
         &generated.public_key_data,
@@ -153,12 +153,12 @@ fn test_merge_public_certificate_duplicate_no_op_modern_high() {
     assert_eq!(result.outcome, CertificateMergeOutcome::NoOp);
     let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
-    assert_eq!(info.profile, KeyProfile::Advanced);
+    assert_eq!(info.suite, KeySuite::Ed448X448);
 }
 
 #[test]
 fn test_merge_public_certificate_expiry_refresh_legacy() {
-    let generated = generate_key(KeyProfile::Universal, "ExpiryA");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "ExpiryA");
     let refreshed = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 365))
         .expect("expiry refresh should succeed");
 
@@ -176,7 +176,7 @@ fn test_merge_public_certificate_expiry_refresh_legacy() {
 
 #[test]
 fn test_merge_public_certificate_expiry_refresh_modern_high() {
-    let generated = generate_key(KeyProfile::Advanced, "ExpiryB");
+    let generated = generate_key(KeySuite::Ed448X448, "ExpiryB");
     let refreshed = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 365))
         .expect("expiry refresh should succeed");
 
@@ -189,13 +189,13 @@ fn test_merge_public_certificate_expiry_refresh_modern_high() {
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
     let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
-    assert_eq!(info.profile, KeyProfile::Advanced);
+    assert_eq!(info.suite, KeySuite::Ed448X448);
     assert_eq!(info.expiry_timestamp, refreshed.key_info.expiry_timestamp);
 }
 
 #[test]
 fn test_merge_public_certificate_absorbs_revocation_update() {
-    let generated = generate_key(KeyProfile::Universal, "Revocation");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Revocation");
     let revocation_update = make_revocation_update(&generated);
 
     let result =
@@ -209,7 +209,7 @@ fn test_merge_public_certificate_absorbs_revocation_update() {
 
 #[test]
 fn test_merge_public_certificate_absorbs_new_user_id() {
-    let generated = generate_key(KeyProfile::Universal, "Userid");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Userid");
     let new_user_id = "Userid Secondary <secondary@example.com>";
     let userid_update = make_userid_update(&generated.cert_data, new_user_id);
 
@@ -229,7 +229,7 @@ fn test_merge_public_certificate_absorbs_new_user_id() {
 
 #[test]
 fn test_merge_public_certificate_absorbs_new_subkey() {
-    let generated = generate_key(KeyProfile::Universal, "Subkey");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Subkey");
     let subkey_update = make_subkey_update(&generated.cert_data);
     let existing_cert =
         openpgp::Cert::from_bytes(&generated.public_key_data).expect("existing cert should parse");
@@ -284,11 +284,11 @@ fn test_parse_key_info_prefers_primary_user_id_after_merge_fixture() {
 
 #[test]
 fn test_parse_key_info_revoked_cert_uses_relaxed_display_user_id_fallback() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Expired Display".to_string(),
         Some("expired-display@example.com".to_string()),
         Some(1),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("short-lived key generation should succeed");
     std::thread::sleep(std::time::Duration::from_secs(2));
@@ -314,7 +314,7 @@ fn test_merge_public_certificate_absorbs_revocation_update_legacy_fixture() {
     let info = keys::parse_key_info(&result.merged_cert_data)
         .expect("merged legacy revocation cert should parse");
     assert!(info.is_revoked);
-    assert_eq!(info.profile, KeyProfile::Universal);
+    assert_eq!(info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn test_merge_public_certificate_absorbs_revocation_update_modern_high_fixture()
     let info = keys::parse_key_info(&result.merged_cert_data)
         .expect("merged modern high revocation cert should parse");
     assert!(info.is_revoked);
-    assert_eq!(info.profile, KeyProfile::Advanced);
+    assert_eq!(info.suite, KeySuite::Ed448X448);
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn test_merge_public_certificate_adds_encryption_subkey_legacy_fixture() {
     let merged_info =
         keys::parse_key_info(&result.merged_cert_data).expect("legacy merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
-    assert_eq!(merged_info.profile, KeyProfile::Universal);
+    assert_eq!(merged_info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
 }
 
 #[test]
@@ -365,13 +365,13 @@ fn test_merge_public_certificate_adds_encryption_subkey_modern_high_fixture() {
     let merged_info =
         keys::parse_key_info(&result.merged_cert_data).expect("modern high merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
-    assert_eq!(merged_info.profile, KeyProfile::Advanced);
+    assert_eq!(merged_info.suite, KeySuite::Ed448X448);
 }
 
 #[test]
 fn test_merge_public_certificate_rejects_fingerprint_mismatch() {
-    let alice = generate_key(KeyProfile::Universal, "MismatchAlice");
-    let bob = generate_key(KeyProfile::Universal, "MismatchBob");
+    let alice = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MismatchAlice");
+    let bob = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MismatchBob");
 
     let error = keys::merge_public_certificate_update(&alice.public_key_data, &bob.public_key_data)
         .expect_err("mismatched fingerprints must be rejected");
@@ -384,7 +384,7 @@ fn test_merge_public_certificate_rejects_fingerprint_mismatch() {
 
 #[test]
 fn test_merge_public_certificate_rejects_secret_bearing_input() {
-    let generated = generate_key(KeyProfile::Universal, "SecretReject");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SecretReject");
 
     let error =
         keys::merge_public_certificate_update(&generated.public_key_data, &generated.cert_data)

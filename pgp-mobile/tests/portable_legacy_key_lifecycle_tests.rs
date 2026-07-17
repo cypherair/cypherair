@@ -1,26 +1,26 @@
 //! Legacy key lifecycle tests.
 //! Covers export/import, revocation, key identity metadata, recipient matching,
-//! and expiry modification paths for Universal profile keys.
+//! and expiry modification paths for Portable Legacy keys.
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::sign;
 
 /// Export key with Iterated+Salted S2K. Re-import with correct passphrase.
 #[test]
 fn test_export_import_key_legacy() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
     let passphrase = "correct-horse-battery-staple";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+    let exported = keys::export_secret_key(&key.cert_data, passphrase)
         .expect("Export should succeed");
     assert!(!exported.is_empty());
 
@@ -33,11 +33,11 @@ fn test_export_import_key_legacy() {
 #[test]
 fn test_import_wrong_passphrase_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let exported =
-        keys::export_secret_key(&key.cert_data, "correct-passphrase", KeyProfile::Universal)
+        keys::export_secret_key(&key.cert_data, "correct-passphrase")
             .expect("Export should succeed");
 
     let result = keys::import_secret_key(&exported, "wrong-passphrase");
@@ -52,7 +52,7 @@ fn test_import_wrong_passphrase_legacy() {
 #[test]
 fn test_unicode_passphrase_export_import_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let passphrases = [
@@ -63,7 +63,7 @@ fn test_unicode_passphrase_export_import_legacy() {
     ];
 
     for passphrase in &passphrases {
-        let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+        let exported = keys::export_secret_key(&key.cert_data, passphrase)
             .expect(&format!(
                 "Export with passphrase '{passphrase}' should succeed"
             ));
@@ -83,33 +83,11 @@ fn test_unicode_passphrase_export_import_legacy() {
     }
 }
 
-/// Export with wrong profile should fail.
-#[test]
-fn test_export_wrong_profile_legacy() {
-    let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
-            .expect("Key gen should succeed");
-
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::Advanced);
-    assert!(
-        result.is_err(),
-        "Exporting v4 key with Advanced profile should fail"
-    );
-    let err = result.unwrap_err();
-    match err {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // the export-time profile/key-version mismatch is the only way this
-        // controlled input reaches it, so the prose reason adds nothing.
-        pgp_mobile::error::PgpError::S2kError { .. } => {}
-        other => panic!("Expected S2kError, got: {other:?}"),
-    }
-}
-
 /// Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     // parse_revocation_cert internally requires a KeyRevocation signature and
@@ -123,11 +101,11 @@ fn test_revocation_cert_legacy() {
 #[test]
 fn test_revocation_cert_wrong_key_legacy() {
     let key_a =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key A gen should succeed");
 
     let key_b =
-        keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key B gen should succeed");
 
     let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
@@ -140,11 +118,11 @@ fn test_revocation_cert_wrong_key_legacy() {
 /// Unicode round-trip: Chinese + emoji User IDs survive.
 #[test]
 fn test_unicode_user_id_legacy() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "张三 🔐".to_string(),
         Some("zhangsan@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen with Unicode should succeed");
 
@@ -160,12 +138,12 @@ fn test_unicode_user_id_legacy() {
 #[test]
 fn test_export_produces_encrypted_key_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let passphrase = "test-passphrase-a";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+    let exported = keys::export_secret_key(&key.cert_data, passphrase)
         .expect("Export should succeed");
 
     let sign_result = sign::sign_cleartext(b"test", &exported);
@@ -178,11 +156,11 @@ fn test_export_produces_encrypted_key_legacy() {
 /// Fix #1+#2 verification: full export → import → decrypt message round-trip.
 #[test]
 fn test_export_import_decrypt_roundtrip_legacy() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
@@ -192,7 +170,7 @@ fn test_export_import_decrypt_roundtrip_legacy() {
         .expect("Encryption should succeed");
 
     let passphrase = "roundtrip-test-passphrase";
-    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+    let exported = keys::export_secret_key(&key.cert_data, passphrase)
         .expect("Export should succeed");
 
     let imported = keys::import_secret_key(&exported, passphrase).expect("Import should succeed");
@@ -207,10 +185,10 @@ fn test_export_import_decrypt_roundtrip_legacy() {
 #[test]
 fn test_export_legacy_uses_iterated_salted() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
-    let exported = keys::export_secret_key(&key.cert_data, "test", KeyProfile::Universal)
+    let exported = keys::export_secret_key(&key.cert_data, "test")
         .expect("Export should succeed");
 
     let s2k_info = keys::parse_s2k_params(&exported).expect("S2K params should parse");
@@ -230,7 +208,7 @@ fn test_export_legacy_uses_iterated_salted() {
 #[test]
 fn test_expired_key_detected_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, Some(1), KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, Some(1), KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(3));
@@ -251,7 +229,7 @@ fn test_expired_key_detected_legacy() {
 #[test]
 fn test_match_recipients_legacy_returns_primary_fingerprint() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let ciphertext =
@@ -272,10 +250,10 @@ fn test_match_recipients_legacy_returns_primary_fingerprint() {
 #[test]
 fn test_match_recipients_legacy_wrong_key_returns_error() {
     let alice =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -297,10 +275,10 @@ fn test_match_recipients_legacy_wrong_key_returns_error() {
 #[test]
 fn test_match_recipients_legacy_multi_recipient() {
     let alice =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -326,11 +304,11 @@ fn test_match_recipients_legacy_multi_recipient() {
 #[test]
 fn test_match_recipients_legacy_encrypt_to_self() {
     let sender =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let recipient =
-        keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -352,11 +330,11 @@ fn test_match_recipients_legacy_encrypt_to_self() {
 /// Pass: key is not expired, expiry_timestamp is set, key info updated.
 #[test]
 fn test_modify_expiry_legacy_extend() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
         Some(365 * 24 * 3600),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
 
@@ -380,7 +358,7 @@ fn test_modify_expiry_legacy_extend() {
         "Should have an expiry timestamp"
     );
     assert_eq!(result.key_info.key_version, 4);
-    assert_eq!(result.key_info.profile, KeyProfile::Universal);
+    assert_eq!(result.key_info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let re_parsed = keys::parse_key_info(&result.public_key_data)
         .expect("Updated public key should be parseable");
@@ -392,11 +370,11 @@ fn test_modify_expiry_legacy_extend() {
 /// Pass: key has no expiry timestamp, key is not expired.
 #[test]
 fn test_modify_expiry_legacy_remove() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
         Some(365 * 24 * 3600),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
 
@@ -425,7 +403,7 @@ fn test_modify_expiry_legacy_remove() {
 #[test]
 fn test_modify_expiry_legacy_to_past() {
     let generated =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key generation should succeed");
 
     let result =
@@ -443,11 +421,11 @@ fn test_modify_expiry_legacy_to_past() {
 /// Verify that encrypt/decrypt still works after modifying expiry on a Legacy key.
 #[test]
 fn test_modify_expiry_legacy_roundtrip_encrypt_decrypt() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
         Some(365 * 24 * 3600),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
 

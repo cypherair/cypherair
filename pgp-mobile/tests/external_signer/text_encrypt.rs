@@ -4,7 +4,7 @@ use super::*;
 fn test_external_signer_runtime_encrypt_api_decrypts_and_verifies_for_v4_and_v6() {
     for version in CandidateVersion::all() {
         let material = build_candidate(version).expect("candidate should build");
-        let recipient = keys::generate_key_with_profile(
+        let recipient = keys::generate_key_with_suite(
             format!("Recipient {}", version.label()),
             Some(format!("recipient-{}@example.test", version.label())),
             None,
@@ -40,18 +40,18 @@ fn test_external_signer_runtime_encrypt_api_decrypts_and_verifies_for_v4_and_v6(
 #[test]
 fn test_external_signer_runtime_encrypt_mixed_recipients_downgrades_to_seipdv1() {
     let material = build_candidate(CandidateVersion::V6).expect("candidate should build");
-    let recipient_v4 = keys::generate_key_with_profile(
+    let recipient_v4 = keys::generate_key_with_suite(
         "Recipient v4".to_string(),
         Some("recipient-v4@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("v4 recipient should generate");
-    let recipient_v6 = keys::generate_key_with_profile(
+    let recipient_v6 = keys::generate_key_with_suite(
         "Recipient v6".to_string(),
         Some("recipient-v6@example.test".to_string()),
         None,
-        keys::KeyProfile::Advanced,
+        keys::KeySuite::Ed448X448,
     )
     .expect("v6 recipient should generate");
     let plaintext = b"runtime external mixed recipients";
@@ -83,18 +83,18 @@ fn test_external_signer_runtime_encrypt_mixed_recipients_downgrades_to_seipdv1()
 #[test]
 fn test_external_signer_runtime_encrypt_to_self_downgrades_and_self_decrypts() {
     let material = build_candidate(CandidateVersion::V6).expect("candidate should build");
-    let recipient_v6 = keys::generate_key_with_profile(
+    let recipient_v6 = keys::generate_key_with_suite(
         "Recipient v6".to_string(),
         Some("recipient-v6@example.test".to_string()),
         None,
-        keys::KeyProfile::Advanced,
+        keys::KeySuite::Ed448X448,
     )
     .expect("v6 recipient should generate");
-    let self_v4 = keys::generate_key_with_profile(
+    let self_v4 = keys::generate_key_with_suite(
         "Self v4".to_string(),
         Some("self-v4@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("v4 self key should generate");
     let plaintext = b"runtime external encrypt to self downgrade";
@@ -123,11 +123,11 @@ fn test_external_signer_runtime_encrypt_to_self_downgrades_and_self_decrypts() {
 #[test]
 fn test_external_signer_runtime_encrypt_cancellation_is_preserved() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
 
@@ -146,11 +146,11 @@ fn test_external_signer_runtime_encrypt_cancellation_is_preserved() {
 #[test]
 fn test_external_signer_runtime_encrypt_sanitizes_callback_failures() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
 
@@ -179,11 +179,11 @@ fn test_external_signer_runtime_encrypt_sanitizes_callback_failures() {
 #[test]
 fn test_external_signer_runtime_encrypt_rejects_invalid_responses() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let signing_key_fingerprint = signing_key_fingerprint(&material);
@@ -217,11 +217,11 @@ fn test_external_signer_runtime_encrypt_rejects_invalid_responses() {
 fn test_external_signer_runtime_encrypt_rejects_wrong_public_key_signature() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let other = build_candidate(CandidateVersion::V4).expect("other should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
 
@@ -241,11 +241,11 @@ fn test_external_signer_runtime_encrypt_rejects_wrong_public_key_signature() {
 fn test_external_signer_runtime_encrypt_rejects_mismatched_fingerprint() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let other = build_candidate(CandidateVersion::V4).expect("other should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let wrong_fingerprint = signing_key_fingerprint(&other);
@@ -264,18 +264,18 @@ fn test_external_signer_runtime_encrypt_rejects_mismatched_fingerprint() {
 
 #[test]
 fn test_external_signer_runtime_encrypt_rejects_secret_non_p256_and_wrong_role_inputs() {
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
-    let secret = keys::generate_key_with_profile(
+    let secret = keys::generate_key_with_suite(
         "Software Secret".to_string(),
         Some("software-secret@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
 

@@ -219,7 +219,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
 
@@ -291,7 +291,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
 
@@ -313,7 +313,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
         XCTAssertTrue(store.isCompleted(.createDemoIdentity))
@@ -575,7 +575,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
 
@@ -639,7 +639,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
 
@@ -674,7 +674,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
 
@@ -1170,7 +1170,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
                 hasEncryptionSubkey: true,
                 isRevoked: false,
                 isExpired: false,
-                profile: .universal,
+                suite: .ed25519LegacyCurve25519Legacy,
                 primaryAlgo: "Ed25519",
                 subkeyAlgo: "X25519",
                 expiryTimestamp: nil

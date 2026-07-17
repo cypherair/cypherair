@@ -7,10 +7,10 @@ extension FFIIntegrationTests {
     /// NoMatchingKey error when decrypting with wrong key.
     func test_errorMapping_noMatchingKey() throws {
         let keyA = try engine.generateKey(
-            name: "Alice", email: nil, expirySeconds: nil, profile: .universal
+            name: "Alice", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let keyB = try engine.generateKey(
-            name: "Bob", email: nil, expirySeconds: nil, profile: .universal
+            name: "Bob", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let ciphertext = try engine.encrypt(
@@ -42,7 +42,7 @@ extension FFIIntegrationTests {
     /// IntegrityCheckFailed / AeadAuthenticationFailed on tampered ciphertext.
     func test_errorMapping_integrityCheckFailed_legacy() throws {
         let key = try engine.generateKey(
-            name: "Tamper A", email: nil, expirySeconds: nil, profile: .universal
+            name: "Tamper A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         var ciphertext = try engine.encrypt(
@@ -81,7 +81,7 @@ extension FFIIntegrationTests {
     /// AeadAuthenticationFailed on tampered Modern High (SEIPDv2) ciphertext.
     func test_errorMapping_aeadAuthenticationFailed_modernHigh() throws {
         let key = try engine.generateKey(
-            name: "Tamper B", email: nil, expirySeconds: nil, profile: .advanced
+            name: "Tamper B", email: nil, expirySeconds: nil, suite: .ed448X448
         )
 
         var ciphertext = try engine.encrypt(
@@ -120,7 +120,7 @@ extension FFIIntegrationTests {
     /// CorruptData on garbage input.
     func test_errorMapping_corruptData() throws {
         let key = try engine.generateKey(
-            name: "Corrupt", email: nil, expirySeconds: nil, profile: .universal
+            name: "Corrupt", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let garbage = Data("this is not valid PGP data at all".utf8)
@@ -148,13 +148,12 @@ extension FFIIntegrationTests {
     /// WrongPassphrase on incorrect passphrase.
     func test_errorMapping_wrongPassphrase() throws {
         let key = try engine.generateKey(
-            name: "Export", email: nil, expirySeconds: nil, profile: .universal
+            name: "Export", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let exported = try engine.exportSecretKey(
             certData: key.certData,
-            passphrase: "correct-password-123",
-            profile: .universal
+            passphrase: "correct-password-123"
         )
 
         XCTAssertThrowsError(
@@ -193,7 +192,7 @@ extension FFIIntegrationTests {
             name: "Merge Secret Reject",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         XCTAssertThrowsError(
@@ -217,7 +216,7 @@ extension FFIIntegrationTests {
     /// BadSignature when verifying a tampered cleartext signature.
     func test_errorMapping_badSignature_cleartextVerify() throws {
         let key = try engine.generateKey(
-            name: "Signer", email: nil, expirySeconds: nil, profile: .universal
+            name: "Signer", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let signed = try engine.signCleartext(
@@ -250,10 +249,10 @@ extension FFIIntegrationTests {
     /// UnknownSigner status when signer key not in verification keys.
     func test_errorMapping_unknownSigner_viaCleartextVerify() throws {
         let signerKey = try engine.generateKey(
-            name: "Unknown Signer", email: nil, expirySeconds: nil, profile: .universal
+            name: "Unknown Signer", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let otherKey = try engine.generateKey(
-            name: "Other", email: nil, expirySeconds: nil, profile: .universal
+            name: "Other", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let signed = try engine.signCleartext(
@@ -341,41 +340,15 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// RevocationError with garbage revocation cert data.
-    func test_errorMapping_revocationError_invalidData() throws {
-        let key = try engine.generateKey(
-            name: "RevTest", email: nil, expirySeconds: nil, profile: .universal
-        )
-        let garbage = Data("not a revocation cert".utf8)
-
-        XCTAssertThrowsError(
-            try engine.parseRevocationCert(
-                revData: garbage,
-                certData: key.certData
-            )
-        ) { error in
-            guard let pgpError = error as? PgpError else {
-                return XCTFail("Expected PgpError, got \(type(of: error))")
-            }
-            switch pgpError {
-            case .RevocationError, .InvalidKeyData, .CorruptData, .InternalError:
-                break // acceptable for garbage revocation data
-            default:
-                XCTFail("Expected RevocationError, InvalidKeyData, CorruptData, or InternalError, got \(pgpError)")
-            }
-        }
-    }
-
     /// S2kError / WrongPassphrase on Modern High export-import with wrong passphrase.
     func test_errorMapping_s2kError_modernHigh_wrongPassphrase() throws {
         let key = try engine.generateKey(
-            name: "S2K Test", email: nil, expirySeconds: nil, profile: .advanced
+            name: "S2K Test", email: nil, expirySeconds: nil, suite: .ed448X448
         )
 
         let exported = try engine.exportSecretKey(
             certData: key.certData,
-            passphrase: "correct-argon2id-pass",
-            profile: .advanced
+            passphrase: "correct-argon2id-pass"
         )
 
         XCTAssertThrowsError(
@@ -399,7 +372,7 @@ extension FFIIntegrationTests {
     /// BadSignature via detached signature verification with tampered data.
     func test_errorMapping_badSignature_detachedVerify() throws {
         let key = try engine.generateKey(
-            name: "DetachedSig", email: nil, expirySeconds: nil, profile: .universal
+            name: "DetachedSig", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let originalData = Data("original data for detached sig".utf8)
@@ -443,7 +416,7 @@ extension FFIIntegrationTests {
     /// info shows isExpired; if it throws, it verifies the error type.
     func test_errorMapping_keyExpired_detectsExpiredKey() throws {
         let engine = try XCTUnwrap(self.engine)
-        let key = try engine.generateKey(name: "Expiry Test", email: nil, expirySeconds: 1, profile: .universal)
+        let key = try engine.generateKey(name: "Expiry Test", email: nil, expirySeconds: 1, suite: .ed25519LegacyCurve25519Legacy)
         // Parse immediately — with expirySeconds=1, the key may already be expired
         // by the time generation + parsing completes, so we don't assert on this result.
         _ = try engine.parseKeyInfo(keyData: key.publicKeyData)

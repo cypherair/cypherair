@@ -60,8 +60,8 @@ struct SelfTestView: View {
                             VStack(alignment: .leading) {
                                 Text(result.name)
                                     .font(.body)
-                                if let profile = result.profile {
-                                    Text(profile.openPGPConfiguration.identity.familyDisplayName)
+                                if let suite = result.suite {
+                                    Text(suite.portableFamily.familyDisplayName)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

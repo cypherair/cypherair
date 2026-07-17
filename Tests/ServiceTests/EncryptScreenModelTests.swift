@@ -339,13 +339,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Preferred Recipient",
             email: "preferred-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let historical = try stack.engine.generateKey(
             name: "Historical Recipient",
             email: "historical-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: preferred.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: historical.publicKeyData, verificationState: .unverified)
@@ -407,13 +407,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Tag First",
             email: "encrypt-tag-first@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try stack.engine.generateKey(
             name: "Tag Second",
             email: "encrypt-tag-second@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: second.publicKeyData, verificationState: .verified)
@@ -474,13 +474,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Selectable Tag Member",
             email: "selectable-tag-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let missingPreferred = try stack.engine.generateKey(
             name: "Missing Preferred Tag Member",
             email: "missing-preferred-tag@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: selectable.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: missingPreferred.publicKeyData, verificationState: .verified)
@@ -525,13 +525,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Tagged Member",
             email: "filter-tagged@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let untagged = try stack.engine.generateKey(
             name: "Untagged Member",
             email: "filter-untagged@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: tagged.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: untagged.publicKeyData, verificationState: .verified)
@@ -572,7 +572,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Filter Member",
             email: "filter-toggle-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: member.publicKeyData, verificationState: .verified)
         let memberContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: member.fingerprint))
@@ -610,13 +610,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Summary First",
             email: "summary-first@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try stack.engine.generateKey(
             name: "Summary Second",
             email: "summary-second@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: second.publicKeyData, verificationState: .verified)
@@ -653,13 +653,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "PQ One",
             email: "pq-one@example.invalid",
             expirySeconds: nil,
-            profile: .postQuantum
+            suite: .mlDsa65Ed25519MlKem768X25519
         )
         let classical = try stack.engine.generateKey(
             name: "Classic Recipient",
             email: "classic-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: pqOne.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: classical.publicKeyData, verificationState: .verified)
@@ -743,7 +743,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Available Recipient",
             email: "available-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: valid.publicKeyData, verificationState: .verified)
         let validContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: valid.fingerprint))
@@ -779,7 +779,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Valid Recipient",
             email: "valid-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: valid.publicKeyData, verificationState: .verified)
         let validContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: valid.fingerprint))
@@ -817,19 +817,19 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Stable Alpha",
             email: "stable-alpha@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let bravo = try stack.engine.generateKey(
             name: "Stable Bravo",
             email: "stable-bravo@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let charlie = try stack.engine.generateKey(
             name: "Stable Charlie",
             email: "stable-charlie@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         for key in [alpha, bravo, charlie] {
             try opened.service.importContact(publicKeyData: key.publicKeyData, verificationState: .verified)
@@ -863,13 +863,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Active Member",
             email: "active-tag-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let nonEncryptable = try stack.engine.generateKey(
             name: "Inactive Member",
             email: "inactive-tag-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: encryptable.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: nonEncryptable.publicKeyData, verificationState: .verified)
@@ -914,7 +914,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Solo Recipient",
             email: "solo-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: only.publicKeyData, verificationState: .verified)
         let onlyContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: only.fingerprint))
@@ -941,13 +941,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Shown Recipient",
             email: "shown-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let hidden = try stack.engine.generateKey(
             name: "Other Recipient",
             email: "other-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: shown.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: hidden.publicKeyData, verificationState: .verified)
@@ -997,7 +997,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Prune Member",
             email: "prune-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: member.publicKeyData, verificationState: .verified)
         let memberContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: member.fingerprint))
@@ -1028,13 +1028,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Visible Alpha",
             email: "visible-alpha@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let hidden = try stack.engine.generateKey(
             name: "Hidden Beta",
             email: "hidden-beta@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: visible.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: hidden.publicKeyData, verificationState: .verified)
@@ -1070,13 +1070,13 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Retained Direct Recipient",
             email: "retained-direct@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let removed = try stack.engine.generateKey(
             name: "Removed Direct Recipient",
             email: "removed-direct@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: retained.publicKeyData, verificationState: .verified)
         try opened.service.importContact(publicKeyData: removed.publicKeyData, verificationState: .verified)
@@ -1116,7 +1116,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Unverified Tag Member",
             email: "unverified-tag-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
         let unverifiedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: unverified.fingerprint))
@@ -1155,7 +1155,7 @@ final class EncryptScreenModelTests: XCTestCase {
             name: "Warning Removed Tag Member",
             email: "warning-removed-tag-member@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
         let unverifiedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: unverified.fingerprint))

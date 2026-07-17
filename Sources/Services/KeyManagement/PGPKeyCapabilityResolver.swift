@@ -1,49 +1,17 @@
 import Foundation
 
-/// Pure policy resolver for OpenPGP configuration, custody, and operation support.
+/// Pure policy resolver for key-family, custody, and operation support.
 struct PGPKeyCapabilityResolver: Sendable {
     struct Policy: Equatable, Sendable {
         var secureEnclaveGenerationSupport: PGPKeyOperationSupport
         var secureEnclaveSigningOperationSupport: PGPKeyOperationSupport
         var secureEnclaveKeyAgreementOperationSupport: PGPKeyOperationSupport
 
-        /// Generation and the implemented private-operation classes are supported.
+        /// Generation and the implemented private-operation classes are
+        /// supported — the only production shape.
         static let production = Policy(
             secureEnclaveGenerationSupport: .supported,
             secureEnclaveSigningOperationSupport: .supported,
-            secureEnclaveKeyAgreementOperationSupport: .supported
-        )
-
-        /// All Secure Enclave supports blocked — a test-only fixture that pins
-        /// the resolver-before-handle-store ordering in route tests. It is not a
-        /// production shape.
-        static let testSecureEnclaveOperationsBlocked = Policy(
-            secureEnclaveGenerationSupport: .unavailable,
-            secureEnclaveSigningOperationSupport: .unavailable,
-            secureEnclaveKeyAgreementOperationSupport: .unavailable
-        )
-
-        static let testSecureEnclavePrivateOperations = Policy(
-            secureEnclaveGenerationSupport: .unavailable,
-            secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented
-        )
-
-        static let testSecureEnclaveGeneration = Policy(
-            secureEnclaveGenerationSupport: .supported,
-            secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented
-        )
-
-        static let testSecureEnclaveSigningRoutes = Policy(
-            secureEnclaveGenerationSupport: .unavailable,
-            secureEnclaveSigningOperationSupport: .supported,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented
-        )
-
-        static let testSecureEnclaveKeyAgreementRoutes = Policy(
-            secureEnclaveGenerationSupport: .unavailable,
-            secureEnclaveSigningOperationSupport: .notImplemented,
             secureEnclaveKeyAgreementOperationSupport: .supported
         )
     }
@@ -76,13 +44,13 @@ struct PGPKeyCapabilityResolver: Sendable {
 
     func support(
         for operation: PGPKeyOperationKind,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         custody: PGPPrivateKeyCustodyKind,
         metadataAvailability: MetadataAvailability = .present
     ) -> PGPKeyOperationSupport {
         resolution(
             for: operation,
-            configuration: configuration,
+            family: family,
             custody: custody,
             metadataAvailability: metadataAvailability
         ).support
@@ -94,7 +62,7 @@ struct PGPKeyCapabilityResolver: Sendable {
     ) -> PGPKeyOperationResolution {
         resolution(
             for: operation,
-            configuration: identity.openPGPConfiguration,
+            family: identity.keyFamily,
             custody: identity.privateKeyCustodyKind,
             metadataAvailability: MetadataAvailability(
                 hasPublicMaterial: !identity.publicKeyData.isEmpty,
@@ -105,12 +73,12 @@ struct PGPKeyCapabilityResolver: Sendable {
 
     func resolution(
         for operation: PGPKeyOperationKind,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         custody: PGPPrivateKeyCustodyKind,
         metadataAvailability: MetadataAvailability = .present
     ) -> PGPKeyOperationResolution {
-        guard isValidConfigurationCustodyPair(
-            configuration: configuration,
+        guard isValidFamilyCustodyPair(
+            family: family,
             custody: custody
         ) else {
             return .unsupported(.invalidConfigurationCustody)
@@ -127,34 +95,21 @@ struct PGPKeyCapabilityResolver: Sendable {
         }
     }
 
-    /// The composite suite is the only one legal under BOTH custody kinds
-    /// (Portable Post-Quantum software keys and Device-Bound Post-Quantum
-    /// split custody), so validity is decided per configuration identity,
-    /// not per algorithm suite.
-    func isValidConfigurationCustodyPair(
-        configuration: PGPKeyConfiguration,
+    /// A family and a custody kind pair validly exactly when they agree on the
+    /// family's custody axis. The composite algorithm suite is the only one
+    /// legal under BOTH custody kinds (portable Post-Quantum software keys and
+    /// device-bound split custody), which is why validity is decided by the
+    /// family — never by the algorithm suite.
+    func isValidFamilyCustodyPair(
+        family: PGPKeyFamily,
         custody: PGPPrivateKeyCustodyKind
     ) -> Bool {
-        switch (configuration.identity, custody) {
-        case (.compatibleSoftwareV4, .softwareSecretCertificate),
-             (.modernSoftwareV6, .softwareSecretCertificate),
-             (.modernHighSoftwareV6, .softwareSecretCertificate),
-             (.postQuantumSoftwareV6, .softwareSecretCertificate),
-             (.postQuantumHighSoftwareV6, .softwareSecretCertificate),
-             (.compatibleP256V4, .appleSecureEnclavePrivateOperations),
-             (.modernP256V6, .appleSecureEnclavePrivateOperations),
-             (.deviceBoundPostQuantumV6, .appleSecureEnclavePrivateOperations),
-             (.deviceBoundPostQuantumHighV6, .appleSecureEnclavePrivateOperations):
+        switch (family.custody, custody) {
+        case (.portable, .softwareSecretCertificate),
+             (.deviceBound, .appleSecureEnclavePrivateOperations):
             return true
-        case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
-             (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
-             (.modernHighSoftwareV6, .appleSecureEnclavePrivateOperations),
-             (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
-             (.postQuantumHighSoftwareV6, .appleSecureEnclavePrivateOperations),
-             (.compatibleP256V4, .softwareSecretCertificate),
-             (.modernP256V6, .softwareSecretCertificate),
-             (.deviceBoundPostQuantumV6, .softwareSecretCertificate),
-             (.deviceBoundPostQuantumHighV6, .softwareSecretCertificate):
+        case (.portable, .appleSecureEnclavePrivateOperations),
+             (.deviceBound, .softwareSecretCertificate):
             return false
         }
     }

@@ -4,14 +4,14 @@ mod common;
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 
 /// Verify that tampered Legacy (SEIPDv1) ciphertext produces an integrity-related
 /// error, not a generic CorruptData. Exercises the case-insensitive error classification.
 #[test]
 fn test_error_classification_tampered_legacy() {
     let key =
-        keys::generate_key_with_profile("Audit".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Audit".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -39,7 +39,7 @@ fn test_error_classification_tampered_legacy() {
 #[test]
 fn test_error_classification_tampered_modern_high() {
     let key =
-        keys::generate_key_with_profile("Audit".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Audit".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -67,10 +67,10 @@ fn test_error_classification_tampered_modern_high() {
 #[test]
 fn test_decrypt_wrong_key_no_plaintext_leak() {
     let alice =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt(
@@ -95,7 +95,7 @@ fn test_decrypt_wrong_key_no_plaintext_leak() {
 #[test]
 fn test_decrypt_legacy_seipd_no_mdc_rejected() {
     let key =
-        keys::generate_key_with_profile("Legacy".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Legacy".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -163,10 +163,10 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
 #[test]
 fn test_decrypt_wrong_key_no_plaintext_leak_modern_high() {
     let alice =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt(

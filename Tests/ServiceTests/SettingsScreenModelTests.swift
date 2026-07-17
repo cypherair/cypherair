@@ -1731,7 +1731,6 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     ) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: 4,
             userId: nil,
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -1743,9 +1742,9 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             expiryDate: nil,
-            openPGPConfigurationIdentity: custody == .appleSecureEnclavePrivateOperations
-                ? .compatibleP256V4
-                : .compatibleSoftwareV4,
+            keyFamily: custody == .appleSecureEnclavePrivateOperations
+                ? .deviceBoundEcdsaNistP256EcdhNistP256V4
+                : .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: custody
         )
     }

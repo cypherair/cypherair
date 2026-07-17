@@ -12,7 +12,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Matcher Same Fingerprint",
             email: "matcher-same@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try mutator.addContact(
@@ -33,7 +33,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Mutator Stable Key",
             email: "mutator-stable@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -69,7 +69,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Artifact Removed Key",
             email: "artifact-removed@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try mutator.addContact(
@@ -103,19 +103,19 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Artifact Target One",
             email: "artifact-target-one@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try engine.generateKey(
             name: "Artifact Target Two",
             email: "artifact-target-two@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let retainedKey = try engine.generateKey(
             name: "Artifact Retained",
             email: "artifact-retained@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try mutator.addContact(
@@ -183,13 +183,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Resolver One",
             email: "resolver-one@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try engine.generateKey(
             name: "Resolver Two",
             email: "resolver-two@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try mutator.addContact(
@@ -235,13 +235,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Projector Preferred",
             email: "projector-preferred@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let historicalKey = try engine.generateKey(
             name: "Projector Historical",
             email: "projector-historical@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try mutator.addContact(
@@ -290,13 +290,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Strong Candidate",
             email: "candidate@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try engine.generateKey(
             name: "Strong Candidate",
             email: "candidate@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         let firstResult = try service.importContact(publicKeyData: firstKey.publicKeyData)
@@ -329,13 +329,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Weak Candidate",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try engine.generateKey(
             name: "Weak Candidate",
             email: nil,
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         let firstResult = try service.importContact(publicKeyData: firstKey.publicKeyData)
@@ -364,7 +364,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Stable Key",
             email: "stable@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -398,13 +398,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Merge Target",
             email: "merge-target@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let sourceKey = try engine.generateKey(
             name: "Merge Source",
             email: "merge-source@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try service.importContact(publicKeyData: targetKey.publicKeyData, verificationState: .verified)
@@ -448,13 +448,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Tagged Target",
             email: "tagged-target@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let sourceKey = try engine.generateKey(
             name: "Tagged Source",
             email: "tagged-source@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try service.importContact(publicKeyData: targetKey.publicKeyData)
@@ -516,13 +516,13 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             name: "Preferred One",
             email: "preferred-one@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try engine.generateKey(
             name: "Preferred Two",
             email: "preferred-two@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try service.importContact(publicKeyData: firstKey.publicKeyData)

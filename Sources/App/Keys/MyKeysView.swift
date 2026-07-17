@@ -178,7 +178,7 @@ private struct KeyRowView: View {
                     KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .compact)
                 }
             }
-            Text(key.openPGPConfigurationIdentity.familyDisplayName)
+            Text(key.keyFamily.familyDisplayName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

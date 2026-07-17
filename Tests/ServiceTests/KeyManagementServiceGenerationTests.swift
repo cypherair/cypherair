@@ -26,7 +26,7 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
         let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         XCTAssertEqual(identity.keyVersion, 4, "Legacy should produce v4 key")
-        XCTAssertEqual(identity.softwareProfile, .universal)
+        XCTAssertEqual(identity.softwareSuite, .ed25519LegacyCurve25519Legacy)
         XCTAssertFalse(identity.fingerprint.isEmpty)
         XCTAssertTrue(identity.hasEncryptionSubkey, "Generated key should have encryption subkey")
         XCTAssertFalse(identity.isRevoked)
@@ -51,7 +51,7 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
         let identity = try await TestHelpers.generateModernHighKey(service: service)
 
         XCTAssertEqual(identity.keyVersion, 6, "Modern High should produce v6 key")
-        XCTAssertEqual(identity.softwareProfile, .advanced)
+        XCTAssertEqual(identity.softwareSuite, .ed448X448)
         XCTAssertTrue(identity.hasEncryptionSubkey)
     }
 

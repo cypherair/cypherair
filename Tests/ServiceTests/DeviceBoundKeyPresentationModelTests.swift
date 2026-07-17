@@ -34,7 +34,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
         // The hidden-generation test rig wires no recovery classifier, so the
@@ -71,7 +71,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
         // A device-bound key with no recovery assessment must read as degraded,
@@ -89,7 +89,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
         let degradedReport = SecureEnclaveCustodyGenerationRecoveryReport(
@@ -120,7 +120,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
         let model = BackupKeyScreenModel(

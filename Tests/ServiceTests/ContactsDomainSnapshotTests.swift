@@ -242,7 +242,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             displayName: "Alice",
             email: "alice@example.com",
             keyVersion: 4,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             hasEncryptionSubkey: true,

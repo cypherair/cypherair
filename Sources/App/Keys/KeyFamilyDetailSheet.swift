@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Read-only detail sheet for one key-family option in key generation.
 struct KeyFamilyDetailSheet: View {
-    let family: PGPKeyConfiguration.Identity
+    let family: PGPKeyFamily
     let onDismiss: () -> Void
 
     var body: some View {
@@ -54,10 +54,10 @@ struct KeyFamilyDetailSheet: View {
                     Text(String(localized: "keyFamily.detail.header", defaultValue: "Details"))
                 }
 
-                if family.isDeviceBoundFamily {
+                if family.custody == .deviceBound {
                     Section {
                         Label {
-                            Text(PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement)
+                            Text(PGPKeyFamily.deviceBoundBiometricRequirement)
                                 .font(.callout)
                         } icon: {
                             Image(systemName: "faceid")

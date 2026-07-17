@@ -62,7 +62,7 @@ final class GnuPGInteropTests: XCTestCase {
         let info = try engine.parseKeyInfo(keyData: pubKeyData)
 
         XCTAssertEqual(info.keyVersion, 4, "GnuPG key should be v4")
-        XCTAssertEqual(info.profile, .universal, "GnuPG v4 key should be detected as Legacy (universal)")
+        XCTAssertEqual(info.suite, .ed25519LegacyCurve25519Legacy, "GnuPG v4 key should be detected as the legacy suite")
         XCTAssertTrue(info.hasEncryptionSubkey, "GnuPG key should have an encryption subkey")
         XCTAssertFalse(info.isRevoked, "GnuPG key should not be revoked")
         XCTAssertFalse(info.isExpired, "GnuPG key should not be expired")

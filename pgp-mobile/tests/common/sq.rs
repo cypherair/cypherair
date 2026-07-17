@@ -83,11 +83,11 @@ pub fn require_pq_capable_sq_or_skip() -> Option<PathBuf> {
 /// capability, so they panic instead: a mandatory interop lane must fail
 /// loudly rather than silently skip its post-quantum coverage.
 fn sq_imports_engine_pq_key(sq_path: &PathBuf) -> bool {
-    let key = pgp_mobile::keys::generate_key_with_profile(
+    let key = pgp_mobile::keys::generate_key_with_suite(
         "CypherAir PQ Capability Probe".to_string(),
         None,
         None,
-        pgp_mobile::keys::KeyProfile::PostQuantum,
+        pgp_mobile::keys::KeySuite::MlDsa65Ed25519MlKem768X25519,
     )
     .unwrap_or_else(|error| {
         panic!(

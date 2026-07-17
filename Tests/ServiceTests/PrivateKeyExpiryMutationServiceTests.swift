@@ -45,11 +45,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveModifyExpiryUsesRealCatalogRouterAndSharedHandleStoreForV4AndV6() async throws {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256
         ] {
-            let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: configurationIdentity)
+            let fixture = try await makeSecureEnclaveRouteFixture(family: family)
             let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
             let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
                 engine: engine,
@@ -76,15 +76,15 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             )
 
             XCTAssertEqual(updated.fingerprint, fixture.identity.fingerprint)
-            XCTAssertEqual(updated.keyVersion, configurationIdentity.configuration.keyVersion)
-            XCTAssertEqual(updated.openPGPConfigurationIdentity, configurationIdentity)
+            XCTAssertEqual(updated.keyVersion, family.keyVersion)
+            XCTAssertEqual(updated.keyFamily, family)
             XCTAssertEqual(updated.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
             XCTAssertFalse(updated.isExpired)
             XCTAssertNotNil(updated.expiryDate)
             XCTAssertNotEqual(updated.publicKeyData, fixture.identity.publicKeyData)
             let updatedInfo = try engine.parseKeyInfo(keyData: updated.publicKeyData)
             XCTAssertEqual(updatedInfo.fingerprint, fixture.identity.fingerprint)
-            XCTAssertEqual(updatedInfo.keyVersion, configurationIdentity.configuration.keyVersion)
+            XCTAssertEqual(updatedInfo.keyVersion, family.keyVersion)
             XCTAssertNotNil(updatedInfo.expiryTimestamp)
             let updatedInspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
                 engine: engine
@@ -185,12 +185,12 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveModifyExpiryRecoversAfterKeyAlreadyExpired() async throws {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256
         ] {
             let fixture = try await makeSecureEnclaveRouteFixture(
-                configurationIdentity: configurationIdentity,
+                family: family,
                 expirySeconds: 1
             )
             let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
@@ -542,7 +542,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             name: "Software Expiry",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         keyManagement.configurePrivateKeyExpiryMutationService(
             TestHelpers.makeExpiryMutator(
@@ -578,7 +578,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     }
 
     private func makeSecureEnclaveRouteFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4,
+        family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4,
         expirySeconds: UInt64? = 3600
     ) async throws -> ExpirySecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
@@ -591,13 +591,12 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             name: "Secure Enclave Expiry",
             email: "secure-expiry@example.invalid",
             expirySeconds: expirySeconds,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -609,7 +608,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
@@ -641,7 +640,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
                 hasEncryptionSubkey: identity.hasEncryptionSubkey,
                 isRevoked: identity.isRevoked,
                 isExpired: false,
-                profile: identity.softwareProfile,
+                suite: identity.softwareSuite,
                 primaryAlgo: identity.primaryAlgo,
                 subkeyAlgo: identity.subkeyAlgo,
                 expiryTimestamp: expiryTimestamp

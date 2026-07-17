@@ -5,13 +5,13 @@ import SwiftUI
 /// The custody row is family-aware: split-custody families disclose that only
 /// the post-quantum half is enclave-resident.
 struct DeviceBoundKeyCommitmentSheet: View {
-    let family: PGPKeyConfiguration.Identity
+    let family: PGPKeyFamily
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
     private var custodyText: String {
         switch family {
-        case .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6:
+        case .deviceBoundMlDsa65Ed25519MlKem768X25519, .deviceBoundMlDsa87Ed448MlKem1024X448:
             String(
                 localized: "keygen.deviceBound.confirm.custodySplit",
                 defaultValue: "The post-quantum half of this key is created inside this device's Secure Enclave; the classical half is sealed to this device. Every signature and decryption requires the Secure Enclave."
@@ -55,7 +55,7 @@ struct DeviceBoundKeyCommitmentSheet: View {
                     )
                     commitmentRow(
                         systemImage: "faceid",
-                        text: PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement
+                        text: PGPKeyFamily.deviceBoundBiometricRequirement
                     )
                 }
 

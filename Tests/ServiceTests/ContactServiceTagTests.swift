@@ -14,7 +14,7 @@ final class ContactServiceTagTests: ContactServiceTestCase {
             name: "Tagged Contact",
             email: "tagged@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -62,13 +62,13 @@ final class ContactServiceTagTests: ContactServiceTestCase {
             name: "Tag Member One",
             email: "tag-member-one@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try engine.generateKey(
             name: "Tag Member Two",
             email: "tag-member-two@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: first.publicKeyData)
         _ = try service.importContact(publicKeyData: second.publicKeyData)
@@ -142,19 +142,19 @@ final class ContactServiceTagTests: ContactServiceTestCase {
             name: "Alpha",
             email: "alpha@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let prefix = try engine.generateKey(
             name: "Alphabet Soup",
             email: "prefix@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let substring = try engine.generateKey(
             name: "Team Alpha Member",
             email: "substring@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try service.importContact(publicKeyData: substring.publicKeyData)
@@ -201,13 +201,13 @@ final class ContactServiceTagTests: ContactServiceTestCase {
             name: "Recipient Preferred",
             email: "recipient-preferred@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let historical = try engine.generateKey(
             name: "Recipient Historical",
             email: "recipient-historical@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try service.importContact(publicKeyData: preferred.publicKeyData)

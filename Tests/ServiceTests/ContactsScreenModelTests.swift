@@ -13,13 +13,13 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
             name: "Work Person",
             email: "work-person@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let personal = try engine.generateKey(
             name: "Personal Person",
             email: "personal-person@example.invalid",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         _ = try service.importContact(publicKeyData: work.publicKeyData)
@@ -59,7 +59,7 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
             name: "Filter Person",
             email: "filter-person@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -87,7 +87,7 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
             name: "Tagged Person",
             email: "tagged-person@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -125,7 +125,7 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
             name: "Searchable Person",
             email: "searchable-person@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try service.importContact(publicKeyData: generated.publicKeyData)

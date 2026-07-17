@@ -38,7 +38,7 @@ final class SelfTestServiceTests: XCTestCase {
         }
 
         // Legacy has 5 tests (keygen, encrypt/decrypt, sign/verify, tamper, export/import)
-        let legacyResults = results.filter { $0.profile == .universal }
+        let legacyResults = results.filter { $0.suite == .ed25519LegacyCurve25519Legacy }
         XCTAssertEqual(legacyResults.count, 5, "Legacy should have 5 test results")
 
         for result in legacyResults {
@@ -54,7 +54,7 @@ final class SelfTestServiceTests: XCTestCase {
             return
         }
 
-        let modernHighResults = results.filter { $0.profile == .advanced }
+        let modernHighResults = results.filter { $0.suite == .ed448X448 }
         XCTAssertEqual(modernHighResults.count, 5, "Modern High should have 5 test results")
 
         for result in modernHighResults {
@@ -70,9 +70,9 @@ final class SelfTestServiceTests: XCTestCase {
             return
         }
 
-        // Verify all results present (5 per software profile + 1 QR),
-        // derived from the profile vocabulary so new families are covered.
-        let expectedCount = PGPKeyProfile.allCases.count * 5 + 1
+        // Verify all results present (5 per software suite + 1 QR),
+        // derived from the suite vocabulary so new families are covered.
+        let expectedCount = PGPKeySuite.allCases.count * 5 + 1
         XCTAssertEqual(
             results.count,
             expectedCount,

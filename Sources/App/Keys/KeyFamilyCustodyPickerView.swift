@@ -118,7 +118,7 @@ struct KeyFamilyCustodyPickerView: View {
         }
     }
 
-    private func custodyColumn(_ custody: PGPKeyConfiguration.Identity.Custody) -> some View {
+    private func custodyColumn(_ custody: PGPKeyFamily.Custody) -> some View {
         let families = model.families(for: custody)
         return VStack(alignment: .leading, spacing: 0) {
             Text(custody.displayName)
@@ -143,7 +143,7 @@ struct KeyFamilyCustodyPickerView: View {
 
     // MARK: Shared
 
-    private func familyRow(_ family: PGPKeyConfiguration.Identity) -> some View {
+    private func familyRow(_ family: PGPKeyFamily) -> some View {
         KeyFamilySelectionRow(
             family: family,
             isSelected: model.selectedFamily == family,

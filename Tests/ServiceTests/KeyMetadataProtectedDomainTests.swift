@@ -36,7 +36,6 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
         let invalidIdentity = PGPKeyIdentity(
             fingerprint: "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
-            keyVersion: 4,
             userId: "Invalid <invalid@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -48,7 +47,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
             primaryAlgo: "P-256",
             subkeyAlgo: "P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
         try await harness.store.ensureCommittedIfNeeded(
@@ -713,35 +712,9 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
     }
 
-    func test_keyMetadataPayloadValidationRejectsConfigurationKeyVersionMismatch() throws {
-        // The persisted keyVersion must match the authoritative configuration
-        // identity's key version (a v6 record claiming the v4 Legacy family).
-        let identity = PGPKeyIdentity(
-            fingerprint: "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8",
-            keyVersion: 6,
-            userId: "Mismatched Configuration <mismatched-configuration@example.invalid>",
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: false,
-            isBackedUp: false,
-            publicKeyData: Data([0x30, 0x31]),
-            revocationCert: Data([0x32]),
-            primaryAlgo: "Ed25519",
-            subkeyAlgo: "X25519",
-            expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleSoftwareV4,
-            privateKeyCustodyKind: .softwareSecretCertificate
-        )
-        let payload = ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity])
-
-        XCTAssertThrowsError(try payload.validateContract())
-    }
-
     func test_keyMetadataPayloadValidationAcceptsRepresentableSecureEnclaveP256() throws {
         let identity = PGPKeyIdentity(
             fingerprint: "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
-            keyVersion: 4,
             userId: "P-256 <p256@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -753,7 +726,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
             primaryAlgo: "P-256",
             subkeyAlgo: "P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let payload = ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity])

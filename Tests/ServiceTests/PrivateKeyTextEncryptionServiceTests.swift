@@ -33,7 +33,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             name: "Software Signer",
             email: "software@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         defer { signer.certData.resetBytes(in: 0..<signer.certData.count) }
         var recipient = try makeRecipient()
@@ -97,11 +97,11 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveV6RouteSignsAndVerifies() async throws {
-        let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
+        let fixture = try await makeSecureEnclaveRouteFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
+        XCTAssertEqual(fixture.identity.keyFamily, .deviceBoundEcdsaNistP256EcdhNistP256)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
-        var recipient = try makeRecipient(profile: .advanced)
+        var recipient = try makeRecipient(suite: .ed448X448)
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
         let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
         let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
@@ -455,13 +455,13 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
 
     private func makeRecipient(
         name: String = "Recipient",
-        profile: KeyProfile = .universal
+        suite: KeySuite = .ed25519LegacyCurve25519Legacy
     ) throws -> GeneratedKey {
         try engine.generateKey(
             name: name,
             email: "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))@example.invalid",
             expirySeconds: nil,
-            profile: profile
+            suite: suite
         )
     }
 
@@ -469,7 +469,6 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
-            keyVersion: UInt8(keyInfo.keyVersion),
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -481,7 +480,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            keyFamily: .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
@@ -500,26 +499,25 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
     }
 
     private func makeSecureEnclaveRouteFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
+        family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4
     ) async throws -> TextSecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
         let signingHandle = handlePair.signing
         let keyAgreementHandle = handlePair.keyAgreement
-        let label = configurationIdentity == .modernP256V6 ? "v6" : "v4"
+        let label = family == .deviceBoundEcdsaNistP256EcdhNistP256 ? "v6" : "v4"
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
         ).generatePublicCertificate(
             name: "Secure Enclave Text Encrypt \(label)",
             email: "secure-text-encrypt-\(label)@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -531,7 +529,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

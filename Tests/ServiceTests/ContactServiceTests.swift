@@ -11,7 +11,7 @@ final class ContactServiceTests: ContactServiceTestCase {
             name: "Protected Lookup",
             email: "protected-lookup@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
@@ -38,7 +38,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_addContact_validPublicKey_returnsAdded() throws {
         let generated = try engine.generateKey(
             name: "Alice", email: "alice@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
@@ -57,7 +57,7 @@ final class ContactServiceTests: ContactServiceTestCase {
             name: "Public Key Lookup",
             email: "lookup@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
@@ -100,7 +100,7 @@ final class ContactServiceTests: ContactServiceTestCase {
             name: "Secret Contact Reject",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         XCTAssertThrowsError(try contactService.importContact(publicKeyData: generated.certData)) { error in
@@ -120,7 +120,7 @@ final class ContactServiceTests: ContactServiceTestCase {
             name: "Armored Secret Contact Reject",
             email: nil,
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let armoredSecret = try engine.armor(data: generated.certData, kind: .secretKey)
 
@@ -139,7 +139,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_addContact_duplicateFingerprint_returnsDuplicate() throws {
         let generated = try engine.generateKey(
             name: "Bob", email: "bob@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Add once
@@ -165,7 +165,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         }
         let generated = try engine.generateKey(
             name: "Update", email: "update@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -206,7 +206,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         }
         let generated = try engine.generateKey(
             name: "Update Unverified", email: "update-unverified@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -239,7 +239,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_addContact_sameFingerprintMaterialUpdate_verifiedImportPromotesExistingUnverifiedContact() throws {
         let generated = try engine.generateKey(
             name: "Update Promote", email: "update-promote@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -296,7 +296,7 @@ final class ContactServiceTests: ContactServiceTestCase {
             name: "bbbbb",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let originalInfo = try engine.parseKeyInfo(keyData: base)
@@ -355,7 +355,7 @@ final class ContactServiceTests: ContactServiceTestCase {
 
         XCTAssertTrue(updatedKey.isRevoked)
         XCTAssertFalse(updatedKey.canEncryptTo)
-        XCTAssertEqual(updatedKey.profile, .advanced)
+        XCTAssertEqual(updatedKey.suite, .ed448X448)
     }
 
     func test_addContact_sameFingerprintEncryptionSubkeyUpdate_legacy_refreshesEncryptionCapability() throws {
@@ -396,18 +396,18 @@ final class ContactServiceTests: ContactServiceTestCase {
 
         XCTAssertTrue(updatedKey.hasEncryptionSubkey)
         XCTAssertTrue(updatedKey.canEncryptTo)
-        XCTAssertEqual(updatedKey.profile, .advanced)
+        XCTAssertEqual(updatedKey.suite, .ed448X448)
     }
 
     func test_importContact_sameUserIdDifferentFingerprint_returnsCandidateContact() throws {
         // Generate two keys with the same userId but different fingerprints
         let key1 = try engine.generateKey(
             name: "Carol", email: "carol@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let key2 = try engine.generateKey(
             name: "Carol", email: "carol@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Add first key
@@ -434,7 +434,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         // the views should pass after the binary import fix.
         let generated = try engine.generateKey(
             name: "BinaryA", email: nil,
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Verify the data is actually binary (not ASCII armor)
@@ -453,7 +453,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_addContact_binaryPublicKey_modernHigh_returnsAdded() throws {
         let generated = try engine.generateKey(
             name: "BinaryB", email: nil,
-            expirySeconds: nil, profile: .advanced
+            expirySeconds: nil, suite: .ed448X448
         )
 
         let firstByte = generated.publicKeyData.first
@@ -472,7 +472,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         // Verify armored format also works (regression guard)
         let generated = try engine.generateKey(
             name: "ArmoredA", email: nil,
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let armoredData = try engine.armorPublicKey(certData: generated.publicKeyData)
@@ -493,11 +493,11 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_contactsMatchingKeyIds_returnsCorrectContacts() throws {
         let key1 = try engine.generateKey(
             name: "Eve", email: nil,
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let key2 = try engine.generateKey(
             name: "Frank", email: nil,
-            expirySeconds: nil, profile: .advanced
+            expirySeconds: nil, suite: .ed448X448
         )
 
         _ = try contactService.importContact(publicKeyData: key1.publicKeyData)
@@ -521,7 +521,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         }
         let generated = try engine.generateKey(
             name: "Manual Verify", email: "manual@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let addResult = try opened.service.importContact(
@@ -552,7 +552,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_addContact_duplicateVerifiedImport_upgradesExistingUnverifiedContact() throws {
         let generated = try engine.generateKey(
             name: "Duplicate Upgrade", email: "upgrade@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         _ = try contactService.importContact(
@@ -578,7 +578,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     func test_contactsDomainSnapshot_usesProtectedRuntimeIdsForImports() throws {
         let generated = try engine.generateKey(
             name: "Projection", email: "projection@example.com",
-            expirySeconds: nil, profile: .universal
+            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
         let addResult = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
@@ -598,7 +598,7 @@ final class ContactServiceTests: ContactServiceTestCase {
 
         let record = try XCTUnwrap(contactService.availableContactKeyRecord(fingerprint: key.fingerprint))
         XCTAssertEqual(record.publicKeyData, generated.publicKeyData)
-        XCTAssertEqual(record.profile, key.profile)
+        XCTAssertEqual(record.suite, key.suite)
         XCTAssertEqual(record.primaryUserId, key.primaryUserId)
         XCTAssertEqual(record.manualVerificationState, .unverified)
     }

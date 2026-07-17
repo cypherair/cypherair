@@ -7,15 +7,15 @@ mod common;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::PublicKeyAlgorithm;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use sequoia_openpgp as openpgp;
 
 fn generate_pq() -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+    keys::generate_key_with_suite(
         "PQ Lifecycle".to_string(),
         Some("pq@lifecycle.example".to_string()),
         None,
-        KeyProfile::PostQuantum,
+        KeySuite::MlDsa65Ed25519MlKem768X25519,
     )
     .expect("Post-Quantum key gen should succeed")
 }
@@ -50,33 +50,33 @@ fn test_generate_post_quantum_cert_shape() {
 }
 
 #[test]
-fn test_detect_profile_classifies_post_quantum() {
+fn test_detect_suite_classifies_post_quantum() {
     let key = generate_pq();
     assert_eq!(
-        keys::detect_profile(&key.public_key_data).expect("detect"),
-        KeyProfile::PostQuantum
+        keys::detect_suite(&key.public_key_data).expect("detect"),
+        KeySuite::MlDsa65Ed25519MlKem768X25519
     );
 
     let info = keys::parse_key_info(&key.public_key_data).expect("parse_key_info");
-    assert_eq!(info.profile, KeyProfile::PostQuantum);
+    assert_eq!(info.suite, KeySuite::MlDsa65Ed25519MlKem768X25519);
     assert_eq!(info.key_version, 6);
 }
 
 /// A foreign (sq-style) RFC 9980 cert must classify as Post-Quantum, not
-/// Modern High — the pre-fix version-only heuristic mislabeled it Advanced.
+/// Modern High — a version-only heuristic would mislabel it Ed448X448.
 #[test]
-fn test_detect_profile_classifies_foreign_pq_cert() {
+fn test_detect_suite_classifies_foreign_pq_cert() {
     let (_tsk, pub_armored) = common::pq::generate_foreign_pq();
     assert_eq!(
-        keys::detect_profile(&pub_armored).expect("detect"),
-        KeyProfile::PostQuantum
+        keys::detect_suite(&pub_armored).expect("detect"),
+        KeySuite::MlDsa65Ed25519MlKem768X25519
     );
 }
 
 /// The higher RFC 9980 tier (ML-DSA-87+Ed448) classifies as its own
 /// Post-Quantum · High profile — distinct from the 65/768 Post-Quantum tier.
 #[test]
-fn test_detect_profile_classifies_mldsa87_tier_as_post_quantum_high() {
+fn test_detect_suite_classifies_mldsa87_tier_as_post_quantum_high() {
     use openpgp::cert::{CertBuilder, CipherSuite};
     use openpgp::serialize::SerializeInto;
 
@@ -88,28 +88,28 @@ fn test_detect_profile_classifies_mldsa87_tier_as_post_quantum_high() {
         .expect("generate 87-tier cert");
     let pub_armored = cert.armored().to_vec().expect("armor");
     assert_eq!(
-        keys::detect_profile(&pub_armored).expect("detect"),
-        KeyProfile::PostQuantumHigh
+        keys::detect_suite(&pub_armored).expect("detect"),
+        KeySuite::MlDsa87Ed448MlKem1024X448
     );
 }
 
 /// The classical fallbacks must be unchanged by the algorithm-aware rule.
 #[test]
-fn test_detect_profile_classical_fallbacks_unchanged() {
-    let universal =
-        keys::generate_key_with_profile("A".to_string(), None, None, KeyProfile::Universal)
+fn test_detect_suite_classical_fallbacks_unchanged() {
+    let legacy =
+        keys::generate_key_with_suite("A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("gen A");
-    let advanced =
-        keys::generate_key_with_profile("B".to_string(), None, None, KeyProfile::Advanced)
+    let ed448 =
+        keys::generate_key_with_suite("B".to_string(), None, None, KeySuite::Ed448X448)
             .expect("gen B");
 
     assert_eq!(
-        keys::detect_profile(&universal.public_key_data).expect("detect A"),
-        KeyProfile::Universal
+        keys::detect_suite(&legacy.public_key_data).expect("detect A"),
+        KeySuite::Ed25519LegacyCurve25519Legacy
     );
     assert_eq!(
-        keys::detect_profile(&advanced.public_key_data).expect("detect B"),
-        KeyProfile::Advanced
+        keys::detect_suite(&ed448.public_key_data).expect("detect B"),
+        KeySuite::Ed448X448
     );
 }
 
@@ -118,7 +118,7 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
     let key = generate_pq();
 
     let exported =
-        keys::export_secret_key(&key.cert_data, "correct horse", KeyProfile::PostQuantum)
+        keys::export_secret_key(&key.cert_data, "correct horse")
             .expect("PQ export should succeed");
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
@@ -155,36 +155,5 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ import");
     let imported_info = keys::parse_key_info(&imported).expect("info");
     assert_eq!(imported_info.fingerprint, key.fingerprint);
-    assert_eq!(imported_info.profile, KeyProfile::PostQuantum);
-}
-
-/// Negative: a PQ cert exported under the Advanced profile must be rejected —
-/// the guard must be algorithm-aware, not just version-aware.
-#[test]
-fn test_export_wrong_profile_pq_cert_as_advanced_fails() {
-    let key = generate_pq();
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::Advanced);
-    match result {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // this controlled wrong-profile export reaches it only through the
-        // profile/key-version mismatch, so the prose reason adds nothing.
-        Err(pgp_mobile::error::PgpError::S2kError { .. }) => {}
-        other => panic!("Expected S2kError profile mismatch, got: {other:?}"),
-    }
-}
-
-/// Negative: an Advanced (classical v6) cert exported as Post-Quantum must
-/// be rejected for the same reason in the other direction.
-#[test]
-fn test_export_wrong_profile_advanced_cert_as_pq_fails() {
-    let key = keys::generate_key_with_profile("B".to_string(), None, None, KeyProfile::Advanced)
-        .expect("gen B");
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::PostQuantum);
-    match result {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // this controlled wrong-profile export reaches it only through the
-        // profile/key-version mismatch, so the prose reason adds nothing.
-        Err(pgp_mobile::error::PgpError::S2kError { .. }) => {}
-        other => panic!("Expected S2kError profile mismatch, got: {other:?}"),
-    }
+    assert_eq!(imported_info.suite, KeySuite::MlDsa65Ed25519MlKem768X25519);
 }

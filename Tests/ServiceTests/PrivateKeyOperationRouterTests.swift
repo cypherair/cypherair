@@ -199,7 +199,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
     func test_invalidConfigurationCustodyPairBlocksBeforeInspection() async throws {
         let identity = PGPKeyIdentity(
             fingerprint: "3333333333333333333333333333333333333333",
-            keyVersion: 4,
             userId: "Invalid <invalid@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -211,7 +210,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             primaryAlgo: "ECDSA P-256",
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
         let inspector = RecordingPublicBindingInspector()
@@ -909,7 +908,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
     private func makeCompositeIdentity() -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: "3333333333333333333333333333333333333333",
-            keyVersion: 6,
             userId: "Composite <composite@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -921,7 +919,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             primaryAlgo: "ML-DSA-65+Ed25519",
             subkeyAlgo: "ML-KEM-768+X25519",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .deviceBoundPostQuantumV6,
+            keyFamily: .deviceBoundMlDsa65Ed25519MlKem768X25519,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
     }
@@ -929,7 +927,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
     private func makeSoftwareIdentity() -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: "1111111111111111111111111111111111111111",
-            keyVersion: 4,
             userId: "Software <software@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -941,7 +938,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            keyFamily: .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
@@ -949,7 +946,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
     private func makeSecureEnclaveIdentity() -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: "2222222222222222222222222222222222222222",
-            keyVersion: 4,
             userId: "Secure Enclave <secure@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -961,7 +957,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             primaryAlgo: "ECDSA P-256",
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
     }

@@ -42,7 +42,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
         let loadedPair = try loadHandlePair(pair, store: handleStore, context: context)
         let messageAdapter = PGPMessageOperationAdapter(engine: PgpEngine())
 
-        for configuration in [PGPKeyConfiguration.Identity.compatibleP256V4, .modernP256V6] {
+        for configuration in [PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4, .deviceBoundEcdsaNistP256EcdhNistP256] {
             let prepared = try await prepareSecureEnclaveDecryptRoute(
                 configuration: configuration,
                 loadedPair: loadedPair
@@ -77,7 +77,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             )
             recordEvidence(
                 .ecdhDecrypt,
-                configuration: configuration == .compatibleP256V4 ? .compatibleP256V4 : .modernP256V6
+                configuration: configuration == .deviceBoundEcdsaNistP256EcdhNistP256V4 ? .deviceBoundEcdsaNistP256EcdhNistP256V4 : .deviceBoundEcdsaNistP256EcdhNistP256
             )
         }
     }
@@ -104,7 +104,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
 
         let loadedPair = try loadHandlePair(pair, store: handleStore, context: context)
         let prepared = try await prepareSecureEnclaveDecryptRoute(
-            configuration: .compatibleP256V4,
+            configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             loadedPair: loadedPair
         )
         let engine = PgpEngine()
@@ -113,7 +113,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             name: "Device Other Recipient",
             email: "device-other-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Mixed-recipient round-trip: the Secure Enclave key-agreement recipient is second
@@ -185,10 +185,10 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             FileManager.default.fileExists(atPath: tamperedOutput.path),
             "No plaintext output may exist after a tampered file hard-fail"
         )
-        recordEvidence(.ecdhDecrypt, configuration: .compatibleP256V4)
+        recordEvidence(.ecdhDecrypt, configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         recordEvidence(
             .payloadTamperHardFail,
-            configuration: .compatibleP256V4,
+            configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             observedCategory: .payloadAuthenticationFailure
         )
     }
@@ -204,7 +204,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
     /// pair (real signing handle), then assembles the matching identity and
     /// key-agreement decrypt route bound to the real `.keyAgreement` handle.
     private func prepareSecureEnclaveDecryptRoute(
-        configuration: PGPKeyConfiguration.Identity,
+        configuration: PGPKeyFamily,
         loadedPair: SecureEnclaveCustodyLoadedHandlePair
     ) async throws -> PreparedSecureEnclaveDecryptRoute {
         let engine = PgpEngine()
@@ -213,13 +213,12 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
                 name: "Device Secure Enclave Decrypt",
                 email: "device-secure-decrypt@example.invalid",
                 expirySeconds: 3600,
-                configuration: configuration.configuration,
+                family: configuration,
                 handlePair: loadedPair,
                 digestSigner: SystemSecureEnclaveCustodyDigestSigner()
             )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -231,7 +230,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configuration,
+            keyFamily: configuration,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)

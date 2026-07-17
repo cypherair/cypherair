@@ -52,7 +52,7 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         cert.with_policy(&policy, Some(creation_time)).is_ok()
     };
 
-    let profile = super::profile::classify_profile(&cert);
+    let suite = super::suite::classify_suite(&cert);
 
     // Extract primary key algorithm name (Display gives human-readable names like "EdDSA", "Ed448")
     let primary_algo = cert.primary_key().key().pk_algo().to_string();
@@ -100,7 +100,7 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         has_encryption_subkey,
         is_revoked,
         is_expired,
-        profile,
+        suite,
         primary_algo,
         subkey_algo,
         expiry_timestamp,

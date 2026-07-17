@@ -3,7 +3,7 @@ use super::*;
 
 #[test]
 fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profiles() {
-    for profile in [KeyProfile::Universal, KeyProfile::Advanced] {
+    for profile in [KeySuite::Ed25519LegacyCurve25519Legacy, KeySuite::Ed448X448] {
         for kind in [
             CertificationKind::Generic,
             CertificationKind::Persona,
@@ -52,8 +52,8 @@ fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profile
 #[test]
 fn test_generate_and_verify_user_id_certification_by_selector_accepts_duplicate_occurrence_selector(
 ) {
-    let signer = generated_key(KeyProfile::Advanced, "SelectorKindSigner");
-    let target = generated_key(KeyProfile::Advanced, "SelectorKindTarget");
+    let signer = generated_key(KeySuite::Ed448X448, "SelectorKindSigner");
+    let target = generated_key(KeySuite::Ed448X448, "SelectorKindTarget");
     let duplicated = duplicate_userid(
         &target.cert_data,
         "SelectorKindTarget <selectorkindtarget@example.com>",
@@ -93,8 +93,8 @@ fn test_generate_and_verify_user_id_certification_by_selector_accepts_duplicate_
 
 #[test]
 fn test_generate_user_id_certification_public_only_input_rejected() {
-    let signer = generated_key(KeyProfile::Universal, "PublicOnlySigner");
-    let target = generated_key(KeyProfile::Universal, "PublicOnlyTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "PublicOnlySigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "PublicOnlyTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
 
@@ -110,8 +110,8 @@ fn test_generate_user_id_certification_public_only_input_rejected() {
 
 #[test]
 fn test_generate_user_id_certification_by_selector_mismatch_returns_invalid_key_data() {
-    let signer = generated_key(KeyProfile::Universal, "SelectorMismatchSigner");
-    let target = generated_key(KeyProfile::Universal, "SelectorMismatchTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorMismatchSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorMismatchTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let mismatched = [user_id_data.clone(), b"-mismatch".to_vec()].concat();
 
@@ -127,8 +127,8 @@ fn test_generate_user_id_certification_by_selector_mismatch_returns_invalid_key_
 
 #[test]
 fn test_generate_user_id_certification_by_selector_out_of_range_returns_invalid_key_data() {
-    let signer = generated_key(KeyProfile::Universal, "SelectorRangeGenerateSigner");
-    let target = generated_key(KeyProfile::Universal, "SelectorRangeGenerateTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorRangeGenerateSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorRangeGenerateTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
 
     let result = cert_signature::generate_user_id_certification_by_selector(
@@ -144,7 +144,7 @@ fn test_generate_user_id_certification_by_selector_out_of_range_returns_invalid_
 #[test]
 fn test_generate_user_id_certification_without_usable_certifier_returns_signing_failed() {
     let signer = unusable_certification_signer();
-    let target = generated_key(KeyProfile::Universal, "UnusableTarget");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "UnusableTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
 

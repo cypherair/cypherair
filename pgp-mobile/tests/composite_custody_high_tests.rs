@@ -18,7 +18,7 @@ use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
 use openpgp::types::{AEADAlgorithm, PublicKeyAlgorithm, SymmetricAlgorithm};
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{decrypt, PgpEngine};
 use sequoia_openpgp as openpgp;
@@ -60,7 +60,7 @@ fn generates_policy_valid_v6_composite_high_certificate() {
 
     let info = keys::parse_key_info(&material.public_key_data).expect("key info parses");
     assert_eq!(info.key_version, 6);
-    assert_eq!(info.profile, KeyProfile::PostQuantumHigh);
+    assert_eq!(info.suite, KeySuite::MlDsa87Ed448MlKem1024X448);
     assert!(info.has_encryption_subkey);
     assert!(!info.is_revoked);
     assert!(!info.is_expired);

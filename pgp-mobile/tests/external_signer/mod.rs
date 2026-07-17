@@ -321,10 +321,10 @@ fn signing_key_fingerprint(material: &CandidateMaterial) -> String {
     material.signing_key_fingerprint.clone()
 }
 
-fn recipient_profile(version: CandidateVersion) -> keys::KeyProfile {
+fn recipient_profile(version: CandidateVersion) -> keys::KeySuite {
     match version {
-        CandidateVersion::V4 => keys::KeyProfile::Universal,
-        CandidateVersion::V6 => keys::KeyProfile::Advanced,
+        CandidateVersion::V4 => keys::KeySuite::Ed25519LegacyCurve25519Legacy,
+        CandidateVersion::V6 => keys::KeySuite::Ed448X448,
     }
 }
 

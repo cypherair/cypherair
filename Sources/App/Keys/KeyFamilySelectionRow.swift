@@ -5,7 +5,7 @@ import SwiftUI
 /// conveyed by the surrounding segmented control / column header, so the cell
 /// leads with the tier and its concise algorithm line.
 struct KeyFamilySelectionRow: View {
-    let family: PGPKeyConfiguration.Identity
+    let family: PGPKeyFamily
     let isSelected: Bool
     let isEnabled: Bool
     let onSelect: () -> Void

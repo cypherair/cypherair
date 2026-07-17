@@ -12,7 +12,7 @@ extension FFIIntegrationTests {
             name: "Test User A",
             email: "test-a@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let ciphertext = try engine.encrypt(
@@ -42,7 +42,7 @@ extension FFIIntegrationTests {
             name: "Test User B",
             email: "test-b@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         let ciphertext = try engine.encrypt(
@@ -72,7 +72,7 @@ extension FFIIntegrationTests {
             name: "Large Data A",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let ciphertext = try engine.encrypt(
@@ -102,7 +102,7 @@ extension FFIIntegrationTests {
             name: "Large Data B",
             email: nil,
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         let ciphertext = try engine.encrypt(
@@ -141,7 +141,7 @@ extension FFIIntegrationTests {
             name: "Unicode测试用户🔑",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         for testString in testStrings {
@@ -175,7 +175,7 @@ extension FFIIntegrationTests {
             name: chineseName,
             email: "zhangsan@例え.jp",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
@@ -186,52 +186,27 @@ extension FFIIntegrationTests {
         )
     }
 
-    // MARK: - KeyProfile Enum
+    // MARK: - KeySuite Enum
 
-    /// KeyProfile.universal → v4 key, KeyProfile.advanced → v6 key.
-    func test_keyProfileEnum_universal_producesV4() throws {
-        let key = try engine.generateKey(
-            name: "Legacy", email: nil, expirySeconds: nil, profile: .universal
-        )
-
-        let version = try engine.getKeyVersion(certData: key.publicKeyData)
-        XCTAssertEqual(version, 4, "KeyProfile.universal must produce v4 key")
-
-        let detectedProfile = try engine.detectProfile(certData: key.publicKeyData)
-        XCTAssertEqual(detectedProfile, .universal, "detectProfile must return .universal for v4 key")
-    }
-
-    /// KeyProfile.advanced → v6 key.
-    func test_keyProfileEnum_advanced_producesV6() throws {
-        let key = try engine.generateKey(
-            name: "Modern High", email: nil, expirySeconds: nil, profile: .advanced
-        )
-
-        let version = try engine.getKeyVersion(certData: key.publicKeyData)
-        XCTAssertEqual(version, 6, "KeyProfile.advanced must produce v6 key")
-
-        let detectedProfile = try engine.detectProfile(certData: key.publicKeyData)
-        XCTAssertEqual(detectedProfile, .advanced, "detectProfile must return .advanced for v6 key")
-    }
-
-    /// The classical software profiles (A and B) generate keys with all expected components.
-    func test_keyProfileEnum_bothProfiles_generateCompleteKeys() throws {
-        for profile in [KeyProfile.universal, KeyProfile.advanced] {
+    /// The classical software suites generate keys with all expected components,
+    /// and the engine's parse-side classification round-trips each suite.
+    func test_keySuiteEnum_classicalSuites_generateCompleteKeys() throws {
+        for suite in [KeySuite.ed25519LegacyCurve25519Legacy, KeySuite.ed448X448] {
             let key = try engine.generateKey(
-                name: "Complete \(profile)",
+                name: "Complete \(suite)",
                 email: "test@example.com",
                 expirySeconds: 86400 * 365,
-                profile: profile
+                suite: suite
             )
 
-            XCTAssertFalse(key.publicKeyData.isEmpty, "\(profile) public key must not be empty")
-            XCTAssertFalse(key.certData.isEmpty, "\(profile) secret key must not be empty")
-            XCTAssertFalse(key.revocationCert.isEmpty, "\(profile) revocation cert must not be empty")
-            XCTAssertFalse(key.fingerprint.isEmpty, "\(profile) fingerprint must not be empty")
+            XCTAssertFalse(key.publicKeyData.isEmpty, "\(suite) public key must not be empty")
+            XCTAssertFalse(key.certData.isEmpty, "\(suite) secret key must not be empty")
+            XCTAssertFalse(key.revocationCert.isEmpty, "\(suite) revocation cert must not be empty")
+            XCTAssertFalse(key.fingerprint.isEmpty, "\(suite) fingerprint must not be empty")
 
             let info = try engine.parseKeyInfo(keyData: key.publicKeyData)
-            XCTAssertTrue(info.userId?.contains("Complete") == true, "\(profile) user ID must contain name")
-            XCTAssertTrue(info.hasEncryptionSubkey, "\(profile) must have encryption subkey")
+            XCTAssertTrue(info.userId?.contains("Complete") == true, "\(suite) user ID must contain name")
+            XCTAssertTrue(info.hasEncryptionSubkey, "\(suite) must have encryption subkey")
         }
     }
 }

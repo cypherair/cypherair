@@ -10,12 +10,11 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             name: "Software Signer",
             email: "software@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
         let identity = PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
-            keyVersion: UInt8(keyInfo.keyVersion),
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -27,7 +26,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            keyFamily: .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
         let router = StaticPrivateKeyOperationRouter(
@@ -278,13 +277,12 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             name: "Secure Enclave Cleartext",
             email: "secure-cleartext@example.invalid",
             expirySeconds: 3600,
-            configuration: PGPKeyConfiguration.Identity.compatibleP256V4.configuration,
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -296,7 +294,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

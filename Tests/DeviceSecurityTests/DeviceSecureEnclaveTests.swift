@@ -281,7 +281,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
         // 1. Generate Legacy key via FFI.
         let generated = try engine.generateKey(
-            name: "Test A", email: nil, expirySeconds: nil, profile: .universal
+            name: "Test A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // 2. Encrypt a message using the public key (signed).
@@ -341,7 +341,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
         // 1. Generate Modern High key via FFI.
         let generated = try engine.generateKey(
-            name: "Test B", email: nil, expirySeconds: nil, profile: .advanced
+            name: "Test B", email: nil, expirySeconds: nil, suite: .ed448X448
         )
 
         // 2. Encrypt a message (SEIPDv2 AEAD for v6 recipient).

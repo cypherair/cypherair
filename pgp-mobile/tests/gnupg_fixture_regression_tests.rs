@@ -5,7 +5,7 @@
 //! rejection of RFC 9580 v6 keys. Ignored by default; run explicitly to
 //! regenerate the fixture.
 
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 
 /// Generate a Modern High (v6) public key fixture for GnuPG rejection testing.
 /// Run manually: `cargo test test_generate_v6_fixture -- --ignored`
@@ -13,11 +13,11 @@ use pgp_mobile::keys::{self, KeyProfile};
 #[test]
 #[ignore]
 fn test_generate_v6_fixture() {
-    let key_b = keys::generate_key_with_profile(
+    let key_b = keys::generate_key_with_suite(
         "Modern High Test".to_string(),
         Some("modern-high@example.com".to_string()),
         None,
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Modern High key gen should succeed");
 

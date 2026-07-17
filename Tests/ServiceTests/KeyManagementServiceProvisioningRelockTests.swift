@@ -18,7 +18,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Reset Race",
                 email: "reset-race@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -59,7 +59,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Relock Before Auth Mode",
                 email: "relock-before-auth-mode@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -100,7 +100,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Relock Race",
                 email: "relock-race@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -140,7 +140,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Cancelled After Commit",
                 email: "cancelled-after-commit@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -176,7 +176,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Relock During Bundle Commit",
                 email: "relock-during-bundle-commit@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -427,7 +427,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Save Failure",
                 email: "save-failure@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
             XCTFail("Expected metadata save failure")
         } catch RecordingKeyMetadataPersistenceError.saveFailed {
@@ -472,7 +472,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Cancelled After Metadata",
                 email: "cancelled-after-metadata@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -551,7 +551,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Discard Failure",
                 email: "discard-failure@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 
@@ -623,7 +623,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 name: "Protected Relock Race",
                 email: "protected-relock-race@example.com",
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
         }
 

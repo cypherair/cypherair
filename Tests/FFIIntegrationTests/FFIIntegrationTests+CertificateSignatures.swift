@@ -28,7 +28,7 @@ extension FFIIntegrationTests {
             name: "Wrong Direct Target",
             email: "wrong-direct@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let result = try engine.verifyDirectKeySignature(
@@ -81,13 +81,13 @@ extension FFIIntegrationTests {
             name: "FFI Persona Signer",
             email: "ffi-persona-signer@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let target = try engine.generateKey(
             name: "FFI Persona Target",
             email: "ffi-persona-target@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let selector = try userIdSelector(for: target.publicKeyData)
 
@@ -117,19 +117,19 @@ extension FFIIntegrationTests {
             name: "FFI Invalid Signer",
             email: "ffi-invalid-signer@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let target = try engine.generateKey(
             name: "Shared Identity",
             email: "shared-identity@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let wrongTarget = try engine.generateKey(
             name: "Shared Identity",
             email: "shared-identity@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let targetSelector = try userIdSelector(for: target.publicKeyData)
         let wrongTargetSelector = try userIdSelector(for: wrongTarget.publicKeyData)
@@ -183,13 +183,13 @@ extension FFIIntegrationTests {
             name: "FFI Missing Signer",
             email: "ffi-missing-signer@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let target = try engine.generateKey(
             name: "FFI Missing Target",
             email: "ffi-missing-target@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let selector = try userIdSelector(for: target.publicKeyData)
 
@@ -217,13 +217,13 @@ extension FFIIntegrationTests {
             name: "FFI Selector Signer",
             email: "ffi-selector-signer@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let target = try engine.generateKey(
             name: "FFI Selector Target",
             email: "ffi-selector-target@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
         let selector = selectorInput(
@@ -256,7 +256,7 @@ extension FFIIntegrationTests {
             name: "FFI Duplicate Selector Signer",
             email: "ffi-duplicate-selector-signer@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let target = try loadFixture("selector_duplicate_userid_second_revoked_secret")
         let discovered = try engine.discoverCertificateSelectors(certData: target)
@@ -287,13 +287,13 @@ extension FFIIntegrationTests {
             name: "FFI Selector Range Signer",
             email: "ffi-selector-range-signer@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let target = try engine.generateKey(
             name: "FFI Selector Range Target",
             email: "ffi-selector-range-target@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
         let selector = selectorInput(
@@ -331,13 +331,13 @@ extension FFIIntegrationTests {
             name: "FFI Selector Mismatch Signer",
             email: "ffi-selector-mismatch-signer@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let target = try engine.generateKey(
             name: "FFI Selector Mismatch Target",
             email: "ffi-selector-mismatch-target@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
         let selector = selectorInput(

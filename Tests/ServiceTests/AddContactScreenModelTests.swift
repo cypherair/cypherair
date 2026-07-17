@@ -107,7 +107,7 @@ final class AddContactScreenModelTests: XCTestCase {
             name: "Contact",
             email: "contact@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let armoredPublicKeyData = try stack.engine.armorPublicKey(certData: generated.publicKeyData)
         let armoredPublicKey = try XCTUnwrap(String(data: armoredPublicKeyData, encoding: .utf8))
@@ -140,13 +140,13 @@ final class AddContactScreenModelTests: XCTestCase {
             name: "Carol",
             email: "carol@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Carol",
             email: "carol@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
 
@@ -182,7 +182,7 @@ final class AddContactScreenModelTests: XCTestCase {
             name: "Duplicate",
             email: "duplicate@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try stack.contactService.importContact(publicKeyData: generated.publicKeyData)
 
@@ -208,13 +208,13 @@ final class AddContactScreenModelTests: XCTestCase {
             name: "Stale Candidate",
             email: "stale-candidate@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Stale Candidate",
             email: "stale-candidate@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let model = makeModel()
         model.importedKeyData = secondKey.publicKeyData
@@ -253,7 +253,7 @@ final class AddContactScreenModelTests: XCTestCase {
             name: "Pending",
             email: "pending@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let model = makeModel()
         model.importedKeyData = generated.publicKeyData

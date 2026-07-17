@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 @Observable
 final class KeyGenerationScreenModel {
-    typealias GenerateKeyAction = @MainActor (String, String?, UInt64?, PGPKeyConfiguration.Identity) async throws -> PGPKeyIdentity
+    typealias GenerateKeyAction = @MainActor (String, String?, UInt64?, PGPKeyFamily) async throws -> PGPKeyIdentity
     typealias PostGenerationPromptAction = @MainActor (PGPKeyIdentity) -> Void
 
     let configuration: KeyGenerationView.Configuration
@@ -18,12 +18,12 @@ final class KeyGenerationScreenModel {
 
     var name = ""
     var email = ""
-    var selectedFamily: PGPKeyConfiguration.Identity = .recommendedDefault
-    var detailFamily: PGPKeyConfiguration.Identity?
+    var selectedFamily: PGPKeyFamily = .recommendedDefault
+    var detailFamily: PGPKeyFamily?
     var expiryMonths = 24
     var isGenerating = false
     var deviceBoundCommitmentPending = false
-    var presentedFamilyDetail: PGPKeyConfiguration.Identity?
+    var presentedFamilyDetail: PGPKeyFamily?
     var error: CypherAirError?
     var showError = false
     var generatedIdentity: PGPKeyIdentity?
@@ -57,12 +57,12 @@ final class KeyGenerationScreenModel {
     /// A locked configuration (tutorial sandbox) is display-only — selection is
     /// fixed and generation never leaves the locked family — so the full catalog
     /// shows with rows disabled rather than hiding what this container can't build.
-    var availableFamilies: [PGPKeyConfiguration.Identity] {
+    var availableFamilies: [PGPKeyFamily] {
         guard configuration.lockedFamily == nil else {
-            return PGPKeyConfiguration.Identity.orderedFamilies
+            return PGPKeyFamily.orderedFamilies
         }
-        return PGPKeyConfiguration.Identity.orderedFamilies.filter { family in
-            guard family.isDeviceBoundFamily else {
+        return PGPKeyFamily.orderedFamilies.filter { family in
+            guard family.custody == .deviceBound else {
                 return true
             }
             guard isSecureEnclaveGenerationAvailable else {
@@ -70,7 +70,7 @@ final class KeyGenerationScreenModel {
             }
             return capabilityResolver.support(
                 for: .generate,
-                configuration: family.configuration,
+                family: family,
                 custody: .appleSecureEnclavePrivateOperations
             ) == .supported
         }
@@ -95,7 +95,7 @@ final class KeyGenerationScreenModel {
         }
     }
 
-    func selectFamily(_ family: PGPKeyConfiguration.Identity) {
+    func selectFamily(_ family: PGPKeyFamily) {
         guard configuration.lockedFamily == nil else {
             return
         }
@@ -103,26 +103,26 @@ final class KeyGenerationScreenModel {
     }
 
     /// Custody columns present in the offered catalog, in stable order.
-    var availableCustodies: [PGPKeyConfiguration.Identity.Custody] {
-        PGPKeyConfiguration.Identity.Custody.allCases.filter { custody in
+    var availableCustodies: [PGPKeyFamily.Custody] {
+        PGPKeyFamily.Custody.allCases.filter { custody in
             availableFamilies.contains { $0.custody == custody }
         }
     }
 
     /// Custody of the currently selected family; drives the compact segmented control.
-    var selectedCustody: PGPKeyConfiguration.Identity.Custody {
+    var selectedCustody: PGPKeyFamily.Custody {
         selectedFamily.custody
     }
 
     /// Offered families within a custody, in stable presentation order.
-    func families(for custody: PGPKeyConfiguration.Identity.Custody) -> [PGPKeyConfiguration.Identity] {
-        PGPKeyConfiguration.Identity.families(custody: custody, in: availableFamilies)
+    func families(for custody: PGPKeyFamily.Custody) -> [PGPKeyFamily] {
+        PGPKeyFamily.families(custody: custody, in: availableFamilies)
     }
 
     /// Switch the compact picker to another custody, landing on that custody's
     /// recommended family (or its first offering). A no-op when the family is
     /// locked (tutorial sandbox) or already in the requested custody.
-    func selectCustody(_ custody: PGPKeyConfiguration.Identity.Custody) {
+    func selectCustody(_ custody: PGPKeyFamily.Custody) {
         guard configuration.lockedFamily == nil, selectedFamily.custody != custody else {
             return
         }
@@ -143,7 +143,7 @@ final class KeyGenerationScreenModel {
         detailFamily = selectedFamily
     }
 
-    func presentFamilyDetail(_ family: PGPKeyConfiguration.Identity) {
+    func presentFamilyDetail(_ family: PGPKeyFamily) {
         presentedFamilyDetail = family
     }
 
@@ -155,7 +155,7 @@ final class KeyGenerationScreenModel {
     /// commitment sheet first, every time, so the portability consequence is
     /// acknowledged before the key exists.
     func generate() {
-        guard !selectedFamily.isDeviceBoundFamily else {
+        guard selectedFamily.custody != .deviceBound else {
             deviceBoundCommitmentPending = true
             return
         }

@@ -17,12 +17,12 @@ final class PasswordMessageServiceTests: XCTestCase {
     }
 
     private func generateKeyAndContact(
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         name: String = "Password Test"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: profile,
+            suite: suite,
             name: name
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -92,7 +92,7 @@ final class PasswordMessageServiceTests: XCTestCase {
     }
 
     func test_encryptText_seipdv2_withSignature_preservesSignature() async throws {
-        let signer = try await generateKeyAndContact(profile: .advanced, name: "Password Signer")
+        let signer = try await generateKeyAndContact(suite: .ed448X448, name: "Password Signer")
 
         let ciphertext = try await stack.passwordMessageService.encryptText(
             "Signed password service message",
@@ -124,7 +124,7 @@ final class PasswordMessageServiceTests: XCTestCase {
 
         let signer = try await TestHelpers.generateAndStoreKey(
             service: otherStack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Password Stranger"
         )
         let ciphertext = try await otherStack.passwordMessageService.encryptText(
@@ -154,7 +154,7 @@ final class PasswordMessageServiceTests: XCTestCase {
     }
 
     func test_decryptMessage_noSkesk_returnsNoSkesk() async throws {
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient Only")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient Only")
         let ciphertext = try await stack.encryptionService.encryptText(
             "recipient only",
             recipientContactIds: [try contactId(for: recipient)],
