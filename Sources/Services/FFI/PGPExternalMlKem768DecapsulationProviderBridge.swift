@@ -81,7 +81,7 @@ final class PGPExternalMlKem768DecapsulationProviderBridge: ExternalMlKem768Deca
              .revocationArtifactUnavailable,
              .openPGPSemanticFailure,
              .payloadAuthenticationFailure,
-             .migrationOrRecoveryRequired,
+             .recoveryRequired,
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed

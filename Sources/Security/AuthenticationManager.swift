@@ -153,11 +153,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
         self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
-        let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
+        let rewrapRecoveryStrategy = PrivateKeyRewrapRecoveryStrategy(bundleStore: bundleStore)
         self.modeSwitchAuthenticator = PrivateKeyModeSwitchAuthenticator()
         self.rewrapRecoveryCoordinator = PrivateKeyRewrapRecoveryCoordinator(
             bundleStore: bundleStore,
-            migrationCoordinator: migrationCoordinator
+            rewrapRecoveryStrategy: rewrapRecoveryStrategy
         )
         self.rewrapWorkflow = PrivateKeyRewrapWorkflow(
             secureEnclave: secureEnclave,
@@ -430,7 +430,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// target-mode persistence while the journal is cleared.
     func checkAndRecoverFromInterruptedRewrap(
         fingerprints: [String]
-    ) -> KeyMigrationRecoverySummary? {
+    ) -> PrivateKeyRewrapRecoverySummary? {
         rewrapRecoveryCoordinator.checkAndRecoverFromInterruptedRewrap(
             fingerprints: fingerprints,
             privateKeyControlStore: privateKeyControlStore

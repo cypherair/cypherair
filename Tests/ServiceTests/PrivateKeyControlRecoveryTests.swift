@@ -375,13 +375,13 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         // distinct unsafe outcomes to distinct user-facing text. Guarded through
         // nil-ness and outcome differentiation, not the exact localized copy.
         let retryableWarning = AppContainer.postUnlockRecoveryLoadWarning(
-            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .retryableFailure]),
+            rewrapSummary: PrivateKeyRewrapRecoverySummary(outcomes: [.noActionSafe, .retryableFailure]),
             modifyExpiryOutcome: nil
         )
         XCTAssertNotNil(retryableWarning)
 
         let duplicateWarning = AppContainer.postUnlockRecoveryLoadWarning(
-            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),
+            rewrapSummary: PrivateKeyRewrapRecoverySummary(outcomes: [.retryableFailure]),
             modifyExpiryOutcome: .retryableFailure
         )
         XCTAssertEqual(duplicateWarning?.components(separatedBy: "\n").count, 1)
@@ -397,7 +397,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         )
 
         XCTAssertNil(AppContainer.postUnlockRecoveryLoadWarning(
-            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .cleanedPendingSafe]),
+            rewrapSummary: PrivateKeyRewrapRecoverySummary(outcomes: [.noActionSafe, .cleanedPendingSafe]),
             modifyExpiryOutcome: .cleanedPendingSafe
         ))
     }
@@ -425,7 +425,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         let config = AppConfiguration(defaults: defaults)
         let customWarning = "Retry loading protected data after unlocking again."
         let keyWarning = AppContainer.postUnlockRecoveryLoadWarning(
-            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),
+            rewrapSummary: PrivateKeyRewrapRecoverySummary(outcomes: [.retryableFailure]),
             modifyExpiryOutcome: nil
         )
 

@@ -1445,8 +1445,8 @@ final class AppContainer: @unchecked Sendable {
     }
 
     static func postUnlockRecoveryLoadWarning(
-        rewrapSummary: KeyMigrationRecoverySummary?,
-        modifyExpiryOutcome: KeyMigrationRecoveryOutcome?
+        rewrapSummary: PrivateKeyRewrapRecoverySummary?,
+        modifyExpiryOutcome: PrivateKeyRewrapRecoveryOutcome?
     ) -> String? {
         var diagnostics: [String] = []
         for diagnostic in rewrapSummary?.startupDiagnostics ?? [] where !diagnostics.contains(diagnostic) {

@@ -5045,22 +5045,6 @@
         }
       }
     },
-    "error.keyOperationUnavailable.migrationOrRecoveryRequired" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This key needs recovery before it can be used."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此密钥需要先恢复才能使用。"
-          }
-        }
-      }
-    },
     "error.keyOperationUnavailable.openPGPSemanticFailure" : {
       "localizations" : {
         "en" : {
@@ -5249,6 +5233,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此密钥的公钥证书不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.recoveryRequired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key needs recovery before it can be used."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥需要先恢复才能使用。"
           }
         }
       }
@@ -14746,13 +14746,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
+            "value" : "A previous secure key protection change could not be fully recovered. CypherAir X will retry recovery on next launch."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先前的安全密钥迁移未能完全恢复。CypherAir X 将在下次启动时重试恢复。"
+            "value" : "先前的安全密钥保护变更未能完全恢复。CypherAir X 将在下次启动时重试恢复。"
           }
         }
       }
@@ -14762,13 +14762,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A previous secure key migration could not be recovered. Restore from backup if private-key operations fail."
+            "value" : "A previous secure key protection change could not be recovered. Restore from backup if private-key operations fail."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先前的安全密钥迁移无法恢复。如果私钥操作失败，请从备份恢复。"
+            "value" : "先前的安全密钥保护变更无法恢复。如果私钥操作失败，请从备份恢复。"
           }
         }
       }

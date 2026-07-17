@@ -1,8 +1,8 @@
 import Foundation
 import Security
 
-/// Recovery actions for interrupted pending/permanent bundle migrations.
-enum KeyMigrationRecoveryAction: Equatable {
+/// Recovery actions for interrupted pending/permanent bundle rewraps.
+enum PrivateKeyRewrapRecoveryAction: Equatable {
     case none
     case deletePending
     case promotePending
@@ -11,7 +11,7 @@ enum KeyMigrationRecoveryAction: Equatable {
 }
 
 /// Strategy-level recovery outcome for one fingerprint.
-enum KeyMigrationRecoveryOutcome: Equatable {
+enum PrivateKeyRewrapRecoveryOutcome: Equatable {
     case noActionSafe
     case cleanedPendingSafe
     case promotedPendingSafe
@@ -27,12 +27,12 @@ enum KeyMigrationRecoveryOutcome: Equatable {
         case .retryableFailure:
             return String(
                 localized: "startup.recovery.retryable",
-                defaultValue: "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
+                defaultValue: "A previous secure key protection change could not be fully recovered. CypherAir X will retry recovery on next launch."
             )
         case .unrecoverable:
             return String(
                 localized: "startup.recovery.unrecoverable",
-                defaultValue: "A previous secure key migration could not be recovered. Restore from backup if private-key operations fail."
+                defaultValue: "A previous secure key protection change could not be recovered. Restore from backup if private-key operations fail."
             )
         case .noActionSafe, .cleanedPendingSafe, .promotedPendingSafe:
             return nil
@@ -41,8 +41,8 @@ enum KeyMigrationRecoveryOutcome: Equatable {
 }
 
 /// Aggregated recovery result for multi-key auth-mode recovery.
-struct KeyMigrationRecoverySummary: Equatable {
-    let outcomes: [KeyMigrationRecoveryOutcome]
+struct PrivateKeyRewrapRecoverySummary: Equatable {
+    let outcomes: [PrivateKeyRewrapRecoveryOutcome]
 
     var shouldClearRecoveryFlag: Bool {
         !outcomes.contains(.retryableFailure)
@@ -60,11 +60,11 @@ struct KeyMigrationRecoverySummary: Equatable {
         }
     }
 
-    func appendingRetryableFailure() -> KeyMigrationRecoverySummary {
+    func appendingRetryableFailure() -> PrivateKeyRewrapRecoverySummary {
         guard !outcomes.contains(.retryableFailure) else {
             return self
         }
-        return KeyMigrationRecoverySummary(outcomes: outcomes + [.retryableFailure])
+        return PrivateKeyRewrapRecoverySummary(outcomes: outcomes + [.retryableFailure])
     }
 
     var startupDiagnostics: [String] {
@@ -76,15 +76,15 @@ struct KeyMigrationRecoverySummary: Equatable {
     }
 }
 
-/// Shared migration recovery logic for auth-mode rewrap and modify-expiry flows.
-struct KeyMigrationCoordinator {
+/// Shared rewrap-recovery logic for auth-mode rewrap and modify-expiry flows.
+struct PrivateKeyRewrapRecoveryStrategy {
     private let bundleStore: KeyBundleStore
 
     init(bundleStore: KeyBundleStore) {
         self.bundleStore = bundleStore
     }
 
-    func recoveryAction(for fingerprint: String) -> KeyMigrationRecoveryAction {
+    func recoveryAction(for fingerprint: String) -> PrivateKeyRewrapRecoveryAction {
         let permanentState = bundleStore.bundleState(
             fingerprint: fingerprint,
             namespace: .permanent
@@ -111,7 +111,7 @@ struct KeyMigrationCoordinator {
         }
     }
 
-    func recoverInterruptedMigration(for fingerprint: String) -> KeyMigrationRecoveryOutcome {
+    func recoverInterruptedRewrap(for fingerprint: String) -> PrivateKeyRewrapRecoveryOutcome {
         switch recoveryAction(for: fingerprint) {
         case .none:
             return .noActionSafe
@@ -144,10 +144,10 @@ struct KeyMigrationCoordinator {
         }
     }
 
-    func recoverInterruptedMigrations(for fingerprints: [String]) -> KeyMigrationRecoverySummary {
+    func recoverInterruptedRewraps(for fingerprints: [String]) -> PrivateKeyRewrapRecoverySummary {
         let outcomes = fingerprints.map {
-            recoverInterruptedMigration(for: $0)
+            recoverInterruptedRewrap(for: $0)
         }
-        return KeyMigrationRecoverySummary(outcomes: outcomes)
+        return PrivateKeyRewrapRecoverySummary(outcomes: outcomes)
     }
 }
