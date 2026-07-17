@@ -15,8 +15,8 @@ struct DeviceBoundKeyExplainerView: View {
     /// Family-aware custody statement: split-custody families disclose that the
     /// classical half is device-sealed rather than enclave-resident.
     private var custodyText: String {
-        switch key?.openPGPConfigurationIdentity {
-        case .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6:
+        switch key?.keyFamily {
+        case .deviceBoundMlDsa65Ed25519MlKem768X25519, .deviceBoundMlDsa87Ed448MlKem1024X448:
             String(
                 localized: "keydetail.deviceBound.explainer.custodySplit",
                 defaultValue: "This key uses split custody. The post-quantum half lives in this device's Secure Enclave; the classical half is sealed to this device and used briefly in app memory during operations. Every signature and decryption requires the Secure Enclave — neither half works alone."
@@ -35,7 +35,7 @@ struct DeviceBoundKeyExplainerView: View {
                 Section {
                     LabeledContent(
                         String(localized: "keydetail.keyType", defaultValue: "Key Type"),
-                        value: key.openPGPConfigurationIdentity.familyDisplayName
+                        value: key.keyFamily.familyDisplayName
                     )
                 }
             }
@@ -69,7 +69,7 @@ struct DeviceBoundKeyExplainerView: View {
                 }
 
                 Label {
-                    Text(PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement)
+                    Text(PGPKeyFamily.deviceBoundBiometricRequirement)
                 } icon: {
                     Image(systemName: "faceid")
                         .foregroundStyle(.blue)

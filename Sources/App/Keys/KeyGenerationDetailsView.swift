@@ -5,7 +5,7 @@ import SwiftUI
 /// custody badge and any in-flow interoperability warning before generation.
 struct KeyGenerationDetailsView: View {
     let model: KeyGenerationScreenModel
-    let family: PGPKeyConfiguration.Identity
+    let family: PGPKeyFamily
 
     @Environment(KeyManagementService.self) private var keyManagement
     @FocusState private var focusedField: KeyGenerationView.Field?
@@ -123,7 +123,7 @@ struct KeyGenerationDetailsView: View {
             HStack(spacing: CypherSpacing.compact) {
                 Text(family.familyDisplayName)
                     .font(.headline)
-                if family.isDeviceBoundFamily {
+                if family.custody == .deviceBound {
                     KeyCustodyBadge(style: .badge)
                 }
             }

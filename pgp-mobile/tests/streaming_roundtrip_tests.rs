@@ -5,14 +5,14 @@
 mod common;
 
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use std::fs;
 
 /// Helper to generate a key pair for testing.
-fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(name.to_string(), None, None, profile)
+fn gen_key(name: &str, profile: KeySuite) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(name.to_string(), None, None, profile)
         .expect("Key generation should succeed")
 }
 
@@ -21,7 +21,7 @@ fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
 #[test]
 fn test_encrypt_decrypt_file_legacy_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     // Write test data to input file
     let plaintext = b"Hello from Legacy streaming test!";
@@ -75,7 +75,7 @@ fn test_encrypt_decrypt_file_legacy_roundtrip() {
 #[test]
 fn test_encrypt_decrypt_file_modern_high_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Bob", KeyProfile::Advanced);
+    let key = gen_key("Bob", KeySuite::Ed448X448);
 
     let plaintext = b"Hello from Modern High streaming test with AEAD!";
     let input_path = dir.path().join("input.txt");
@@ -112,7 +112,7 @@ fn test_encrypt_decrypt_file_modern_high_roundtrip() {
 #[test]
 fn test_encrypt_decrypt_file_with_signature_legacy() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let plaintext = b"Signed Legacy streaming message";
     let input_path = dir.path().join("input.txt");
@@ -162,7 +162,7 @@ fn test_encrypt_decrypt_file_with_signature_legacy() {
 #[test]
 fn test_encrypt_decrypt_file_with_signature_modern_high() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Bob", KeyProfile::Advanced);
+    let key = gen_key("Bob", KeySuite::Ed448X448);
 
     let plaintext = b"Signed Modern High streaming message with AEAD";
     let input_path = dir.path().join("input.txt");
@@ -207,7 +207,7 @@ fn test_encrypt_decrypt_file_with_signature_modern_high() {
 #[test]
 fn test_sign_verify_detached_file_legacy() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Alice", KeyProfile::Universal);
+    let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let data = b"File content to sign with Legacy";
     let data_path = dir.path().join("document.txt");
@@ -243,7 +243,7 @@ fn test_sign_verify_detached_file_legacy() {
 #[test]
 fn test_sign_verify_detached_file_modern_high() {
     let dir = tempfile::tempdir().unwrap();
-    let key = gen_key("Bob", KeyProfile::Advanced);
+    let key = gen_key("Bob", KeySuite::Ed448X448);
 
     let data = b"File content to sign with Modern High";
     let data_path = dir.path().join("document.txt");
@@ -277,8 +277,8 @@ fn test_sign_verify_detached_file_modern_high() {
 #[test]
 fn test_match_recipients_from_file() {
     let dir = tempfile::tempdir().unwrap();
-    let alice = gen_key("Alice", KeyProfile::Universal);
-    let bob = gen_key("Bob", KeyProfile::Advanced);
+    let alice = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
+    let bob = gen_key("Bob", KeySuite::Ed448X448);
 
     let plaintext = b"Recipient matching test";
     let input_path = dir.path().join("input.txt");
@@ -322,8 +322,8 @@ fn test_match_recipients_from_file() {
 #[test]
 fn test_encrypt_file_cross_profile() {
     let dir = tempfile::tempdir().unwrap();
-    let sender_b = gen_key("Bob", KeyProfile::Advanced);
-    let recipient_a = gen_key("Alice", KeyProfile::Universal);
+    let sender_b = gen_key("Bob", KeySuite::Ed448X448);
+    let recipient_a = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
     let plaintext = b"Cross-profile streaming: B sender to A recipient";
     let input_path = dir.path().join("input.txt");

@@ -20,7 +20,7 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, GeneratedKey, KeyProfile};
+use pgp_mobile::keys::{self, GeneratedKey, KeySuite};
 use pgp_mobile::sign;
 
 mod common;
@@ -30,15 +30,15 @@ use common::sq::{
 
 /// Post-quantum profiles need an sq that reads final RFC 9980 artifacts;
 /// classical profiles only need sq present.
-fn sq_for(profile: &KeyProfile) -> Option<std::path::PathBuf> {
+fn sq_for(profile: &KeySuite) -> Option<std::path::PathBuf> {
     match profile {
-        KeyProfile::PostQuantum | KeyProfile::PostQuantumHigh => require_pq_capable_sq_or_skip(),
+        KeySuite::MlDsa65Ed25519MlKem768X25519 | KeySuite::MlDsa87Ed448MlKem1024X448 => require_pq_capable_sq_or_skip(),
         _ => require_sq_or_skip(),
     }
 }
 
-fn generate_engine_key(profile: KeyProfile, label: &str) -> GeneratedKey {
-    keys::generate_key_with_profile(
+fn generate_engine_key(profile: KeySuite, label: &str) -> GeneratedKey {
+    keys::generate_key_with_suite(
         format!("CypherAir {label} Live"),
         Some(format!(
             "cypherair-{}-live@example.com",
@@ -62,7 +62,7 @@ fn read_file(path: &Path) -> Vec<u8> {
 
 // ── (f) Our engine encrypts → sq decrypts with our imported secret key ─────
 
-fn assert_sq_decrypts_our_message(profile: KeyProfile, label: &str) {
+fn assert_sq_decrypts_our_message(profile: KeySuite, label: &str) {
     let Some(sq) = sq_for(&profile) else {
         return;
     };
@@ -102,32 +102,32 @@ fn assert_sq_decrypts_our_message(profile: KeyProfile, label: &str) {
 
 #[test]
 fn test_sq_decrypts_engine_message_legacy() {
-    assert_sq_decrypts_our_message(KeyProfile::Universal, "Legacy");
+    assert_sq_decrypts_our_message(KeySuite::Ed25519LegacyCurve25519Legacy, "Legacy");
 }
 
 #[test]
 fn test_sq_decrypts_engine_message_modern() {
-    assert_sq_decrypts_our_message(KeyProfile::Modern, "Modern");
+    assert_sq_decrypts_our_message(KeySuite::Ed25519X25519, "Modern");
 }
 
 #[test]
 fn test_sq_decrypts_engine_message_modernhigh() {
-    assert_sq_decrypts_our_message(KeyProfile::Advanced, "ModernHigh");
+    assert_sq_decrypts_our_message(KeySuite::Ed448X448, "ModernHigh");
 }
 
 #[test]
 fn test_sq_decrypts_engine_message_pq() {
-    assert_sq_decrypts_our_message(KeyProfile::PostQuantum, "PQ");
+    assert_sq_decrypts_our_message(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ");
 }
 
 #[test]
 fn test_sq_decrypts_engine_message_pqhigh() {
-    assert_sq_decrypts_our_message(KeyProfile::PostQuantumHigh, "PQHigh");
+    assert_sq_decrypts_our_message(KeySuite::MlDsa87Ed448MlKem1024X448, "PQHigh");
 }
 
 // ── (g) Our engine signs → sq verifies against our public certificate ──────
 
-fn assert_sq_verifies_our_cleartext_signature(profile: KeyProfile, label: &str) {
+fn assert_sq_verifies_our_cleartext_signature(profile: KeySuite, label: &str) {
     let Some(sq) = sq_for(&profile) else {
         return;
     };
@@ -168,25 +168,25 @@ fn assert_sq_verifies_our_cleartext_signature(profile: KeyProfile, label: &str) 
 
 #[test]
 fn test_sq_verifies_engine_signature_legacy() {
-    assert_sq_verifies_our_cleartext_signature(KeyProfile::Universal, "Legacy");
+    assert_sq_verifies_our_cleartext_signature(KeySuite::Ed25519LegacyCurve25519Legacy, "Legacy");
 }
 
 #[test]
 fn test_sq_verifies_engine_signature_modern() {
-    assert_sq_verifies_our_cleartext_signature(KeyProfile::Modern, "Modern");
+    assert_sq_verifies_our_cleartext_signature(KeySuite::Ed25519X25519, "Modern");
 }
 
 #[test]
 fn test_sq_verifies_engine_signature_modernhigh() {
-    assert_sq_verifies_our_cleartext_signature(KeyProfile::Advanced, "ModernHigh");
+    assert_sq_verifies_our_cleartext_signature(KeySuite::Ed448X448, "ModernHigh");
 }
 
 #[test]
 fn test_sq_verifies_engine_signature_pq() {
-    assert_sq_verifies_our_cleartext_signature(KeyProfile::PostQuantum, "PQ");
+    assert_sq_verifies_our_cleartext_signature(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ");
 }
 
 #[test]
 fn test_sq_verifies_engine_signature_pqhigh() {
-    assert_sq_verifies_our_cleartext_signature(KeyProfile::PostQuantumHigh, "PQHigh");
+    assert_sq_verifies_our_cleartext_signature(KeySuite::MlDsa87Ed448MlKem1024X448, "PQHigh");
 }

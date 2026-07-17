@@ -34,33 +34,21 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
 
         private static func validateIdentityContract(_ identity: PGPKeyIdentity) throws {
-            let configuration = identity.openPGPConfiguration
-            guard identity.keyVersion == configuration.keyVersion else {
+            // Custody validity comes from the family's custody axis: the
+            // composite algorithm suite is legal under both custody kinds
+            // (portable software vs device-bound split custody), so the
+            // family — not the suite — decides.
+            switch (identity.keyFamily.custody, identity.privateKeyCustodyKind) {
+            case (.deviceBound, .softwareSecretCertificate):
                 throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata configuration does not match key version."
+                    "Key metadata cannot use software custody for a device-bound family."
                 )
-            }
-
-            // Custody validity is identity-level: the composite suite is legal
-            // under both custody kinds (portable software vs device-bound
-            // split custody), so the suite alone cannot decide.
-            switch (configuration.identity, identity.privateKeyCustodyKind) {
-            case (.compatibleP256V4, .softwareSecretCertificate),
-                 (.modernP256V6, .softwareSecretCertificate),
-                 (.deviceBoundPostQuantumV6, .softwareSecretCertificate),
-                 (.deviceBoundPostQuantumHighV6, .softwareSecretCertificate):
+            case (.portable, .appleSecureEnclavePrivateOperations):
                 throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata cannot use software custody for a device-bound configuration."
+                    "Key metadata cannot use Secure Enclave custody for a portable family."
                 )
-            case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
-                 (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
-                 (.modernHighSoftwareV6, .appleSecureEnclavePrivateOperations),
-                 (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
-                 (.postQuantumHighSoftwareV6, .appleSecureEnclavePrivateOperations):
-                throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata cannot use Secure Enclave custody for a software configuration."
-                )
-            default:
+            case (.deviceBound, .appleSecureEnclavePrivateOperations),
+                 (.portable, .softwareSecretCertificate):
                 return
             }
         }

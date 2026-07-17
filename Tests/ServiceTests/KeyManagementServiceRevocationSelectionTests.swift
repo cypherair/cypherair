@@ -113,7 +113,6 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         let metadata = PGPKeyMetadataAdapter.metadata(from: info)
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
-            keyVersion: metadata.keyVersion,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -125,7 +124,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: try XCTUnwrap(metadata.profile).openPGPConfiguration.identity,
+            keyFamily: try XCTUnwrap(metadata.suite).portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
         try storeIdentity(identity)
@@ -264,38 +263,6 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Missing artifact must not trigger private-key unwrap")
         XCTAssertEqual(metadataPersistence.updateCallCount, updateCountBefore, "Missing artifact must not rewrite metadata")
         XCTAssertTrue(try loadStoredIdentity(fingerprint: identity.fingerprint).revocationCert.isEmpty)
-    }
-
-    func test_generateKey_legacy_revocationCertIsValidOpenPGP() async throws {
-        let identity = try await TestHelpers.generateLegacyKey(service: service)
-
-        XCTAssertFalse(identity.revocationCert.isEmpty, "Revocation cert should not be empty")
-        XCTAssertFalse(identity.publicKeyData.isEmpty, "Public key data should not be empty")
-
-        // engine.parseRevocationCert performs:
-        // 1. Parse as OpenPGP signature packet
-        // 2. Verify signature type is KeyRevocation
-        // 3. Cryptographically verify signature against the key
-        let result = try engine.parseRevocationCert(
-            revData: identity.revocationCert,
-            certData: identity.publicKeyData
-        )
-        XCTAssertTrue(result.lowercased().contains(identity.fingerprint.lowercased()),
-                      "Validation result should contain the key's fingerprint")
-    }
-
-    func test_generateKey_modernHigh_revocationCertIsValidOpenPGP() async throws {
-        let identity = try await TestHelpers.generateModernHighKey(service: service)
-
-        XCTAssertFalse(identity.revocationCert.isEmpty)
-        XCTAssertFalse(identity.publicKeyData.isEmpty)
-
-        let result = try engine.parseRevocationCert(
-            revData: identity.revocationCert,
-            certData: identity.publicKeyData
-        )
-        XCTAssertTrue(result.lowercased().contains(identity.fingerprint.lowercased()),
-                      "Validation result should contain the key's fingerprint")
     }
 
     func test_exportSubkeyRevocationCertificate_legacy_returnsArmoredSignatureAndUnwrapsOnce() async throws {

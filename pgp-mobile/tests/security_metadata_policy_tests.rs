@@ -4,7 +4,7 @@ use pgp_mobile::armor::{self, ArmorKind};
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 
 /// Armor round-trip preserves the correct kind for all known types.
 #[test]
@@ -50,11 +50,11 @@ fn test_armor_encode_unknown_rejected() {
 /// We test this by decoding a valid armored message and verifying known kinds work.
 #[test]
 fn test_armor_decode_known_kinds_not_unknown() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Armor Test".to_string(),
         None,
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
@@ -78,10 +78,10 @@ fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
     let plaintext_bytes = unicode_plaintext.as_bytes();
 
     for (profile, label) in [
-        (KeyProfile::Universal, "Legacy"),
-        (KeyProfile::Advanced, "Modern High"),
+        (KeySuite::Ed25519LegacyCurve25519Legacy, "Legacy"),
+        (KeySuite::Ed448X448, "Modern High"),
     ] {
-        let key = keys::generate_key_with_profile("Unicode Test".to_string(), None, None, profile)
+        let key = keys::generate_key_with_suite("Unicode Test".to_string(), None, None, profile)
             .expect("Key gen should succeed");
 
         let ciphertext =
@@ -108,11 +108,11 @@ fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
 /// with_policy(Some(now)) fails for expired certs.
 #[test]
 fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Expiry Test".to_string(),
         None,
         Some(1),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 

@@ -21,12 +21,12 @@ final class SigningServiceTests: XCTestCase {
 
     /// Generate a key and register it as a contact.
     private func generateKeyAndContact(
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         name: String = "Signer"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: profile,
+            suite: suite,
             name: name
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -45,7 +45,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Cleartext Signing
 
     func test_signCleartext_legacy_producesSignedMessage() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         let signed = try await stack.signingService.signCleartext(
             "Test message for signing",
@@ -61,7 +61,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_signCleartext_modernHigh_producesSignedMessage() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
 
         let signed = try await stack.signingService.signCleartext(
             "Test message Modern High",
@@ -74,7 +74,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Detached Signing
 
     func test_signDetachedStreaming_legacy_producesDetachedSignature() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
         let data = Data("File content for signing".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -89,7 +89,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_signDetachedStreaming_modernHigh_producesDetachedSignature() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
         let data = Data("File content for Modern High signing".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -106,7 +106,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Cleartext Verification
 
     func test_verifyCleartext_validSignature_returnsValid() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         let signed = try await stack.signingService.signCleartext(
             "Verify this message",
@@ -118,7 +118,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_modernHigh_validSignature_returnsValid() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
 
         let signed = try await stack.signingService.signCleartext(
             "Verify this Modern High message",
@@ -131,7 +131,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_tamperedMessage_returnsBad() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         var signed = try await stack.signingService.signCleartext(
             "Original message",
@@ -149,7 +149,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_modernHigh_tamperedMessage_returnsBad() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
 
         var signed = try await stack.signingService.signCleartext(
             "Original Modern High message",
@@ -175,7 +175,7 @@ final class SigningServiceTests: XCTestCase {
 
         let otherIdentity = try await TestHelpers.generateAndStoreKey(
             service: otherStack.keyManagement,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Stranger"
         )
 
@@ -198,7 +198,7 @@ final class SigningServiceTests: XCTestCase {
 
         let otherIdentity = try await TestHelpers.generateAndStoreKey(
             service: otherStack.keyManagement,
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Stranger B"
         )
 
@@ -215,7 +215,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Detached Verification
 
     func test_verifyDetachedStreaming_validSignature_returnsValid() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
         let data = Data("Detached verify data".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -235,7 +235,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyDetachedStreaming_modernHigh_validSignature_returnsValid() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
         let data = Data("Detached verify Modern High data".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -255,7 +255,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyDetachedStreaming_tamperedData_returnsBad() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
         let data = Data("Original detached data".utf8)
         let originalURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: originalURL) }
@@ -280,7 +280,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyDetachedStreaming_modernHigh_tamperedData_returnsBad() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(suite: .ed448X448)
         let data = Data("Original detached Modern High data".utf8)
         let originalURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: originalURL) }
@@ -312,7 +312,7 @@ final class SigningServiceTests: XCTestCase {
             name: "Expiring Signer",
             email: nil,
             expirySeconds: 1,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
@@ -345,7 +345,7 @@ final class SigningServiceTests: XCTestCase {
             name: "Expiring Modern High Signer",
             email: nil,
             expirySeconds: 1,
-            profile: .advanced
+            suite: .ed448X448
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
@@ -373,7 +373,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Known Contact Resolution
 
     func test_verifyCleartext_knownContact_resolvesSigner() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal, name: "Alice Known")
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Alice Known")
 
         let signed = try await stack.signingService.signCleartext(
             "From a known contact",
@@ -388,7 +388,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_modernHigh_knownContact_resolvesSigner() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced, name: "Bob Known")
+        let identity = try await generateKeyAndContact(suite: .ed448X448, name: "Bob Known")
 
         let signed = try await stack.signingService.signCleartext(
             "From a known Modern High contact",

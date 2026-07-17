@@ -4,9 +4,9 @@ struct PGPValidatedPublicCertificate: Equatable, Sendable {
     let publicCertData: Data
     let metadata: PGPKeyMetadata
     /// Contact-importable certificates are always portable software
-    /// certificates, so the engine's detected profile is guaranteed here
-    /// (unlike the optional `PGPKeyMetadata.profile`).
-    let profile: PGPKeyProfile
+    /// certificates, so the engine's detected suite is guaranteed here
+    /// (unlike the optional `PGPKeyMetadata.suite`).
+    let suite: PGPKeySuite
 }
 
 enum PGPPublicCertificateMergeOutcome: Equatable, Sendable {
@@ -54,7 +54,7 @@ final class PGPContactImportAdapter: @unchecked Sendable {
             return PGPValidatedPublicCertificate(
                 publicCertData: validation.publicCertData,
                 metadata: PGPKeyMetadataAdapter.metadata(from: validation),
-                profile: validation.profile.appProfile
+                suite: validation.suite.appSuite
             )
         } catch {
             throw mapContactImportError(error)

@@ -120,7 +120,6 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
     private func makeDeviceBoundIdentity() -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: "2222222222222222222222222222222222222222",
-            keyVersion: 4,
             userId: "Alice <alice@example.com>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -132,7 +131,7 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
             primaryAlgo: "P-256",
             subkeyAlgo: "P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
     }

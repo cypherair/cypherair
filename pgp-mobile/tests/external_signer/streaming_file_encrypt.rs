@@ -5,7 +5,7 @@ fn test_external_signer_runtime_streaming_file_encrypt_decrypts_and_verifies_for
     for version in CandidateVersion::all() {
         let material = build_candidate(version).expect("candidate should build");
         let verifier_cert = material.public_cert.clone();
-        let recipient = keys::generate_key_with_profile(
+        let recipient = keys::generate_key_with_suite(
             format!("File Recipient {}", version.label()),
             Some(format!("file-recipient-{}@example.test", version.label())),
             None,
@@ -44,18 +44,18 @@ fn test_external_signer_runtime_streaming_file_encrypt_decrypts_and_verifies_for
 fn test_external_signer_runtime_streaming_file_encrypt_mixed_recipients_downgrades_to_seipdv1() {
     let material = build_candidate(CandidateVersion::V6).expect("candidate should build");
     let verifier_cert = material.public_cert.clone();
-    let recipient_v4 = keys::generate_key_with_profile(
+    let recipient_v4 = keys::generate_key_with_suite(
         "File Recipient v4".to_string(),
         Some("file-recipient-v4@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("v4 recipient should generate");
-    let recipient_v6 = keys::generate_key_with_profile(
+    let recipient_v6 = keys::generate_key_with_suite(
         "File Recipient v6".to_string(),
         Some("file-recipient-v6@example.test".to_string()),
         None,
-        keys::KeyProfile::Advanced,
+        keys::KeySuite::Ed448X448,
     )
     .expect("v6 recipient should generate");
     let plaintext = b"runtime external streaming file mixed recipients";
@@ -86,18 +86,18 @@ fn test_external_signer_runtime_streaming_file_encrypt_mixed_recipients_downgrad
 fn test_external_signer_runtime_streaming_file_encrypt_to_self_downgrades_and_self_decrypts() {
     let material = build_candidate(CandidateVersion::V6).expect("candidate should build");
     let verifier_cert = material.public_cert.clone();
-    let recipient_v6 = keys::generate_key_with_profile(
+    let recipient_v6 = keys::generate_key_with_suite(
         "File Recipient v6".to_string(),
         Some("file-recipient-v6@example.test".to_string()),
         None,
-        keys::KeyProfile::Advanced,
+        keys::KeySuite::Ed448X448,
     )
     .expect("v6 recipient should generate");
-    let self_v4 = keys::generate_key_with_profile(
+    let self_v4 = keys::generate_key_with_suite(
         "File Self v4".to_string(),
         Some("file-self-v4@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("v4 self key should generate");
     let plaintext = b"runtime external streaming file encrypt to self downgrade";
@@ -124,11 +124,11 @@ fn test_external_signer_runtime_streaming_file_encrypt_to_self_downgrades_and_se
 #[test]
 fn test_external_signer_runtime_streaming_file_encrypt_cancellation_is_preserved() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let input = write_temp_data_file(b"cancel streaming file sign plus encrypt");
@@ -153,11 +153,11 @@ fn test_external_signer_runtime_streaming_file_encrypt_cancellation_is_preserved
 #[test]
 fn test_external_signer_runtime_streaming_file_encrypt_progress_cancellation_is_preserved() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let input = write_temp_data_file(&vec![0x42; 128 * 1024]);
@@ -182,11 +182,11 @@ fn test_external_signer_runtime_streaming_file_encrypt_progress_cancellation_is_
 #[test]
 fn test_external_signer_runtime_streaming_file_encrypt_sanitizes_callback_failures() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let input = write_temp_data_file(b"fail streaming file sign plus encrypt");
@@ -223,11 +223,11 @@ fn test_external_signer_runtime_streaming_file_encrypt_rejects_invalid_responses
     let signing_material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let wrong_digest_material =
         build_candidate(CandidateVersion::V4).expect("candidate should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let input = write_temp_data_file(b"invalid streaming file sign plus encrypt response");
@@ -271,11 +271,11 @@ fn test_external_signer_runtime_streaming_file_encrypt_rejects_invalid_responses
 fn test_external_signer_runtime_streaming_file_encrypt_rejects_wrong_public_key_signature() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let other = build_candidate(CandidateVersion::V4).expect("other should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let input = write_temp_data_file(b"wrong public key streaming file sign plus encrypt");
@@ -301,11 +301,11 @@ fn test_external_signer_runtime_streaming_file_encrypt_rejects_wrong_public_key_
 fn test_external_signer_runtime_streaming_file_encrypt_rejects_mismatched_fingerprint() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let other = build_candidate(CandidateVersion::V4).expect("other should build");
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let input = write_temp_data_file(b"wrong fingerprint streaming file sign plus encrypt");
@@ -330,18 +330,18 @@ fn test_external_signer_runtime_streaming_file_encrypt_rejects_mismatched_finger
 #[test]
 fn test_external_signer_runtime_streaming_file_encrypt_rejects_secret_non_p256_and_wrong_role_inputs(
 ) {
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "File Recipient".to_string(),
         Some("file-recipient@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
-    let secret = keys::generate_key_with_profile(
+    let secret = keys::generate_key_with_suite(
         "Software Secret".to_string(),
         Some("software-secret@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let input = write_temp_data_file(b"invalid streaming file sign plus encrypt inputs");

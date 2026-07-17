@@ -61,7 +61,6 @@ final class KeyCatalogStore {
 
         let updated = PGPKeyIdentity(
             fingerprint: current.fingerprint,
-            keyVersion: metadata.keyVersion,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -73,7 +72,7 @@ final class KeyCatalogStore {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: current.openPGPConfigurationIdentity,
+            keyFamily: current.keyFamily,
             privateKeyCustodyKind: current.privateKeyCustodyKind
         )
 

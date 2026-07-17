@@ -12,7 +12,7 @@ struct KeyGenerationView: View {
 
         var prefilledName: String?
         var prefilledEmail: String?
-        var lockedFamily: PGPKeyConfiguration.Identity?
+        var lockedFamily: PGPKeyFamily?
         var lockedExpiryMonths: Int?
         var postGenerationBehavior: PostGenerationBehavior = .showPrompt
         var onGenerated: (@MainActor (PGPKeyIdentity) -> Void)?

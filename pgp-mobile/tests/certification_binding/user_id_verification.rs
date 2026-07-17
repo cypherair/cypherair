@@ -3,8 +3,8 @@ use super::*;
 
 #[test]
 fn test_verify_user_id_binding_signature_signer_missing_empty_candidates() {
-    let signer = generated_key(KeyProfile::Universal, "MissingSigner");
-    let target = generated_key(KeyProfile::Universal, "MissingTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MissingSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MissingTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
     let signature = cert_signature::generate_user_id_certification_by_selector(
@@ -31,14 +31,14 @@ fn test_verify_user_id_binding_signature_signer_missing_empty_candidates() {
 
 #[test]
 fn test_verify_user_id_binding_signature_invalid_matching_user_id_returns_invalid() {
-    let signer = generated_key(KeyProfile::Universal, "InvalidSigner");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "InvalidSigner");
     let target = generated_key_with_identity(
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
         "Shared Identity",
         "shared-identity@example.com",
     );
     let wrong_target = generated_key_with_identity(
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
         "Shared Identity",
         "shared-identity@example.com",
     );
@@ -77,7 +77,7 @@ fn test_verify_user_id_binding_signature_invalid_matching_user_id_returns_invali
 #[test]
 fn test_verify_user_id_binding_signature_missing_issuer_fallback_succeeds_with_subkey_signer() {
     let (signer_cert, signer_secret_bytes, subkey_fingerprint) = certification_subkey_signer();
-    let target = generated_key(KeyProfile::Universal, "FallbackTarget");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "FallbackTarget");
     let target_cert = parse_cert(&target.public_key_data);
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
@@ -103,7 +103,7 @@ fn test_verify_user_id_binding_signature_missing_issuer_fallback_succeeds_with_s
 #[test]
 fn test_verify_user_id_binding_signature_issuer_guided_rejects_signing_only_subkey() {
     let (signer_cert, signer_public_bytes) = signing_only_subkey_signer();
-    let target = generated_key(KeyProfile::Universal, "IssuerGuidedUserIdTarget");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "IssuerGuidedUserIdTarget");
     let target_cert = parse_cert(&target.public_key_data);
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
@@ -152,7 +152,7 @@ fn test_verify_user_id_binding_signature_issuer_guided_rejects_signing_only_subk
 
 #[test]
 fn test_verify_user_id_binding_signature_wrong_signature_type_returns_err() {
-    let generated = generated_key(KeyProfile::Universal, "WrongTypeDirect");
+    let generated = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "WrongTypeDirect");
     let signature = direct_key_signature_bytes(&generated.public_key_data);
     let user_id_data = first_user_id_bytes(&generated.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
@@ -169,7 +169,7 @@ fn test_verify_user_id_binding_signature_wrong_signature_type_returns_err() {
 
 #[test]
 fn test_verify_user_id_binding_signature_malformed_signature_returns_err() {
-    let generated = generated_key(KeyProfile::Universal, "MalformedSig");
+    let generated = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MalformedSig");
     let user_id_data = first_user_id_bytes(&generated.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
 
@@ -185,8 +185,8 @@ fn test_verify_user_id_binding_signature_malformed_signature_returns_err() {
 
 #[test]
 fn test_verify_user_id_binding_signature_by_selector_out_of_range_returns_invalid_key_data() {
-    let signer = generated_key(KeyProfile::Universal, "SelectorRangeSigner");
-    let target = generated_key(KeyProfile::Universal, "SelectorRangeTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorRangeSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorRangeTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
     let signature = cert_signature::generate_user_id_certification_by_selector(
@@ -209,8 +209,8 @@ fn test_verify_user_id_binding_signature_by_selector_out_of_range_returns_invali
 
 #[test]
 fn test_verify_user_id_binding_signature_by_selector_mismatch_returns_invalid_key_data() {
-    let signer = generated_key(KeyProfile::Universal, "SelectorVerifyMismatchSigner");
-    let target = generated_key(KeyProfile::Universal, "SelectorVerifyMismatchTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorVerifyMismatchSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorVerifyMismatchTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let mismatched = [user_id_data.clone(), b"-mismatch".to_vec()].concat();
     let selector = user_id_selector(&user_id_data, 0);
@@ -239,8 +239,8 @@ fn test_verify_user_id_binding_signature_by_selector_mismatch_returns_invalid_ke
 fn test_verify_user_id_binding_signature_rejects_revoked_signer() {
     use openpgp::types::ReasonForRevocation;
 
-    let signer = generated_key(KeyProfile::Universal, "RevokedVouchSigner");
-    let target = generated_key(KeyProfile::Universal, "RevokedVouchTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "RevokedVouchSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "RevokedVouchTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
 
@@ -309,8 +309,8 @@ fn test_verify_user_id_binding_signature_rejects_sha1_certification() {
     use openpgp::packet::signature::SignatureBuilder;
     use openpgp::types::HashAlgorithm;
 
-    let signer = generated_key(KeyProfile::Universal, "Sha1VouchSigner");
-    let target = generated_key(KeyProfile::Universal, "Sha1VouchTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Sha1VouchSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "Sha1VouchTarget");
     let signer_cert = parse_cert(&signer.cert_data);
     let target_cert = parse_cert(&target.public_key_data);
     let user_id_data = first_user_id_bytes(&target.public_key_data);

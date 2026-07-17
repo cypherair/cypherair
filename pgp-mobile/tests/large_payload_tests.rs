@@ -5,14 +5,14 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 
 /// (extended): 50 MB file encrypt/decrypt (Legacy).
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_50mb_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let plaintext = vec![0xABu8; 50 * 1024 * 1024];
@@ -39,7 +39,7 @@ fn test_file_encrypt_decrypt_50mb_legacy() {
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_100mb_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let plaintext = vec![0xCDu8; 100 * 1024 * 1024];
@@ -62,7 +62,7 @@ fn test_file_encrypt_decrypt_100mb_legacy() {
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_50mb_modern_high() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let plaintext = vec![0xABu8; 50 * 1024 * 1024];
@@ -89,7 +89,7 @@ fn test_file_encrypt_decrypt_50mb_modern_high() {
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_100mb_modern_high() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let plaintext = vec![0xCDu8; 100 * 1024 * 1024];

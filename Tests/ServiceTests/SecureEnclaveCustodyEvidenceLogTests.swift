@@ -9,7 +9,7 @@ final class SecureEnclaveCustodyEvidenceLogTests: XCTestCase {
     func test_summaryLine_rendersStableEnumAndCountTokens() {
         let summary = SecureEnclaveCustodyEvidenceSummary(
             scenario: .ecdhDecrypt,
-            configuration: .modernP256V6,
+            configuration: .deviceBoundEcdsaNistP256EcdhNistP256,
             outcome: .passed,
             observedCategory: nil,
             handleCount: 2,
@@ -17,7 +17,7 @@ final class SecureEnclaveCustodyEvidenceLogTests: XCTestCase {
         )
         XCTAssertEqual(
             summary.line,
-            "SE-CUSTODY-EVIDENCE scenario=ecdhDecrypt outcome=passed config=modernP256V6 handles=2 completeSets=1"
+            "SE-CUSTODY-EVIDENCE scenario=ecdhDecrypt outcome=passed config=deviceBoundEcdsaNistP256EcdhNistP256 handles=2 completeSets=1"
         )
     }
 

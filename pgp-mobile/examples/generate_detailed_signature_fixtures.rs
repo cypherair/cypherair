@@ -18,7 +18,7 @@ use openpgp::serialize::stream::{Armorer, Encryptor, LiteralWriter, Message, Sig
 use openpgp::serialize::Serialize;
 use openpgp::types::SignatureType;
 use pgp_mobile::armor::{self, ArmorKind};
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::signature_details::{
     DetailedSignatureStatus, FileVerifyDetailedResult, SignatureVerificationState,
 };
@@ -195,41 +195,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .join("Fixtures");
     fs::create_dir_all(&fixtures_dir)?;
 
-    let signer_a = keys::generate_key_with_profile(
+    let signer_a = keys::generate_key_with_suite(
         "FFI Detailed Signer A".to_string(),
         Some("ffi-detailed-a@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
-    let signer_b = keys::generate_key_with_profile(
+    let signer_b = keys::generate_key_with_suite(
         "FFI Detailed Signer B".to_string(),
         Some("ffi-detailed-b@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
-    let recipient = keys::generate_key_with_profile(
+    let recipient = keys::generate_key_with_suite(
         "FFI Detailed Recipient".to_string(),
         Some("ffi-detailed-recipient@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
-    let expired_signer = keys::generate_key_with_profile(
+    let expired_signer = keys::generate_key_with_suite(
         "FFI Detailed Expired Signer".to_string(),
         Some("ffi-detailed-expired@example.com".to_string()),
         Some(1),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
-    let bad_signer = keys::generate_key_with_profile(
+    let bad_signer = keys::generate_key_with_suite(
         "FFI Detailed Bad Signer".to_string(),
         Some("ffi-detailed-bad@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
-    let unknown_signer = keys::generate_key_with_profile(
+    let unknown_signer = keys::generate_key_with_suite(
         "FFI Detailed Unknown Signer".to_string(),
         Some("ffi-detailed-unknown@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
 
     let cleartext = sign_cleartext_multi(

@@ -61,7 +61,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
             name: "Expiry Test",
             email: "expiry@example.com",
             expirySeconds: 60 * 60 * 24 * 365,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         XCTAssertEqual(stub.calls, 0, "Generation must not consult the expiry authenticator.")
 
@@ -100,7 +100,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
             name: "Expiry Decline",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let generatesAfterProvisioning = made.mockSE.generateCallCount
 
@@ -145,7 +145,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
             name: "Expiry Legacy",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let updated = try await made.service.modifyExpiry(
@@ -186,7 +186,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
             name: "Expiry Relock",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         do {

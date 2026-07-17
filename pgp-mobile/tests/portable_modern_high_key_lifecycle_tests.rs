@@ -4,35 +4,13 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeyProfile};
-
-/// Export with wrong profile should fail.
-#[test]
-fn test_export_wrong_profile_modern_high() {
-    let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
-            .expect("Key gen should succeed");
-
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::Universal);
-    assert!(
-        result.is_err(),
-        "Exporting v6 key with Universal profile should fail"
-    );
-    let err = result.unwrap_err();
-    match err {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // the export-time profile/key-version mismatch is the only way this
-        // controlled input reaches it, so the prose reason adds nothing.
-        pgp_mobile::error::PgpError::S2kError { .. } => {}
-        other => panic!("Expected S2kError, got: {other:?}"),
-    }
-}
+use pgp_mobile::keys::{self, KeySuite};
 
 /// Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_modern_high() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     // parse_revocation_cert internally requires a KeyRevocation signature and
@@ -46,11 +24,11 @@ fn test_revocation_cert_modern_high() {
 #[test]
 fn test_revocation_cert_wrong_key_modern_high() {
     let key_a =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key A gen should succeed");
 
     let key_b =
-        keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key B gen should succeed");
 
     let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
@@ -69,12 +47,12 @@ fn test_export_modern_high_uses_argon2id() {
     use sequoia_openpgp::parse::Parse;
 
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let passphrase = "s2k-verification-test";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Advanced)
+    let exported = keys::export_secret_key(&key.cert_data, passphrase)
         .expect("Export should succeed");
 
     let s2k_info = keys::parse_s2k_params(&exported).expect("S2K params should parse");
@@ -109,7 +87,7 @@ fn test_export_modern_high_uses_argon2id() {
 #[test]
 fn test_expired_key_detected_modern_high() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, Some(1), KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, Some(1), KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(3));
@@ -125,11 +103,11 @@ fn test_expired_key_detected_modern_high() {
 /// Unicode User ID (Modern High).
 #[test]
 fn test_unicode_user_id_modern_high() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "李四 🛡️".to_string(),
         Some("lisi@example.com".to_string()),
         None,
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key gen with Unicode should succeed");
 
@@ -140,7 +118,7 @@ fn test_unicode_user_id_modern_high() {
 /// match_recipients: Modern High (v6 key, SEIPDv2) returns primary fingerprint.
 #[test]
 fn test_match_recipients_modern_high_returns_primary_fingerprint() {
-    let key = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+    let key = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -162,10 +140,10 @@ fn test_match_recipients_modern_high_returns_primary_fingerprint() {
 #[test]
 fn test_match_recipients_modern_high_wrong_key_returns_error() {
     let alice =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -188,11 +166,11 @@ fn test_match_recipients_modern_high_wrong_key_returns_error() {
 #[test]
 fn test_match_recipients_modern_high_encrypt_to_self() {
     let sender =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let recipient =
-        keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -225,11 +203,11 @@ fn test_match_recipients_modern_high_encrypt_to_self() {
 /// Pass: key is not expired, expiry_timestamp is set, key info updated.
 #[test]
 fn test_modify_expiry_modern_high_extend() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
         Some(365 * 24 * 3600),
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
 
@@ -241,7 +219,7 @@ fn test_modify_expiry_modern_high_extend() {
     assert!(!result.key_info.is_expired);
     assert!(result.key_info.expiry_timestamp.is_some());
     assert_eq!(result.key_info.key_version, 6);
-    assert_eq!(result.key_info.profile, KeyProfile::Advanced);
+    assert_eq!(result.key_info.suite, KeySuite::Ed448X448);
 
     let re_parsed = keys::parse_key_info(&result.public_key_data)
         .expect("Updated public key should be parseable");
@@ -253,11 +231,11 @@ fn test_modify_expiry_modern_high_extend() {
 /// Pass: key has no expiry timestamp, key is not expired.
 #[test]
 fn test_modify_expiry_modern_high_remove() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
         Some(365 * 24 * 3600),
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
 
@@ -277,7 +255,7 @@ fn test_modify_expiry_modern_high_remove() {
 #[test]
 fn test_modify_expiry_modern_high_to_past() {
     let generated =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key generation should succeed");
 
     let result =
@@ -295,11 +273,11 @@ fn test_modify_expiry_modern_high_to_past() {
 /// Verify that encrypt/decrypt still works after modifying expiry on a Modern High key.
 #[test]
 fn test_modify_expiry_modern_high_roundtrip_encrypt_decrypt() {
-    let generated = keys::generate_key_with_profile(
+    let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
         Some(365 * 24 * 3600),
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
 

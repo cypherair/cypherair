@@ -67,7 +67,7 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
                 name: "Device Secure Enclave Interop",
                 email: "device-se-interop@example.invalid",
                 expirySeconds: 3600,
-                configuration: PGPKeyConfiguration.Identity.compatibleP256V4.configuration,
+                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
                 handlePair: loadedPair,
                 digestSigner: SystemSecureEnclaveCustodyDigestSigner()
             )
@@ -160,7 +160,7 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         )
         XCTAssertEqual(decrypted.summaryState, .notSigned)
 
-        recordEvidence(.gnupgInteropV4, configuration: .compatibleP256V4)
+        recordEvidence(.gnupgInteropV4, configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4)
     }
 
     // MARK: - gpg process harness

@@ -12,7 +12,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Certified Contact",
             email: "pr6-certified@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -64,7 +64,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Manual Separate",
             email: "pr6-manual@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(
             publicKeyData: generated.publicKeyData,
@@ -98,7 +98,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Stale Digest",
             email: "pr6-stale-digest@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -136,7 +136,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Backfill Digest",
             email: "pr6-backfill@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -176,7 +176,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Dedupe Refresh",
             email: "pr6-dedupe@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -248,7 +248,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Recompute Stale Digest",
             email: "pr6-recompute-stale@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -299,7 +299,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Recompute Artifact Only",
             email: "pr6-recompute-artifact@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
@@ -350,7 +350,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             name: "PR6 Recompute Valid Digest",
             email: "pr6-recompute-valid@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))

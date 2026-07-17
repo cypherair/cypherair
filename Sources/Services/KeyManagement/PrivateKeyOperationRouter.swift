@@ -103,8 +103,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity
     ) async -> PrivateKeyOperationRoute {
-        let configuration = identity.openPGPConfiguration
-        guard let tier = configuration.identity.deviceBoundCustodyTier else {
+        guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
             return .blocked(.unsupported(.invalidConfigurationCustody))
         }
         switch tier {
@@ -126,10 +125,6 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity
     ) async -> PrivateKeyOperationRoute {
-        let configuration = identity.openPGPConfiguration
-        guard configuration.keyVersion == identity.keyVersion else {
-            return .blocked(.unsupported(.invalidConfigurationCustody))
-        }
         guard !identity.publicKeyData.isEmpty else {
             return .blocked(.unavailable(.publicMaterialUnavailable))
         }
@@ -270,10 +265,6 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         identity: PGPKeyIdentity,
         tier: SecureEnclaveCustodyTier
     ) async -> PrivateKeyOperationRoute {
-        let configuration = identity.openPGPConfiguration
-        guard configuration.keyVersion == identity.keyVersion else {
-            return .blocked(.unavailable(.metadataAssociationMismatch))
-        }
         guard !identity.publicKeyData.isEmpty else {
             return .blocked(.unavailable(.publicMaterialUnavailable))
         }

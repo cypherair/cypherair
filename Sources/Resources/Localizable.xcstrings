@@ -9445,7 +9445,7 @@
         }
       }
     },
-    "keyFamily.deviceBoundCompatible.description" : {
+    "keyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.description" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9461,7 +9461,7 @@
         }
       }
     },
-    "keyFamily.deviceBoundCompatible.name" : {
+    "keyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.name" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9477,7 +9477,7 @@
         }
       }
     },
-    "keyFamily.deviceBoundCompatible.securityLevel" : {
+    "keyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.securityLevel" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9493,7 +9493,7 @@
         }
       }
     },
-    "keyFamily.deviceBoundCompatible.subtitle" : {
+    "keyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.subtitle" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9861,7 +9861,7 @@
         }
       }
     },
-    "keyFamily.portableCompatible.algorithms" : {
+    "keyFamily.portableEd25519LegacyCurve25519Legacy.algorithms" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9877,7 +9877,7 @@
         }
       }
     },
-    "keyFamily.portableCompatible.description" : {
+    "keyFamily.portableEd25519LegacyCurve25519Legacy.description" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9893,7 +9893,7 @@
         }
       }
     },
-    "keyFamily.portableCompatible.name" : {
+    "keyFamily.portableEd25519LegacyCurve25519Legacy.name" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9909,7 +9909,7 @@
         }
       }
     },
-    "keyFamily.portableCompatible.securityLevel" : {
+    "keyFamily.portableEd25519LegacyCurve25519Legacy.securityLevel" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9925,7 +9925,7 @@
         }
       }
     },
-    "keyFamily.portableCompatible.subtitle" : {
+    "keyFamily.portableEd25519LegacyCurve25519Legacy.subtitle" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {

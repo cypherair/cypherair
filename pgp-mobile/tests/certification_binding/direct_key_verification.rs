@@ -3,7 +3,7 @@ use super::*;
 
 #[test]
 fn test_verify_direct_key_signature_valid_legacy_and_modern_high() {
-    for profile in [KeyProfile::Universal, KeyProfile::Advanced] {
+    for profile in [KeySuite::Ed25519LegacyCurve25519Legacy, KeySuite::Ed448X448] {
         let generated = generated_key(profile, "DirectValid");
         let signature = direct_key_signature_bytes(&generated.public_key_data);
 
@@ -26,8 +26,8 @@ fn test_verify_direct_key_signature_valid_legacy_and_modern_high() {
 
 #[test]
 fn test_verify_direct_key_signature_invalid_returns_invalid() {
-    let signer = generated_key(KeyProfile::Universal, "DirectSigner");
-    let other_target = generated_key(KeyProfile::Universal, "OtherTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "DirectSigner");
+    let other_target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "OtherTarget");
     let signature = direct_key_signature_bytes(&signer.public_key_data);
 
     let result = cert_signature::verify_direct_key_signature(
@@ -45,7 +45,7 @@ fn test_verify_direct_key_signature_invalid_returns_invalid() {
 
 #[test]
 fn test_verify_direct_key_signature_signer_missing_empty_candidates() {
-    let generated = generated_key(KeyProfile::Universal, "DirectMissing");
+    let generated = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "DirectMissing");
     let signature = direct_key_signature_bytes(&generated.public_key_data);
 
     let result =
@@ -60,8 +60,8 @@ fn test_verify_direct_key_signature_signer_missing_empty_candidates() {
 
 #[test]
 fn test_verify_direct_key_signature_wrong_signature_type_returns_err() {
-    let signer = generated_key(KeyProfile::Universal, "WrongTypeSigner");
-    let target = generated_key(KeyProfile::Universal, "WrongTypeTarget");
+    let signer = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "WrongTypeSigner");
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "WrongTypeTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let selector = user_id_selector(&user_id_data, 0);
     let signature = cert_signature::generate_user_id_certification_by_selector(

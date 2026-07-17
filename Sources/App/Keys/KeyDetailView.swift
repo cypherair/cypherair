@@ -88,14 +88,14 @@ private struct KeyDetailScreenHostView: View {
                             NavigationLink(value: AppRoute.deviceBoundKeyExplainer(fingerprint: model.fingerprint)) {
                                 LabeledContent(
                                     String(localized: "keydetail.keyType", defaultValue: "Key Type"),
-                                    value: key.openPGPConfigurationIdentity.familyDisplayName
+                                    value: key.keyFamily.familyDisplayName
                                 )
                             }
                             .accessibilityIdentifier("keydetail.keyType.explainer")
                         } else {
                             LabeledContent(
                                 String(localized: "keydetail.keyType", defaultValue: "Key Type"),
-                                value: key.openPGPConfigurationIdentity.familyDisplayName
+                                value: key.keyFamily.familyDisplayName
                             )
                         }
 
@@ -123,7 +123,7 @@ private struct KeyDetailScreenHostView: View {
                         )
                         LabeledContent(
                             String(localized: "keydetail.security", defaultValue: "Security Level"),
-                            value: key.openPGPConfigurationIdentity.familySecurityLevel
+                            value: key.keyFamily.familySecurityLevel
                         )
                         LabeledContent(
                             String(localized: "keydetail.shortKeyId", defaultValue: "Short Key ID"),

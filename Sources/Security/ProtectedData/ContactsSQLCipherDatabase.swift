@@ -245,7 +245,7 @@ final class ContactsSQLCipherDatabase {
                 display_name TEXT NOT NULL,
                 email TEXT,
                 key_version INTEGER NOT NULL,
-                profile TEXT NOT NULL,
+                suite TEXT NOT NULL,
                 primary_algo TEXT NOT NULL,
                 subkey_algo TEXT,
                 has_encryption_subkey INTEGER NOT NULL,
@@ -512,7 +512,7 @@ final class ContactsSQLCipherDatabase {
                 display_name,
                 email,
                 key_version,
-                profile,
+                suite,
                 primary_algo,
                 subkey_algo,
                 has_encryption_subkey,
@@ -537,7 +537,7 @@ final class ContactsSQLCipherDatabase {
             try bindText(keyRecord.displayName, to: statement, at: 6)
             try bindOptionalText(keyRecord.email, to: statement, at: 7)
             try bindInt(Int(keyRecord.keyVersion), to: statement, at: 8)
-            try bindText(keyRecord.profile.rawValue, to: statement, at: 9)
+            try bindText(keyRecord.suite.rawValue, to: statement, at: 9)
             try bindText(keyRecord.primaryAlgo, to: statement, at: 10)
             try bindOptionalText(keyRecord.subkeyAlgo, to: statement, at: 11)
             try bindBool(keyRecord.hasEncryptionSubkey, to: statement, at: 12)
@@ -723,7 +723,7 @@ final class ContactsSQLCipherDatabase {
                 display_name,
                 email,
                 key_version,
-                profile,
+                suite,
                 primary_algo,
                 subkey_algo,
                 has_encryption_subkey,
@@ -744,10 +744,10 @@ final class ContactsSQLCipherDatabase {
             var records: [ContactKeyRecord] = []
             while try stepRow(statement, operation: "load-key-records") {
                 let keyID = try columnString(statement, at: 0)
-                let profileRawValue = try columnString(statement, at: 7)
-                guard let profile = PGPKeyProfile(rawValue: profileRawValue) else {
+                let suiteRawValue = try columnString(statement, at: 7)
+                guard let suite = PGPKeySuite(rawValue: suiteRawValue) else {
                     throw ProtectedDataError.invalidEnvelope(
-                        "Contacts SQLCipher key profile is unsupported."
+                        "Contacts SQLCipher key suite is unsupported."
                     )
                 }
                 let verificationRawValue = try columnString(statement, at: 13)
@@ -786,7 +786,7 @@ final class ContactsSQLCipherDatabase {
                         displayName: try columnString(statement, at: 4),
                         email: try columnOptionalString(statement, at: 5),
                         keyVersion: UInt8(keyVersion),
-                        profile: profile,
+                        suite: suite,
                         primaryAlgo: try columnString(statement, at: 8),
                         subkeyAlgo: try columnOptionalString(statement, at: 9),
                         hasEncryptionSubkey: try columnBool(statement, at: 10),

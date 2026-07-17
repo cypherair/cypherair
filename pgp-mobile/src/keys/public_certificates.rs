@@ -16,12 +16,12 @@ pub fn validate_public_certificate(
 
     let public_cert_data = serialize_public_cert(&cert)?;
     let key_info = parse_key_info(&public_cert_data)?;
-    let profile = key_info.profile;
+    let suite = key_info.suite;
 
     Ok(PublicCertificateValidationResult {
         public_cert_data,
         key_info,
-        profile,
+        suite,
     })
 }
 

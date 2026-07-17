@@ -61,41 +61,30 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
 }
 
 /// Export a secret key protected with a passphrase.
-/// - Portable Legacy (Universal): Iterated+Salted S2K (mode 3) — GnuPG compatible.
-/// - Every v6 profile (Modern, Advanced, Post-Quantum, Post-Quantum · High):
-///   Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
+///
+/// The S2K mode is derived from the certificate's classified suite:
+/// - `Ed25519LegacyCurve25519Legacy`: Iterated+Salted S2K (mode 3) — GnuPG compatible.
+/// - Every v6 suite: Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
 ///
 /// Returns ASCII-armored key data with passphrase-encrypted secret key material.
-pub fn export_secret_key(
-    cert_data: &[u8],
-    passphrase: &str,
-    profile: KeyProfile,
-) -> Result<Vec<u8>, PgpError> {
+pub fn export_secret_key(cert_data: &[u8], passphrase: &str) -> Result<Vec<u8>, PgpError> {
     let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
         reason: e.to_string(),
     })?;
 
-    // Validate that the provided profile matches the key's actual shape.
-    // Algorithm-aware: a v6 RFC 9980 composite cert is Post-Quantum, not
-    // Portable Modern · High, so a bare version check is not sufficient.
-    let key_version = cert.primary_key().key().version();
-    let expected_profile = super::profile::classify_profile(&cert);
-    if profile != expected_profile {
-        return Err(PgpError::S2kError {
-            reason: format!(
-                "Profile mismatch: requested {:?} but key is v{} ({:?})",
-                profile, key_version, expected_profile
-            ),
-        });
-    }
+    // Classify the certificate to pick the S2K mode. Algorithm-aware: a v6
+    // RFC 9980 composite cert is a post-quantum suite, not the high classical
+    // one, so a bare version check would not be sufficient.
+    let suite = super::suite::classify_suite(&cert);
+    let uses_argon2id = suite != KeySuite::Ed25519LegacyCurve25519Legacy;
 
     let password = openpgp::crypto::Password::from(passphrase);
 
     // Encrypt each secret key component with the passphrase.
-    // For Portable Legacy: Sequoia's default S2K (Iterated+Salted) is appropriate.
-    // For Portable Modern · High: We must explicitly use Argon2id S2K, because Sequoia's
-    // S2K::default() returns Iterated+Salted for all key versions.
-    // PRD requires Argon2id (512 MB / p=4 / ~3s) for Portable Modern · High exports.
+    // For the legacy suite: Sequoia's default S2K (Iterated+Salted) is appropriate.
+    // For the v6 suites: We must explicitly use Argon2id S2K, because Sequoia's
+    // S2K::default() returns Iterated+Salted for all key versions, and the PRD
+    // requires Argon2id (512 MB / p=4 / ~3s) for v6 exports.
     let mut encrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
     // Encrypt primary key
@@ -111,12 +100,10 @@ pub fn export_secret_key(
             .map_err(|e| PgpError::S2kError {
                 reason: format!("Primary key has no secret parts: {e}"),
             })?;
-        let encrypted = match profile {
-            KeyProfile::Universal => primary.encrypt_secret(&password),
-            KeyProfile::Advanced
-            | KeyProfile::Modern
-            | KeyProfile::PostQuantum
-            | KeyProfile::PostQuantumHigh => encrypt_key_argon2id(primary, &password),
+        let encrypted = if uses_argon2id {
+            encrypt_key_argon2id(primary, &password)
+        } else {
+            primary.encrypt_secret(&password)
         }
         .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt primary key: {e}"),
@@ -127,12 +114,10 @@ pub fn export_secret_key(
     // Encrypt subkeys
     for ka in cert.keys().subkeys().secret() {
         let key = ka.key().clone();
-        let encrypted = match profile {
-            KeyProfile::Universal => key.encrypt_secret(&password),
-            KeyProfile::Advanced
-            | KeyProfile::Modern
-            | KeyProfile::PostQuantum
-            | KeyProfile::PostQuantumHigh => encrypt_key_argon2id(key, &password),
+        let encrypted = if uses_argon2id {
+            encrypt_key_argon2id(key, &password)
+        } else {
+            key.encrypt_secret(&password)
         }
         .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt subkey: {e}"),

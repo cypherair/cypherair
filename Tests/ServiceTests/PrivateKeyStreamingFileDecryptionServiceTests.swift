@@ -12,9 +12,9 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             name: "Software File Recipient",
             email: "software-file-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
-        let identity = try softwareIdentity(from: generated, profile: .universal, isDefault: true)
+        let identity = try softwareIdentity(from: generated, suite: .ed25519LegacyCurve25519Legacy, isDefault: true)
         let router = StaticStreamingPrivateKeyOperationRouter(
             route: .softwareSecretCertificate(
                 SoftwareSecretCertificateRoute(identity: identity, operation: .decrypt)
@@ -51,27 +51,27 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
 
     func test_secureEnclaveRouteDecryptsV4FileWithoutUnwrappingSecretCertificate() async throws {
         try await assertSecureEnclaveRouteDecryptsFile(
-            configurationIdentity: .compatibleP256V4,
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             plaintext: "secure enclave v4 file decrypt 🔐"
         )
     }
 
     func test_secureEnclaveRouteDecryptsV6FileWithoutUnwrappingSecretCertificate() async throws {
         try await assertSecureEnclaveRouteDecryptsFile(
-            configurationIdentity: .modernP256V6,
+            family: .deviceBoundEcdsaNistP256EcdhNistP256,
             plaintext: "secure enclave v6 file decrypt 🛡️"
         )
     }
 
     func test_secureEnclaveSignedFileFoldsSignatureVerification() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let signer = try engine.generateKey(
             name: "Folding File Signer",
             email: "folding-file-signer@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
-        let signerIdentity = try softwareIdentity(from: signer, profile: .universal)
+        let signerIdentity = try softwareIdentity(from: signer, suite: .ed25519LegacyCurve25519Legacy)
         let input = try await writeEncryptedInputFile(
             plaintext: "signed secure enclave file",
             recipientPublicKey: fixture.identity.publicKeyData,
@@ -104,7 +104,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveFileDecryptUsesRealCatalogRouterAndSharedHandleStore() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
@@ -144,7 +144,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_blockingPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
@@ -218,7 +218,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_signerRouteThrowsRoleMismatchWithoutUnwrappingOrOutput() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let input = try makeTemporaryFile(Data([0x01]))
         let output = makeTemporaryOutputURL()
         defer { cleanup(input, output) }
@@ -255,7 +255,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveCallbackFailureMapsToUnavailableCategoryWithoutSoftwareFallback() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let input = try await writeEncryptedInputFile(
             plaintext: "callback failure file",
             recipientPublicKey: fixture.identity.publicKeyData
@@ -292,8 +292,8 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveRecipientMismatchFailsClosedWithoutUnwrappingOrOutput() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
-        let otherFixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
+        let otherFixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         // Encrypt to a DIFFERENT Secure Enclave-shaped recipient than the route binds.
         let input = try await writeEncryptedInputFile(
             plaintext: "recipient mismatch file",
@@ -328,22 +328,22 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveTamperedV4FileHardFailsWithoutPlaintext() async throws {
-        try await assertSecureEnclaveTamperHardFails(configurationIdentity: .compatibleP256V4)
+        try await assertSecureEnclaveTamperHardFails(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
     }
 
     func test_secureEnclaveTamperedV6FileHardFailsWithoutPlaintext() async throws {
-        try await assertSecureEnclaveTamperHardFails(configurationIdentity: .modernP256V6)
+        try await assertSecureEnclaveTamperHardFails(family: .deviceBoundEcdsaNistP256EcdhNistP256)
     }
 
     // MARK: - Mixed recipients, repeated operations, no partial plaintext
 
     func test_secureEnclaveRouteDecryptsMixedRecipientFileWithoutUnwrap() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let otherRecipient = try engine.generateKey(
             name: "Other File Recipient",
             email: "other-file-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let adapter = PGPMessageOperationAdapter(engine: engine)
         let plaintext = "secure enclave mixed-recipient file decrypt 🔐"
@@ -383,7 +383,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveRepeatedFileDecryptsLeaveNoResidualArtifacts() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let adapter = PGPMessageOperationAdapter(engine: engine)
         // Large enough that the streaming payload spans multiple reads and a scratch
         // temp file is actually created and renamed on each run.
@@ -426,12 +426,12 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveMixedRecipientFileTamperHardFailsWithoutPartialOutput() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let otherRecipient = try engine.generateKey(
             name: "Other Tamper Recipient",
             email: "other-tamper-recipient@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let adapter = PGPMessageOperationAdapter(engine: engine)
         let plaintext = String(repeating: "mixed-recipient tamper target ", count: 600)
@@ -483,10 +483,10 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     // MARK: - Shared assertions
 
     private func assertSecureEnclaveRouteDecryptsFile(
-        configurationIdentity: PGPKeyConfiguration.Identity,
+        family: PGPKeyFamily,
         plaintext: String
     ) async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: configurationIdentity)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: family)
         let input = try await writeEncryptedInputFile(
             plaintext: plaintext,
             recipientPublicKey: fixture.identity.publicKeyData
@@ -514,9 +514,9 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     }
 
     private func assertSecureEnclaveTamperHardFails(
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: configurationIdentity)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: family)
         let adapter = PGPMessageOperationAdapter(engine: engine)
         // Large plaintext so the SEIPD body is substantial and the tail tamper lands
         // well inside the encrypted payload rather than the PKESK header.
@@ -581,7 +581,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     // MARK: - Helpers
 
     func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
-        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let fixture = try await makeSecureEnclaveDecryptFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         let input = try await writeEncryptedInputFile(
             plaintext: "authorized streaming decrypt",
             recipientPublicKey: fixture.identity.publicKeyData
@@ -743,13 +743,12 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
 
     private func softwareIdentity(
         from generated: GeneratedKey,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         isDefault: Bool = false
     ) throws -> PGPKeyIdentity {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
-            keyVersion: UInt8(keyInfo.keyVersion),
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -761,13 +760,13 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: profile.openPGPConfiguration.identity,
+            keyFamily: suite.portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 
     private func makeSecureEnclaveDecryptFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws -> SecureEnclaveFileDecryptFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
@@ -779,13 +778,12 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             name: "Secure Enclave File Decrypt",
             email: "secure-file-decrypt@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -797,7 +795,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

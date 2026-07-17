@@ -60,7 +60,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile
+        suite: PGPKeySuite
     ) async throws -> PGPGeneratedKeyMaterial {
         do {
             return try await Self.performGenerateKey(
@@ -68,7 +68,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                profile: profile,
+                suite: suite,
                 zeroizeSecretData: zeroizeSecretData
             )
         } catch {
@@ -106,15 +106,13 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
 
     func exportSecretKey(
         certData: Data,
-        passphrase: String,
-        profile: PGPKeyProfile
+        passphrase: String
     ) async throws -> Data {
         do {
             return try await Self.performExportSecretKey(
                 engine: engine,
                 certData: certData,
-                passphrase: passphrase,
-                profile: profile
+                passphrase: passphrase
             )
         } catch {
             throw PGPErrorMapper.map(error) { .s2kError(reason: $0) }
@@ -191,14 +189,14 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         zeroizeSecretData: PGPSecretDataZeroizer
     ) async throws -> PGPGeneratedKeyMaterial {
         var generated = try engine.generateKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            profile: profile.ffiValue
+            suite: suite.ffiValue
         )
         var shouldZeroizeSecret = true
         defer {
@@ -210,7 +208,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
         let metadata = PGPKeyMetadataAdapter.metadata(
             from: keyInfo,
-            profile: profile.ffiValue
+            suite: suite.ffiValue
         )
         let material = PGPGeneratedKeyMaterial(
             certData: generated.certData,
@@ -241,10 +239,10 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         }
 
         let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
-        let profile = try engine.detectProfile(certData: secretKeyData)
+        let suite = try engine.detectSuite(certData: secretKeyData)
         let metadata = PGPKeyMetadataAdapter.metadata(
             from: keyInfo,
-            profile: profile
+            suite: suite
         )
         let armoredPublicKey = try engine.armorPublicKey(certData: secretKeyData)
         let publicKeyData = try engine.dearmor(armored: armoredPublicKey)
@@ -263,13 +261,11 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
     private static func performExportSecretKey(
         engine: PgpEngine,
         certData: Data,
-        passphrase: String,
-        profile: PGPKeyProfile
+        passphrase: String
     ) async throws -> Data {
         try engine.exportSecretKey(
             certData: certData,
-            passphrase: passphrase,
-            profile: profile.ffiValue
+            passphrase: passphrase
         )
     }
 

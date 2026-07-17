@@ -199,7 +199,7 @@ extension FFIIntegrationTests {
             name: "FFI Detailed Recipient",
             email: "ffi-detailed@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let ciphertext = try engine.encryptBinary(
@@ -224,13 +224,13 @@ extension FFIIntegrationTests {
             name: "FFI Detailed Modern High Signer",
             email: "ffi-detailed-b@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let recipient = try engine.generateKey(
             name: "FFI Detailed Modern High Recipient",
             email: "ffi-detailed-b-recipient@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         let signed = try engine.signCleartext(

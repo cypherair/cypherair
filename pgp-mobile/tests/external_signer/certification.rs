@@ -27,7 +27,7 @@ fn first_subkey_fingerprint(public_cert: &[u8]) -> String {
 }
 
 fn generated_target(version: CandidateVersion) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+    keys::generate_key_with_suite(
         format!("External Certification Target {}", version.label()),
         Some(format!(
             "external-certification-target-{}@example.test",
@@ -195,15 +195,15 @@ fn test_external_signer_runtime_user_id_certifications_verify_for_v4_and_v6() {
 
 #[test]
 fn test_software_user_id_certification_keeps_default_hash() {
-    for profile in [keys::KeyProfile::Universal, keys::KeyProfile::Advanced] {
-        let signer = keys::generate_key_with_profile(
+    for profile in [keys::KeySuite::Ed25519LegacyCurve25519Legacy, keys::KeySuite::Ed448X448] {
+        let signer = keys::generate_key_with_suite(
             "Software Certification Hash".to_string(),
             Some("software-certification-hash@example.test".to_string()),
             None,
             profile,
         )
         .expect("software signer should generate");
-        let target = keys::generate_key_with_profile(
+        let target = keys::generate_key_with_suite(
             "Software Certification Target".to_string(),
             Some("software-certification-target@example.test".to_string()),
             None,
@@ -302,11 +302,11 @@ fn test_external_signer_runtime_user_id_certification_requires_certification_cap
 #[test]
 fn test_external_signer_runtime_user_id_certification_rejects_secret_non_p256_and_wrong_role_inputs(
 ) {
-    let secret = keys::generate_key_with_profile(
+    let secret = keys::generate_key_with_suite(
         "Secret Certification".to_string(),
         Some("secret-certification@example.test".to_string()),
         None,
-        keys::KeyProfile::Universal,
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     let target = generated_target(CandidateVersion::V4);

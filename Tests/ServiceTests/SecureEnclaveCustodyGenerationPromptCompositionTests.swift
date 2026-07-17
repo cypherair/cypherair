@@ -66,7 +66,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
                 name: "SE Custody Composition",
                 email: nil,
                 expirySeconds: nil,
-                configurationIdentity: .compatibleP256V4
+                family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
         }
         await fulfillment(of: [gate.suspendedExpectation], timeout: 30)
@@ -115,7 +115,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
                 name: "SE Custody Outside Prompt",
                 email: nil,
                 expirySeconds: nil,
-                configurationIdentity: .compatibleP256V4
+                family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
         }
         await fulfillment(of: [gate.suspendedExpectation], timeout: 30)
@@ -148,7 +148,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             name: "SE Custody Plain",
             email: nil,
             expirySeconds: nil,
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
         XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
@@ -169,7 +169,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             name: "SE Custody",
             email: nil,
             expirySeconds: nil,
-            configurationIdentity: .compatibleP256V4
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
         XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)

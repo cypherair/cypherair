@@ -15,30 +15,26 @@ use zeroize::Zeroizing;
 use crate::armor;
 use crate::error::PgpError;
 
-/// Encryption profile selection.
-/// Portable Legacy (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
-/// Modern: v6, Ed25519+X25519, SEIPDv2 AEAD OCB, Argon2id S2K.
-/// Portable Modern · High (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
-/// Post-Quantum: v6, RFC 9980 composite ML-DSA-65+Ed25519 signing and
-/// ML-KEM-768+X25519 encryption, SEIPDv2, Argon2id S2K.
-/// Post-Quantum · High: v6, RFC 9980 composite ML-DSA-87+Ed448 signing and
-/// ML-KEM-1024+X448 encryption, SEIPDv2, Argon2id S2K.
+/// Software key-generation suite, named by its RFC 9580/9980 registered
+/// signing + encryption algorithms and ordered by ascending security tier.
+/// Suites map 1:1 onto the portable key families; device-bound custody
+/// certificates are built through the Secure Enclave paths instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum KeyProfile {
-    /// Portable Legacy: Universal compatible. v4 keys, GnuPG compatible.
-    Universal,
-    /// Portable Modern · High: Advanced security. v6 Ed448+X448 keys, RFC 9580. Presented to
-    /// the user as "Modern · High"; the baseline v6 classical tier is `Modern`.
-    Advanced,
-    /// Modern: v6 Ed25519+X25519 keys, RFC 9580. The baseline v6 classical
-    /// profile — Curve25519 under RFC 9580, i.e. Ed25519 (27) + X25519 (25).
-    /// Not GnuPG compatible (v6 format).
-    Modern,
-    /// Post-Quantum: RFC 9980 composite algorithms on v6 keys. Not GnuPG compatible.
-    PostQuantum,
-    /// Post-Quantum · High: RFC 9980 composite ML-DSA-87+Ed448 signing and
-    /// ML-KEM-1024+X448 encryption on v6 keys (NIST level 5). Not GnuPG compatible.
-    PostQuantumHigh,
+pub enum KeySuite {
+    /// v4 Ed25519Legacy (EdDSALegacy, 22) + Curve25519Legacy (ECDH, 18) under
+    /// RFC 4880. SEIPDv1, Iterated+Salted S2K, GnuPG compatible.
+    Ed25519LegacyCurve25519Legacy,
+    /// v6 Ed25519 (27) + X25519 (25) under RFC 9580 — the baseline v6
+    /// classical suite. SEIPDv2 AEAD OCB, Argon2id S2K.
+    Ed25519X25519,
+    /// v6 Ed448 (28) + X448 (26) under RFC 9580. SEIPDv2 AEAD OCB, Argon2id S2K.
+    Ed448X448,
+    /// v6 RFC 9980 composite ML-DSA-65+Ed25519 (30) signing +
+    /// ML-KEM-768+X25519 (35) encryption. SEIPDv2, Argon2id S2K.
+    MlDsa65Ed25519MlKem768X25519,
+    /// v6 RFC 9980 composite ML-DSA-87+Ed448 (31) signing +
+    /// ML-KEM-1024+X448 (36) encryption (NIST level 5). SEIPDv2, Argon2id S2K.
+    MlDsa87Ed448MlKem1024X448,
 }
 
 /// Result of key generation, containing the key pair and revocation certificate.
@@ -60,10 +56,10 @@ pub struct GeneratedKey {
     pub revocation_cert: Vec<u8>,
     /// Key fingerprint as lowercase hex string.
     pub fingerprint: String,
-    /// Key version (4 for Portable Legacy, 6 for Portable Modern · High).
+    /// Key version (4 for the legacy suite, 6 for the v6 suites).
     pub key_version: u8,
-    /// The profile used to generate this key.
-    pub profile: KeyProfile,
+    /// The suite used to generate this key.
+    pub suite: KeySuite,
 }
 
 /// OpenPGP certificate version for Secure Enclave custody public-certificate construction.
@@ -719,8 +715,8 @@ pub struct KeyInfo {
     pub is_revoked: bool,
     /// Whether the key has expired.
     pub is_expired: bool,
-    /// Detected profile based on key version and algorithms.
-    pub profile: KeyProfile,
+    /// Detected suite based on key version and algorithms.
+    pub suite: KeySuite,
     /// Primary key algorithm name (e.g., "Ed25519", "Ed448").
     pub primary_algo: String,
     /// Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
@@ -791,8 +787,8 @@ pub struct PublicCertificateValidationResult {
     pub public_cert_data: Vec<u8>,
     /// Parsed key metadata for the validated public certificate.
     pub key_info: KeyInfo,
-    /// Detected profile of the validated public certificate.
-    pub profile: KeyProfile,
+    /// Detected suite of the validated public certificate.
+    pub suite: KeySuite,
 }
 
 /// Stable `InvalidKeyData.reason` token for contact-import public-only violations.
@@ -833,13 +829,13 @@ mod composite_custody_generation;
 mod expiry;
 mod generation;
 mod key_info;
-mod profile;
 mod public_certificates;
 mod revocation;
 mod s2k;
 mod secret_transfer;
 mod secure_enclave_generation;
 mod selector_discovery;
+mod suite;
 
 pub use composite_custody_generation::{
     generate_secure_enclave_composite_high_public_certificate,
@@ -851,9 +847,8 @@ pub use expiry::{
     modify_expiry_with_external_composite_signer, modify_expiry_with_external_p256_signer,
     ModifyExpiryPublicResult, ModifyExpiryResult,
 };
-pub use generation::generate_key_with_profile;
+pub use generation::generate_key_with_suite;
 pub use key_info::parse_key_info;
-pub use profile::{detect_profile, get_key_version};
 pub use public_certificates::{merge_public_certificate_update, validate_public_certificate};
 pub use revocation::{
     generate_key_revocation, generate_subkey_revocation,
@@ -870,6 +865,7 @@ pub use secure_enclave_generation::{
     generate_secure_enclave_public_certificate, inspect_secure_enclave_public_bindings,
 };
 pub use selector_discovery::discover_certificate_selectors;
+pub use suite::{detect_suite, get_key_version};
 
 fn select_display_user_id(
     cert: &openpgp::Cert,

@@ -7,15 +7,15 @@
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::PublicKeyAlgorithm;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use sequoia_openpgp as openpgp;
 
 fn generate_pq_high() -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+    keys::generate_key_with_suite(
         "PQ High Lifecycle".to_string(),
         Some("pqhigh@lifecycle.example".to_string()),
         None,
-        KeyProfile::PostQuantumHigh,
+        KeySuite::MlDsa87Ed448MlKem1024X448,
     )
     .expect("Post-Quantum · High key gen should succeed")
 }
@@ -54,15 +54,15 @@ fn test_generate_post_quantum_high_cert_shape() {
 }
 
 #[test]
-fn test_detect_profile_classifies_post_quantum_high() {
+fn test_detect_suite_classifies_post_quantum_high() {
     let key = generate_pq_high();
     assert_eq!(
-        keys::detect_profile(&key.public_key_data).expect("detect"),
-        KeyProfile::PostQuantumHigh
+        keys::detect_suite(&key.public_key_data).expect("detect"),
+        KeySuite::MlDsa87Ed448MlKem1024X448
     );
 
     let info = keys::parse_key_info(&key.public_key_data).expect("parse_key_info");
-    assert_eq!(info.profile, KeyProfile::PostQuantumHigh);
+    assert_eq!(info.suite, KeySuite::MlDsa87Ed448MlKem1024X448);
     assert_eq!(info.key_version, 6);
 }
 
@@ -71,7 +71,7 @@ fn test_export_import_roundtrip_post_quantum_high_uses_argon2id() {
     let key = generate_pq_high();
 
     let exported =
-        keys::export_secret_key(&key.cert_data, "correct horse", KeyProfile::PostQuantumHigh)
+        keys::export_secret_key(&key.cert_data, "correct horse")
             .expect("PQ-High export should succeed");
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
@@ -102,37 +102,5 @@ fn test_export_import_roundtrip_post_quantum_high_uses_argon2id() {
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ-High import");
     let imported_info = keys::parse_key_info(&imported).expect("info");
     assert_eq!(imported_info.fingerprint, key.fingerprint);
-    assert_eq!(imported_info.profile, KeyProfile::PostQuantumHigh);
-}
-
-/// Negative: the two RFC 9980 tiers must not be interchangeable — exporting a
-/// PQ-High cert under the 65/768 Post-Quantum profile is a mismatch.
-#[test]
-fn test_export_wrong_profile_pq_high_cert_as_post_quantum_fails() {
-    let key = generate_pq_high();
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::PostQuantum);
-    match result {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // this controlled wrong-profile export reaches it only through the
-        // profile/key-version mismatch, so the prose reason adds nothing.
-        Err(pgp_mobile::error::PgpError::S2kError { .. }) => {}
-        other => panic!("Expected S2kError profile mismatch, got: {other:?}"),
-    }
-}
-
-/// Negative: the reverse direction — a 65/768 Post-Quantum cert exported as
-/// PQ-High must also be rejected.
-#[test]
-fn test_export_wrong_profile_post_quantum_cert_as_pq_high_fails() {
-    let key =
-        keys::generate_key_with_profile("PQ".to_string(), None, None, KeyProfile::PostQuantum)
-            .expect("gen PQ");
-    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::PostQuantumHigh);
-    match result {
-        // The typed S2kError variant (with panic on any other) is the guarantee;
-        // this controlled wrong-profile export reaches it only through the
-        // profile/key-version mismatch, so the prose reason adds nothing.
-        Err(pgp_mobile::error::PgpError::S2kError { .. }) => {}
-        other => panic!("Expected S2kError profile mismatch, got: {other:?}"),
-    }
+    assert_eq!(imported_info.suite, KeySuite::MlDsa87Ed448MlKem1024X448);
 }

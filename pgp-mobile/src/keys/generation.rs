@@ -1,11 +1,11 @@
 use super::*;
 
-/// Generate a new key pair with explicit profile selection.
-pub fn generate_key_with_profile(
+/// Generate a new key pair with explicit suite selection.
+pub fn generate_key_with_suite(
     name: String,
     email: Option<String>,
     expiry_seconds: Option<u64>,
-    profile: KeyProfile,
+    suite: KeySuite,
 ) -> Result<GeneratedKey, PgpError> {
     let user_id = match &email {
         Some(e) => format!("{name} <{e}>"),
@@ -14,15 +14,16 @@ pub fn generate_key_with_profile(
 
     let mut builder = CertBuilder::general_purpose(Some(user_id.clone()));
 
-    // Set cipher suite and profile based on KeyProfile
-    match profile {
-        KeyProfile::Universal => {
+    // Set cipher suite and profile based on KeySuite
+    match suite {
+        KeySuite::Ed25519LegacyCurve25519Legacy => {
             // Explicitly set RFC4880 profile and strip SEIPDv2 feature.
             // Sequoia defaults to advertising SEIPDv2 support in the
             // Features subpacket (because the library itself supports it).
-            // For Portable Legacy (GnuPG-compatible), we must advertise only SEIPDv1
-            // so that other implementations send SEIPDv1 messages to this key.
-            // Without this, GnuPG users cannot decrypt messages sent to Portable Legacy keys.
+            // For the legacy suite (GnuPG-compatible), we must advertise only
+            // SEIPDv1 so that other implementations send SEIPDv1 messages to
+            // this key. Without this, GnuPG users cannot decrypt messages sent
+            // to Portable Legacy keys.
             builder = builder
                 .set_cipher_suite(CipherSuite::Cv25519)
                 .set_profile(openpgp::Profile::RFC4880)
@@ -34,19 +35,12 @@ pub fn generate_key_with_profile(
                     reason: format!("Failed to set features: {e}"),
                 })?;
         }
-        KeyProfile::Advanced => {
-            builder = builder
-                .set_cipher_suite(CipherSuite::Cv448)
-                .set_profile(openpgp::Profile::RFC9580)
-                .map_err(|e| PgpError::KeyGenerationFailed {
-                    reason: format!("Failed to set profile: {e}"),
-                })?;
-        }
-        KeyProfile::Modern => {
+        KeySuite::Ed25519X25519 => {
             // Baseline v6 classical suite: Curve25519 under RFC 9580 yields
             // Ed25519 (27) signing + X25519 (25) encryption — the dedicated v6
             // algorithms, not the deprecated v4 EdDSALegacy/ECDH that the same
-            // Cv25519 suite produces under RFC 4880 (KeyProfile::Universal).
+            // Cv25519 cipher suite produces under RFC 4880
+            // (KeySuite::Ed25519LegacyCurve25519Legacy).
             builder = builder
                 .set_cipher_suite(CipherSuite::Cv25519)
                 .set_profile(openpgp::Profile::RFC9580)
@@ -54,9 +48,17 @@ pub fn generate_key_with_profile(
                     reason: format!("Failed to set profile: {e}"),
                 })?;
         }
-        KeyProfile::PostQuantum => {
+        KeySuite::Ed448X448 => {
+            builder = builder
+                .set_cipher_suite(CipherSuite::Cv448)
+                .set_profile(openpgp::Profile::RFC9580)
+                .map_err(|e| PgpError::KeyGenerationFailed {
+                    reason: format!("Failed to set profile: {e}"),
+                })?;
+        }
+        KeySuite::MlDsa65Ed25519MlKem768X25519 => {
             // RFC 9980 composite suite: ML-DSA-65+Ed25519 primary/signing,
-            // ML-KEM-768+X25519 encryption subkey. v6-only, like Advanced.
+            // ML-KEM-768+X25519 encryption subkey. v6-only, like Ed448X448.
             builder = builder
                 .set_cipher_suite(CipherSuite::MLDSA65_Ed25519)
                 .set_profile(openpgp::Profile::RFC9580)
@@ -64,7 +66,7 @@ pub fn generate_key_with_profile(
                     reason: format!("Failed to set profile: {e}"),
                 })?;
         }
-        KeyProfile::PostQuantumHigh => {
+        KeySuite::MlDsa87Ed448MlKem1024X448 => {
             // RFC 9980 composite high tier: ML-DSA-87+Ed448 primary/signing,
             // ML-KEM-1024+X448 encryption subkey (NIST level 5). v6-only.
             builder = builder
@@ -125,6 +127,6 @@ pub fn generate_key_with_profile(
         revocation_cert,
         fingerprint: fingerprint.to_lowercase(),
         key_version,
-        profile,
+        suite,
     })
 }

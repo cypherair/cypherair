@@ -64,13 +64,12 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configurationIdentity: PGPKeyConfiguration.Identity,
+        family: PGPKeyFamily,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        let configuration = configurationIdentity.configuration
-        guard let tier = configuration.identity.deviceBoundCustodyTier else {
+        guard let tier = family.deviceBoundCustodyTier else {
             throw CypherAirError.invalidKeyData(
-                reason: "Secure Enclave custody generation requires a device-bound configuration."
+                reason: "Secure Enclave custody generation requires a device-bound family."
             )
         }
         switch tier {
@@ -79,7 +78,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                configuration: configuration,
+                family: family,
                 invalidationToken: token
             )
         case .postQuantum, .postQuantumHigh:
@@ -87,7 +86,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                configuration: configuration,
+                family: family,
                 tier: tier,
                 invalidationToken: token
             )
@@ -102,12 +101,12 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         let resolution = resolver.resolution(
             for: .generate,
-            configuration: configuration,
+            family: family,
             custody: .appleSecureEnclavePrivateOperations
         )
         guard resolution.support == .supported else {
@@ -140,7 +139,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                configuration: configuration,
+                family: family,
                 handlePair: loadedPair,
                 digestSigner: digestSigner
             )
@@ -157,7 +156,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
 
                     let identity = PGPKeyIdentity(
                         fingerprint: generated.metadata.fingerprint,
-                        keyVersion: generated.metadata.keyVersion,
                         userId: generated.metadata.userId,
                         hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
                         isRevoked: false,
@@ -169,7 +167,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                         primaryAlgo: generated.metadata.primaryAlgo,
                         subkeyAlgo: generated.metadata.subkeyAlgo,
                         expiryDate: generated.metadata.expiryDate,
-                        openPGPConfigurationIdentity: configuration.identity,
+                        keyFamily: family,
                         privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
                     )
                     try catalogStore.storeNewIdentity(identity)
@@ -219,7 +217,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         tier: SecureEnclaveCustodyTier,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -247,7 +245,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         }
         let resolution = resolver.resolution(
             for: .generate,
-            configuration: configuration,
+            family: family,
             custody: .appleSecureEnclavePrivateOperations
         )
         guard resolution.support == .supported else {
@@ -318,7 +316,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
 
                     let identity = PGPKeyIdentity(
                         fingerprint: generated.metadata.fingerprint,
-                        keyVersion: generated.metadata.keyVersion,
                         userId: generated.metadata.userId,
                         hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
                         isRevoked: false,
@@ -330,7 +327,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                         primaryAlgo: generated.metadata.primaryAlgo,
                         subkeyAlgo: generated.metadata.subkeyAlgo,
                         expiryDate: generated.metadata.expiryDate,
-                        openPGPConfigurationIdentity: configuration.identity,
+                        keyFamily: family,
                         privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
                     )
                     try catalogStore.storeNewIdentity(identity)

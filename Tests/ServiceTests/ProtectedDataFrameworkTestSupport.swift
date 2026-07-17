@@ -247,7 +247,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
     ) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: fingerprint.lowercased(),
-            keyVersion: 4,
             userId: userId,
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -259,7 +258,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            keyFamily: .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }

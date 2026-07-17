@@ -1,8 +1,8 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile, CONTACT_IMPORT_PUBLIC_ONLY_REASON};
+use pgp_mobile::keys::{self, KeySuite, CONTACT_IMPORT_PUBLIC_ONLY_REASON};
 
-fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
         None,
@@ -13,31 +13,31 @@ fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
 
 #[test]
 fn test_validate_public_certificate_accepts_legacy_public_cert() {
-    let generated = generate_key(KeyProfile::Universal, "ValidatePublicA");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "ValidatePublicA");
 
     let result = keys::validate_public_certificate(&generated.public_key_data)
         .expect("legacy public cert should validate");
 
     assert_eq!(result.key_info.fingerprint, generated.fingerprint);
-    assert_eq!(result.profile, KeyProfile::Universal);
+    assert_eq!(result.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
     assert_eq!(result.public_cert_data, generated.public_key_data);
 }
 
 #[test]
 fn test_validate_public_certificate_accepts_modern_high_public_cert() {
-    let generated = generate_key(KeyProfile::Advanced, "ValidatePublicB");
+    let generated = generate_key(KeySuite::Ed448X448, "ValidatePublicB");
 
     let result = keys::validate_public_certificate(&generated.public_key_data)
         .expect("modern high public cert should validate");
 
     assert_eq!(result.key_info.fingerprint, generated.fingerprint);
-    assert_eq!(result.profile, KeyProfile::Advanced);
+    assert_eq!(result.suite, KeySuite::Ed448X448);
     assert_eq!(result.public_cert_data, generated.public_key_data);
 }
 
 #[test]
 fn test_validate_public_certificate_rejects_legacy_secret_cert() {
-    let generated = generate_key(KeyProfile::Universal, "ValidateSecretA");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "ValidateSecretA");
 
     let error = keys::validate_public_certificate(&generated.cert_data)
         .expect_err("legacy secret cert must be rejected");
@@ -52,7 +52,7 @@ fn test_validate_public_certificate_rejects_legacy_secret_cert() {
 
 #[test]
 fn test_validate_public_certificate_rejects_modern_high_secret_cert() {
-    let generated = generate_key(KeyProfile::Advanced, "ValidateSecretB");
+    let generated = generate_key(KeySuite::Ed448X448, "ValidateSecretB");
 
     let error = keys::validate_public_certificate(&generated.cert_data)
         .expect_err("modern high secret cert must be rejected");

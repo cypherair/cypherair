@@ -20,7 +20,7 @@
 
 The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-KEM-768 suite backs the **Portable Post-Quantum** software key below and **Device-Bound Post-Quantum** split custody, and the ML-DSA-87/ML-KEM-1024 suite backs **Portable Post-Quantum · High** and **Device-Bound Post-Quantum · High** ([SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1). The table below shows the base Post-Quantum tier; the · High tier uses the same RFC 9580/9980 configuration with ML-DSA-87+Ed448 (composite, algo 31) / ML-KEM-1024+X448 (composite, algo 36) at NIST security level 5. Family taxonomy and product exposure: [PRD.md](PRD.md) §3.
 
-| Setting | Legacy (Universal) | Modern | Modern · High (Advanced) | Post-Quantum |
+| Setting | Legacy | Modern | Modern · High | Post-Quantum |
 |---------|--------------------|--------|--------------------------|--------------|
 | `Profile` | `Profile::RFC4880` | `Profile::RFC9580` | `Profile::RFC9580` | `Profile::RFC9580` |
 | `CipherSuite` | `CipherSuite::Cv25519` | `CipherSuite::Cv25519` | `CipherSuite::Cv448` | `CipherSuite::MLDSA65_Ed25519` |
@@ -34,11 +34,11 @@ The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-K
 | Compression | DEFLATE (read-only) | DEFLATE (read-only) | DEFLATE (read-only) | DEFLATE (read-only) |
 | Security level | ~128 bit | ~128 bit | ~224 bit | ~192 bit, quantum-resistant |
 
-Legacy (Universal) and Modern share `CipherSuite::Cv25519` (Ed25519+X25519); they differ only by `Profile` — RFC 4880 yields a v4 key, RFC 9580 a v6 key. Modern · High (Advanced) is the Ed448+X448 v6 tier (`CipherSuite::Cv448`).
+Legacy and Modern share `CipherSuite::Cv25519` (Ed25519+X25519); they differ only by `Profile` — RFC 4880 yields a v4 key, RFC 9580 a v6 key. Modern · High is the Ed448+X448 v6 tier (`CipherSuite::Cv448`). In code the suites carry their RFC-registered algorithm names: `KeySuite` (Rust/FFI) and `PGPKeySuite` (Swift) enumerate `Ed25519LegacyCurve25519Legacy`, `Ed25519X25519`, `Ed448X448`, `MlDsa65Ed25519MlKem768X25519`, `MlDsa87Ed448MlKem1024X448` in tier order, and the nine product families are `PGPKeyFamily` (custody prefix + algorithm tokens — the software suite name for the five portable families, the ECDSA/ECDH NIST P-256 pair with a `V4` marker for the device-bound classical pair; key version computed from the family).
 
-**Classification is algorithm-aware, not version-only:** an RFC 9980 composite primary (ML-DSA-65+Ed25519 or ML-DSA-87+Ed448) classifies as Post-Quantum; an Ed25519 v6 primary classifies as Modern; an Ed448 v6 primary classifies as Advanced; v4 classifies as Universal. Any other v6 primary hits the defensive Advanced catch-all (`_ if version >= 6 => Advanced`), so SLH-DSA primaries fall back to Advanced (an under-claim, never an over-claim). The rule lives in one shared function (`classify_profile`) used by `detect_profile`, `parse_key_info`, and the export profile-mismatch guard.
+**Classification is algorithm-aware, not version-only:** an RFC 9980 composite primary (ML-DSA-65+Ed25519 or ML-DSA-87+Ed448) classifies as its post-quantum suite; an Ed25519 v6 primary classifies as `Ed25519X25519`; an Ed448 v6 primary classifies as `Ed448X448`; v4 classifies as `Ed25519LegacyCurve25519Legacy`. Any other v6 primary hits the defensive `Ed448X448` catch-all (`_ if version >= 6`), so SLH-DSA primaries fall back to the high classical tier (an under-claim, never an over-claim). The rule lives in one shared function (`classify_suite`) used by `detect_suite`, `parse_key_info`, and secret-key export, which derives its S2K mode from the classified suite (legacy → Iterated+Salted, every v6 suite → Argon2id) instead of taking a caller-supplied suite.
 
-**Legacy (Universal) Features subpacket:** Sequoia defaults to advertising SEIPDv2 support. Legacy generation explicitly sets `Features::empty().set_seipdv1()` so other implementations send SEIPDv1 to this key — otherwise a GnuPG sender would see SEIPDv2 advertised and produce a message it cannot construct correctly. `set_profile(Profile::RFC4880)` is likewise explicit.
+**Legacy Features subpacket:** Sequoia defaults to advertising SEIPDv2 support. Legacy generation explicitly sets `Features::empty().set_seipdv1()` so other implementations send SEIPDv1 to this key — otherwise a GnuPG sender would see SEIPDv2 advertised and produce a message it cannot construct correctly. `set_profile(Profile::RFC4880)` is likewise explicit.
 
 ### 1.4 Encryption Format Auto-Selection
 

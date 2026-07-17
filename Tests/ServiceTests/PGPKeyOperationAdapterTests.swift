@@ -18,7 +18,7 @@ final class PGPKeyOperationAdapterTests: XCTestCase {
                 name: "Alice",
                 email: nil,
                 expirySeconds: nil,
-                profile: .universal
+                suite: .ed25519LegacyCurve25519Legacy
             )
             XCTFail("Expected generateKey to throw")
         } catch {
@@ -65,7 +65,7 @@ final class PGPKeyOperationAdapterTests: XCTestCase {
             name: "Alice",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         XCTAssertEqual(generated.certData, generateEngine.secretCert)
@@ -108,7 +108,7 @@ private class GeneratedKeySuccessEngine: PgpEngine {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: KeyProfile
+        suite: KeySuite
     ) throws -> GeneratedKey {
         GeneratedKey(
             certData: secretCert,
@@ -116,7 +116,7 @@ private class GeneratedKeySuccessEngine: PgpEngine {
             revocationCert: revocation,
             fingerprint: "generated-fingerprint",
             keyVersion: 4,
-            profile: profile
+            suite: suite
         )
     }
 
@@ -147,8 +147,8 @@ private class ImportedSecretKeySuccessEngine: PgpEngine {
         keyInfo()
     }
 
-    override func detectProfile(certData: Data) throws -> KeyProfile {
-        .universal
+    override func detectSuite(certData: Data) throws -> KeySuite {
+        .ed25519LegacyCurve25519Legacy
     }
 
     override func armorPublicKey(certData: Data) throws -> Data {
@@ -165,8 +165,8 @@ private class ImportedSecretKeySuccessEngine: PgpEngine {
 }
 
 private final class ImportedSecretKeyDetectProfileFailureEngine: ImportedSecretKeySuccessEngine {
-    override func detectProfile(certData: Data) throws -> KeyProfile {
-        throw PgpError.InvalidKeyData(reason: "profile detection failed")
+    override func detectSuite(certData: Data) throws -> KeySuite {
+        throw PgpError.InvalidKeyData(reason: "suite detection failed")
     }
 }
 
@@ -178,7 +178,7 @@ private func keyInfo() -> KeyInfo {
         hasEncryptionSubkey: true,
         isRevoked: false,
         isExpired: false,
-        profile: .universal,
+        suite: .ed25519LegacyCurve25519Legacy,
         primaryAlgo: "Ed25519",
         subkeyAlgo: "X25519",
         expiryTimestamp: nil

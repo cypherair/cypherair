@@ -72,7 +72,7 @@ final class ModifyExpiryOperationPromptCompositionTests: XCTestCase {
             name: "Composition",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         return (made, stub, identity.fingerprint)
     }

@@ -43,23 +43,24 @@ enum SecureEnclaveCustodyTier: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-extension PGPKeyConfiguration.Identity {
+extension PGPKeyFamily {
     /// The Secure Enclave custody tier this key family runs on, or nil for
-    /// every software-custody family. This is the single dispatch key for
-    /// routing, generation, recovery, and deletion of device-bound keys: an
-    /// exhaustive switch, so adding a family forces the author to classify it
-    /// (a missing arm fails to compile), and the software families deliberately
-    /// map to nil so they never reach the Secure Enclave custody paths.
+    /// every portable family. This is the single dispatch key for routing,
+    /// generation, recovery, and deletion of device-bound keys: an exhaustive
+    /// switch, so adding a family forces the author to classify it (a missing
+    /// arm fails to compile), and the portable families deliberately map to
+    /// nil so they never reach the Secure Enclave custody paths.
     var deviceBoundCustodyTier: SecureEnclaveCustodyTier? {
         switch self {
-        case .compatibleP256V4, .modernP256V6:
+        case .deviceBoundEcdsaNistP256EcdhNistP256V4, .deviceBoundEcdsaNistP256EcdhNistP256:
             return .classicalP256
-        case .deviceBoundPostQuantumV6:
+        case .deviceBoundMlDsa65Ed25519MlKem768X25519:
             return .postQuantum
-        case .deviceBoundPostQuantumHighV6:
+        case .deviceBoundMlDsa87Ed448MlKem1024X448:
             return .postQuantumHigh
-        case .compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6,
-             .postQuantumSoftwareV6, .postQuantumHighSoftwareV6:
+        case .portableEd25519LegacyCurve25519Legacy, .portableEd25519X25519,
+             .portableEd448X448, .portableMlDsa65Ed25519MlKem768X25519,
+             .portableMlDsa87Ed448MlKem1024X448:
             return nil
         }
     }

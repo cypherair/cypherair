@@ -3,7 +3,7 @@ import SwiftUI
 @testable import CypherAir
 
 /// Tests for model types: CypherAirError, Contact, PGPKeyIdentity,
-/// PGPKeyProfile, and SignatureVerification.
+/// PGPKeySuite, and SignatureVerification.
 final class ModelTests: XCTestCase {
 
     // MARK: - PGPErrorMapper
@@ -394,109 +394,9 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(IdentityDisplayPresentation.displayName("Alice"), "Alice")
     }
 
-    // MARK: - PGPKeyProfile
+    // MARK: - Private-operation vocabulary
 
-    func test_pgpKeyProfile_decode_historicalRawValues() throws {
-        let decoder = JSONDecoder()
-
-        XCTAssertEqual(
-            try decoder.decode(PGPKeyProfile.self, from: Data(#""universal""#.utf8)),
-            .universal
-        )
-        XCTAssertEqual(
-            try decoder.decode(PGPKeyProfile.self, from: Data(#""advanced""#.utf8)),
-            .advanced
-        )
-    }
-
-    func test_pgpKeyProfile_encodeDecode_universal_roundTrip() throws {
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-
-        let profile = PGPKeyProfile.universal
-        let data = try encoder.encode(profile)
-        let decoded = try decoder.decode(PGPKeyProfile.self, from: data)
-
-        XCTAssertEqual(decoded, .universal)
-    }
-
-    func test_pgpKeyProfile_encodeDecode_advanced_roundTrip() throws {
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-
-        let profile = PGPKeyProfile.advanced
-        let data = try encoder.encode(profile)
-        let decoded = try decoder.decode(PGPKeyProfile.self, from: data)
-
-        XCTAssertEqual(decoded, .advanced)
-    }
-
-    func test_pgpKeyProfile_decode_unknownValue_throwsError() {
-        let decoder = JSONDecoder()
-        let invalidJSON = Data("\"quantum\"".utf8)
-
-        XCTAssertThrowsError(try decoder.decode(PGPKeyProfile.self, from: invalidJSON)) { error in
-            guard case DecodingError.dataCorrupted = error else {
-                XCTFail("Expected DecodingError.dataCorrupted, got \(error)")
-                return
-            }
-        }
-    }
-
-    func test_pgpKeyProfile_successorConfigurationMappings_preserveSoftwareCustody() {
-        let universal = PGPKeyProfile.universal.openPGPConfiguration
-        XCTAssertEqual(universal.identity, .compatibleSoftwareV4)
-        XCTAssertEqual(universal.keyVersion, 4)
-        XCTAssertEqual(universal.algorithmSuite, .ed25519X25519)
-        XCTAssertEqual(universal.compatibilityTarget, .gnupgOriented)
-        XCTAssertEqual(universal.messageFormatPreference, .seipdV1)
-        XCTAssertEqual(universal.softwareExportProtection, .iteratedSaltedS2K)
-
-        let modern = PGPKeyProfile.modern.openPGPConfiguration
-        XCTAssertEqual(modern.identity, .modernSoftwareV6)
-        XCTAssertEqual(modern.keyVersion, 6)
-        XCTAssertEqual(modern.algorithmSuite, .ed25519X25519)
-        XCTAssertEqual(modern.compatibilityTarget, .rfc9580Oriented)
-        XCTAssertEqual(modern.messageFormatPreference, .seipdV2Aead)
-        XCTAssertEqual(modern.softwareExportProtection, .argon2idS2K)
-
-        let advanced = PGPKeyProfile.advanced.openPGPConfiguration
-        XCTAssertEqual(advanced.identity, .modernHighSoftwareV6)
-        XCTAssertEqual(advanced.keyVersion, 6)
-        XCTAssertEqual(advanced.algorithmSuite, .ed448X448)
-        XCTAssertEqual(advanced.compatibilityTarget, .rfc9580Oriented)
-        XCTAssertEqual(advanced.messageFormatPreference, .seipdV2Aead)
-        XCTAssertEqual(advanced.softwareExportProtection, .argon2idS2K)
-
-        let postQuantumHigh = PGPKeyProfile.postQuantumHigh.openPGPConfiguration
-        XCTAssertEqual(postQuantumHigh.identity, .postQuantumHighSoftwareV6)
-        XCTAssertEqual(postQuantumHigh.keyVersion, 6)
-        XCTAssertEqual(postQuantumHigh.algorithmSuite, .mldsa87Ed448Mlkem1024X448)
-        XCTAssertEqual(postQuantumHigh.compatibilityTarget, .rfc9580Oriented)
-        XCTAssertEqual(postQuantumHigh.messageFormatPreference, .seipdV2Aead)
-        XCTAssertEqual(postQuantumHigh.softwareExportProtection, .argon2idS2K)
-    }
-
-    func test_secureEnclaveVocabulary_isRepresentableButNotSelectedByCurrentProfiles() {
-        let compatibleP256 = PGPKeyConfiguration.compatibleP256V4
-        XCTAssertEqual(compatibleP256.identity, .compatibleP256V4)
-        XCTAssertEqual(compatibleP256.keyVersion, 4)
-        XCTAssertEqual(compatibleP256.algorithmSuite, .p256)
-        XCTAssertEqual(compatibleP256.compatibilityTarget, .gnupgOriented)
-        XCTAssertEqual(compatibleP256.softwareExportProtection, .notAvailable)
-
-        let modernP256 = PGPKeyConfiguration.modernP256V6
-        XCTAssertEqual(modernP256.identity, .modernP256V6)
-        XCTAssertEqual(modernP256.keyVersion, 6)
-        XCTAssertEqual(modernP256.algorithmSuite, .p256)
-        XCTAssertEqual(modernP256.messageFormatPreference, .seipdV2Aead)
-        XCTAssertEqual(modernP256.softwareExportProtection, .notAvailable)
-
-        for profile in PGPKeyProfile.allCases {
-            XCTAssertNotEqual(profile.openPGPConfiguration, .compatibleP256V4)
-            XCTAssertNotEqual(profile.openPGPConfiguration, .modernP256V6)
-        }
-
+    func test_privateOperationVocabulary_rolesAndKinds() {
         XCTAssertEqual(
             Set(PGPPrivateOperationRole.allCases),
             [.signing, .keyAgreement]
@@ -1003,7 +903,7 @@ final class ModelTests: XCTestCase {
             displayName: IdentityPresentation.parsedDisplayName(from: userId) ?? "",
             email: IdentityPresentation.email(from: userId),
             keyVersion: 4,
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             hasEncryptionSubkey: hasEncryptionSubkey,
@@ -1024,7 +924,6 @@ final class ModelTests: XCTestCase {
     ) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: 4,
             userId: "Test",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -1036,7 +935,7 @@ final class ModelTests: XCTestCase {
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            keyFamily: .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
@@ -1096,63 +995,94 @@ final class ModelTests: XCTestCase {
 
     // MARK: - Key-family vocabulary
 
-    func test_keyFamily_equivalentSoftwareProfile_isTotalAndCorrect() {
-        XCTAssertEqual(PGPKeyConfiguration.Identity.compatibleSoftwareV4.equivalentSoftwareProfile, .universal)
-        XCTAssertEqual(PGPKeyConfiguration.Identity.modernSoftwareV6.equivalentSoftwareProfile, .modern)
-        XCTAssertEqual(PGPKeyConfiguration.Identity.modernHighSoftwareV6.equivalentSoftwareProfile, .advanced)
-        XCTAssertEqual(PGPKeyConfiguration.Identity.postQuantumHighSoftwareV6.equivalentSoftwareProfile, .postQuantumHigh)
-        XCTAssertNil(PGPKeyConfiguration.Identity.compatibleP256V4.equivalentSoftwareProfile)
-        XCTAssertNil(PGPKeyConfiguration.Identity.modernP256V6.equivalentSoftwareProfile)
+    func test_keyFamily_softwareGenerationSuite_isTotalAndCorrect() {
+        XCTAssertEqual(
+            PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.softwareGenerationSuite,
+            .ed25519LegacyCurve25519Legacy
+        )
+        XCTAssertEqual(PGPKeyFamily.portableEd25519X25519.softwareGenerationSuite, .ed25519X25519)
+        XCTAssertEqual(PGPKeyFamily.portableEd448X448.softwareGenerationSuite, .ed448X448)
+        XCTAssertEqual(
+            PGPKeyFamily.portableMlDsa65Ed25519MlKem768X25519.softwareGenerationSuite,
+            .mlDsa65Ed25519MlKem768X25519
+        )
+        XCTAssertEqual(
+            PGPKeyFamily.portableMlDsa87Ed448MlKem1024X448.softwareGenerationSuite,
+            .mlDsa87Ed448MlKem1024X448
+        )
+        for family in PGPKeyFamily.allCases where family.custody == .deviceBound {
+            XCTAssertNil(family.softwareGenerationSuite)
+        }
 
-        // The inverse mapping round-trips through the existing profile bridge.
-        for profile in PGPKeyProfile.allCases {
-            XCTAssertEqual(
-                profile.openPGPConfiguration.identity.equivalentSoftwareProfile,
-                profile
-            )
+        // The inverse mapping round-trips through the suite's portable family.
+        for suite in PGPKeySuite.allCases {
+            XCTAssertEqual(suite.portableFamily.softwareGenerationSuite, suite)
+            XCTAssertEqual(suite.portableFamily.custody, .portable)
+            XCTAssertEqual(suite.keyVersion, suite.portableFamily.keyVersion)
+        }
+    }
+
+    func test_keyFamily_keyVersionFollowsTheV4NamingRule() {
+        // Exactly the two V4-form families are v4; every unmarked family is
+        // the current v6 form (the naming rule on PGPKeyFamily).
+        for family in PGPKeyFamily.allCases {
+            switch family {
+            case .portableEd25519LegacyCurve25519Legacy, .deviceBoundEcdsaNistP256EcdhNistP256V4:
+                XCTAssertEqual(family.keyVersion, 4, "\(family)")
+            default:
+                XCTAssertEqual(family.keyVersion, 6, "\(family)")
+            }
         }
     }
 
     func test_keyFamily_orderedFamiliesCoverEveryIdentityOnce() {
         XCTAssertEqual(
-            PGPKeyConfiguration.Identity.orderedFamilies.sorted { $0.rawValue < $1.rawValue },
-            PGPKeyConfiguration.Identity.allCases.sorted { $0.rawValue < $1.rawValue }
+            PGPKeyFamily.orderedFamilies.sorted { $0.rawValue < $1.rawValue },
+            PGPKeyFamily.allCases.sorted { $0.rawValue < $1.rawValue }
         )
     }
 
-    func test_keyFamily_deviceBoundFlagsMatchCustodyValidity() {
-        XCTAssertFalse(PGPKeyConfiguration.Identity.compatibleSoftwareV4.isDeviceBoundFamily)
-        XCTAssertFalse(PGPKeyConfiguration.Identity.modernSoftwareV6.isDeviceBoundFamily)
-        XCTAssertFalse(PGPKeyConfiguration.Identity.modernHighSoftwareV6.isDeviceBoundFamily)
-        XCTAssertFalse(PGPKeyConfiguration.Identity.postQuantumSoftwareV6.isDeviceBoundFamily)
-        XCTAssertFalse(PGPKeyConfiguration.Identity.postQuantumHighSoftwareV6.isDeviceBoundFamily)
-        XCTAssertTrue(PGPKeyConfiguration.Identity.compatibleP256V4.isDeviceBoundFamily)
-        XCTAssertTrue(PGPKeyConfiguration.Identity.modernP256V6.isDeviceBoundFamily)
-        XCTAssertTrue(PGPKeyConfiguration.Identity.deviceBoundPostQuantumV6.isDeviceBoundFamily)
+    func test_keyFamily_custodyAxisMatchesResolverValidity() {
+        XCTAssertEqual(PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.custody, .portable)
+        XCTAssertEqual(PGPKeyFamily.portableEd25519X25519.custody, .portable)
+        XCTAssertEqual(PGPKeyFamily.portableEd448X448.custody, .portable)
+        XCTAssertEqual(PGPKeyFamily.portableMlDsa65Ed25519MlKem768X25519.custody, .portable)
+        XCTAssertEqual(PGPKeyFamily.portableMlDsa87Ed448MlKem1024X448.custody, .portable)
+        XCTAssertEqual(PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.custody, .deviceBound)
+        XCTAssertEqual(PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256.custody, .deviceBound)
+        XCTAssertEqual(PGPKeyFamily.deviceBoundMlDsa65Ed25519MlKem768X25519.custody, .deviceBound)
+        XCTAssertEqual(PGPKeyFamily.deviceBoundMlDsa87Ed448MlKem1024X448.custody, .deviceBound)
 
-        // Device-bound flag agrees with the resolver's valid configuration/custody pairs.
+        // The custody axis agrees with the resolver's valid family/custody pairs.
         let resolver = PGPKeyCapabilityResolver()
-        for identity in PGPKeyConfiguration.Identity.allCases {
+        for family in PGPKeyFamily.allCases {
             XCTAssertEqual(
-                resolver.isValidConfigurationCustodyPair(
-                    configuration: identity.configuration,
+                resolver.isValidFamilyCustodyPair(
+                    family: family,
                     custody: .appleSecureEnclavePrivateOperations
                 ),
-                identity.isDeviceBoundFamily
+                family.custody == .deviceBound
+            )
+            XCTAssertEqual(
+                resolver.isValidFamilyCustodyPair(
+                    family: family,
+                    custody: .softwareSecretCertificate
+                ),
+                family.custody == .portable
             )
         }
     }
 
     func test_keyFamily_presentationStringsAreDistinctAndNonEmpty() {
-        let names = PGPKeyConfiguration.Identity.allCases.map(\.familyDisplayName)
-        let descriptions = PGPKeyConfiguration.Identity.allCases.map(\.familyDescription)
+        let names = PGPKeyFamily.allCases.map(\.familyDisplayName)
+        let descriptions = PGPKeyFamily.allCases.map(\.familyDescription)
 
         XCTAssertEqual(Set(names).count, names.count)
         XCTAssertEqual(Set(descriptions).count, descriptions.count)
         for value in names + descriptions {
             XCTAssertFalse(value.isEmpty)
         }
-        for identity in PGPKeyConfiguration.Identity.allCases {
+        for identity in PGPKeyFamily.allCases {
             XCTAssertFalse(identity.familySecurityLevel.isEmpty)
             XCTAssertFalse(identity.familyAlgorithmSummary.isEmpty)
             XCTAssertFalse(identity.familyKeyVersionDisplay.isEmpty)
@@ -1161,14 +1091,14 @@ final class ModelTests: XCTestCase {
             XCTAssertFalse(identity.familyGnuPGCompatibilityDisplay.isEmpty)
             XCTAssertFalse(identity.familyCustodyDisplay.isEmpty)
         }
-        XCTAssertFalse(PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement.isEmpty)
+        XCTAssertFalse(PGPKeyFamily.deviceBoundBiometricRequirement.isEmpty)
     }
 
     func test_keyFamily_deviceBoundCopyAvoidsBannedClaims() {
         // Device-bound families are P-256 (~128 bit): they must not inherit the
         // "~224 bit"/"stronger algorithms" claims, and the commitment copy must
         // not mention a passcode (access control is biometry-only).
-        for identity in PGPKeyConfiguration.Identity.allCases where identity.isDeviceBoundFamily {
+        for identity in PGPKeyFamily.allCases where identity.custody == .deviceBound {
             let copy = [
                 identity.familyDisplayName,
                 identity.familyDescription,
@@ -1179,7 +1109,7 @@ final class ModelTests: XCTestCase {
                 identity.familyExportabilityDisplay,
                 identity.familyGnuPGCompatibilityDisplay,
                 identity.familyCustodyDisplay,
-                PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement,
+                PGPKeyFamily.deviceBoundBiometricRequirement,
             ].joined(separator: " ")
             XCTAssertFalse(copy.contains("224"))
             XCTAssertFalse(copy.lowercased().contains("stronger"))
@@ -1190,8 +1120,8 @@ final class ModelTests: XCTestCase {
     func test_contactKeyKindPresentation_avoidsCustodyVocabulary() {
         // Contact certificates expose compatibility, not custody: contact rows
         // must not claim portable or device-bound custody for someone else's key.
-        for profile in PGPKeyProfile.allCases {
-            let value = profile.contactKeyKindDisplayName
+        for suite in PGPKeySuite.allCases {
+            let value = suite.contactKeyKindDisplayName
             XCTAssertFalse(value.isEmpty)
             XCTAssertFalse(value.lowercased().contains("portable"))
             XCTAssertFalse(value.lowercased().contains("device-bound"))

@@ -41,12 +41,12 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveSelectiveRevocationUsesRealCatalogRouterAndSharedHandleStoreForV4AndV6() async throws {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6,
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256,
         ] {
             let fixture = try await makeSecureEnclaveRouteFixture(
-                configurationIdentity: configurationIdentity
+                family: family
             )
             let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
             try metadataPersistence.save(fixture.identity)
@@ -82,8 +82,8 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
 
             try assertArmoredSignature(subkeyRevocation)
             try assertArmoredSignature(userIdRevocation)
-            XCTAssertEqual(fixture.identity.keyVersion, configurationIdentity.configuration.keyVersion)
-            XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, configurationIdentity)
+            XCTAssertEqual(fixture.identity.keyVersion, family.keyVersion)
+            XCTAssertEqual(fixture.identity.keyFamily, family)
             XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
             XCTAssertEqual(keyManagement.keys.map(\.fingerprint), [fixture.identity.fingerprint])
             XCTAssertEqual(mockSE.unwrapCallCount, 0)
@@ -429,7 +429,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
     }
 
     private func makeSecureEnclaveRouteFixture(
-        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
+        family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4
     ) async throws -> SelectiveRevocationSecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
@@ -441,13 +441,12 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
             name: "Secure Enclave Selective Revocation",
             email: "secure-selective-revocation@example.invalid",
             expirySeconds: 3600,
-            configuration: configurationIdentity.configuration,
+            family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -459,7 +458,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(

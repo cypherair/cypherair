@@ -80,7 +80,7 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
                 ? .unavailable(.revocationArtifactUnavailable)
                 : .available
 
-        guard let tier = identity.openPGPConfiguration.identity.deviceBoundCustodyTier else {
+        guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
             return assessment(
                 identity: identity,
                 ordinal: ordinal,
@@ -98,17 +98,6 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
                 ordinal: ordinal,
                 tier: tier,
                 revocationAvailability: revocationAvailability
-            )
-        }
-
-        let configuration = identity.openPGPConfiguration
-        guard configuration.keyVersion == identity.keyVersion else {
-            return assessment(
-                identity: identity,
-                ordinal: ordinal,
-                publicMaterialAvailability: .unavailable(.invalidConfigurationCustody),
-                revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.invalidConfigurationCustody)
             )
         }
 
@@ -171,16 +160,6 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
         tier: SecureEnclaveCustodyTier,
         revocationAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability
     ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
-        guard identity.openPGPConfiguration.keyVersion == identity.keyVersion else {
-            return assessment(
-                identity: identity,
-                ordinal: ordinal,
-                publicMaterialAvailability: .unavailable(.invalidConfigurationCustody),
-                revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.invalidConfigurationCustody)
-            )
-        }
-
         guard !identity.publicKeyData.isEmpty else {
             return assessment(
                 identity: identity,

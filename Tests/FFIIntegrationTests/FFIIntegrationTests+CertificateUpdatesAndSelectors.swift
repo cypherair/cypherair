@@ -9,7 +9,7 @@ extension FFIIntegrationTests {
             name: "Merge A",
             email: "merge-a@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -32,7 +32,7 @@ extension FFIIntegrationTests {
             name: "Merge B",
             email: "merge-b@example.com",
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
@@ -47,7 +47,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.outcome, .updated)
         let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
         XCTAssertEqual(info.fingerprint, generated.fingerprint)
-        XCTAssertEqual(info.profile, .advanced)
+        XCTAssertEqual(info.suite, .ed448X448)
         XCTAssertEqual(info.expiryTimestamp, refreshed.keyInfo.expiryTimestamp)
     }
 
@@ -56,7 +56,7 @@ extension FFIIntegrationTests {
             name: "Merge Duplicate",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let result = try engine.mergePublicCertificateUpdate(
@@ -98,7 +98,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.outcome, .updated)
         let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
         XCTAssertTrue(info.isRevoked)
-        XCTAssertEqual(info.profile, .universal)
+        XCTAssertEqual(info.suite, .ed25519LegacyCurve25519Legacy)
     }
 
     func test_certificateMergeUpdate_modernHigh_revocationFixtureReturnsUpdated() throws {
@@ -113,7 +113,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.outcome, .updated)
         let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
         XCTAssertTrue(info.isRevoked)
-        XCTAssertEqual(info.profile, .advanced)
+        XCTAssertEqual(info.suite, .ed448X448)
     }
 
     func test_certificateMergeUpdate_legacy_encryptionSubkeyFixtureReturnsUpdated() throws {
@@ -130,7 +130,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.outcome, .updated)
         let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
         XCTAssertTrue(info.hasEncryptionSubkey)
-        XCTAssertEqual(info.profile, .universal)
+        XCTAssertEqual(info.suite, .ed25519LegacyCurve25519Legacy)
     }
 
     func test_certificateMergeUpdate_modernHigh_encryptionSubkeyFixtureReturnsUpdated() throws {
@@ -147,7 +147,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.outcome, .updated)
         let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
         XCTAssertTrue(info.hasEncryptionSubkey)
-        XCTAssertEqual(info.profile, .advanced)
+        XCTAssertEqual(info.suite, .ed448X448)
     }
 
     func test_validatePublicCertificate_returnsNormalizedPublicCertAndMetadata() throws {
@@ -155,14 +155,14 @@ extension FFIIntegrationTests {
             name: "Validate Public",
             email: nil,
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         let result = try engine.validatePublicCertificate(certData: generated.publicKeyData)
 
         XCTAssertEqual(result.publicCertData, generated.publicKeyData)
         XCTAssertEqual(result.keyInfo.fingerprint, generated.fingerprint)
-        XCTAssertEqual(result.profile, .universal)
+        XCTAssertEqual(result.suite, .ed25519LegacyCurve25519Legacy)
     }
 
     // MARK: - Selector Discovery
@@ -180,12 +180,12 @@ extension FFIIntegrationTests {
     }
 
     func test_discoverCertificateSelectors_generatedProfiles_driveSelectiveRevocationAcrossFFI() throws {
-        for profile in [KeyProfile.universal, .advanced] {
+        for suite in [KeySuite.ed25519LegacyCurve25519Legacy, .ed448X448] {
             let generated = try engine.generateKey(
-                name: "Selector \(profile)",
-                email: "selector-\(profile)-ffi@example.com",
+                name: "Selector \(suite)",
+                email: "selector-\(suite)-ffi@example.com",
                 expirySeconds: nil,
-                profile: profile
+                suite: suite
             )
 
             let discovered = try engine.discoverCertificateSelectors(certData: generated.publicKeyData)
@@ -274,7 +274,7 @@ extension FFIIntegrationTests {
             name: "Validate Secret",
             email: nil,
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         XCTAssertThrowsError(

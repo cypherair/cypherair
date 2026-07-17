@@ -19,8 +19,8 @@ enum SecureEnclaveCustodyEvidenceScenario: String, CaseIterable, Sendable {
 
 /// The OpenPGP configuration a scenario exercised, when relevant.
 enum SecureEnclaveCustodyEvidenceConfiguration: String, CaseIterable, Sendable {
-    case compatibleP256V4
-    case modernP256V6
+    case deviceBoundEcdsaNistP256EcdhNistP256V4
+    case deviceBoundEcdsaNistP256EcdhNistP256
 }
 
 /// The observed result of an evidence scenario.

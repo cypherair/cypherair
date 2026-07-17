@@ -129,7 +129,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
     }
 
     /// Both tiers return the same `SecureEnclaveCompositeGeneratedCertificate`;
-    /// the engine classifies the certificate as post-quantum, so `keyInfo.profile`
+    /// the engine classifies the certificate as post-quantum, so `keyInfo.suite`
     /// is authoritative and no override is needed.
     private static func material(
         from generated: SecureEnclaveCompositeGeneratedCertificate,

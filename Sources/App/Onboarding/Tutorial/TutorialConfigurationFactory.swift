@@ -12,7 +12,7 @@ struct TutorialConfigurationFactory {
             ),
             prefilledEmail: "alice@demo.invalid",
             // The tutorial demo identity uses the Modern (Ed25519+X25519) family.
-            lockedFamily: .modernSoftwareV6,
+            lockedFamily: .portableEd25519X25519,
             lockedExpiryMonths: 24,
             postGenerationBehavior: .suppressPrompt
         )

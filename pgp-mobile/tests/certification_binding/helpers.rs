@@ -1,7 +1,7 @@
 use super::*;
 
-pub(super) fn generated_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+pub(super) fn generated_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
         None,
@@ -11,11 +11,11 @@ pub(super) fn generated_key(profile: KeyProfile, name: &str) -> keys::GeneratedK
 }
 
 pub(super) fn generated_key_with_identity(
-    profile: KeyProfile,
+    profile: KeySuite,
     name: &str,
     email: &str,
 ) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(name.to_string(), Some(email.to_string()), None, profile)
+    keys::generate_key_with_suite(name.to_string(), Some(email.to_string()), None, profile)
         .expect("key generation should succeed")
 }
 

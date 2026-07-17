@@ -5,16 +5,16 @@ import XCTest
 
 final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
     func test_hiddenGenerationPersistsP256SecureEnclaveIdentity() async throws {
-        for configurationIdentity in [
-            PGPKeyConfiguration.Identity.compatibleP256V4,
-            .modernP256V6
+        for family in [
+            PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
+            .deviceBoundEcdsaNistP256EcdhNistP256
         ] {
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             let metadataStore = MemoryKeyMetadataPersistence()
             let builder = MockSecureEnclaveCustodyCertificateBuilder(
                 result: Self.material(
-                    fingerprint: "abc\(configurationIdentity.rawValue)",
-                    keyVersion: configurationIdentity.configuration.keyVersion
+                    fingerprint: "abc\(family.rawValue)",
+                    keyVersion: family.keyVersion
                 )
             )
             let service = makeService(
@@ -28,22 +28,22 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Secure Enclave",
                 email: "se@example.test",
                 expirySeconds: 3600,
-                configurationIdentity: configurationIdentity,
+                family: family,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
 
-            XCTAssertEqual(identity.openPGPConfigurationIdentity, configurationIdentity)
+            XCTAssertEqual(identity.keyFamily, family)
             XCTAssertEqual(
                 identity.privateKeyCustodyKind,
                 PGPPrivateKeyCustodyKind.appleSecureEnclavePrivateOperations
             )
-            XCTAssertEqual(identity.keyVersion, configurationIdentity.configuration.keyVersion)
+            XCTAssertEqual(identity.keyVersion, family.keyVersion)
             XCTAssertFalse(identity.publicKeyData.isEmpty)
             XCTAssertFalse(identity.revocationCert.isEmpty)
             XCTAssertEqual(metadataStore.identities, [identity])
             XCTAssertEqual(keyStore.storedHandleCount(), 2)
             XCTAssertEqual(builder.requests.count, 1)
-            XCTAssertEqual(builder.requests[0].configuration.identity, configurationIdentity)
+            XCTAssertEqual(builder.requests[0].family, family)
             XCTAssertEqual(builder.requests[0].handlePair.signing.role, PGPPrivateOperationRole.signing)
             XCTAssertEqual(builder.requests[0].handlePair.keyAgreement.role, PGPPrivateOperationRole.keyAgreement)
         }
@@ -61,7 +61,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Secure Enclave",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
@@ -77,7 +77,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Software",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleSoftwareV4,
+                family: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
@@ -96,7 +96,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Builder Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
@@ -106,7 +106,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         let duplicateKeyStore = MockSecureEnclaveCustodyKeyStore()
         let duplicateMetadataStore = MemoryKeyMetadataPersistence()
         duplicateMetadataStore.seed([
-            Self.identity(fingerprint: "duplicate", configurationIdentity: .compatibleP256V4)
+            Self.identity(fingerprint: "duplicate", family: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         ])
         let duplicateService = makeService(
             keyStore: duplicateKeyStore,
@@ -121,7 +121,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Duplicate",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
@@ -146,7 +146,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Save Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.modernP256V6,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
@@ -173,7 +173,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Post Commit",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         } inspectError: { error in
@@ -204,7 +204,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Rollback Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.modernP256V6,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         } inspectError: { error in
@@ -286,7 +286,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             name: "Success",
             email: Optional<String>.none,
             expirySeconds: Optional<UInt64>.none,
-            configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+            family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
             invalidationToken: KeyProvisioningInvalidationGate().makeToken()
         )
 
@@ -318,7 +318,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Cancel",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         } inspectError: { error in
@@ -350,7 +350,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Lockout",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         } inspectError: { error in
@@ -382,7 +382,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 name: "Rollback",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
-                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
@@ -404,7 +404,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             name: "Nil",
             email: Optional<String>.none,
             expirySeconds: Optional<UInt64>.none,
-            configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+            family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
             invalidationToken: KeyProvisioningInvalidationGate().makeToken()
         )
 
@@ -468,7 +468,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 hasEncryptionSubkey: true,
                 isRevoked: false,
                 isExpired: false,
-                profile: keyVersion == 4 ? .universal : .advanced,
+                suite: keyVersion == 4 ? .ed25519LegacyCurve25519Legacy : .ed448X448,
                 primaryAlgo: "ECDSA P-256",
                 subkeyAlgo: "ECDH P-256",
                 expiryTimestamp: nil
@@ -480,11 +480,10 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
     private static func identity(
         fingerprint: String,
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: configurationIdentity.configuration.keyVersion,
             userId: "Existing",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -496,7 +495,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             primaryAlgo: "ECDSA P-256",
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
     }
@@ -504,7 +503,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
 private final class MockSecureEnclaveCustodyCertificateBuilder: SecureEnclaveCustodyCertificateBuilding, @unchecked Sendable {
     struct Request {
-        let configuration: PGPKeyConfiguration
+        let family: PGPKeyFamily
         let handlePair: SecureEnclaveCustodyLoadedHandlePair
     }
 
@@ -524,11 +523,11 @@ private final class MockSecureEnclaveCustodyCertificateBuilder: SecureEnclaveCus
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configuration: PGPKeyConfiguration,
+        family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
-        requests.append(Request(configuration: configuration, handlePair: handlePair))
+        requests.append(Request(family: family, handlePair: handlePair))
         if let error {
             throw error
         }

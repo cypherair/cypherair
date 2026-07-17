@@ -21,7 +21,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         let identity = Self.identity(
             fingerprint: "device-bound-pq",
             keyVersion: 6,
-            configurationIdentity: .deviceBoundPostQuantumV6,
+            family: .deviceBoundMlDsa65Ed25519MlKem768X25519,
             publicKeyData: Data("device-bound-pq-cert".utf8),
             revocationCert: Data("device-bound-pq-revocation".utf8)
         )
@@ -57,7 +57,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         let identity = Self.identity(
             fingerprint: "device-bound-pq-high",
             keyVersion: 6,
-            configurationIdentity: .deviceBoundPostQuantumHighV6,
+            family: .deviceBoundMlDsa87Ed448MlKem1024X448,
             publicKeyData: Data("device-bound-pq-high-cert".utf8),
             revocationCert: Data("device-bound-pq-high-revocation".utf8)
         )
@@ -89,7 +89,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         let identity = Self.identity(
             fingerprint: "device-bound-pq-orphan",
             keyVersion: 6,
-            configurationIdentity: .deviceBoundPostQuantumV6,
+            family: .deviceBoundMlDsa65Ed25519MlKem768X25519,
             publicKeyData: Data("device-bound-pq-orphan-cert".utf8),
             revocationCert: Data("device-bound-pq-orphan-revocation".utf8)
         )
@@ -314,13 +314,12 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
     private static func identity(
         fingerprint: String,
         keyVersion: UInt8 = 4,
-        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4,
+        family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4,
         publicKeyData: Data = Data("public".utf8),
         revocationCert: Data = Data("revocation".utf8)
     ) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: keyVersion,
             userId: "Secure Enclave <se@example.test>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -332,7 +331,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             primaryAlgo: "ECDSA P-256",
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: configurationIdentity,
+            keyFamily: family,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
     }

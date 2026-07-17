@@ -66,7 +66,7 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
             material.classicalEddsaSecret.resetBytes(in: 0..<material.classicalEddsaSecret.count)
             material.classicalEcdhSecret.resetBytes(in: 0..<material.classicalEcdhSecret.count)
         }
-        XCTAssertEqual(material.metadata.profile, .postQuantum)
+        XCTAssertEqual(material.metadata.suite, .mlDsa65Ed25519MlKem768X25519)
         XCTAssertEqual(material.metadata.keyVersion, 6)
         XCTAssertEqual(material.classicalEddsaSecret.count, 32)
         XCTAssertEqual(material.classicalEcdhSecret.count, 32)
@@ -183,7 +183,7 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
             material.classicalEddsaSecret.resetBytes(in: 0..<material.classicalEddsaSecret.count)
             material.classicalEcdhSecret.resetBytes(in: 0..<material.classicalEcdhSecret.count)
         }
-        XCTAssertEqual(material.metadata.profile, .postQuantumHigh)
+        XCTAssertEqual(material.metadata.suite, .mlDsa87Ed448MlKem1024X448)
         XCTAssertEqual(material.metadata.keyVersion, 6)
         XCTAssertEqual(material.classicalEddsaSecret.count, 57)
         XCTAssertEqual(material.classicalEcdhSecret.count, 56)

@@ -15,15 +15,15 @@ use openpgp::parse::stream::{
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::{PublicKeyAlgorithm, SymmetricAlgorithm};
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{decrypt, encrypt, sign, verify};
 use sequoia_openpgp as openpgp;
 
 const PLAINTEXT: &[u8] = b"portable post-quantum message";
 
-fn gen(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(name.to_string(), None, None, profile)
+fn gen(profile: KeySuite, name: &str) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(name.to_string(), None, None, profile)
         .expect("key gen should succeed")
 }
 
@@ -95,7 +95,7 @@ fn negotiated_cipher(ciphertext: &[u8], tsk_data: &[u8]) -> SymmetricAlgorithm {
 
 #[test]
 fn test_pq_only_message_uses_seipdv2_aes256() {
-    let pq = gen(KeyProfile::PostQuantum, "PQ");
+    let pq = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ");
     let ct = encrypt::encrypt(PLAINTEXT, &[pq.public_key_data.clone()], None, None)
         .expect("encrypt to PQ recipient");
 
@@ -118,8 +118,8 @@ fn test_pq_only_message_uses_seipdv2_aes256() {
 
 #[test]
 fn test_pq_plus_v4_mixed_uses_seipdv1_with_aes256_floor() {
-    let pq = gen(KeyProfile::PostQuantum, "PQ");
-    let v4 = gen(KeyProfile::Universal, "Classic");
+    let pq = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ");
+    let v4 = gen(KeySuite::Ed25519LegacyCurve25519Legacy, "Classic");
     let ct = encrypt::encrypt(
         PLAINTEXT,
         &[pq.public_key_data.clone(), v4.public_key_data.clone()],
@@ -150,16 +150,16 @@ fn test_pq_plus_v4_mixed_uses_seipdv1_with_aes256_floor() {
 }
 
 #[test]
-fn test_pq_plus_advanced_v6_uses_seipdv2_aes256() {
-    let pq = gen(KeyProfile::PostQuantum, "PQ");
-    let v6 = gen(KeyProfile::Advanced, "Modern");
+fn test_pq_plus_ed448_v6_uses_seipdv2_aes256() {
+    let pq = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ");
+    let v6 = gen(KeySuite::Ed448X448, "Modern");
     let ct = encrypt::encrypt(
         PLAINTEXT,
         &[pq.public_key_data.clone(), v6.public_key_data.clone()],
         None,
         None,
     )
-    .expect("encrypt to PQ + Advanced");
+    .expect("encrypt to PQ + Ed448");
 
     let (v1, v2) = detect_message_format(&ct);
     assert!(!v1 && v2, "all-v6 recipients must produce SEIPDv2");
@@ -175,8 +175,8 @@ fn test_pq_plus_advanced_v6_uses_seipdv2_aes256() {
 
 #[test]
 fn test_pq_to_pq_message() {
-    let alice = gen(KeyProfile::PostQuantum, "Alice PQ");
-    let bob = gen(KeyProfile::PostQuantum, "Bob PQ");
+    let alice = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "Alice PQ");
+    let bob = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "Bob PQ");
     let ct = encrypt::encrypt(
         PLAINTEXT,
         &[alice.public_key_data.clone(), bob.public_key_data.clone()],
@@ -204,8 +204,8 @@ fn test_pq_to_pq_message() {
 
 #[test]
 fn test_pq_signed_and_encrypted_roundtrip() {
-    let signer = gen(KeyProfile::PostQuantum, "PQ Signer");
-    let recipient = gen(KeyProfile::PostQuantum, "PQ Recipient");
+    let signer = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ Signer");
+    let recipient = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ Recipient");
 
     let ct = encrypt::encrypt(
         PLAINTEXT,
@@ -229,8 +229,8 @@ fn test_pq_signed_and_encrypted_roundtrip() {
 fn test_message_quantum_safety_classifies_by_pkesk_algorithms() {
     use pgp_mobile::decrypt::MessageQuantumSafety;
 
-    let pq = gen(KeyProfile::PostQuantum, "PQ");
-    let v4 = gen(KeyProfile::Universal, "Classic");
+    let pq = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ");
+    let v4 = gen(KeySuite::Ed25519LegacyCurve25519Legacy, "Classic");
 
     let pq_only =
         encrypt::encrypt(PLAINTEXT, &[pq.public_key_data.clone()], None, None).expect("pq only");
@@ -307,7 +307,7 @@ fn test_message_quantum_safety_classifies_by_pkesk_algorithms() {
 
 #[test]
 fn test_pq_cleartext_sign_verify_roundtrip() {
-    let signer = gen(KeyProfile::PostQuantum, "PQ Signer");
+    let signer = gen(KeySuite::MlDsa65Ed25519MlKem768X25519, "PQ Signer");
     let text = b"post-quantum cleartext".to_vec();
 
     let signed = sign::sign_cleartext(&text, &signer.cert_data).expect("cleartext sign");

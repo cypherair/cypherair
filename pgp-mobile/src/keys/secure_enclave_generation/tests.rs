@@ -358,11 +358,11 @@ fn test_secure_enclave_public_certificate_rejects_invalid_or_duplicate_public_ke
 
 #[test]
 fn test_secure_enclave_public_binding_inspection_rejects_non_se_certificates() {
-    let generated = generate_key_with_profile(
+    let generated = generate_key_with_suite(
         "Software".to_string(),
         Some("software@example.test".to_string()),
         Some(3600),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
     assert!(inspect_secure_enclave_public_bindings(&generated.public_key_data).is_err());

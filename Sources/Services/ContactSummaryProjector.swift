@@ -101,7 +101,7 @@ struct ContactSummaryProjector {
             displayName: keyRecord.displayName,
             email: keyRecord.email,
             keyVersion: keyRecord.keyVersion,
-            profile: keyRecord.profile,
+            suite: keyRecord.suite,
             primaryAlgo: keyRecord.primaryAlgo,
             subkeyAlgo: keyRecord.subkeyAlgo,
             hasEncryptionSubkey: keyRecord.hasEncryptionSubkey,

@@ -2,21 +2,20 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    func test_generateKeyRevocation_roundTrip_validatesAgainstSourceCert() throws {
+    func test_generateKeyRevocation_generatedKey_returnsSignatureBytes() throws {
+        // Cryptographic validation of generated revocations against their
+        // source certificate lives in the Rust integration tests
+        // (revocation_construction_tests.rs); this pins the FFI crossing.
         let key = try engine.generateKey(
             name: "Generated Revocation",
             email: nil,
             expirySeconds: nil,
-            profile: .advanced
+            suite: .ed448X448
         )
 
         let generatedRevocation = try engine.generateKeyRevocation(secretCert: key.certData)
-        let validation = try engine.parseRevocationCert(
-            revData: generatedRevocation,
-            certData: key.publicKeyData
-        )
 
-        XCTAssertTrue(validation.lowercased().contains(key.fingerprint.lowercased()))
+        XCTAssertFalse(generatedRevocation.isEmpty)
     }
 
     func test_generateSubkeyRevocation_fixtureBinaryInput_returnsSignatureBytes() throws {
@@ -117,7 +116,7 @@ extension FFIIntegrationTests {
             name: "Selector Revocation",
             email: "selector-revocation@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
 
@@ -139,7 +138,7 @@ extension FFIIntegrationTests {
             name: "Selector Revocation Range",
             email: "selector-revocation-range@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
 
@@ -163,7 +162,7 @@ extension FFIIntegrationTests {
             name: "Selector Revocation Mismatch",
             email: "selector-revocation-mismatch@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
         let mismatchedData = discovered.userIds[0].userIdData + Data("-mismatch".utf8)

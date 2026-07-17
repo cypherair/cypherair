@@ -434,7 +434,6 @@ final class KeyDetailScreenModelTests: XCTestCase {
     ) -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: 4,
             userId: nil,
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -446,9 +445,9 @@ final class KeyDetailScreenModelTests: XCTestCase {
             primaryAlgo: "P-256",
             subkeyAlgo: "P-256",
             expiryDate: nil,
-            openPGPConfigurationIdentity: custody == .appleSecureEnclavePrivateOperations
-                ? .compatibleP256V4
-                : .compatibleSoftwareV4,
+            keyFamily: custody == .appleSecureEnclavePrivateOperations
+                ? .deviceBoundEcdsaNistP256EcdhNistP256V4
+                : .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: custody
         )
     }

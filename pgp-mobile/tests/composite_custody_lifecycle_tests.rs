@@ -16,7 +16,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::{PublicKeyAlgorithm, RevocationStatus, SymmetricAlgorithm};
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile, SecureEnclaveCompositePublicCertificateInput};
+use pgp_mobile::keys::{self, KeySuite, SecureEnclaveCompositePublicCertificateInput};
 use pgp_mobile::PgpEngine;
 use sequoia_openpgp as openpgp;
 
@@ -30,7 +30,7 @@ fn generates_policy_valid_v6_composite_certificate() {
 
     let info = keys::parse_key_info(&material.public_key_data).expect("key info parses");
     assert_eq!(info.key_version, 6);
-    assert_eq!(info.profile, KeyProfile::PostQuantum);
+    assert_eq!(info.suite, KeySuite::MlDsa65Ed25519MlKem768X25519);
     assert!(info.has_encryption_subkey);
     assert!(!info.is_revoked);
     assert!(!info.is_expired);
@@ -345,11 +345,11 @@ fn subkey_and_user_id_revocations_apply_to_certificate() {
 #[test]
 fn certifies_another_certificate_user_id() {
     let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let target = keys::generate_key_with_profile(
+    let target = keys::generate_key_with_suite(
         "Certified Contact".to_string(),
         Some("contact@example.test".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("target key generates");
 

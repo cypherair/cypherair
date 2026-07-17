@@ -23,12 +23,12 @@ final class StreamingServiceTests: XCTestCase {
 
     /// Generate a key and register it as a contact, returning the identity.
     private func generateKeyAndContact(
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         name: String = "Test"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: profile,
+            suite: suite,
             name: name
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -54,8 +54,8 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Encrypt/Decrypt Round-Trip: Legacy
 
     func test_encryptFileStreaming_legacy_roundTrip() async throws {
-        let sender = try await generateKeyAndContact(profile: .universal, name: "Sender A")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient A")
+        let sender = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Sender A")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient A")
 
         // Write test file
         let plaintext = Data("Hello streaming Legacy! 你好世界 🔐".utf8)
@@ -104,8 +104,8 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Encrypt/Decrypt Round-Trip: Modern High
 
     func test_encryptFileStreaming_modernHigh_roundTrip() async throws {
-        let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
-        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let sender = try await generateKeyAndContact(suite: .ed448X448, name: "Sender B")
+        let recipient = try await generateKeyAndContact(suite: .ed448X448, name: "Recipient B")
 
         let plaintext = Data("Hello streaming Modern High! 你好世界 🔐".utf8)
         let inputURL = try writeTempFile(plaintext)
@@ -142,7 +142,7 @@ final class StreamingServiceTests: XCTestCase {
     }
 
     func test_encryptFileStreaming_sameFilename_usesUniqueOperationDirectories() async throws {
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
         let inputURL = try writeTempFile(Data("same name".utf8), filename: "same-name.txt")
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
@@ -173,7 +173,7 @@ final class StreamingServiceTests: XCTestCase {
     }
 
     func test_decryptFileStreaming_sameFilename_usesUniqueOperationDirectories() async throws {
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
         let inputURL = try writeTempFile(Data("same encrypted".utf8), filename: "same-encrypted.txt")
         defer { try? FileManager.default.removeItem(at: inputURL) }
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
@@ -201,7 +201,7 @@ final class StreamingServiceTests: XCTestCase {
     }
 
     func test_decryptFileStreaming_failedRepeatDoesNotDeletePreviousSuccessfulOutput() async throws {
-        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient")
+        let recipient = try await generateKeyAndContact(suite: .ed448X448, name: "Recipient")
         let inputURL = try writeTempFile(Data("survives failure".utf8), filename: "repeat-failure.txt")
         defer { try? FileManager.default.removeItem(at: inputURL) }
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
@@ -231,7 +231,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Sign/Verify Round-Trip: Legacy
 
     func test_signDetachedStreaming_legacy_roundTrip() async throws {
-        let signer = try await generateKeyAndContact(profile: .universal, name: "Signer A")
+        let signer = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Signer A")
 
         let fileData = Data("Sign me (Legacy)".utf8)
         let inputURL = try writeTempFile(fileData)
@@ -260,7 +260,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Sign/Verify Round-Trip: Modern High
 
     func test_signDetachedStreaming_modernHigh_roundTrip() async throws {
-        let signer = try await generateKeyAndContact(profile: .advanced, name: "Signer B")
+        let signer = try await generateKeyAndContact(suite: .ed448X448, name: "Signer B")
 
         let fileData = Data("Sign me (Modern High)".utf8)
         let inputURL = try writeTempFile(fileData)
@@ -287,7 +287,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Cancellation
 
     func test_encryptFileStreaming_cancellation_throwsOperationCancelled() async throws {
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         // Create a file large enough for progress to be reported
         let fileData = Data(repeating: 0x42, count: 256 * 1024)  // 256 KB
@@ -321,7 +321,7 @@ final class StreamingServiceTests: XCTestCase {
     }
 
     func test_verifyDetachedStreaming_cancellation_throwsOperationCancelled() async throws {
-        let signer = try await generateKeyAndContact(profile: .universal, name: "Verify Signer")
+        let signer = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Verify Signer")
 
         let fileData = Data(repeating: 0x42, count: 256 * 1024)  // 256 KB
         let inputURL = try writeTempFile(fileData)
@@ -369,7 +369,7 @@ final class StreamingServiceTests: XCTestCase {
             diskSpaceChecker: diskChecker
         )
 
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let recipient = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "Recipient")
 
         let fileData = Data(repeating: 0x42, count: 10 * 1024 * 1024)  // 10 MB
         let inputURL = try writeTempFile(fileData)
@@ -399,7 +399,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Tamper Detection
 
     func test_decryptFileStreaming_tamperedFile_throwsError() async throws {
-        let key = try await generateKeyAndContact(profile: .advanced, name: "Tamper Test")
+        let key = try await generateKeyAndContact(suite: .ed448X448, name: "Tamper Test")
 
         let plaintext = Data("Tamper test content".utf8)
         let inputURL = try writeTempFile(plaintext)
@@ -449,7 +449,7 @@ final class StreamingServiceTests: XCTestCase {
             name: "External",
             email: "ext@example.com",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Parse the external public key and add as contact
@@ -509,7 +509,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - FileIoError
 
     func test_encryptFileStreaming_invalidInputPath_throwsError() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy)
 
         let nonexistentURL = URL(fileURLWithPath: "/nonexistent/path/file.txt")
 

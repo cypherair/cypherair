@@ -193,30 +193,32 @@ final class KeyManagementService: @unchecked Sendable {
     // MARK: - Key Generation
 
     /// Single generation entry point: dispatches to the portable software
-    /// path or the Secure Enclave custody path by the family's custody model.
+    /// path or the Secure Enclave custody path by the family's custody model
+    /// (portable families carry their generation suite; device-bound families
+    /// carry none and take the custody path).
     func generateKey(
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        family: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws -> PGPKeyIdentity {
-        if let profile = family.equivalentSoftwareProfile {
+        if let suite = family.softwareGenerationSuite {
             return try await generateKey(
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                profile: profile
+                suite: suite
             )
         }
         return try await generateSecureEnclaveCustodyKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            configurationIdentity: family
+            family: family
         )
     }
 
-    /// Generate a new key pair with the specified profile.
+    /// Generate a new key pair with the specified software suite.
     /// The private key is immediately SE-wrapped and stored in Keychain.
     ///
     /// Uses the unlocked private-key control domain for the SE access-control mode.
@@ -224,7 +226,7 @@ final class KeyManagementService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile
+        suite: PGPKeySuite
     ) async throws -> PGPKeyIdentity {
         let token = provisioningInvalidationGate.makeToken()
         if let beforeAuthModeReadCheckpoint {
@@ -239,7 +241,7 @@ final class KeyManagementService: @unchecked Sendable {
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            profile: profile,
+            suite: suite,
             authMode: authMode,
             token: token
         )
@@ -249,7 +251,7 @@ final class KeyManagementService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         authMode: AuthenticationMode,
         token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -257,7 +259,7 @@ final class KeyManagementService: @unchecked Sendable {
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            profile: profile,
+            suite: suite,
             authMode: authMode,
             invalidationToken: token
         )
@@ -273,7 +275,7 @@ final class KeyManagementService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        configurationIdentity: PGPKeyConfiguration.Identity
+        family: PGPKeyFamily
     ) async throws -> PGPKeyIdentity {
         guard let secureEnclaveCustodyGenerationService else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)
@@ -285,7 +287,7 @@ final class KeyManagementService: @unchecked Sendable {
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                configurationIdentity: configurationIdentity,
+                family: family,
                 invalidationToken: token
             )
         } catch let error as SecureEnclaveCustodyHandleError {

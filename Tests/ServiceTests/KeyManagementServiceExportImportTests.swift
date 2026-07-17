@@ -99,11 +99,11 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
             passphrase: passphrase
         )
 
-        // Verify fingerprint and profile match
+        // Verify fingerprint and suite match
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Imported key fingerprint should match original")
-        XCTAssertEqual(imported.softwareProfile, .universal,
-                       "Imported key should retain Legacy (universal)")
+        XCTAssertEqual(imported.softwareSuite, .ed25519LegacyCurve25519Legacy,
+                       "Imported key should retain the legacy suite")
         XCTAssertEqual(imported.keyVersion, 4)
     }
 
@@ -124,8 +124,8 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Imported key fingerprint should match original")
-        XCTAssertEqual(imported.softwareProfile, .advanced,
-                       "Imported key should retain Modern High (advanced)")
+        XCTAssertEqual(imported.softwareSuite, .ed448X448,
+                       "Imported key should retain the Ed448 suite")
         XCTAssertEqual(imported.keyVersion, 6)
     }
 
@@ -198,15 +198,9 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Binary import should produce same fingerprint as original")
-        XCTAssertEqual(imported.softwareProfile, .universal)
+        XCTAssertEqual(imported.softwareSuite, .ed25519LegacyCurve25519Legacy)
         XCTAssertEqual(imported.keyVersion, 4)
         XCTAssertFalse(imported.revocationCert.isEmpty, "Imported key should immediately store a revocation signature")
-
-        let revocationValidation = try engine.parseRevocationCert(
-            revData: imported.revocationCert,
-            certData: imported.publicKeyData
-        )
-        XCTAssertTrue(revocationValidation.lowercased().contains(imported.fingerprint.lowercased()))
     }
 
     func test_importKey_binaryFormat_modernHigh_fingerprintMatches() async throws {
@@ -226,15 +220,9 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Binary import should produce same fingerprint as original")
-        XCTAssertEqual(imported.softwareProfile, .advanced)
+        XCTAssertEqual(imported.softwareSuite, .ed448X448)
         XCTAssertEqual(imported.keyVersion, 6)
         XCTAssertFalse(imported.revocationCert.isEmpty)
-
-        let revocationValidation = try engine.parseRevocationCert(
-            revData: imported.revocationCert,
-            certData: imported.publicKeyData
-        )
-        XCTAssertTrue(revocationValidation.lowercased().contains(imported.fingerprint.lowercased()))
     }
 
 }

@@ -11,7 +11,7 @@ use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
@@ -39,7 +39,7 @@ fn test_import_gpg_pubkey() {
     let info = keys::parse_key_info(&gpg_pubkey).expect("Should parse GnuPG public key");
 
     assert_eq!(info.key_version, 4, "GnuPG key must be v4");
-    assert_eq!(info.profile, KeyProfile::Universal);
+    assert_eq!(info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
     assert!(
         info.has_encryption_subkey,
         "Must have Cv25519 encryption subkey"
@@ -103,11 +103,11 @@ fn test_app_encrypt_signed_to_gpg_key() {
     let plaintext = b"Signed message from CypherAir";
 
     // Generate a Legacy key for signing
-    let sender = keys::generate_key_with_profile(
+    let sender = keys::generate_key_with_suite(
         "Sender".to_string(),
         Some("sender@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
@@ -140,7 +140,7 @@ fn test_app_encrypt_signed_to_gpg_key() {
 #[test]
 fn test_app_sign_legacy() {
     let sender =
-        keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Signer".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let plaintext = b"This message is signed by CypherAir Legacy";
@@ -345,11 +345,11 @@ fn test_full_roundtrip_signed() {
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
     // Generate a Legacy signing key
-    let signer = keys::generate_key_with_profile(
+    let signer = keys::generate_key_with_suite(
         "App User".to_string(),
         Some("app@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
@@ -385,11 +385,11 @@ fn test_full_roundtrip_signed() {
 /// generating the v6 fixture with `test_generate_v6_fixture`.
 #[test]
 fn test_modern_high_key_is_v6_gnupg_incompatible() {
-    let key_b = keys::generate_key_with_profile(
+    let key_b = keys::generate_key_with_suite(
         "Modern High User".to_string(),
         None,
         None,
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
 
@@ -398,7 +398,7 @@ fn test_modern_high_key_is_v6_gnupg_incompatible() {
     let info =
         keys::parse_key_info(&key_b.public_key_data).expect("Should parse Modern High public key");
     assert_eq!(info.key_version, 6);
-    assert_eq!(info.profile, KeyProfile::Advanced);
+    assert_eq!(info.suite, KeySuite::Ed448X448);
 
     // v6 keys use a different packet format that GnuPG 2.4.x cannot parse.
     // GnuPG will report: "gpg: no valid OpenPGP data found" or similar.
@@ -408,11 +408,11 @@ fn test_modern_high_key_is_v6_gnupg_incompatible() {
 /// (encryption): Modern High encryption produces SEIPDv2 (incompatible with GnuPG).
 #[test]
 fn test_modern_high_encryption_not_gnupg_compatible() {
-    let key_b = keys::generate_key_with_profile(
+    let key_b = keys::generate_key_with_suite(
         "Modern High".to_string(),
         None,
         None,
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
 
@@ -511,7 +511,7 @@ fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
     let sender =
-        keys::generate_key_with_profile("Sender".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Sender".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let plaintext = b"Encrypt-to-self with GnuPG recipient";
@@ -550,11 +550,11 @@ fn test_modern_high_sender_to_gpg_v4_recipient_uses_seipdv1() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
-    let sender_b = keys::generate_key_with_profile(
+    let sender_b = keys::generate_key_with_suite(
         "Modern High Sender".to_string(),
         None,
         None,
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
 

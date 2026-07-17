@@ -9,7 +9,7 @@
 
 ## 1. Overview
 
-Secure Enclave custody is a device-bound private-key custody model: long-term signing and key-agreement private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for Device-Bound Post-Quantum (§4.1). It sits alongside, and does not replace, the portable software-key model. It is a custody model, not a third OpenPGP profile.
+Secure Enclave custody is a device-bound private-key custody model: long-term signing and key-agreement private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for Device-Bound Post-Quantum (§4.1). It sits alongside, and does not replace, the portable software-key model. It is a custody model, not an algorithm suite.
 
 The product presents it as four of the nine key families ([PRD.md](PRD.md) §3 owns the full taxonomy, generation UX, commitment sheet, and compatibility copy):
 

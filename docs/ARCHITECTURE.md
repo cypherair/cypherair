@@ -129,7 +129,7 @@ The canonical row-level classification and migration-readiness table is [PERSIST
 
 ### Models (`Sources/Models/`)
 
-Shared app-owned models: PGP key representations (`PGPKeyIdentity`, `PGPKeyConfiguration`, `PGPKeyProfile`, custody kinds), the `CypherAirError` vocabulary, operation-support/failure-category types, ordinary-settings snapshot/persistence coordination, Contacts validation values, and identity parsing/formatting (`IdentityPresentation`). Generated `PgpError` normalization lives in the FFI mapper boundary, not Models; ProtectedData/Security implementation state is reduced to app-owned availability values before reaching Models.
+Shared app-owned models: PGP key representations (`PGPKeyIdentity`, `PGPKeyFamily`, `PGPKeySuite`, custody kinds), the `CypherAirError` vocabulary, operation-support/failure-category types, ordinary-settings snapshot/persistence coordination, Contacts validation values, and identity parsing/formatting (`IdentityPresentation`). Generated `PgpError` normalization lives in the FFI mapper boundary, not Models; ProtectedData/Security implementation state is reduced to app-owned availability values before reaching Models.
 
 ### Rust Engine (`pgp-mobile/`)
 

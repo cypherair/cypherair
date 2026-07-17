@@ -184,7 +184,7 @@ private struct DecryptScreenHostView: View {
                     )
                     LabeledContent(
                         String(localized: "decrypt.matchedKey.keyType", defaultValue: "Key Type"),
-                        value: matchedKey.openPGPConfigurationIdentity.familyDisplayName
+                        value: matchedKey.keyFamily.familyDisplayName
                     )
                     FingerprintView(
                         fingerprint: matchedKey.fingerprint,

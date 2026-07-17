@@ -18,13 +18,13 @@ use openpgp::types::{AEADAlgorithm, HashAlgorithm, SymmetricAlgorithm};
 use openssl::kdf::{hkdf, HkdfMode};
 use openssl::md::Md;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::password::{self, PasswordDecryptStatus, PasswordMessageFormat};
 use pgp_mobile::signature_details::{DetailedSignatureStatus, SignatureVerificationState};
 use sequoia_openpgp as openpgp;
 
-fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(name.to_string(), None, None, profile)
+fn gen_key(name: &str, profile: KeySuite) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(name.to_string(), None, None, profile)
         .expect("key generation should succeed")
 }
 
@@ -306,8 +306,8 @@ fn test_password_encrypt_decrypt_armored_seipdv1_round_trip_unsigned() {
 
 #[test]
 fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
-    let password: Password = "advanced password".into();
-    let signer = gen_key("Password Signer B", KeyProfile::Advanced);
+    let password: Password = "resilient password".into();
+    let signer = gen_key("Password Signer B", KeySuite::Ed448X448);
     let plaintext = b"Password message using SEIPDv2 and a v6 signature.";
 
     let ciphertext = password::encrypt(
@@ -342,7 +342,7 @@ fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
 #[test]
 fn test_password_decrypt_signed_without_verification_cert_reports_missing_certificate() {
     let password: Password = "password missing verification cert".into();
-    let signer = gen_key("Password Missing Signer", KeyProfile::Universal);
+    let signer = gen_key("Password Missing Signer", KeySuite::Ed25519LegacyCurve25519Legacy);
     let plaintext = b"Password signed message without verification cert.";
 
     let ciphertext = password::encrypt_binary(
@@ -372,7 +372,7 @@ fn test_password_decrypt_signed_without_verification_cert_reports_missing_certif
 #[test]
 fn test_password_encrypt_decrypt_binary_seipdv1_round_trip_signed() {
     let password: Password = "binary-seipdv1".into();
-    let signer = gen_key("Password Signer A", KeyProfile::Universal);
+    let signer = gen_key("Password Signer A", KeySuite::Ed25519LegacyCurve25519Legacy);
     let plaintext = b"Binary password message using SEIPDv1.";
 
     let ciphertext = password::encrypt_binary(
@@ -468,7 +468,7 @@ fn test_password_encrypt_seipdv2_uses_ocb_aes256_and_default_s2k() {
 
 #[test]
 fn test_password_decrypt_no_skesk_returns_status() {
-    let recipient = gen_key("Recipient", KeyProfile::Universal);
+    let recipient = gen_key("Recipient", KeySuite::Ed25519LegacyCurve25519Legacy);
     let ciphertext = pgp_mobile::encrypt::encrypt_binary(
         b"recipient-only message",
         &[recipient.public_key_data.clone()],
@@ -522,7 +522,7 @@ fn test_password_decrypt_multi_password_message_accepts_second_password() {
 #[test]
 fn test_password_decrypt_mixed_pkesk_skesk_message_succeeds() {
     let password: Password = "mixed-message-password".into();
-    let recipient = gen_key("Mixed Recipient", KeyProfile::Universal);
+    let recipient = gen_key("Mixed Recipient", KeySuite::Ed25519LegacyCurve25519Legacy);
     let plaintext = b"mixed password + recipient message";
 
     let ciphertext = encrypt_mixed_message(plaintext, &password, &recipient.public_key_data);

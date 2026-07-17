@@ -47,7 +47,7 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
             name: "CypherAir Device Custody",
             email: "device-custody@example.invalid",
             expirySeconds: nil,
-            configuration: PGPKeyConfiguration.Identity.compatibleP256V4.configuration,
+            family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             handlePair: loadedPair,
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
@@ -63,6 +63,6 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
             keyAgreementPublicKeyRaw: pair.keyAgreement.publicKeyRaw
         )
         XCTAssertEqual(located, pair)
-        recordEvidence(.hiddenGeneration, configuration: .compatibleP256V4)
+        recordEvidence(.hiddenGeneration, configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4)
     }
 }

@@ -1,5 +1,5 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile, UserIdSelectorInput};
+use pgp_mobile::keys::{self, KeySuite, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 use openpgp::packet::signature;
@@ -10,8 +10,8 @@ use openpgp::serialize::Serialize;
 use openpgp::types::{RevocationStatus, SignatureType};
 use openpgp::Packet;
 
-fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_profile(
+fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
         None,
@@ -160,7 +160,7 @@ fn assert_invalid_key_data(result: Result<Vec<u8>, PgpError>) {
 
 #[test]
 fn test_generate_key_revocation_legacy_validates_against_source_cert() {
-    let generated = generate_key(KeyProfile::Universal, "RevocationA");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "RevocationA");
     let revocation =
         keys::generate_key_revocation(&generated.cert_data).expect("revocation should generate");
 
@@ -178,7 +178,7 @@ fn test_generate_key_revocation_legacy_validates_against_source_cert() {
 
 #[test]
 fn test_generate_key_revocation_modern_high_validates_against_source_cert() {
-    let generated = generate_key(KeyProfile::Advanced, "RevocationB");
+    let generated = generate_key(KeySuite::Ed448X448, "RevocationB");
     let revocation =
         keys::generate_key_revocation(&generated.cert_data).expect("revocation should generate");
 
@@ -196,8 +196,8 @@ fn test_generate_key_revocation_modern_high_validates_against_source_cert() {
 
 #[test]
 fn test_generate_key_revocation_wrong_certificate_fails_validation() {
-    let key_a = generate_key(KeyProfile::Universal, "KeyA");
-    let key_b = generate_key(KeyProfile::Universal, "KeyB");
+    let key_a = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "KeyA");
+    let key_b = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "KeyB");
 
     let revocation =
         keys::generate_key_revocation(&key_a.cert_data).expect("revocation should generate");
@@ -210,13 +210,13 @@ fn test_generate_key_revocation_wrong_certificate_fails_validation() {
 
 #[test]
 fn test_generate_key_revocation_public_only_input_rejected() {
-    let generated = generate_key(KeyProfile::Universal, "PublicOnlyKey");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "PublicOnlyKey");
     assert_invalid_key_data(keys::generate_key_revocation(&generated.public_key_data));
 }
 
 #[test]
 fn test_generate_subkey_revocation_public_only_input_rejected() {
-    let generated = generate_key(KeyProfile::Universal, "PublicOnlySubkey");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "PublicOnlySubkey");
     let cert = openpgp::Cert::from_bytes(&generated.public_key_data).expect("cert should parse");
     let fingerprint = cert
         .keys()
@@ -236,7 +236,7 @@ fn test_generate_subkey_revocation_public_only_input_rejected() {
 
 #[test]
 fn test_generate_user_id_revocation_public_only_input_rejected() {
-    let generated = generate_key(KeyProfile::Universal, "PublicOnlyUserid");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "PublicOnlyUserid");
     let cert = openpgp::Cert::from_bytes(&generated.public_key_data).expect("cert should parse");
     let user_id = cert
         .userids()
@@ -254,8 +254,8 @@ fn test_generate_user_id_revocation_public_only_input_rejected() {
 
 #[test]
 fn test_generate_key_revocation_encrypted_secret_input_rejected() {
-    let generated = generate_key(KeyProfile::Advanced, "EncryptedSecret");
-    let armored = keys::export_secret_key(&generated.cert_data, "passphrase", KeyProfile::Advanced)
+    let generated = generate_key(KeySuite::Ed448X448, "EncryptedSecret");
+    let armored = keys::export_secret_key(&generated.cert_data, "passphrase")
         .expect("secret key export should succeed");
     let (encrypted_secret, _) =
         pgp_mobile::armor::decode_armor(&armored).expect("armored secret key should dearmor");
@@ -265,7 +265,7 @@ fn test_generate_key_revocation_encrypted_secret_input_rejected() {
 
 #[test]
 fn test_generate_subkey_revocation_revokes_selected_subkey() {
-    let generated = generate_key(KeyProfile::Universal, "SubkeyTarget");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SubkeyTarget");
     let cert = openpgp::Cert::from_bytes(&generated.cert_data).expect("secret cert should parse");
     let fingerprint = cert
         .keys()
@@ -301,7 +301,7 @@ fn test_generate_subkey_revocation_revokes_selected_subkey() {
 
 #[test]
 fn test_generate_subkey_revocation_uppercase_fingerprint_succeeds() {
-    let generated = generate_key(KeyProfile::Universal, "UppercaseSubkey");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "UppercaseSubkey");
     let cert = openpgp::Cert::from_bytes(&generated.cert_data).expect("secret cert should parse");
     let fingerprint = cert
         .keys()
@@ -321,7 +321,7 @@ fn test_generate_subkey_revocation_uppercase_fingerprint_succeeds() {
 
 #[test]
 fn test_generate_subkey_revocation_selector_miss_returns_invalid_key_data() {
-    let generated = generate_key(KeyProfile::Universal, "MissingSubkey");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MissingSubkey");
     assert_invalid_key_data(keys::generate_subkey_revocation(
         &generated.cert_data,
         "0000000000000000000000000000000000000000",
@@ -330,7 +330,7 @@ fn test_generate_subkey_revocation_selector_miss_returns_invalid_key_data() {
 
 #[test]
 fn test_generate_user_id_revocation_revokes_selected_user_id_only() {
-    let generated = generate_key(KeyProfile::Universal, "UseridTarget");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "UseridTarget");
     let secret_with_extra_userid = add_userid(&generated.cert_data, "secondary@example.com");
     let cert =
         openpgp::Cert::from_bytes(&secret_with_extra_userid).expect("secret cert should parse");
@@ -383,7 +383,7 @@ fn test_generate_user_id_revocation_revokes_selected_user_id_only() {
 
 #[test]
 fn test_generate_user_id_revocation_by_selector_accepts_duplicate_occurrence_selector() {
-    let generated = generate_key(KeyProfile::Universal, "SelectorDuplicateUserid");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorDuplicateUserid");
     let duplicated = duplicate_userid(
         &generated.cert_data,
         "SelectorDuplicateUserid <selectorduplicateuserid@example.com>",
@@ -404,7 +404,7 @@ fn test_generate_user_id_revocation_by_selector_accepts_duplicate_occurrence_sel
 #[test]
 fn test_generate_user_id_revocation_by_selector_occurrence_index_out_of_range_returns_invalid_key_data(
 ) {
-    let generated = generate_key(KeyProfile::Universal, "OutOfRangeUserid");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "OutOfRangeUserid");
     let user_id_data = first_user_id_bytes(&generated.cert_data);
 
     assert_invalid_key_data(keys::generate_user_id_revocation_by_selector(
@@ -415,7 +415,7 @@ fn test_generate_user_id_revocation_by_selector_occurrence_index_out_of_range_re
 
 #[test]
 fn test_generate_user_id_revocation_by_selector_bytes_mismatch_returns_invalid_key_data() {
-    let generated = generate_key(KeyProfile::Universal, "MismatchUserid");
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "MismatchUserid");
     let first_user_id = first_user_id_bytes(&generated.cert_data);
     let mismatched = [first_user_id.clone(), b"-mismatch".to_vec()].concat();
 
@@ -427,7 +427,7 @@ fn test_generate_user_id_revocation_by_selector_bytes_mismatch_returns_invalid_k
 
 #[test]
 fn test_generate_subkey_and_user_id_revocations_are_signature_packets() {
-    let generated = generate_key(KeyProfile::Advanced, "SignatureTypes");
+    let generated = generate_key(KeySuite::Ed448X448, "SignatureTypes");
     let cert = openpgp::Cert::from_bytes(&generated.cert_data).expect("secret cert should parse");
     let subkey_fingerprint = cert
         .keys()
@@ -467,5 +467,18 @@ fn test_generate_subkey_and_user_id_revocations_are_signature_packets() {
     match user_id_packet {
         Packet::Signature(sig) => assert_eq!(sig.typ(), SignatureType::CertificationRevocation),
         other => panic!("expected user ID revocation signature, got: {other:?}"),
+    }
+}
+
+/// Re-homed from the retired FFI `parse_revocation_cert` oracle: garbage
+/// revocation bytes fail with the typed revocation error, never a panic or a
+/// silent success.
+#[test]
+fn test_parse_revocation_cert_garbage_input_returns_revocation_error() {
+    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "GarbageRevTarget");
+    let result = keys::parse_revocation_cert(b"not a revocation cert", &generated.public_key_data);
+    match result {
+        Err(PgpError::RevocationError { .. }) => {}
+        other => panic!("expected RevocationError, got: {other:?}"),
     }
 }

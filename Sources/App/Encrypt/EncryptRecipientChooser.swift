@@ -238,7 +238,7 @@ enum RecipientCompatibility {
     }
 }
 
-/// A composed VoiceOver label for a recipient row: name, profile, plus the SEIPDv1
+/// A composed VoiceOver label for a recipient row: name, suite, plus the SEIPDv1
 /// downgrade warning and the unverified status when they apply. Keeps the
 /// downgrade/verification cues audible (following the comma-separated idiom used
 /// elsewhere in the app); the row separately announces its selected state.
@@ -248,7 +248,7 @@ private func recipientAccessibilityLabel(
 ) -> String {
     var parts = [
         IdentityDisplayPresentation.displayName(contact.displayName),
-        contact.preferredKey.profile.contactKeyKindDisplayName
+        contact.preferredKey.suite.contactKeyKindDisplayName
     ]
     if RecipientCompatibility.isSeipdV1Downgrade(
         senderDefaultKeyVersion: defaultKeyVersion,
@@ -287,7 +287,7 @@ private struct RecipientCompatibilityIcon: View {
 
 /// Shared identity content for a recipient row: compatibility glyph, the display
 /// name (wraps rather than truncating so long names keep their identity info), the
-/// profile, and an Unverified badge when applicable.
+/// suite, and an Unverified badge when applicable.
 private struct RecipientRowContent: View {
     let contact: ContactRecipientSummary
     let defaultKeyVersion: UInt8?
@@ -299,7 +299,7 @@ private struct RecipientRowContent: View {
                 Text(IdentityDisplayPresentation.displayName(contact.displayName))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
-                    Text(contact.preferredKey.profile.contactKeyKindDisplayName)
+                    Text(contact.preferredKey.suite.contactKeyKindDisplayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if !contact.isPreferredKeyVerified {

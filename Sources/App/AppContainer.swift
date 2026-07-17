@@ -1357,7 +1357,7 @@ final class AppContainer: @unchecked Sendable {
             name: "UITest Contact",
             email: "uitest-contact@example.invalid",
             expirySeconds: nil,
-            profile: .universal
+            suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
     }

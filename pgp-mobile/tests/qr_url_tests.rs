@@ -1,6 +1,6 @@
 //! QR / URL Scheme validation tests.
 
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::PgpEngine;
 
 /// v4 public key → base64url encode → cypherair:// URL → decode → byte-identical.
@@ -8,11 +8,11 @@ use pgp_mobile::PgpEngine;
 fn test_qr_url_roundtrip_v4() {
     let engine = PgpEngine::new();
 
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
@@ -38,7 +38,7 @@ fn test_qr_url_roundtrip_v4() {
 fn test_qr_url_roundtrip_v6() {
     let engine = PgpEngine::new();
 
-    let key = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+    let key = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
         .expect("Key gen should succeed");
 
     let url = engine
@@ -86,7 +86,7 @@ fn test_qr_url_rejects_secret_key_on_encode() {
     let engine = PgpEngine::new();
 
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     // encode_qr_url should reject secret key material (defense in depth)
@@ -112,7 +112,7 @@ fn test_qr_url_rejects_secret_key_on_decode() {
     let engine = PgpEngine::new();
 
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     // Manually construct a URL with secret key data (bypassing encode_qr_url validation)
@@ -144,7 +144,7 @@ fn test_qr_url_length_reasonable() {
     let engine = PgpEngine::new();
 
     // Legacy key
-    let key_a = keys::generate_key_with_profile("A".to_string(), None, None, KeyProfile::Universal)
+    let key_a = keys::generate_key_with_suite("A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
         .expect("Key gen should succeed");
     let url_a = engine.encode_qr_url(key_a.public_key_data.clone()).unwrap();
     // Full certificate (primary key + User ID + self-sig + encryption subkey + binding sig)
@@ -157,7 +157,7 @@ fn test_qr_url_length_reasonable() {
     );
 
     // Modern High key
-    let key_b = keys::generate_key_with_profile("B".to_string(), None, None, KeyProfile::Advanced)
+    let key_b = keys::generate_key_with_suite("B".to_string(), None, None, KeySuite::Ed448X448)
         .expect("Key gen should succeed");
     let url_b = engine.encode_qr_url(key_b.public_key_data.clone()).unwrap();
     // Modern High keys (Ed448+X448, v6 format) have larger signatures and key material.
@@ -195,7 +195,7 @@ fn test_qr_url_decode_query_params() {
 
     // First encode a valid key to get a real URL
     let key =
-        keys::generate_key_with_profile("Test".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Test".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let valid_url = engine

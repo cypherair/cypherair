@@ -1,7 +1,7 @@
 //! pgp-mobile: OpenPGP wrapper for CypherAir iOS app.
 //!
 //! Wraps Sequoia PGP 2.4.1 behind a UniFFI-annotated API.
-//! Exposes profile-aware OpenPGP operations across the supported key families.
+//! Exposes suite-aware OpenPGP operations across the supported key families.
 //! All Sequoia internal types are hidden behind this boundary.
 
 pub mod armor;
@@ -37,7 +37,7 @@ use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, ExternalMlDsa65SigningProvider,
     ExternalMlDsa87SigningProvider, ExternalMlKem1024DecapsulationProvider,
     ExternalMlKem768DecapsulationProvider, ExternalP256KeyAgreementProvider,
-    ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryPublicResult,
+    ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeySuite, ModifyExpiryPublicResult,
     ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
     SecureEnclaveCompositeBindingInspection, SecureEnclaveCompositeGeneratedCertificate,
     SecureEnclaveCompositeHighBindingInspection, SecureEnclaveCompositeHighPublicCertificateInput,
@@ -68,18 +68,24 @@ impl PgpEngine {
 
     // ── Key Generation ──────────────────────────────────────────────
 
-    /// Generate a new key pair with the specified profile.
+    /// Generate a new software key pair with the specified suite.
     ///
-    /// - Portable Legacy (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
-    /// - Portable Modern · High (Advanced): v6 key, Ed448+X448, RFC 9580.
+    /// - `Ed25519LegacyCurve25519Legacy`: v4 key, Ed25519Legacy+Curve25519Legacy
+    ///   under RFC 4880, GnuPG compatible.
+    /// - `Ed25519X25519`: v6 key, Ed25519+X25519, RFC 9580.
+    /// - `Ed448X448`: v6 key, Ed448+X448, RFC 9580.
+    /// - `MlDsa65Ed25519MlKem768X25519`: v6 key, RFC 9980 composite
+    ///   ML-DSA-65+Ed25519 / ML-KEM-768+X25519.
+    /// - `MlDsa87Ed448MlKem1024X448`: v6 key, RFC 9980 composite
+    ///   ML-DSA-87+Ed448 / ML-KEM-1024+X448 (NIST level 5).
     pub fn generate_key(
         &self,
         name: String,
         email: Option<String>,
         expiry_seconds: Option<u64>,
-        profile: KeyProfile,
+        suite: KeySuite,
     ) -> Result<GeneratedKey, PgpError> {
-        keys::generate_key_with_profile(name, email, expiry_seconds, profile)
+        keys::generate_key_with_suite(name, email, expiry_seconds, suite)
     }
 
     /// Build a public-only P-256 OpenPGP certificate whose private operations are external.
@@ -444,14 +450,9 @@ impl PgpEngine {
         keys::discover_certificate_selectors(&cert_data)
     }
 
-    /// Get the key version from binary certificate data.
-    pub fn get_key_version(&self, cert_data: Vec<u8>) -> Result<u8, PgpError> {
-        keys::get_key_version(&cert_data)
-    }
-
-    /// Detect the profile of a key (Universal or Advanced).
-    pub fn detect_profile(&self, cert_data: Vec<u8>) -> Result<KeyProfile, PgpError> {
-        keys::detect_profile(&cert_data)
+    /// Detect the suite of a key based on its version and algorithms.
+    pub fn detect_suite(&self, cert_data: Vec<u8>) -> Result<KeySuite, PgpError> {
+        keys::detect_suite(&cert_data)
     }
 
     /// Validate contact-import data as a public certificate and return normalized metadata.
@@ -1002,15 +1003,15 @@ impl PgpEngine {
     // ── Key Export/Import ────────────────────────────────────────────
 
     /// Export a secret key protected with a passphrase (ASCII-armored).
-    /// Portable Legacy → Iterated+Salted S2K. Portable Modern · High → Argon2id.
+    /// The S2K mode follows the certificate's classified suite: the legacy
+    /// suite → Iterated+Salted, every v6 suite → Argon2id.
     pub fn export_secret_key(
         &self,
         cert_data: Vec<u8>,
         passphrase: String,
-        profile: KeyProfile,
     ) -> Result<Vec<u8>, PgpError> {
         let cert_data = Zeroizing::new(cert_data);
-        keys::export_secret_key(&cert_data, &passphrase, profile)
+        keys::export_secret_key(&cert_data, &passphrase)
     }
 
     /// Parse S2K parameters from a passphrase-protected key without importing it.
@@ -1031,16 +1032,6 @@ impl PgpEngine {
     }
 
     // ── Revocation ──────────────────────────────────────────────────
-
-    /// Parse and cryptographically verify a revocation certificate against the target key.
-    pub fn parse_revocation_cert(
-        &self,
-        rev_data: Vec<u8>,
-        cert_data: Vec<u8>,
-    ) -> Result<String, PgpError> {
-        let cert_data = Zeroizing::new(cert_data);
-        keys::parse_revocation_cert(&rev_data, &cert_data)
-    }
 
     /// Generate a key-level revocation signature from an existing secret certificate.
     pub fn generate_key_revocation(&self, secret_cert: Vec<u8>) -> Result<Vec<u8>, PgpError> {

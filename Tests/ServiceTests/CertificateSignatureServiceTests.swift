@@ -25,7 +25,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
     }
 
     private func generatedTarget(
-        profile: KeyProfile,
+        suite: KeySuite,
         name: String,
         email: String
     ) throws -> GeneratedKey {
@@ -33,7 +33,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
             name: name,
             email: email,
             expirySeconds: nil,
-            profile: profile
+            suite: suite
         )
     }
 
@@ -46,13 +46,13 @@ final class CertificateSignatureServiceTests: XCTestCase {
     }
 
     private func generateSigner(
-        profile: PGPKeyProfile,
+        suite: PGPKeySuite,
         name: String,
         email: String
     ) async throws -> PGPKeyIdentity {
         try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
-            profile: profile,
+            suite: suite,
             name: name,
             email: email
         )
@@ -60,7 +60,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_selectionCatalog_targetCert_isReadOnly() throws {
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Selector ReadOnly",
             email: "selector-readonly@example.com"
         )
@@ -99,7 +99,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         let signature = try loadFixture("ffi_direct_key_signature", ext: "sig")
         _ = try stack.contactService.importContact(publicKeyData: target)
         let wrongTarget = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Wrong Direct Target",
             email: "wrong-direct-target@example.com"
         )
@@ -156,7 +156,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_verifyUserIdBindingSignature_duplicateOccurrence_acceptsSelectedOccurrence() async throws {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Duplicate Service Signer",
             email: "duplicate-service-signer@example.com"
         )
@@ -181,12 +181,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_generateUserIdCertification_roundTrip_legacy_returnsOwnKeyIdentity() async throws {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Service Signer A",
             email: "service-signer-a@example.com"
         )
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Service Target A",
             email: "service-target-a@example.com"
         )
@@ -211,12 +211,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_generateUserIdCertification_roundTrip_modernHigh_returnsOwnKeyIdentity() async throws {
         let signer = try await generateSigner(
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Service Signer B",
             email: "service-signer-b@example.com"
         )
         let target = try generatedTarget(
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Service Target B",
             email: "service-target-b@example.com"
         )
@@ -242,12 +242,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_generateUserIdCertification_preservesAllCertificationKinds() async throws {
         let signer = try await generateSigner(
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Kinds Signer",
             email: "kinds-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Kinds Target",
             email: "kinds-target@example.com"
         )
@@ -274,12 +274,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_generateArmoredUserIdCertification_returnsArmoredSignature() async throws {
         let signer = try await generateSigner(
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Armored Signer",
             email: "armored-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .advanced,
+            suite: .ed448X448,
             name: "Armored Target",
             email: "armored-target@example.com"
         )
@@ -299,12 +299,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_generateArmoredUserIdCertification_dearmoredRoundTrip_verifiesSuccessfully() async throws {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Armored Roundtrip Signer",
             email: "armored-roundtrip-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Armored Roundtrip Target",
             email: "armored-roundtrip-target@example.com"
         )
@@ -330,12 +330,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_validateUserIdCertificationArtifact_returnsPersistableMetadata() async throws {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Artifact Metadata Signer",
             email: "artifact-metadata-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Artifact Metadata Target",
             email: "artifact-metadata-target@example.com"
         )
@@ -404,12 +404,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
         async throws
     {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Mismatch Signer",
             email: "mismatch-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Mismatch Target",
             email: "mismatch-target@example.com"
         )
@@ -444,12 +444,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
         async throws
     {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Out Of Range Signer",
             email: "out-of-range-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Out Of Range Target",
             email: "out-of-range-target@example.com"
         )
@@ -482,12 +482,12 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_verifyUserIdBindingSignature_mismatchedSelector_throwsInvalidKeyData() async throws {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Verify Mismatch Signer",
             email: "verify-mismatch-signer@example.com"
         )
         let target = try generatedTarget(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Verify Mismatch Target",
             email: "verify-mismatch-target@example.com"
         )
@@ -522,7 +522,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
     func test_candidateSignerCertificates_preservesContactThenOwnMultiplicity() async throws {
         let signer = try await generateSigner(
-            profile: .universal,
+            suite: .ed25519LegacyCurve25519Legacy,
             name: "Multiplicity Signer",
             email: "multiplicity-signer@example.com"
         )

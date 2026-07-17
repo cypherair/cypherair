@@ -21,7 +21,7 @@
 //! `legacy` — correctly negotiates SEIPDv2. The SEIPDv1 floor for v4-only
 //! holders (keys that do not advertise SEIPDv2, like GnuPG's or our Profile
 //! A's) is asserted in the mixed-recipient test below with an engine
-//! Universal key in the set.
+//! legacy key in the set.
 //!
 //! The pq/pqhigh suites additionally decrypt the sq-encrypted fixtures through
 //! the split-custody external-decryptor path, which is the cross-implementation
@@ -40,7 +40,7 @@ use tempfile::NamedTempFile;
 use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use pgp_mobile::verify;
@@ -57,33 +57,33 @@ use common::{detect_message_format, load_fixture};
 struct SqSuite {
     name: &'static str,
     key_version: u8,
-    profile: KeyProfile,
+    profile: KeySuite,
 }
 
 const LEGACY: SqSuite = SqSuite {
     name: "legacy",
     key_version: 4,
-    profile: KeyProfile::Universal,
+    profile: KeySuite::Ed25519LegacyCurve25519Legacy,
 };
 const MODERN: SqSuite = SqSuite {
     name: "modern",
     key_version: 6,
-    profile: KeyProfile::Modern,
+    profile: KeySuite::Ed25519X25519,
 };
 const MODERN_HIGH: SqSuite = SqSuite {
     name: "modernhigh",
     key_version: 6,
-    profile: KeyProfile::Advanced,
+    profile: KeySuite::Ed448X448,
 };
 const PQ: SqSuite = SqSuite {
     name: "pq",
     key_version: 6,
-    profile: KeyProfile::PostQuantum,
+    profile: KeySuite::MlDsa65Ed25519MlKem768X25519,
 };
 const PQ_HIGH: SqSuite = SqSuite {
     name: "pqhigh",
     key_version: 6,
-    profile: KeyProfile::PostQuantumHigh,
+    profile: KeySuite::MlDsa87Ed448MlKem1024X448,
 };
 
 impl SqSuite {
@@ -102,7 +102,7 @@ impl SqSuite {
     fn is_post_quantum(&self) -> bool {
         matches!(
             self.profile,
-            KeyProfile::PostQuantum | KeyProfile::PostQuantumHigh
+            KeySuite::MlDsa65Ed25519MlKem768X25519 | KeySuite::MlDsa87Ed448MlKem1024X448
         )
     }
 }
@@ -130,20 +130,20 @@ fn assert_sq_cert_classifies(suite: &SqSuite) {
     let info = keys::parse_key_info(&pubkey).expect("sq public cert should parse");
 
     assert_eq!(info.key_version, suite.key_version, "key version");
-    assert_eq!(info.profile, suite.profile, "profile classification");
+    assert_eq!(info.suite, suite.profile, "profile classification");
     assert!(info.has_encryption_subkey, "must have encryption subkey");
     assert!(!info.is_revoked);
     assert!(!info.is_expired);
     assert!(info.user_id.is_some(), "sq cert should carry a user ID");
 
     assert_eq!(
-        keys::detect_profile(&pubkey).expect("detect_profile"),
+        keys::detect_suite(&pubkey).expect("detect_suite"),
         suite.profile
     );
 }
 
 #[test]
-fn test_parse_sq_legacy_cert_classifies_universal_v4() {
+fn test_parse_sq_legacy_cert_classifies_legacy_v4() {
     assert_sq_cert_classifies(&LEGACY);
 }
 
@@ -153,7 +153,7 @@ fn test_parse_sq_modern_cert_classifies_modern_v6() {
 }
 
 #[test]
-fn test_parse_sq_modernhigh_cert_classifies_advanced_v6() {
+fn test_parse_sq_modernhigh_cert_classifies_ed448x448_v6() {
     assert_sq_cert_classifies(&MODERN_HIGH);
 }
 
@@ -330,20 +330,20 @@ fn test_verify_sq_pqhigh_signatures() {
 
 // ── (e) Mixed-recipient format rule with sq certificates in the set ────────
 
-/// The SEIPDv1 floor (hard constraint #8): an engine Universal (Portable Legacy)
+/// The SEIPDv1 floor (hard constraint #8): an engine Portable Legacy
 /// key advertises only SEIPDv1, so mixing it with an sq v6 cert must floor
 /// the whole message to SEIPDv1 — never SEIPDv2 when a v4-only holder is a
 /// recipient — and both sides must decrypt. Mirrors the cross-profile GnuPG
 /// assertions with a real sq cert in the set.
 #[test]
 fn test_mixed_engine_v4_only_and_sq_v6_recipients_floor_to_seipdv1() {
-    let engine_key = keys::generate_key_with_profile(
-        "Engine Universal".to_string(),
+    let engine_key = keys::generate_key_with_suite(
+        "Engine Legacy".to_string(),
         None,
         None,
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
-    .expect("engine Universal key gen should succeed");
+    .expect("engine legacy key gen should succeed");
     let modern_pub = MODERN.pubkey();
     let plaintext = b"Mixed engine-v4-only + sq-v6 recipient set.";
 

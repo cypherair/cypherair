@@ -2,14 +2,14 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::sign;
 
 /// parse_recipients() returns valid hex key IDs for a Legacy message.
 #[test]
 fn test_parse_recipients_valid_message_legacy() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let ciphertext =
@@ -32,7 +32,7 @@ fn test_parse_recipients_valid_message_legacy() {
 #[test]
 fn test_parse_recipients_valid_message_modern_high() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -53,10 +53,10 @@ fn test_parse_recipients_valid_message_modern_high() {
 #[test]
 fn test_parse_recipients_multi_recipient() {
     let alice =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
@@ -92,7 +92,7 @@ fn test_parse_recipients_corrupt_data() {
 #[test]
 fn test_parse_recipients_signed_not_encrypted() {
     let key =
-        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let signed = sign::sign_cleartext(b"Just signed, not encrypted", &key.cert_data)
@@ -109,11 +109,11 @@ fn test_parse_recipients_signed_not_encrypted() {
 /// Uses 1-second expiry + sleep to create a genuinely expired key.
 #[test]
 fn test_encrypt_to_expired_key_rejected_legacy() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Expiring".to_string(),
         None,
         Some(1),
-        KeyProfile::Universal,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
@@ -128,11 +128,11 @@ fn test_encrypt_to_expired_key_rejected_legacy() {
 /// Encrypting to an expired key must fail (Modern High).
 #[test]
 fn test_encrypt_to_expired_key_rejected_modern_high() {
-    let key = keys::generate_key_with_profile(
+    let key = keys::generate_key_with_suite(
         "Expiring".to_string(),
         None,
         Some(1),
-        KeyProfile::Advanced,
+        KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
 
@@ -153,7 +153,7 @@ fn test_encrypt_to_revoked_key_rejected() {
     use sequoia_openpgp as openpgp;
 
     let key =
-        keys::generate_key_with_profile("Revoked".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Revoked".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let cert =
@@ -182,7 +182,7 @@ fn test_encrypt_to_revoked_key_modern_high_rejected() {
     use sequoia_openpgp as openpgp;
 
     let key =
-        keys::generate_key_with_profile("Revoked-v6".to_string(), None, None, KeyProfile::Advanced)
+        keys::generate_key_with_suite("Revoked-v6".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
 
     let cert =
@@ -219,7 +219,7 @@ fn test_encrypt_empty_recipients_rejected() {
 #[test]
 fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
     let self_key =
-        keys::generate_key_with_profile("Self".to_string(), None, None, KeyProfile::Universal)
+        keys::generate_key_with_suite("Self".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
 
     let result = encrypt::encrypt_binary(

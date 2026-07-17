@@ -29,7 +29,7 @@ struct ContactKeySummaryView: View {
 
             LabeledContent(
                 String(localized: "contactdetail.keyType", defaultValue: "Key Type"),
-                value: key.profile.contactKeyKindDisplayName
+                value: key.suite.contactKeyKindDisplayName
             )
             LabeledContent(
                 String(localized: "contactdetail.shortKeyId", defaultValue: "Short Key ID"),
