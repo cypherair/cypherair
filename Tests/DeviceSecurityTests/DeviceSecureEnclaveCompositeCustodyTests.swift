@@ -4,8 +4,8 @@ import Security
 import XCTest
 @testable import CypherAir
 
-/// Device-only evidence for Device-Bound Post-Quantum split custody (campaign
-/// #567 Phase 3) against a real Secure Enclave: ML-DSA-65 / ML-KEM-768 keys are
+/// Device-only evidence for Device-Bound Post-Quantum split custody against a
+/// real Secure Enclave: ML-DSA-65 / ML-KEM-768 keys are
 /// generated in the enclave, the composite certificate is built through the
 /// external ML-DSA signing bridge (self-verified in Rust), a message encrypted
 /// to the certificate decrypts through the external decapsulation bridge plus

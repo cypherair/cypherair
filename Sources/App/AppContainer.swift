@@ -717,7 +717,7 @@ final class AppContainer: @unchecked Sendable {
             engine: engine
         )
         let secureEnclaveCustodyDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
-        // Device-Bound Post-Quantum split custody (campaign #567 Phase 3):
+        // Device-Bound Post-Quantum split custody:
         // per-identity classical component envelope and the composite binding
         // inspector, shared by routing, generation, and deletion.
         let secureEnclaveCompositeHandleStore = SecureEnclaveCustodyHandleStore(
@@ -781,11 +781,11 @@ final class AppContainer: @unchecked Sendable {
             ),
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
-            // Device-bound Secure Enclave custody generation (issue #501 P7D
-            // exposure). Hardware-guarded at the composition root; on hardware
-            // without a Secure Enclave the factory stays nil and the UI hides
-            // the device-bound families. The prompt coordinator enrolls only
-            // the custody authorization and immediate handle-load window.
+            // Device-bound Secure Enclave custody generation. Hardware-guarded
+            // at the composition root; on hardware without a Secure Enclave the
+            // factory stays nil and the UI hides the device-bound families. The
+            // prompt coordinator enrolls only the custody authorization and
+            // immediate handle-load window.
             secureEnclaveCustodyGenerationServiceFactory: HardwareSecureEnclave.isAvailable
                 ? { catalogStore, invalidationGate, commitCoordinator in
                     SecureEnclaveCustodyGenerationService(

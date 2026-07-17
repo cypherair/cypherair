@@ -4,7 +4,7 @@ import Security
 import XCTest
 @testable import CypherAir
 
-/// Device-only evidence for Phase 6 Secure Enclave custody decrypt through a real
+/// Device-only evidence for Secure Enclave custody decrypt through a real
 /// `.keyAgreement` P-256 handle (the external ECDH/key-agreement route).
 ///
 /// This test creates and deletes only the handle pair it owns; it does not invoke

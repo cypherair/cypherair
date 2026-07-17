@@ -28,7 +28,7 @@ fn test_export_wrong_profile_modern_high() {
     }
 }
 
-/// C2B.9: Generate + parse revocation cert.
+/// Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_modern_high() {
     let key =
@@ -60,7 +60,7 @@ fn test_revocation_cert_wrong_key_modern_high() {
     );
 }
 
-/// C2B.6 (extended): Verify that Modern High export uses Argon2id S2K with expected parameters.
+/// (extended): Verify that Modern High export uses Argon2id S2K with expected parameters.
 /// PRD requires: 512 MB memory (encoded_m=19), t=3 passes, p=4 parallelism. Memory is asserted
 /// through the FFI probe the app uses; t/p are pinned on the exported packets directly.
 #[test]

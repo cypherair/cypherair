@@ -60,7 +60,7 @@ struct SecureEnclaveCustodyEvidenceSummary: Equatable, Sendable {
     }
 
     /// The sanitized one-line rendering, assembled only from enum raw values and
-    /// integer counts. Operators paste this line into the Phase 8 evidence matrix.
+    /// integer counts. Operators paste this line into the Secure Enclave custody evidence matrix.
     var line: String {
         var fields = ["scenario=\(scenario.rawValue)", "outcome=\(outcome.rawValue)"]
         if let configuration {
@@ -81,7 +81,7 @@ struct SecureEnclaveCustodyEvidenceSummary: Equatable, Sendable {
 
 /// Emits sanitized Secure Enclave custody evidence lines to the test console so a
 /// real-hardware (or interop-harness) run produces a copy-pasteable record for the
-/// Phase 8 evidence matrix. Nothing here writes app state or files; the line is the
+/// Secure Enclave custody evidence matrix. Nothing here writes app state or files; the line is the
 /// artifact and it is sanitized by construction (see `SecureEnclaveCustodyEvidenceSummary`).
 enum SecureEnclaveCustodyEvidenceLog {
     /// Grep anchor for harvesting evidence lines from an `xcodebuild` log.

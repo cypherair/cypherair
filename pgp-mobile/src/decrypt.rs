@@ -610,7 +610,7 @@ fn map_openpgp_error(err: &openpgp::Error, original: &openpgp::anyhow::Error) ->
 /// Check if an error chain contains an `openpgp::Error::Expired` variant.
 /// Used to distinguish expired signer keys from other verification failures,
 /// so that the UI can show "Ask sender to update" instead of "Content may have
-/// been modified." See security audit finding M2+M3.
+/// been modified."
 ///
 /// Uses the same hybrid strategy as `classify_decrypt_error()`:
 /// 1. Structured downcast (preferred, resilient to message rewording)
@@ -708,7 +708,7 @@ mod tests {
     #[test]
     fn read_capped_zeroizing_rejects_output_over_ceiling() {
         // A reader that yields more than the ceiling must fail closed rather
-        // than accumulate without bound (decompression-bomb guard, #611).
+        // than accumulate without bound (decompression-bomb guard).
         let data = vec![0xABu8; 20];
         let mut sink = Vec::new();
         let result = read_capped_zeroizing(&mut data.as_slice(), &mut sink, 10);

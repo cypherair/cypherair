@@ -9,7 +9,7 @@ use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
 
-/// C2B.6: Export key with Argon2id.
+/// Export key with Argon2id.
 #[test]
 #[ignore = "slow"]
 fn test_export_key_modern_high() {
@@ -24,7 +24,7 @@ fn test_export_key_modern_high() {
     assert!(!exported.is_empty());
 }
 
-/// C2B.7: Re-import with correct passphrase.
+/// Re-import with correct passphrase.
 #[test]
 #[ignore = "slow"]
 fn test_import_correct_passphrase_modern_high() {
@@ -42,7 +42,7 @@ fn test_import_correct_passphrase_modern_high() {
     assert!(!imported.is_empty());
 }
 
-/// C2B.8: Re-import with wrong passphrase → graceful error.
+/// Re-import with wrong passphrase → graceful error.
 #[test]
 #[ignore = "slow"]
 fn test_import_wrong_passphrase_modern_high() {

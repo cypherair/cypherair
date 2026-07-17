@@ -133,4 +133,4 @@ pub enum PgpError {
 // All Sequoia anyhow::Error results must be mapped to specific PgpError variants via
 // explicit .map_err() calls. This prevents the ? operator from silently converting
 // errors to InternalError, which would bypass classify_decrypt_error() and potentially
-// misclassify AEAD/MDC/wrong-key errors. See security audit finding H1.
+// misclassify AEAD/MDC/wrong-key errors.

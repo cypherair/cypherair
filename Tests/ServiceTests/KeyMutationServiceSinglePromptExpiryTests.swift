@@ -167,7 +167,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
     }
 
     func test_modifyExpiry_catalogRelockedMidAction_throwsKeyMetadataUnavailable() async throws {
-        // Replicates the #495 field failure shape: the key-metadata domain
+        // The key-metadata domain
         // relocks underneath the flow AFTER routing succeeded (here: from inside
         // the pre-auth seam, which runs between routing and the catalog guard).
         // The flow must surface the honest "metadata unavailable" error, not the

@@ -351,7 +351,7 @@ fn test_sign_with_expired_key_not_accepted_as_valid() {
     }
 }
 
-// ── Own-signing-key revocation (signing side of WCR-01, follow-up to #589) ──
+// ── Own-signing-key revocation ──
 //
 // Recipient selection filters revoked encryption subkeys via `.revoked(false)`.
 // The own-signing-key selection chains (`sign.rs::extract_signing_keypair`,

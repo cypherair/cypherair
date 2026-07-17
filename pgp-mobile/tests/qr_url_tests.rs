@@ -1,10 +1,9 @@
 //! QR / URL Scheme validation tests.
-//! Covers POC test cases C9.1–C9.3.
 
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::PgpEngine;
 
-/// C9.1: v4 public key → base64url encode → cypherair:// URL → decode → byte-identical.
+/// v4 public key → base64url encode → cypherair:// URL → decode → byte-identical.
 #[test]
 fn test_qr_url_roundtrip_v4() {
     let engine = PgpEngine::new();
@@ -34,7 +33,7 @@ fn test_qr_url_roundtrip_v4() {
     assert_eq!(decoded_info.key_version, 4);
 }
 
-/// C9.2: v6 public key → same round-trip.
+/// v6 public key → same round-trip.
 #[test]
 fn test_qr_url_roundtrip_v6() {
     let engine = PgpEngine::new();
@@ -58,7 +57,7 @@ fn test_qr_url_roundtrip_v6() {
     assert_eq!(decoded_info.key_version, 6);
 }
 
-/// C9.3: Malformed base64url data → parse returns clear error.
+/// Malformed base64url data → parse returns clear error.
 #[test]
 fn test_qr_url_malformed_data() {
     let engine = PgpEngine::new();
@@ -169,7 +168,7 @@ fn test_qr_url_length_reasonable() {
     );
 }
 
-// ── M7: QR URL edge-case malformed inputs ─────────────────────────────────
+// ── QR URL edge-case malformed inputs ─────────────────────────────────
 
 /// Empty string is not a valid QR URL.
 #[test]
@@ -217,7 +216,7 @@ fn test_qr_url_decode_unicode_in_payload() {
     assert!(result.is_err(), "Unicode in payload should fail");
 }
 
-// ── L5: Base64url padding handling ────────────────────────────────────────
+// ── Base64url padding handling ────────────────────────────────────────
 
 /// Standard base64 padding characters (=) are not valid in base64url-no-pad format.
 #[test]

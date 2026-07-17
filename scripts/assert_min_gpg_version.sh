@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Assert the installed GnuPG meets a minimum version and echo the detected version
-# as evidence-of-record for the Phase 8 Secure Enclave custody GnuPG interop lane.
+# as evidence-of-record for the Secure Enclave custody GnuPG interop lane.
 #
 # The interop contract (v4 ECDSA/ECDH P-256, PKESK v3, SEIPDv1/MDC, v6 rejection) is
 # stable across GnuPG >= 2.4, so the lane asserts a floor rather than pinning an exact

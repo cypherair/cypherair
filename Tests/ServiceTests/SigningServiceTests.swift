@@ -401,7 +401,7 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
-    // MARK: - H1: High Security Biometrics Blocking
+    // MARK: - High Security Biometrics Blocking
 
     func test_signCleartext_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)

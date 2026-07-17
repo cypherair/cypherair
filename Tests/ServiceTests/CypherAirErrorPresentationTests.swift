@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-/// Per-category key-operation failure presentation (stage 7C): every sanitized
+/// Per-category key-operation failure presentation: every sanitized
 /// failure category must carry its own user-facing copy.
 final class CypherAirErrorPresentationTests: XCTestCase {
     func test_everyFailureCategory_hasNonEmptyDescription() {

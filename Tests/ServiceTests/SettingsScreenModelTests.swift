@@ -1678,7 +1678,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
     }
 
-    // MARK: - Device-bound custody awareness (P7D)
+    // MARK: - Device-bound custody awareness
 
     func test_backupExpectation_ignoresDeviceBoundKeys() {
         let backedUpSoftware = makeCustodySettingsIdentity(

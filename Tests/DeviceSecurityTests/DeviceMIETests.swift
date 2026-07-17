@@ -4,7 +4,7 @@ import Security
 import LocalAuthentication
 @testable import CypherAir
 
-/// C8: Hardware memory tagging and crypto workflow tests on device.
+/// Hardware memory tagging and crypto workflow tests on device.
 final class DeviceMIETests: DeviceSecurityTestCase {
     private func writeTemporaryFile(_ data: Data, name: String = "mie-\(UUID().uuidString).bin") throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
@@ -12,7 +12,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         return url
     }
 
-    // MARK: - C8.1: MIE Smoke Tests (SE Wrap/Unwrap)
+    // MARK: - MIE Smoke Tests (SE Wrap/Unwrap)
 
     func test_mie_singleWrapUnwrapCycle_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -52,20 +52,20 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
     }
 
-    // MARK: - C8.2: Full PGP Workflow Under MIE (Legacy + Modern High)
+    // MARK: - Full PGP Workflow Under MIE (Legacy + Modern High)
 
-    /// C8.2: Complete Legacy (v4, Ed25519+X25519, SEIPDv1) workflow on device.
+    /// Complete Legacy (v4, Ed25519+X25519, SEIPDv1) workflow on device.
     /// Exercises OpenSSL: AES-256, X25519 key agreement, Ed25519 signing, SHA-512 hashing.
     /// Pass: all operations complete without EXC_GUARD / GUARD_EXC_MTE_SYNC_FAULT.
     func test_mie_fullPGPWorkflow_legacy_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
-        let plaintext = Data("C8.2 Legacy MIE: full workflow — 你好世界 🔐".utf8)
+        let plaintext = Data("Legacy MIE: full workflow — 你好世界 🔐".utf8)
 
         // 1. Key generation (Ed25519+X25519, v4).
         let key = try engine.generateKey(
-            name: "C8.2 MIE Test A", email: "mie-a@test.local",
+            name: "MIE Test A", email: "mie-a@test.local",
             expirySeconds: nil, profile: .universal
         )
         XCTAssertFalse(key.certData.isEmpty, "Legacy key generation must succeed")
@@ -126,18 +126,18 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             "Legacy detached signature must verify")
     }
 
-    /// C8.2: Complete Modern High (v6, Ed448+X448, SEIPDv2 AEAD OCB) workflow on device.
+    /// Complete Modern High (v6, Ed448+X448, SEIPDv2 AEAD OCB) workflow on device.
     /// Exercises OpenSSL: AES-256-OCB AEAD, X448 key agreement, Ed448 signing, SHA-512.
     /// Pass: all operations complete without tag mismatch crashes.
     func test_mie_fullPGPWorkflow_modernHigh_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
-        let plaintext = Data("C8.2 Modern High MIE: full workflow — AEAD OCB 🛡️".utf8)
+        let plaintext = Data("Modern High MIE: full workflow — AEAD OCB 🛡️".utf8)
 
         // 1. Key generation (Ed448+X448, v6).
         let key = try engine.generateKey(
-            name: "C8.2 MIE Test B", email: "mie-b@test.local",
+            name: "MIE Test B", email: "mie-b@test.local",
             expirySeconds: nil, profile: .advanced
         )
         XCTAssertFalse(key.certData.isEmpty, "Modern High key generation must succeed")
@@ -197,13 +197,13 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             "Modern High detached signature must verify")
     }
 
-    /// C8.2: Cross-profile encryption format auto-selection under MIE.
+    /// Cross-profile encryption format auto-selection under MIE.
     /// Tests: B→A (SEIPDv1), A→B (SEIPDv2), mixed A+B recipients (SEIPDv1).
     func test_mie_crossProfileEncrypt_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
-        let plaintext = Data("C8.2 Cross-profile MIE test".utf8)
+        let plaintext = Data("Cross-profile MIE test".utf8)
 
         let keyA = try engine.generateKey(
             name: "Cross A", email: nil, expirySeconds: nil, profile: .universal
@@ -265,14 +265,14 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         XCTAssertEqual(resultMixedB.plaintext, plaintext, "Mixed→B decrypt must succeed")
     }
 
-    /// C8.2: Key export/import round-trip under MIE.
+    /// Key export/import round-trip under MIE.
     /// Legacy: Iterated+Salted S2K. Modern High: Argon2id S2K (512 MB).
     func test_mie_keyExportImport_bothProfiles_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
         let passphrase = "mie-export-test-passphrase"
-        let plaintext = Data("C8.2 export/import round-trip test".utf8)
+        let plaintext = Data("export/import round-trip test".utf8)
 
         // Legacy: export with Iterated+Salted S2K, then import.
         let keyA = try engine.generateKey(
@@ -334,16 +334,16 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             "Modern High: imported key must decrypt correctly")
     }
 
-    // MARK: - C8.3: OpenSSL Crypto Operations Under MIE
+    // MARK: - OpenSSL Crypto Operations Under MIE
 
-    /// C8.3: Explicitly exercise every OpenSSL code path used by Sequoia.
+    /// Explicitly exercise every OpenSSL code path used by Sequoia.
     /// Covers: AES-256, SHA-512, Ed25519, X25519, Ed448, X448, AES-256-OCB AEAD, Argon2id.
     /// Pass: all crypto operations succeed with no memory tagging violations.
     func test_mie_opensslCryptoPaths_allAlgorithms_noTagViolations() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
-        let plaintext = Data("C8.3 OpenSSL paths MIE validation".utf8)
+        let plaintext = Data("OpenSSL paths MIE validation".utf8)
 
         // --- Generate keys for Legacy and Modern High ---
         let keyA = try engine.generateKey(
@@ -449,7 +449,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         XCTAssertEqual(detVerifyB.summaryState, .verified, "Ed448 detached sign/verify failed")
     }
 
-    /// C8.3: Armor/dearmor exercises OpenSSL Base64 and binary parsing paths.
+    /// Armor/dearmor exercises OpenSSL Base64 and binary parsing paths.
     func test_mie_armorDearmor_bothProfiles_noTagViolations() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
@@ -490,9 +490,9 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             "Message armor/dearmor must preserve binary content")
     }
 
-    // MARK: - C8.4: 100× Encrypt/Decrypt Cycles Under MIE
+    // MARK: - 100× Encrypt/Decrypt Cycles Under MIE
 
-    /// C8.4: 100 encrypt/decrypt cycles for Legacy (SEIPDv1) under MIE.
+    /// 100 encrypt/decrypt cycles for Legacy (SEIPDv1) under MIE.
     /// Detects intermittent tag mismatches that single-cycle tests might miss.
     /// Monitor: `log stream --predicate 'eventMessage contains "MTE"'`
     /// Pass: zero tag violations across 100 cycles.
@@ -505,7 +505,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
 
         for i in 0..<100 {
-            let plaintext = Data("C8.4 Legacy iteration \(i) — \(UUID().uuidString)".utf8)
+            let plaintext = Data("Legacy iteration \(i) — \(UUID().uuidString)".utf8)
 
             let ciphertext = try engine.encrypt(
                 plaintext: plaintext,
@@ -527,7 +527,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
     }
 
-    /// C8.4: 100 encrypt/decrypt cycles for Modern High (SEIPDv2 AEAD OCB) under MIE.
+    /// 100 encrypt/decrypt cycles for Modern High (SEIPDv2 AEAD OCB) under MIE.
     /// Exercises OpenSSL AES-256-OCB + X448 + Ed448 100 times.
     /// Pass: zero tag violations across 100 cycles.
     func test_mie_100xEncryptDecryptCycles_modernHigh_noIntermittentCrashes() throws {
@@ -539,7 +539,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
 
         for i in 0..<100 {
-            let plaintext = Data("C8.4 Modern High iteration \(i) — \(UUID().uuidString)".utf8)
+            let plaintext = Data("Modern High iteration \(i) — \(UUID().uuidString)".utf8)
 
             let ciphertext = try engine.encrypt(
                 plaintext: plaintext,
@@ -561,7 +561,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
     }
 
-    /// C8.4: 100 sign/verify cycles for Legacy and Modern High under MIE.
+    /// 100 sign/verify cycles for Legacy and Modern High under MIE.
     /// Exercises Ed25519 + Ed448 + SHA-512 hashing 200 times total.
     /// Pass: zero tag violations across all cycles.
     func test_mie_100xSignVerifyCycles_bothProfiles_noIntermittentCrashes() throws {
@@ -576,7 +576,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
 
         for i in 0..<100 {
-            let text = Data("C8.4 sign/verify iteration \(i) — \(UUID().uuidString)".utf8)
+            let text = Data("sign/verify iteration \(i) — \(UUID().uuidString)".utf8)
 
             // Legacy: Ed25519 cleartext sign + verify.
             let signedA = try engine.signCleartext(text: text, signerCert: keyA.certData)

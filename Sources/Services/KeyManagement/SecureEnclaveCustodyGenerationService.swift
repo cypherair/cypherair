@@ -2,7 +2,7 @@ import Foundation
 import LocalAuthentication
 
 /// Generation path for Secure Enclave custody public-only keys (device-bound
-/// families). Exposed to the product UI since P7D; previously hidden/test-only.
+/// families).
 final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     typealias GenerationCheckpoint = @Sendable () async throws -> Void
 

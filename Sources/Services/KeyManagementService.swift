@@ -412,7 +412,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// triggering device authentication. Requires device authentication only when the
     /// selector matches the stored certificate.
     ///
-    /// v1 policy: this operation is export-on-demand. It does not persist a new revocation
+    /// This operation is export-on-demand. It does not persist a new revocation
     /// artifact on `PGPKeyIdentity` or in the Keychain, and it does not mutate catalog state.
     ///
     /// - Parameters:
@@ -436,7 +436,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// triggering device authentication. Requires device authentication only when the
     /// selector matches the stored certificate.
     ///
-    /// v1 policy: this operation is export-on-demand. It does not persist a new revocation
+    /// This operation is export-on-demand. It does not persist a new revocation
     /// artifact on `PGPKeyIdentity` or in the Keychain, and it does not mutate catalog state.
     ///
     /// - Parameters:

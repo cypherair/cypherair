@@ -3,19 +3,18 @@ import SwiftUI
 import AppKit
 #endif
 
-/// The single owner of the platform lifecycle signal (P1 of the auth-lifecycle
-/// redesign). It translates the platform's unambiguous away/foreground events into
+/// The single owner of the platform lifecycle signal. It translates the platform's
+/// unambiguous away/foreground events into
 /// `AppLockController`'s foreground-active / away / foreground calls. The controller
 /// owns the foreground-active state (the cosmetic cover reads it), so there is no
 /// separate cover binding here.
 ///
-/// Per-platform away-event rule (TARGET §3):
+/// Per-platform away-event rule:
 /// - iOS / iPadOS / visionOS: away = `ScenePhase.background` ONLY. A biometric
 ///   prompt yields `.inactive` (cover only), never `.background`, so it is never an
-///   away event — this is how grace=0 "no double-auth" is preserved structurally,
-///   without the deleted disambiguation gate/settle/union.
+///   away event — this is how grace=0 "no double-auth" holds structurally.
 /// - macOS: away = app-resign ∪ screen-lock ∪ explicit "Lock Now", filtered by the
-///   controller's `.authenticating` rule (TARGET §3): a resign during an in-flight
+///   controller's `.authenticating` rule: a resign during an in-flight
 ///   app-session unlock is the auth sheet's own, and a resign during a private-key
 ///   operation prompt is deferred and decided when the prompts end. The observer
 ///   stays signal-only — every resign is still routed; the controller decides.

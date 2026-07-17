@@ -4,7 +4,7 @@ import Security
 import LocalAuthentication
 @testable import CypherAir
 
-/// C7.1-C7.3: Authentication manager tests on real hardware.
+/// Authentication manager tests on real hardware.
 final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     private func authenticateAndUnwrapStoredBundle(
         mode: AuthenticationMode,
@@ -52,7 +52,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         XCTAssertEqual(unwrapped, privateKey, "Stored key must unwrap after production authentication")
     }
 
-    // MARK: - C7.1: Authentication Manager — Access Control
+    // MARK: - Authentication Manager — Access Control
 
     func test_createAccessControl_standard_succeeds() throws {
         let authManager = makeAuthenticationManager(
@@ -104,7 +104,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         XCTAssertTrue(authManager.isBiometricsAvailable, "Biometrics must be available on iPhone 17 Pro Max")
     }
 
-    // MARK: - C7.1A: Production Authentication Path (Manual Device)
+    // MARK: - Production Authentication Path (Manual Device)
 
     func test_authenticateAndUnwrap_standard_productionPath_manual() async throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -138,7 +138,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         )
     }
 
-    // MARK: - C7.2: Authentication Manager — Private-Key Control State
+    // MARK: - Authentication Manager — Private-Key Control State
 
     func test_currentMode_withoutPrivateKeyControlStore_isNil() {
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
@@ -152,7 +152,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         testDefaults.removePersistentDomain(forName: "com.cypherair.test")
     }
 
-    // MARK: - C7.3: Crash Recovery
+    // MARK: - Crash Recovery
 
     func test_crashRecovery_oldAndPendingExist_cleansPendingKeepsOld() throws {
         let fingerprint = uniqueFingerprint()
@@ -253,11 +253,6 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         XCTAssertNil(summary)
         XCTAssertTrue(keychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account))
     }
-
-    // The former `test_crashRecovery_partialPermanentAndCompletePending_replacesPermanent`
-    // was removed: a partially-present permanent bundle is structurally impossible with the
-    // single-row envelope, so that scenario collapses to
-    // `test_crashRecovery_onlyPendingExist_promotesToPermanent` above.
 
     func test_crashRecovery_unrecoverable_clearsFlagAndLeavesAuthModeUnchanged() {
         let fingerprint = uniqueFingerprint()

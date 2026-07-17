@@ -163,12 +163,7 @@ private extension CypherSingleLineTextInputProfile {
 #endif
 
 extension View {
-    @ViewBuilder
     func applyMacWritingToolsPolicy() -> some View {
-        if #available(macOS 15.0, *) {
-            self.writingToolsBehavior(.disabled)
-        } else {
-            self
-        }
+        self.writingToolsBehavior(.disabled)
     }
 }

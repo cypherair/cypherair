@@ -200,7 +200,7 @@ fn classical_component_failure_is_skippable_for_anonymous_recipient() {
     // key agreement fail before the external ML-KEM decapsulation runs. For a
     // wildcard / hidden-recipient PKESK this failure is attacker-inducible and
     // must be a skippable non-match, not a hard abort that would deny an
-    // otherwise-decryptable multi-recipient message (issue #614).
+    // otherwise-decryptable multi-recipient message.
     let fixture = composite_ka_fixture();
     let mut decryptor = ExternalCompositeDecryptor::new(
         fixture.public_key,
@@ -405,8 +405,8 @@ fn high_wrong_but_valid_shape_share_fails_session_key_unwrap_without_recording()
 
 #[test]
 fn high_classical_component_failure_is_skippable_for_anonymous_recipient() {
-    // · High analog of the 768-tier anonymous-recipient classical-failure guard
-    // (issue #614): an all-zero / low-order X448 peer ephemeral fails the
+    // · High analog of the 768-tier anonymous-recipient classical-failure guard:
+    // an all-zero / low-order X448 peer ephemeral fails the
     // classical half and must be a skippable non-match for a wildcard PKESK.
     let fixture = composite_high_ka_fixture();
     let mut decryptor = ExternalCompositeHighDecryptor::new(

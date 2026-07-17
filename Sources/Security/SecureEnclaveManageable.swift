@@ -82,12 +82,10 @@ protocol SecureEnclaveManageable: Sendable {
     static var isAvailable: Bool { get }
 }
 
-// The former nil-context convenience overloads of `generateWrappingKey` /
-// `reconstructKey` were removed in P3' stage 0: every call site states its
-// `authenticationContext:` explicitly, so a reviewer can see at each Secure
-// Enclave operation whether an authenticated context is threaded (e.g. the
-// mode-switch re-wrap or modify-expiry rewrap window) or implicit system
-// authentication is intended (`nil`).
+// Every Secure Enclave call site threads an explicit `authenticationContext:`, so
+// a reviewer can see at each Secure Enclave operation whether an authenticated
+// context is threaded (e.g. the mode-switch re-wrap or modify-expiry rewrap
+// window) or implicit system authentication is intended (`nil`).
 
 /// Fingerprint validation shared by the private-key Secure Enclave envelope.
 /// The fingerprint is bound into `PrivateKeyEnvelope` (HKDF `sharedInfo` + AES-GCM AAD)

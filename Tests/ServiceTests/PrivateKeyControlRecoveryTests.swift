@@ -180,7 +180,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
     }
 
     func test_rewrapRecovery_commitRequired_softwareOnlyEnumerationPersistsTargetMode() throws {
-        // Regression pin (P7D): the post-unlock recovery call site passes
+        // Regression pin: the post-unlock recovery call site passes
         // software-custody fingerprints only. With that contract honored, an
         // interrupted commit-required switch on a mixed population (the
         // device-bound key is simply absent from the list) must complete:
@@ -212,7 +212,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
     }
 
     func test_rewrapRecovery_bundlelessFingerprintBlocksTargetModePersistence() throws {
-        // Contract pin (P7D): a fingerprint with no SE-wrapped bundles — the
+        // Contract pin: a fingerprint with no SE-wrapped bundles — the
         // shape of a device-bound Secure Enclave custody key — classifies as
         // unrecoverable and blocks target-mode persistence. This is WHY every
         // caller must pre-filter to software custody; if this behavior ever
@@ -369,13 +369,6 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             ))
         }
     }
-
-    // The former `test_rewrapRecovery_commitRequiredPartialPending_keepsJournalAndFailsClosed`
-    // was removed: the single-row private-key envelope makes a partially-written pending
-    // bundle structurally impossible (a row is atomically present or absent), so the
-    // `(.complete, .partial)` commit-required arm it exercised is now unreachable.
-    // Decode-time fail-closed behavior for a corrupt/undecodable envelope row is covered
-    // by `PrivateKeyEnvelopeTests`.
 
     func test_postUnlockRecoveryWarningBuilder_surfacesOnlyUnsafeOutcomes() {
         // The builder surfaces a warning only for unsafe outcomes, and maps

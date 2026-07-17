@@ -5,16 +5,15 @@ import Security
 import XCTest
 @testable import CypherAir
 
-/// P3′ stage 2′ — the REQUIRED composition regression test (the class that would
-/// have failed on #495): lock controller + prompt coordinator + the actual
-/// modify-expiry flow, asserting the pre-authentication runs INSIDE an
+/// The composition regression test: lock controller + prompt coordinator + the
+/// actual modify-expiry flow, asserting the pre-authentication runs INSIDE an
 /// operation-prompt session and that a resign delivered during it is deferred
 /// (the app stays unlocked mid-action) and decided at the prompts' end.
 @MainActor
 final class ModifyExpiryOperationPromptCompositionTests: XCTestCase {
     /// Suspends inside the pre-auth so the test can deliver a resign while the
     /// "system sheet" is up, and records whether the coordinator saw the prompt
-    /// as part of an operation session — the assertion #495 failed.
+    /// as part of an operation session.
     private final class GatedExpiryAuthenticator: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<Void, Never>?
@@ -97,7 +96,7 @@ final class ModifyExpiryOperationPromptCompositionTests: XCTestCase {
         XCTAssertEqual(
             flow.stub.wasInOperationPromptSession,
             true,
-            "The pre-authentication must run inside an operation-prompt session — the #495 regression."
+            "The pre-authentication must run inside an operation-prompt session."
         )
 
         // The pre-auth sheet's own resign arrives while the prompt is up.

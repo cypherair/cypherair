@@ -239,7 +239,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_tutorial_generateAlice_opensKeyDetailFromKeyReady() throws {
-        launchTutorial(task: "generateAliceKey")
+        launchTutorial(task: "createDemoIdentity")
         generateTutorialKey()
 
         element("postgen.keyDetail").tap()
@@ -248,7 +248,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_tutorial_generateAlice_opensQRCodeFromKeyReady() throws {
-        launchTutorial(task: "generateAliceKey")
+        launchTutorial(task: "createDemoIdentity")
         generateTutorialKey()
 
         element("postgen.qr").tap()
@@ -257,7 +257,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_tutorial_generateAlice_opensBackupFromKeyReady() throws {
-        launchTutorial(task: "generateAliceKey")
+        launchTutorial(task: "createDemoIdentity")
         generateTutorialKey()
 
         element("postgen.backup").tap()
@@ -266,7 +266,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_tutorial_keyDetail_showsDisabledSelectiveRevocationEntry() throws {
-        launchTutorial(task: "generateAliceKey")
+        launchTutorial(task: "createDemoIdentity")
         generateTutorialKey()
 
         element("postgen.keyDetail").tap()
@@ -372,7 +372,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_tutorial_workspaceGuidance_usesSingleReturnSurface() throws {
-        launchTutorial(task: "generateAliceKey")
+        launchTutorial(task: "createDemoIdentity")
 
         if element("tutorial.hub.ready").waitForExistence(timeout: 2) {
             element("tutorial.primaryAction").tap()
@@ -402,7 +402,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_tutorial_addContactPrefilledPaste_keepsAddActionHittable() throws {
-        launchTutorial(task: "generateAliceKey")
+        launchTutorial(task: "createDemoIdentity")
         generateTutorialKey()
         completeCurrentTutorialTaskFromPrompt()
 

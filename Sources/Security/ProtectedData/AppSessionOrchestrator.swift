@@ -1,13 +1,11 @@
 import Foundation
 import LocalAuthentication
 
-/// App-session authentication concerns for Protected App-Data (P1 of the
-/// auth-lifecycle redesign). The lock state machine — lock state, blur/cover,
-/// grace, away/foreground and the former settle/resume bookkeeping — now lives in
-/// `AppLockController`. This type keeps the app-session-authentication concerns it
-/// owned before:
+/// App-session authentication concerns for Protected App-Data. The lock state
+/// machine — lock state, cover, grace, away/foreground bookkeeping — lives in
+/// `AppLockController`. This type owns the app-session-authentication concerns:
 ///
-/// - **Authenticated-`LAContext` handoff custody (D1).** It stores the context a
+/// - **Authenticated-`LAContext` handoff custody.** It stores the context a
 ///   successful app-session unlock produced and hands it to `CypherAirApp` exactly
 ///   once to authorize Protected App-Data. `AppLockController` drives the unlock
 ///   and calls `recordSuccessfulAppSessionAuthentication(context:)` on success; it
@@ -56,7 +54,7 @@ final class AppSessionOrchestrator {
 
     /// Store the handoff context a successful app-session unlock produced and record
     /// the authentication. Called by `AppLockController` on a successful unlock
-    /// (D1: the orchestrator stays the handoff-context custodian).
+    /// (the orchestrator is the handoff-context custodian).
     func recordSuccessfulAppSessionAuthentication(context: LAContext?) {
         replacePendingAuthenticatedContext(with: context, reason: "unlockHandoff")
         recordAuthentication()
@@ -103,7 +101,7 @@ final class AppSessionOrchestrator {
         )
     }
 
-    // MARK: - Authenticated-context handoff custody (D1)
+    // MARK: - Authenticated-context handoff custody
 
     var hasProtectedDataAuthorizationHandoffContext: Bool {
         pendingAuthenticatedContext != nil

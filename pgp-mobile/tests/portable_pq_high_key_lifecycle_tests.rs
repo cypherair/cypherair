@@ -1,5 +1,5 @@
 //! Portable Post-Quantum · High key lifecycle tests
-//! (RFC 9980 ML-DSA-87+Ed448 / ML-KEM-1024+X448 — issue #591 Phase 2).
+//! (RFC 9980 ML-DSA-87+Ed448 / ML-KEM-1024+X448).
 //! Mirrors the 65/768 lifecycle: generation shape, classification as its own
 //! Post-Quantum · High tier (distinct from the 65/768 Post-Quantum tier),
 //! Argon2id export/import, and cross-tier mismatch guards.

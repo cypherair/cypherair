@@ -1,4 +1,4 @@
-//! Post-quantum test key helpers (RFC 9980 — campaign #567 Phase 2).
+//! Post-quantum test key helpers (RFC 9980).
 
 use openpgp::cert::{CertBuilder, CipherSuite};
 use openpgp::serialize::{Serialize, SerializeInto};

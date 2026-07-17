@@ -160,7 +160,7 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
 
     // MARK: - Evidence
 
-    /// Emit a sanitized Phase 8 evidence line whose `outcome` reflects whether this
+    /// Emit a sanitized Secure Enclave custody evidence line whose `outcome` reflects whether this
     /// test method has recorded any assertion failure up to this point. XCTest
     /// assertions are non-fatal, so a literal `.passed` would mislead the evidence
     /// matrix on a regression (the test goes red, yet the harvested line still

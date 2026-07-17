@@ -38,7 +38,7 @@ extension FFIIntegrationTests {
         return ciphertext
     }
 
-    // MARK: - C5.2C Password / SKESK
+    // MARK: - Password / SKESK
 
     func test_passwordRoundTrip_armoredSeipdv1_dataPreservedAcrossFFI() throws {
         let plaintext = Data("Password SEIPDv1 via FFI".utf8)

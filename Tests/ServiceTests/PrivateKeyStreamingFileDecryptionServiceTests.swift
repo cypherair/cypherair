@@ -335,7 +335,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         try await assertSecureEnclaveTamperHardFails(configurationIdentity: .modernP256V6)
     }
 
-    // MARK: - Phase 6D closure (mixed recipients, repeated operations, no partial plaintext)
+    // MARK: - Mixed recipients, repeated operations, no partial plaintext
 
     func test_secureEnclaveRouteDecryptsMixedRecipientFileWithoutUnwrap() async throws {
         let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)

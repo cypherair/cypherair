@@ -2,9 +2,9 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C4: Argon2id Memory Guard Tests
+    // MARK: - Argon2id Memory Guard Tests
 
-    /// C4.1: Import Modern High key with 512 MB Argon2id → success on device with enough memory.
+    /// Import Modern High key with 512 MB Argon2id → success on device with enough memory.
     /// Uses real Modern High key export/parseS2kParams, but mocks memory to ensure success.
     func test_argon2idGuard_modernHigh_512MB_8GBDevice_passes() throws {
         let key = try engine.generateKey(
@@ -29,7 +29,7 @@ extension FFIIntegrationTests {
         XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
-    /// C4.2: 1 GB Argon2id params → graceful error with limited memory.
+    /// 1 GB Argon2id params → graceful error with limited memory.
     func test_argon2idGuard_1GB_lowMemory_throwsExceeded() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
@@ -55,7 +55,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C4.2: 1 GB Argon2id params → success with ample memory.
+    /// 1 GB Argon2id params → success with ample memory.
     func test_argon2idGuard_1GB_ampleMemory_passes() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
@@ -71,7 +71,7 @@ extension FFIIntegrationTests {
         XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
-    /// C4.3: 2 GB Argon2id → graceful refusal even on device with moderate available memory.
+    /// 2 GB Argon2id → graceful refusal even on device with moderate available memory.
     func test_argon2idGuard_2GB_moderateMemory_throwsExceeded() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
@@ -97,7 +97,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C4.4: Exact 75% boundary — at boundary should pass.
+    /// Exact 75% boundary — at boundary should pass.
     /// Guard checks: required * 4 <= available * 3.
     /// Smallest passing available = ceil(required * 4 / 3).
     func test_argon2idGuard_exact75PercentBoundary_passes() throws {
@@ -120,7 +120,7 @@ extension FFIIntegrationTests {
         XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
-    /// C4.4: One byte below 75% boundary — should fail.
+    /// One byte below 75% boundary — should fail.
     func test_argon2idGuard_justBelow75PercentBoundary_throwsExceeded() throws {
         let requiredKib: UInt64 = 524_288
         let requiredBytes = requiredKib * 1024
@@ -138,7 +138,7 @@ extension FFIIntegrationTests {
         XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
-    /// C4.4: Legacy (Iterated+Salted) — guard is a no-op even with minimal memory.
+    /// Legacy (Iterated+Salted) — guard is a no-op even with minimal memory.
     func test_argon2idGuard_legacy_iteratedSalted_alwaysPasses() throws {
         let key = try engine.generateKey(
             name: "Legacy Test", email: nil, expirySeconds: nil, profile: .universal

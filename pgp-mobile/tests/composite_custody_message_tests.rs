@@ -1,5 +1,5 @@
-//! Device-Bound Post-Quantum split-custody message tests (RFC 9980 —
-//! issue #567 Phase 3). The foreign-sender round-trip is the correctness
+//! Device-Bound Post-Quantum split-custody message tests (RFC 9980).
+//! The foreign-sender round-trip is the correctness
 //! proof for the vendored KEM combiner: stock Sequoia encapsulates through
 //! its native composite path, and our split-custody decryptor (in-Rust
 //! X25519 + external ML-KEM decapsulation + vendored combiner + AES-256

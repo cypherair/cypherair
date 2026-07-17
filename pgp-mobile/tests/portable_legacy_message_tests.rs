@@ -19,7 +19,7 @@ fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
     input
 }
 
-/// C2A.1: Generate Ed25519+X25519 v4 key pair.
+/// Generate Ed25519+X25519 v4 key pair.
 /// Pass: key version is 4.
 #[test]
 fn test_generate_key_legacy_produces_v4() {
@@ -39,7 +39,7 @@ fn test_generate_key_legacy_produces_v4() {
     assert!(!result.revocation_cert.is_empty());
 }
 
-/// C2A.1 (extended): Verify key algorithms are Ed25519+X25519.
+/// (extended): Verify key algorithms are Ed25519+X25519.
 #[test]
 fn test_generate_key_legacy_algorithms() {
     let result = keys::generate_key_with_profile(
@@ -72,7 +72,7 @@ fn test_generate_key_legacy_algorithms() {
     );
 }
 
-/// C2A.2: Sign + verify text (Legacy).
+/// Sign + verify text (Legacy).
 #[test]
 fn test_sign_verify_text_legacy() {
     let key =
@@ -99,7 +99,7 @@ fn test_sign_verify_text_legacy() {
     );
 }
 
-/// C2A.3: Encrypt + decrypt text (SEIPDv1).
+/// Encrypt + decrypt text (SEIPDv1).
 #[test]
 fn test_encrypt_decrypt_text_legacy() {
     let key =
@@ -119,7 +119,7 @@ fn test_encrypt_decrypt_text_legacy() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// C2A.3 (extended): Encrypt + decrypt with signature.
+/// (extended): Encrypt + decrypt with signature.
 #[test]
 fn test_encrypt_decrypt_signed_legacy() {
     let sender =
@@ -159,7 +159,7 @@ fn test_encrypt_decrypt_signed_legacy() {
     );
 }
 
-/// C2A.4: Encrypt-to-self — sender decrypts own ciphertext.
+/// Encrypt-to-self — sender decrypts own ciphertext.
 #[test]
 fn test_encrypt_to_self_legacy() {
     let sender =
@@ -193,7 +193,7 @@ fn test_encrypt_to_self_legacy() {
     assert_eq!(result_sender.plaintext, plaintext);
 }
 
-/// C2A.5: File encrypt/decrypt with various sizes (1 MB).
+/// File encrypt/decrypt with various sizes (1 MB).
 #[test]
 fn test_file_encrypt_decrypt_1mb_legacy() {
     let key =
@@ -213,7 +213,7 @@ fn test_file_encrypt_decrypt_1mb_legacy() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// C2A.5: File encrypt/decrypt 10 MB.
+/// File encrypt/decrypt 10 MB.
 #[test]
 fn test_file_encrypt_decrypt_10mb_legacy() {
     let key =
@@ -387,7 +387,7 @@ fn test_decrypt_wrong_key_legacy() {
 
     // Bob tries to decrypt Alice's message
     let result = decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[]);
-    // M1: Verify the specific error variant, not just that it failed
+    // Verify the specific error variant, not just that it failed
     match result {
         Err(PgpError::NoMatchingKey) => {} // expected
         Err(other) => panic!("Expected NoMatchingKey, got: {other:?}"),
@@ -416,7 +416,7 @@ fn test_encrypt_decrypt_empty_plaintext_legacy() {
     );
 }
 
-/// C5.6: Concurrent encrypt from 2 threads (Legacy, different key pairs).
+/// Concurrent encrypt from 2 threads (Legacy, different key pairs).
 #[test]
 fn test_concurrent_encrypt_legacy() {
     let key1 =

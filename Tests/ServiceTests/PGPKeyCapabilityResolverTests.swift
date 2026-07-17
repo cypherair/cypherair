@@ -85,7 +85,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             ))
 
             // Positive: generation and every implemented private-operation
-            // class are exposed by the production policy (P7D).
+            // class are exposed by the production policy.
             for operation: PGPKeyOperationKind in [.generate, .sign, .certify, .revoke, .modifyExpiry, .decrypt] {
                 XCTAssertEqual(
                     resolver.resolution(
@@ -235,7 +235,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                     custody: .appleSecureEnclavePrivateOperations
                 ),
                 .supported,
-                "Expected \(operation) to be routeable through the Phase 5A signing hook."
+                "Expected \(operation) to be routeable through the signing hook."
             )
         }
 

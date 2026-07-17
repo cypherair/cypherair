@@ -7,8 +7,7 @@ struct PGPKeyCapabilityResolver: Sendable {
         var secureEnclaveSigningOperationSupport: PGPKeyOperationSupport
         var secureEnclaveKeyAgreementOperationSupport: PGPKeyOperationSupport
 
-        /// Production exposure (issue #501 decision 3, P7D): generation and the
-        /// implemented private-operation classes are supported.
+        /// Generation and the implemented private-operation classes are supported.
         static let production = Policy(
             secureEnclaveGenerationSupport: .supported,
             secureEnclaveSigningOperationSupport: .supported,
@@ -16,9 +15,8 @@ struct PGPKeyCapabilityResolver: Sendable {
         )
 
         /// All Secure Enclave supports blocked — a test-only fixture that pins
-        /// the resolver-before-handle-store ordering in route tests. The
-        /// production policy now exposes these operations (P7D), so this no
-        /// longer mirrors any production shape.
+        /// the resolver-before-handle-store ordering in route tests. It is not a
+        /// production shape.
         static let testSecureEnclaveOperationsBlocked = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .unavailable,

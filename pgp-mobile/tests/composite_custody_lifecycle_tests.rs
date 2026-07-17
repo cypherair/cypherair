@@ -1,5 +1,5 @@
-//! Device-Bound Post-Quantum split-custody lifecycle tests (RFC 9980 —
-//! issue #567 Phase 3). Covers production certificate generation around
+//! Device-Bound Post-Quantum split-custody lifecycle tests (RFC 9980).
+//! Covers production certificate generation around
 //! software PQ component keys, certificate shape and policy validity,
 //! inspection, revocation, expiry modification, certification, and the
 //! fail-closed generation/signing negatives.

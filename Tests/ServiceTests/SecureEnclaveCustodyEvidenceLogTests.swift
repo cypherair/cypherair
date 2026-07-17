@@ -1,7 +1,7 @@
 import XCTest
 @testable import CypherAir
 
-/// Hardware-independent guard for the Phase 8 evidence summary. It runs in the
+/// Hardware-independent guard for the Secure Enclave custody evidence summary. It runs in the
 /// default unit lane (CI) — not the device lanes — and pins the property that an
 /// evidence line is sanitized purely by what the type can represent: only enum raw
 /// values and integer counts, never key material, fingerprints, or locators.

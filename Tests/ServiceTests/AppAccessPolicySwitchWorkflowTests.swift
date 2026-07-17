@@ -3,10 +3,9 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// App Access Protection policy switch branch logic of the extracted
-/// `AppAccessPolicySwitchWorkflow` (previously an untestable `CypherAirApp`
-/// closure), plus the macOS composition pin that the authentication /
-/// reprotection window runs inside one operation-prompt session.
+/// App Access Protection policy switch branch logic of
+/// `AppAccessPolicySwitchWorkflow`, plus the macOS composition pin that the
+/// authentication / reprotection window runs inside one operation-prompt session.
 @MainActor
 final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
     private final class TrackingLAContext: LAContext {

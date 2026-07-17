@@ -2,12 +2,12 @@ import CryptoKit
 import Security
 import XCTest
 
-/// Spike S0 (issue #591): does *this device's* Secure Enclave actually generate
+/// Does *this device's* Secure Enclave actually generate
 /// and operate on the ML-DSA-87 / ML-KEM-1024 tier? That is the one platform
-/// precondition for a device-bound **Post-Quantum · High** family — everything
-/// else in that phase is copy-the-65/768-pattern, but SE support for the 87/1024
+/// precondition for a device-bound **Post-Quantum · High** family — the rest of
+/// the family is the same shape as the 65/768 tier, but SE support for the 87/1024
 /// types on the minimum target hardware (8 GB Apple silicon) is the genuine
-/// unknown and gates the phase.
+/// unknown.
 ///
 /// This is a capability probe, not a custody test: it creates *non-biometric*
 /// enclave keys (`.privateKeyUsage` only, so no Touch ID prompt), exercises

@@ -695,7 +695,7 @@ mod tests {
     #[test]
     fn validate_s2k_memory_rejects_oversized_argon2() {
         // m = 30 -> 2^30 KiB = 1 TiB, far past the ceiling: a decrypt-time OOM
-        // DoS that must be refused before the KDF runs (#611).
+        // DoS that must be refused before the KDF runs.
         let s2k = S2K::Argon2 {
             salt: [0u8; 16],
             t: 1,
@@ -723,7 +723,7 @@ mod tests {
     #[test]
     fn validate_s2k_memory_rejects_excessive_passes() {
         // Legal memory but an abusive time cost: bounded so a single decrypt
-        // attempt cannot be driven arbitrarily long (#661 C3).
+        // attempt cannot be driven arbitrarily long.
         let s2k = S2K::Argon2 {
             salt: [0u8; 16],
             t: MAX_MESSAGE_ARGON2_PASSES + 1,

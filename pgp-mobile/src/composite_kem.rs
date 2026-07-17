@@ -1,6 +1,6 @@
 //! Vendored RFC 9980 KEM key combiner for split-custody composite decryption.
 //!
-//! Byte-exact port of `multi_key_combine` from sequoia-openpgp 2.4.0
+//! Byte-exact port of `multi_key_combine` from sequoia-openpgp 2.4.1
 //! (`src/crypto/asymmetric.rs`), which is `pub(crate)` upstream and therefore
 //! unreachable from this crate. Upstream export has been requested
 //! (<https://gitlab.com/sequoia-pgp/sequoia/-/issues/1249>); delete this module

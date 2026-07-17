@@ -283,7 +283,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         _ = try await service.generateKey(
-            name: "P7F Success",
+            name: "Success",
             email: Optional<String>.none,
             expirySeconds: Optional<UInt64>.none,
             configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
@@ -315,7 +315,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
         await XCTAssertThrowsErrorAsync {
             _ = try await service.generateKey(
-                name: "P7F Cancel",
+                name: "Cancel",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
                 configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
@@ -347,7 +347,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
         await XCTAssertThrowsErrorAsync {
             _ = try await service.generateKey(
-                name: "P7F Lockout",
+                name: "Lockout",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
                 configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
@@ -379,7 +379,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
         await XCTAssertThrowsErrorAsync {
             _ = try await service.generateKey(
-                name: "P7F Rollback",
+                name: "Rollback",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
                 configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
@@ -401,7 +401,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         _ = try await service.generateKey(
-            name: "P7F Nil",
+            name: "Nil",
             email: Optional<String>.none,
             expirySeconds: Optional<UInt64>.none,
             configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,

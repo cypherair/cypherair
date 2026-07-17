@@ -1,24 +1,20 @@
 import Foundation
 import LocalAuthentication
 
-/// The single source of truth for the app lock state (the auth-lifecycle
-/// redesign; shipped model in docs/SECURITY.md §4–§5).
+/// The single source of truth for the app lock state (shipped model in
+/// docs/SECURITY.md §4–§5).
 ///
-/// `AppLockController` replaces the previous, entangled model where "locked" was
-/// *inferred* from `AppSessionOrchestrator.isPrivacyScreenBlurred` plus a cluster
-/// of disambiguation machinery (the authentication shield, the
-/// `PrivacyScreenLifecycleGate`, the prompt union snapshot, and a settle window).
-/// Here, lock is an **explicit** state, and the system biometric sheet's transient
-/// `.inactive` is never treated as an away event — so there is nothing to
-/// disambiguate (the grace=0 "no double-auth" behavior is preserved structurally;
-/// see `handleAwayEvent`).
+/// Lock is an **explicit** state: views read it directly and nothing infers lock
+/// from a blur flag. The system biometric sheet's transient `.inactive` is never
+/// treated as an away event, so there is nothing to disambiguate (the grace=0
+/// "no double-auth" behavior holds structurally; see `handleAwayEvent`).
 ///
-/// Subsystem boundary (TARGET §1, ROADMAP §3 P1):
+/// Subsystem boundary:
 /// - This controller owns the lock state, the auto-lock grace decision, the
 ///   per-platform away/foreground bookkeeping, the fail-closed Protected App-Data
 ///   relock on entering `locked`, and the **sequencing** of the authenticated-
 ///   `LAContext` handoff on unlock.
-/// - `AppSessionOrchestrator` keeps the app-session-auth concerns: it remains the
+/// - `AppSessionOrchestrator` owns the app-session-auth concerns: it is the
 ///   custodian of the handoff context (`recordAuthentication`,
 ///   `pendingAuthenticatedContext`, `consumeAuthenticatedContextForProtectedData`).
 ///   On a successful unlock this controller calls back into the orchestrator (via
@@ -50,7 +46,7 @@ final class AppLockController {
     private let lastAuthenticationDateProvider: () -> Date?
     private let evaluateAppSessionAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
     /// Store the authenticated context + record the authentication on the
-    /// orchestrator (D1: the orchestrator stays the handoff-context custodian).
+    /// orchestrator (the handoff-context custodian).
     private let recordSuccessfulAuthentication: (LAContext?) -> Void
     /// Discard the orchestrator's pending handoff context (fail-closed) on
     /// away/relock/failure.
@@ -59,13 +55,12 @@ final class AppLockController {
     /// and zeroizes the wrapping root key). The trigger owner moves here; the
     /// fan-out itself stays in `ProtectedDataSessionCoordinator`.
     private let relockProtectedData: () async -> Void
-    /// Post-unlock domain-open fan-out (moved verbatim from the orchestrator's
-    /// construction). Receives the authenticated context and the source.
+    /// Post-unlock domain-open fan-out. Receives the authenticated context and the
+    /// source.
     private let postAuthenticationHandler: (LAContext?, String) async -> Void
-    /// Ordinary-settings relock side effect (the orchestrator's old
-    /// `contentClearHandler`).
+    /// Ordinary-settings relock side effect.
     private let contentClearHandler: () -> Void
-    /// UI-test bypass (the orchestrator's old `shouldBypassPrivacyAuthentication`).
+    /// UI-test bypass.
     private let shouldBypassAuthentication: () -> Bool
     /// Live coordinator query used on macOS to close begin/end hook races. When
     /// absent, tests that exercise the controller directly fall back to the
@@ -77,7 +72,7 @@ final class AppLockController {
 
     #if os(macOS)
     /// A macOS app-resign arrived while a private-key operation prompt was in
-    /// flight (the `.authenticating` rule, TARGET §3). The away decision is
+    /// flight (the `.authenticating` rule). The away decision is
     /// deferred to the prompts' end: `handleOperationPromptsEnded()` processes it
     /// if the app is still not foreground-active, and discards it if the user
     /// returned. Holds the original away source for tracing.
@@ -236,7 +231,7 @@ final class AppLockController {
     /// (A biometric prompt's `.inactive` is NOT routed here — see the observer.)
     func handleAwayEvent(source: String = "awayEvent") {
         #if os(macOS)
-        // The `.authenticating` rule (TARGET §3): an app-resign during an
+        // The `.authenticating` rule: an app-resign during an
         // app-driven authentication is explicit state, never an away event.
         //
         // (a) An app-session unlock is in flight (`.authenticating` spans the
@@ -259,8 +254,7 @@ final class AppLockController {
         //     decision is DEFERRED to the prompts' end rather than suppressed
         //     outright. `handleOperationPromptsEnded()` processes the away if the
         //     app is still not foreground-active then, and discards it if the user
-        //     returned. This replaces the accepted P1-interim regression (a per-op
-        //     prompt at grace=0 used to lock the app mid-operation).
+        //     returned.
         if isOperationPromptInProgressForAwayRule {
             // First resign wins: later resigns during the same prompt session carry
             // no additional information (the decision at the prompts' end depends
@@ -294,7 +288,7 @@ final class AppLockController {
             ]
         )
 
-        // "Immediately" (interval 0) locks on the away event, literally (TARGET §3).
+        // "Immediately" (interval 0) locks on the away event, literally.
         // For a non-zero interval the relock is evaluated lazily on the next
         // foreground resume (grace check), matching the shipped behavior; the
         // cosmetic cover (owned by the app, not this controller) hides content
@@ -320,7 +314,7 @@ final class AppLockController {
 
     /// The last in-flight private-key operation prompt ended (wired from
     /// `AuthenticationPromptCoordinator` on macOS). Closes the main-actor mirror
-    /// and decides a deferred away (the `.authenticating` rule, TARGET §3): if a
+    /// and decides a deferred away (the `.authenticating` rule): if a
     /// resign arrived during the prompts and the app is still not
     /// foreground-active, the away is processed now (normal grace semantics); if
     /// the user returned — or an explicit lock already superseded it — it is
@@ -372,7 +366,7 @@ final class AppLockController {
 
     /// The app returned to the foreground. Idempotent: safe to call from both the
     /// lifecycle observer (`.active` / `didBecomeActive`) and the lock surface's
-    /// auto-invoke. Replaces the orchestrator's `handleResume`/`handleInitialAppearance`.
+    /// auto-invoke.
     func handleForegroundActive(source: String = "foregroundActive") async {
         // Release the resume-time cover hold once the lock decision has resolved,
         // on EVERY exit path (bypass, not-foreground-active, in-flight, spurious,
@@ -474,8 +468,8 @@ final class AppLockController {
         Task { await enterLocked(source: "lockNow:\(source)") }
     }
 
-    /// Local Data Reset hook (the lock-state portion of the orchestrator's old
-    /// `resetAfterLocalDataReset`). The orchestrator clears its own auth record.
+    /// Local Data Reset hook for the lock-state portion of the reset. The
+    /// orchestrator clears its own auth record.
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
         awayGeneration &+= 1
         #if os(macOS)
@@ -630,8 +624,7 @@ final class AppLockController {
     // MARK: - Grace
 
     private func effectiveGracePeriod() -> Int {
-        // Fail-closed: an unavailable settings snapshot → 0 (immediate auth), the
-        // same `?? 0` semantics the orchestrator used.
+        // Fail-closed: an unavailable settings snapshot → 0 (immediate auth).
         gracePeriodProvider() ?? 0
     }
 
@@ -686,8 +679,7 @@ final class AppLockController {
         String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
     }
 
-    /// Map an authentication error to a user-facing failure reason (moved verbatim
-    /// from `AppSessionOrchestrator.authenticationFailureReason(for:)`).
+    /// Map an authentication error to a user-facing failure reason.
     private static func failureReason(for error: Error) -> AppSessionAuthenticationFailureReason {
         if let authenticationError = error as? AuthenticationError {
             switch authenticationError {

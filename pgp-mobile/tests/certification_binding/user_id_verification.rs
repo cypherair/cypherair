@@ -234,7 +234,7 @@ fn test_verify_user_id_binding_signature_by_selector_mismatch_returns_invalid_ke
 
 // A cryptographically genuine certification from a signer whose certificate is
 // later revoked (key compromise) must stop reading as a valid vouch: otherwise a
-// compromised contact key could vouch for an attacker-controlled key (#609).
+// compromised contact key could vouch for an attacker-controlled key.
 #[test]
 fn test_verify_user_id_binding_signature_rejects_revoked_signer() {
     use openpgp::types::ReasonForRevocation;
