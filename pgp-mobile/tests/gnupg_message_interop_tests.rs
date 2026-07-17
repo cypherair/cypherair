@@ -34,7 +34,7 @@ fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
 /// Import GnuPG public key into Sequoia.
 /// Pass: key parsed successfully, v4, Ed25519, has encryption subkey.
 #[test]
-fn test_c3_1_import_gpg_pubkey() {
+fn test_import_gpg_pubkey() {
     let gpg_pubkey = load_fixture("gpg_pubkey.asc");
     let info = keys::parse_key_info(&gpg_pubkey).expect("Should parse GnuPG public key");
 
@@ -54,7 +54,7 @@ fn test_c3_1_import_gpg_pubkey() {
 
 /// (binary): Import GnuPG public key in binary format.
 #[test]
-fn test_c3_1_import_gpg_pubkey_binary() {
+fn test_import_gpg_pubkey_binary() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let info = keys::parse_key_info(&gpg_pubkey).expect("Should parse binary GnuPG public key");
     assert_eq!(info.key_version, 4);
@@ -68,7 +68,7 @@ fn test_c3_1_import_gpg_pubkey_binary() {
 /// Sequoia encrypts to GnuPG public key, then decrypts with GnuPG secret key.
 /// This proves the ciphertext format is GnuPG-compatible (SEIPDv1).
 #[test]
-fn test_c3_2_app_encrypt_to_gpg_key() {
+fn test_app_encrypt_to_gpg_key() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
     let plaintext = b"Hello from CypherAir to GnuPG!";
@@ -97,7 +97,7 @@ fn test_c3_2_app_encrypt_to_gpg_key() {
 
 /// (signed): Sequoia encrypts+signs to GnuPG key.
 #[test]
-fn test_c3_2_app_encrypt_signed_to_gpg_key() {
+fn test_app_encrypt_signed_to_gpg_key() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
     let plaintext = b"Signed message from CypherAir";
@@ -138,7 +138,7 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
 
 /// Sequoia Legacy cleartext signature is valid.
 #[test]
-fn test_c3_3_app_sign_legacy() {
+fn test_app_sign_legacy() {
     let sender =
         keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -166,7 +166,7 @@ fn test_c3_3_app_sign_legacy() {
 /// Decrypt a GnuPG-encrypted message (armored).
 /// GnuPG encrypted to its own key. We decrypt with the GnuPG secret key.
 #[test]
-fn test_c3_4_decrypt_gpg_encrypted_message_armored() {
+fn test_decrypt_gpg_encrypted_message_armored() {
     let ciphertext = load_fixture("gpg_encrypted_message.asc");
     let secretkey = load_fixture("gpg_secretkey.asc");
     let pubkey = load_fixture("gpg_pubkey.asc");
@@ -180,7 +180,7 @@ fn test_c3_4_decrypt_gpg_encrypted_message_armored() {
 
 /// (binary): Decrypt a GnuPG-encrypted message (binary .gpg).
 #[test]
-fn test_c3_4_decrypt_gpg_encrypted_message_binary() {
+fn test_decrypt_gpg_encrypted_message_binary() {
     let ciphertext = load_fixture("gpg_encrypted_message.gpg");
     let secretkey = load_fixture("gpg_secretkey.asc");
     let pubkey = load_fixture("gpg_pubkey.gpg");
@@ -201,7 +201,7 @@ fn test_c3_4_decrypt_gpg_encrypted_message_binary() {
 
 /// Verify a GnuPG cleartext signature.
 #[test]
-fn test_c3_5_verify_gpg_cleartext_signature() {
+fn test_verify_gpg_cleartext_signature() {
     let signed = load_fixture("gpg_cleartext_signed.asc");
     let pubkey = load_fixture("gpg_pubkey.asc");
     let expected = expected_plaintext();
@@ -220,7 +220,7 @@ fn test_c3_5_verify_gpg_cleartext_signature() {
 
 /// (detached, armored): Verify a GnuPG detached signature.
 #[test]
-fn test_c3_5_verify_gpg_detached_signature_armored() {
+fn test_verify_gpg_detached_signature_armored() {
     let signature = load_fixture("gpg_detached_sig.asc");
     let pubkey = load_fixture("gpg_pubkey.asc");
     let data = expected_plaintext();
@@ -239,7 +239,7 @@ fn test_c3_5_verify_gpg_detached_signature_armored() {
 
 /// (detached, binary): Verify a GnuPG detached signature in binary format.
 #[test]
-fn test_c3_5_verify_gpg_detached_signature_binary() {
+fn test_verify_gpg_detached_signature_binary() {
     let signature = load_fixture("gpg_detached_sig.sig");
     let pubkey = load_fixture("gpg_pubkey.gpg");
     let data = expected_plaintext();
@@ -260,7 +260,7 @@ fn test_c3_5_verify_gpg_detached_signature_binary() {
 
 /// Tampered GnuPG ciphertext fails to decrypt.
 #[test]
-fn test_c3_6_tampered_gpg_ciphertext_fails() {
+fn test_tampered_gpg_ciphertext_fails() {
     let tampered = load_fixture("gpg_encrypted_tampered.gpg");
     let secretkey = load_fixture("gpg_secretkey.asc");
     let pubkey = load_fixture("gpg_pubkey.gpg");
@@ -283,7 +283,7 @@ fn test_c3_6_tampered_gpg_ciphertext_fails() {
 
 /// (Sequoia-encrypted): Tamper Sequoia ciphertext → verify it fails.
 #[test]
-fn test_c3_6_tampered_sequoia_ciphertext_for_gpg_key() {
+fn test_tampered_sequoia_ciphertext_for_gpg_key() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
     let plaintext = b"Tamper test";
@@ -317,7 +317,7 @@ fn test_c3_6_tampered_sequoia_ciphertext_for_gpg_key() {
 
 /// Full interop round-trip (gpg key → Sequoia encrypt → gpg decrypt).
 #[test]
-fn test_c3_7_full_roundtrip_gpg_key() {
+fn test_full_roundtrip_gpg_key() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
@@ -340,7 +340,7 @@ fn test_c3_7_full_roundtrip_gpg_key() {
 
 /// (with signing): Full signed round-trip.
 #[test]
-fn test_c3_7_full_roundtrip_signed() {
+fn test_full_roundtrip_signed() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
@@ -384,7 +384,7 @@ fn test_c3_7_full_roundtrip_signed() {
 /// GnuPG rejection is captured by running `generate_gpg_fixtures.sh` after
 /// generating the v6 fixture with `test_generate_v6_fixture`.
 #[test]
-fn test_c3_8_modern_high_key_is_v6_gnupg_incompatible() {
+fn test_modern_high_key_is_v6_gnupg_incompatible() {
     let key_b = keys::generate_key_with_profile(
         "Modern High User".to_string(),
         None,
@@ -407,7 +407,7 @@ fn test_c3_8_modern_high_key_is_v6_gnupg_incompatible() {
 
 /// (encryption): Modern High encryption produces SEIPDv2 (incompatible with GnuPG).
 #[test]
-fn test_c3_8_modern_high_encryption_not_gnupg_compatible() {
+fn test_modern_high_encryption_not_gnupg_compatible() {
     let key_b = keys::generate_key_with_profile(
         "Modern High".to_string(),
         None,
@@ -438,7 +438,7 @@ fn test_c3_8_modern_high_encryption_not_gnupg_compatible() {
 /// GnuPG compressed the message with DEFLATE (algo 1) before encrypting.
 /// Sequoia must decompress it transparently during decryption.
 #[test]
-fn test_c2a_9_decrypt_deflate_compressed_message() {
+fn test_decrypt_deflate_compressed_message() {
     let ciphertext = load_fixture("gpg_encrypted_compressed_deflate.asc");
     let secretkey = load_fixture("gpg_secretkey.asc");
     let pubkey = load_fixture("gpg_pubkey.asc");
@@ -456,7 +456,7 @@ fn test_c2a_9_decrypt_deflate_compressed_message() {
 /// (ZLIB): Decrypt a ZLIB-compressed message from GnuPG.
 /// ZLIB (algo 2) is another compression format GnuPG may use.
 #[test]
-fn test_c2a_9_decrypt_zlib_compressed_message() {
+fn test_decrypt_zlib_compressed_message() {
     let ciphertext = load_fixture("gpg_encrypted_compressed_zlib.asc");
     let secretkey = load_fixture("gpg_secretkey.asc");
     let pubkey = load_fixture("gpg_pubkey.asc");
