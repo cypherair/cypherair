@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+@testable import CypherAir
 
 /// Mock authenticator for testing authentication flows.
 /// Controls whether authentication succeeds and whether biometrics are available.
