@@ -207,9 +207,9 @@ final class SensitiveBytesBox: @unchecked Sendable {
 /// See SECURITY.md Section 3 and Section 10.
 struct ProtectedDomainEnvelope: Codable, Equatable, Sendable {
     static let magic = "CPDENV5"
-    static let currentFormatVersion = 2
-    static let currentAADVersion = 2
-    static let algorithmID = "aes-256-gcm-v1"
+    static let currentFormatVersion = 5
+    static let currentAADVersion = 5
+    static let algorithmID = "aes-256-gcm-v5"
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
 

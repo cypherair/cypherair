@@ -16,9 +16,9 @@ import os
 /// See SECURITY.md Section 3 and Section 10.
 struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
     static let magic = "CADMKV5"
-    static let currentFormatVersion = 2
-    static let currentAADVersion = 2
-    static let algorithmID = "aes-256-gcm-hkdf-sha256-v1"
+    static let currentFormatVersion = 5
+    static let currentAADVersion = 5
+    static let algorithmID = "aes-256-gcm-hkdf-sha256-v5"
     static let expectedDomainMasterKeyLength = 32
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16

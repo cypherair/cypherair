@@ -17,7 +17,7 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
         XCTAssertEqual(record.magic, WrappedDomainMasterKeyRecord.magic)
         XCTAssertEqual(record.magic, "CADMKV5")
         XCTAssertEqual(record.formatVersion, WrappedDomainMasterKeyRecord.currentFormatVersion)
-        XCTAssertEqual(record.formatVersion, 2)
+        XCTAssertEqual(record.formatVersion, 5)
         XCTAssertEqual(record.algorithmID, WrappedDomainMasterKeyRecord.algorithmID)
         XCTAssertEqual(record.aadVersion, WrappedDomainMasterKeyRecord.currentAADVersion)
         XCTAssertEqual(record.nonce.count, WrappedDomainMasterKeyRecord.expectedNonceLength)

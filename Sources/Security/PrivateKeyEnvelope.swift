@@ -43,9 +43,9 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
 /// See SECURITY.md Section 3 and Section 10.
 struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
     static let magic = "CAPKEV5"
-    static let currentFormatVersion = 1
-    static let currentAADVersion = 1
-    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v1"
+    static let currentFormatVersion = 5
+    static let currentAADVersion = 5
+    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v5"
     static let expectedSaltLength = 32
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16

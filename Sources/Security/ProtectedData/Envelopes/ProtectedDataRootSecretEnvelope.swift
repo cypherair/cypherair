@@ -19,9 +19,9 @@ import Security
 /// See SECURITY.md Section 3 and Section 10.
 struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
     static let magic = "CAPDSEV5"
-    static let currentFormatVersion = 3
-    static let currentAADVersion = 3
-    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v1"
+    static let currentFormatVersion = 5
+    static let currentAADVersion = 5
+    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v5"
     static let expectedRootSecretLength = 32
     static let expectedSaltLength = 32
     static let expectedNonceLength = 12

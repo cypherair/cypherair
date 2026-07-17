@@ -13,7 +13,7 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
         XCTAssertEqual(envelope.magic, ProtectedDomainEnvelope.magic)
         XCTAssertEqual(envelope.magic, "CPDENV5")
         XCTAssertEqual(envelope.formatVersion, ProtectedDomainEnvelope.currentFormatVersion)
-        XCTAssertEqual(envelope.formatVersion, 2)
+        XCTAssertEqual(envelope.formatVersion, 5)
         XCTAssertEqual(envelope.algorithmID, ProtectedDomainEnvelope.algorithmID)
         XCTAssertEqual(envelope.aadVersion, ProtectedDomainEnvelope.currentAADVersion)
         XCTAssertEqual(envelope.schemaVersion, 2)
