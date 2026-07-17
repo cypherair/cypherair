@@ -30,7 +30,7 @@ pub(crate) fn extract_signing_keypair(
     })?;
 
     // `.revoked(false)` skips a revoked signing subkey, mirroring recipient
-    // selection in encrypt.rs (WCR-01). `.alive()` checks expiry only, so without
+    // selection in encrypt.rs. `.alive()` checks expiry only, so without
     // this filter a cert with a live primary but a hard-revoked signing subkey
     // could still be selected to sign. If another live, unrevoked signing key
     // remains it is used; only when none does the no-valid-signing-key error fire.
@@ -146,7 +146,7 @@ pub(crate) fn select_external_signing_key(
     }
 
     // `.revoked(false)` skips a revoked signing subkey before the fingerprint
-    // match, mirroring recipient selection in encrypt.rs (WCR-01). The custody
+    // match, mirroring recipient selection in encrypt.rs. The custody
     // fingerprint is caller-supplied, but selection still runs through this
     // capability chain, and `.alive()` checks expiry only — so without this
     // filter a revoked signing subkey whose fingerprint is pinned would still be

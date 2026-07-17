@@ -79,8 +79,6 @@ project_setting() {
 }
 
 # Reject a tag that is not an SSH-signed annotated tag pointing at CI_COMMIT.
-# Mirrors the publish-time revalidation that previously lived in
-# stable-build-release.yml.
 revalidate_signed_tag() {
     local tag="$1" commit="$2"
     GITHUB_TOKEN="$CAPTURED_GITHUB_PAT" python3 - "$GITHUB_REPOSITORY_SLUG" "$tag" "$commit" <<'PY'

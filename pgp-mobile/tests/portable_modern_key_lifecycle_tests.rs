@@ -1,4 +1,4 @@
-//! Portable Modern key lifecycle tests (v6 Ed25519+X25519, RFC 9580 — issue #591 Phase 2).
+//! Portable Modern key lifecycle tests (v6 Ed25519+X25519, RFC 9580).
 //! Covers generation shape, algorithm-aware profile classification (an Ed25519
 //! primary distinguishes Modern from the Ed448 Advanced tier), passphrase
 //! export/import (Argon2id, like every v6 profile), and profile-mismatch guards.

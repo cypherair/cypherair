@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The opaque lock surface shown while `AppLockController` is locked
-/// (P4 of the auth-lifecycle redesign — TARGET §5). It auto-invokes
-/// authentication on appear and hosts the retry / biometrics-locked-out
+/// The opaque lock surface shown while `AppLockController` is locked. It
+/// auto-invokes authentication on appear and hosts the retry / biometrics-locked-out
 /// messaging, driven solely by the explicit `AppLockController.lockState`.
 ///
 /// The surface is deliberately OPAQUE — an app-identified screen, not a
@@ -11,8 +10,7 @@ import SwiftUI
 /// no decorative lock imagery. The cosmetic privacy cover
 /// (`CosmeticPrivacyCover`) is a separate, unrelated layer with its own
 /// role. Native platform chrome only; no `.glassEffect()` on a security
-/// surface (PRD §4.9). The failure/retry/locked-out content (and its localized
-/// strings) is unchanged from the P1 surface.
+/// surface (PRD §4.9).
 struct AppLockSurfaceView: View {
     let appLockController: AppLockController
 

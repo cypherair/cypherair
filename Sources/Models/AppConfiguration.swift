@@ -1,7 +1,7 @@
 import Foundation
 
 enum GuidedTutorialVersion {
-    static let current = 2
+    static let current = 1
 }
 
 enum GuidedTutorialCompletionState: Equatable {

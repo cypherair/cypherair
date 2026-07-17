@@ -1,5 +1,4 @@
 //! Cross-Profile Interoperability tests.
-//! Covers POC test cases C2X.1–C2X.5.
 //! Validates format auto-selection by recipient key version.
 
 mod common;
@@ -12,7 +11,7 @@ use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::verify;
 
-/// C2X.1: Legacy encrypts to Modern High recipient (v6 key).
+/// Legacy encrypts to Modern High recipient (v6 key).
 /// Pass: message format is SEIPDv2. Recipient decrypts.
 #[test]
 fn test_legacy_encrypts_to_modern_high() {
@@ -46,7 +45,7 @@ fn test_legacy_encrypts_to_modern_high() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// C2X.2: Modern High encrypts to Legacy recipient (v4 key).
+/// Modern High encrypts to Legacy recipient (v4 key).
 /// Pass: message format is SEIPDv1. Recipient decrypts.
 #[test]
 fn test_modern_high_encrypts_to_legacy() {
@@ -80,7 +79,7 @@ fn test_modern_high_encrypts_to_legacy() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// C2X.3: Modern High encrypts to mixed recipients (v4 + v6).
+/// Modern High encrypts to mixed recipients (v4 + v6).
 /// Pass: format is SEIPDv1 (lowest common). Both decrypt.
 #[test]
 fn test_mixed_recipients_v4_and_v6() {
@@ -102,7 +101,7 @@ fn test_mixed_recipients_v4_and_v6() {
 
     let plaintext = b"Message to mixed v4+v6 recipients.";
 
-    // M11: Use sender_b as the signing key (was previously unused)
+    // Use sender_b as the signing key
     let ciphertext = encrypt::encrypt(
         plaintext,
         &[
@@ -125,7 +124,7 @@ fn test_mixed_recipients_v4_and_v6() {
     assert_eq!(result_b.plaintext, plaintext);
 }
 
-/// C2X.4: Modern High with encrypt-to-self encrypts to v4 recipient.
+/// Modern High with encrypt-to-self encrypts to v4 recipient.
 /// Pass: SEIPDv1 (mixed rule). Both sender and recipient decrypt.
 #[test]
 fn test_modern_high_encrypt_to_self_with_v4_recipient() {
@@ -158,7 +157,7 @@ fn test_modern_high_encrypt_to_self_with_v4_recipient() {
     assert_eq!(result_b.plaintext, plaintext);
 }
 
-/// C2X.5: Legacy signature verified by Modern High user, and vice versa.
+/// Legacy signature verified by Modern High user, and vice versa.
 #[test]
 fn test_cross_profile_signature_verification() {
     let key_a =
@@ -368,7 +367,7 @@ fn test_format_selection_mixed_recipients_produces_seipd_v1() {
     assert!(!has_v2, "Mixed v4+v6 recipients should NOT produce SEIPDv2");
 }
 
-// ── H2: Format verification for cross-profile encrypt (sender ≠ recipient profile) ──
+// ── Format verification for cross-profile encrypt (sender ≠ recipient profile) ──
 
 /// Legacy sender encrypts to Modern High recipient → must produce SEIPDv2.
 /// Validates that format selection depends on RECIPIENT key version, not sender's profile.
@@ -428,7 +427,7 @@ fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
     assert!(!has_v2, "B sender to v4 recipient must NOT produce SEIPDv2");
 }
 
-// ── H3: Legacy sender + encrypt-to-self + v6 recipient ────────────────
+// ── Legacy sender + encrypt-to-self + v6 recipient ────────────────
 
 /// Legacy sender with encrypt-to-self encrypts to v6 recipient.
 /// Mixed v4 (sender) + v6 (recipient) → must use SEIPDv1.
@@ -591,7 +590,7 @@ fn test_modify_expiry_public_key_only_fails_legacy() {
         result.is_err(),
         "modify_expiry should fail with public key only"
     );
-    // L9: Match on the error variant only — the exact reason string is an implementation
+    // Match on the error variant only — the exact reason string is an implementation
     // detail of Sequoia and may change across versions. The InvalidKeyData variant match
     // is sufficient to confirm the correct error category.
     match result.unwrap_err() {
@@ -616,7 +615,7 @@ fn test_modify_expiry_public_key_only_fails_modern_high() {
         result.is_err(),
         "modify_expiry should fail with public key only"
     );
-    // L9: Match on the error variant only — see comment in Legacy test above.
+    // Match on the error variant only — see comment in Legacy test above.
     match result.unwrap_err() {
         pgp_mobile::error::PgpError::InvalidKeyData { .. } => {} // expected
         other => panic!("Expected InvalidKeyData error, got: {other:?}"),

@@ -7,9 +7,7 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         /// Portable Modern: v6 Ed25519+X25519 (RFC 9580). The baseline v6
         /// classical family — the plain "Modern" tier.
         case modernSoftwareV6
-        /// Portable Modern · High: v6 Ed448+X448 (RFC 9580). Historically named
-        /// `modernSoftwareV6`; re-keyed in issue #591 Phase 2 when the baseline
-        /// Ed25519 Modern family took that name.
+        /// Portable Modern · High: v6 Ed448+X448 (RFC 9580).
         case modernHighSoftwareV6
         case postQuantumSoftwareV6
         /// Portable Post-Quantum · High: v6 RFC 9980 composite ML-DSA-87+Ed448 /

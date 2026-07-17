@@ -7,7 +7,7 @@ use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
 
-/// C2A.6: Export key with Iterated+Salted S2K. Re-import with correct passphrase.
+/// Export key with Iterated+Salted S2K. Re-import with correct passphrase.
 #[test]
 fn test_export_import_key_legacy() {
     let key = keys::generate_key_with_profile(
@@ -29,7 +29,7 @@ fn test_export_import_key_legacy() {
     assert!(!imported.is_empty());
 }
 
-/// C2A.7: Re-import with wrong passphrase → graceful error.
+/// Re-import with wrong passphrase → graceful error.
 #[test]
 fn test_import_wrong_passphrase_legacy() {
     let key =
@@ -105,7 +105,7 @@ fn test_export_wrong_profile_legacy() {
     }
 }
 
-/// C2A.8: Generate + parse revocation cert.
+/// Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_legacy() {
     let key =

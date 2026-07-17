@@ -7,7 +7,7 @@ use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 
-/// C2A.5 (extended): 50 MB file encrypt/decrypt (Legacy).
+/// (extended): 50 MB file encrypt/decrypt (Legacy).
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_50mb_legacy() {
@@ -34,7 +34,7 @@ fn test_file_encrypt_decrypt_50mb_legacy() {
     );
 }
 
-/// C2A.5 (extended): 100 MB file encrypt/decrypt (Legacy).
+/// (extended): 100 MB file encrypt/decrypt (Legacy).
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_100mb_legacy() {
@@ -57,7 +57,7 @@ fn test_file_encrypt_decrypt_100mb_legacy() {
     );
 }
 
-/// C2B.5 (extended): 50 MB file encrypt/decrypt (Modern High).
+/// (extended): 50 MB file encrypt/decrypt (Modern High).
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_50mb_modern_high() {
@@ -84,7 +84,7 @@ fn test_file_encrypt_decrypt_50mb_modern_high() {
     );
 }
 
-/// C2B.5 (extended): 100 MB file encrypt/decrypt (Modern High).
+/// (extended): 100 MB file encrypt/decrypt (Modern High).
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_100mb_modern_high() {

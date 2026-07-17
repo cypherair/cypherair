@@ -730,7 +730,7 @@ where
         .map_err(classify_decrypt_error)?;
 
     // Write to temp file first (AEAD hard-fail: no partial plaintext).
-    // Use a random suffix to prevent predictable temp file paths (M3 fix).
+    // Use a random suffix to prevent predictable temp file paths.
     let mut random_bytes = [0u8; 8];
     openpgp::crypto::random(&mut random_bytes).map_err(|e| PgpError::InternalError {
         reason: format!("Random generation failed: {e}"),
@@ -746,7 +746,7 @@ where
     // Stream decrypted data to temp file using zeroing copy.
     // CopyError preserves the original io::Error so we can extract and reclassify
     // Sequoia decryption errors (AEAD/MDC/wrong-key) that are wrapped inside io::Error
-    // by the Decryptor's Read impl. This is the core fix for security finding M2.
+    // by the Decryptor's Read impl.
     if let Err(e) = zeroing_copy_decrypt(
         &mut decryptor,
         &mut temp_file,

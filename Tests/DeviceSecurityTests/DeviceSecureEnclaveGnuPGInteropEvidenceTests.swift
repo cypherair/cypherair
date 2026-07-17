@@ -12,10 +12,8 @@ import XCTest
 
 /// Manual macOS-only evidence harness: a REAL Secure Enclave custody v4 key
 /// interoperating bidirectionally with the local `gpg` binary, through the
-/// production external signer and key-agreement seams. This is the production
-/// successor to the POC `gnupg-interop --request` mode — without the POC's
-/// raw-shared-secret response file (the in-process callback bridges carry the
-/// private operations).
+/// production external signer and key-agreement seams. The in-process callback
+/// bridges carry the private operations.
 ///
 /// It is intentionally selected ONLY by `CypherAir-InteropEvidenceTests` and is
 /// excluded from `CypherAir-UnitTests` and the device plans. It requires real

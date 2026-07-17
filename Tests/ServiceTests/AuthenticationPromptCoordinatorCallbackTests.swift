@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-/// The `onOperationPromptsEnded` hook (P3′ stage 1): fires exactly when the
+/// The `onOperationPromptsEnded` hook fires exactly when the
 /// operation-prompt stack becomes empty — the moment the `.authenticating` rule's
 /// deferred away decision is made — and never for privacy prompts.
 final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {

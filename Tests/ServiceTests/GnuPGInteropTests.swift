@@ -55,9 +55,9 @@ final class GnuPGInteropTests: XCTestCase {
         return url
     }
 
-    // MARK: - C3.1 Import GnuPG Public Key
+    // MARK: - Import GnuPG Public Key
 
-    func test_c3_1_importGnuPGPublicKey_armored_parsesCorrectly() throws {
+    func test_importGnuPGPublicKey_armored_parsesCorrectly() throws {
         let pubKeyData = try loadGpgPublicKey()
         let info = try engine.parseKeyInfo(keyData: pubKeyData)
 
@@ -69,9 +69,9 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertFalse(info.fingerprint.isEmpty, "Fingerprint should not be empty")
     }
 
-    // MARK: - C3.4 Decrypt GnuPG Encrypted Messages
+    // MARK: - Decrypt GnuPG Encrypted Messages
 
-    func test_c3_4_decryptGnuPGMessage_armored_matchesPlaintext() throws {
+    func test_decryptGnuPGMessage_armored_matchesPlaintext() throws {
         let ciphertextArmored = try FixtureLoader.loadData("gpg_encrypted_message", ext: "asc")
         let ciphertext = try engine.dearmor(armored: ciphertextArmored)
         let secretKey = try loadGpgSecretKey()
@@ -84,7 +84,7 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertEqual(decryptedText, expectedPlaintext, "Decrypted armored message should match GnuPG plaintext")
     }
 
-    func test_c3_4_decryptGnuPGMessage_binary_matchesPlaintext() throws {
+    func test_decryptGnuPGMessage_binary_matchesPlaintext() throws {
         let ciphertext = try FixtureLoader.loadData("gpg_encrypted_message", ext: "gpg")
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
@@ -96,9 +96,9 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertEqual(decryptedText, expectedPlaintext, "Decrypted binary message should match GnuPG plaintext")
     }
 
-    // MARK: - C3.5 Verify GnuPG Signatures
+    // MARK: - Verify GnuPG Signatures
 
-    func test_c3_5_verifyGnuPGCleartextSignature_returnsValid() throws {
+    func test_verifyGnuPGCleartextSignature_returnsValid() throws {
         let signedMessage = try FixtureLoader.loadData("gpg_cleartext_signed", ext: "asc")
         let pubKey = try loadGpgPublicKey()
 
@@ -109,7 +109,7 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertNotNil(result.content, "Signed content should be extracted")
     }
 
-    func test_c3_5_verifyGnuPGDetachedSignature_armored_returnsValid() throws {
+    func test_verifyGnuPGDetachedSignature_armored_returnsValid() throws {
         let plaintext = try FixtureLoader.loadData("gpg_plaintext", ext: "txt")
         let signatureArmored = try FixtureLoader.loadData("gpg_detached_sig", ext: "asc")
         let signature = try engine.dearmor(armored: signatureArmored)
@@ -127,7 +127,7 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertEqual(result.summaryState, .verified, "GnuPG armored detached signature should be valid")
     }
 
-    func test_c3_5_verifyGnuPGDetachedSignature_binary_returnsValid() throws {
+    func test_verifyGnuPGDetachedSignature_binary_returnsValid() throws {
         let plaintext = try FixtureLoader.loadData("gpg_plaintext", ext: "txt")
         let signature = try FixtureLoader.loadData("gpg_detached_sig", ext: "sig")
         let pubKey = try loadGpgPublicKey()
@@ -144,9 +144,9 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertEqual(result.summaryState, .verified, "GnuPG binary detached signature should be valid")
     }
 
-    // MARK: - C3.6 Tamper Detection
+    // MARK: - Tamper Detection
 
-    func test_c3_6_tamperedGnuPGCiphertext_throwsIntegrityError() throws {
+    func test_tamperedGnuPGCiphertext_throwsIntegrityError() throws {
         let tamperedCiphertext = try FixtureLoader.loadData("gpg_encrypted_tampered", ext: "gpg")
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
@@ -157,7 +157,7 @@ final class GnuPGInteropTests: XCTestCase {
         )
     }
 
-    func test_c3_6_tamperedSequoiaCiphertext_forGnuPGKey_throwsIntegrityError() throws {
+    func test_tamperedSequoiaCiphertext_forGnuPGKey_throwsIntegrityError() throws {
         let pubKey = try loadGpgPublicKey()
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
@@ -185,9 +185,9 @@ final class GnuPGInteropTests: XCTestCase {
         )
     }
 
-    // MARK: - C3.7 Full Round-Trip
+    // MARK: - Full Round-Trip
 
-    func test_c3_7_fullRoundtrip_encryptToGnuPGKey_thenDecrypt() throws {
+    func test_fullRoundtrip_encryptToGnuPGKey_thenDecrypt() throws {
         let pubKey = try loadGpgPublicKey()
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
@@ -212,9 +212,9 @@ final class GnuPGInteropTests: XCTestCase {
         XCTAssertEqual(decryptedText, originalText, "Round-trip plaintext should match original")
     }
 
-    // MARK: - C2A.9 Compressed Message Decryption
+    // MARK: - Compressed Message Decryption
 
-    func test_c2a_9_decryptDeflateCompressedMessage_matchesPlaintext() throws {
+    func test_decryptDeflateCompressedMessage_matchesPlaintext() throws {
         let ciphertextArmored = try FixtureLoader.loadData("gpg_encrypted_compressed_deflate", ext: "asc")
         let ciphertext = try engine.dearmor(armored: ciphertextArmored)
         let secretKey = try loadGpgSecretKey()

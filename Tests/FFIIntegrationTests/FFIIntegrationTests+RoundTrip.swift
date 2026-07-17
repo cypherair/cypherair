@@ -2,9 +2,9 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C5.1 Binary Round-Trip
+    // MARK: - Binary Round-Trip
 
-    /// C5.1: Generate key → encrypt → decrypt. Verify Data↔Vec<u8> integrity.
+    /// Generate key → encrypt → decrypt. Verify Data↔Vec<u8> integrity.
     func test_binaryRoundTrip_legacy_dataPreservedAcrossFFI() throws {
         let plaintext = Data("Hello from Swift to Rust and back!".utf8)
 
@@ -34,7 +34,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.plaintext, plaintext, "Decrypted data must match original plaintext")
     }
 
-    /// C5.1: Same round-trip for Modern High (v6, Ed448+X448, SEIPDv2).
+    /// Same round-trip for Modern High (v6, Ed448+X448, SEIPDv2).
     func test_binaryRoundTrip_modernHigh_dataPreservedAcrossFFI() throws {
         let plaintext = Data("Modern High round-trip test data with binary: \0\u{01}\u{FF}".utf8)
 
@@ -61,7 +61,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.plaintext, plaintext)
     }
 
-    /// C5.1: Large data round-trip (1 MB) Legacy to stress the RustBuffer transfer.
+    /// Large data round-trip (1 MB) Legacy to stress the RustBuffer transfer.
     func test_binaryRoundTrip_largeData_1MB_legacy() throws {
         var plaintext = Data(count: 1_000_000)
         for i in 0..<plaintext.count {
@@ -91,7 +91,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Legacy)")
     }
 
-    /// C5.1: Large data round-trip (1 MB) Modern High (SEIPDv2 AEAD).
+    /// Large data round-trip (1 MB) Modern High (SEIPDv2 AEAD).
     func test_binaryRoundTrip_largeData_1MB_modernHigh() throws {
         var plaintext = Data(count: 1_000_000)
         for i in 0..<plaintext.count {
@@ -121,9 +121,9 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Modern High)")
     }
 
-    // MARK: - C5.2 Unicode Round-Trip
+    // MARK: - Unicode Round-Trip
 
-    /// C5.2: Chinese + emoji + special Unicode characters survive FFI.
+    /// Chinese + emoji + special Unicode characters survive FFI.
     func test_unicodeRoundTrip_chineseEmojiPreserved() throws {
         let testStrings = [
             "你好世界",
@@ -168,7 +168,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.2: Unicode user ID survives key generation and parseKeyInfo.
+    /// Unicode user ID survives key generation and parseKeyInfo.
     func test_unicodeRoundTrip_userIdPreserved() throws {
         let chineseName = "张三"
         let generated = try engine.generateKey(
@@ -186,9 +186,9 @@ extension FFIIntegrationTests {
         )
     }
 
-    // MARK: - C5.5 KeyProfile Enum
+    // MARK: - KeyProfile Enum
 
-    /// C5.5: KeyProfile.universal → v4 key, KeyProfile.advanced → v6 key.
+    /// KeyProfile.universal → v4 key, KeyProfile.advanced → v6 key.
     func test_keyProfileEnum_universal_producesV4() throws {
         let key = try engine.generateKey(
             name: "Legacy", email: nil, expirySeconds: nil, profile: .universal
@@ -201,7 +201,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(detectedProfile, .universal, "detectProfile must return .universal for v4 key")
     }
 
-    /// C5.5: KeyProfile.advanced → v6 key.
+    /// KeyProfile.advanced → v6 key.
     func test_keyProfileEnum_advanced_producesV6() throws {
         let key = try engine.generateKey(
             name: "Modern High", email: nil, expirySeconds: nil, profile: .advanced
@@ -214,7 +214,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(detectedProfile, .advanced, "detectProfile must return .advanced for v6 key")
     }
 
-    /// C5.5: The classical software profiles (A and B) generate keys with all expected components.
+    /// The classical software profiles (A and B) generate keys with all expected components.
     func test_keyProfileEnum_bothProfiles_generateCompleteKeys() throws {
         for profile in [KeyProfile.universal, KeyProfile.advanced] {
             let key = try engine.generateKey(

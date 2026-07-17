@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C5.4 Certificate Signature FFI
+    // MARK: - Certificate Signature FFI
 
     func test_certificateSignature_directKeyFixture_smokeAcrossFFI() throws {
         let target = try loadFixture("ffi_direct_key_target")

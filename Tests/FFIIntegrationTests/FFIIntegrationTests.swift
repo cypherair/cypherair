@@ -1,7 +1,7 @@
 import XCTest
 @testable import CypherAir
 
-/// C5: FFI Boundary Integration Tests
+/// FFI Boundary Integration Tests
 /// Validates that data crosses the Rust↔Swift UniFFI boundary correctly.
 final class FFIIntegrationTests: XCTestCase {
 

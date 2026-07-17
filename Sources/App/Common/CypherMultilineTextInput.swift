@@ -14,7 +14,7 @@ enum CypherMultilineTextInputMode {
 /// full-height editor sheet. The editor must not live inline in the Form row:
 /// SwiftUI's Form sizes a `UITextView`-backed row to the text view's own
 /// content height and ignores every cap short of a definite frame, so a long
-/// paste balloons the row into a blank unscrollable area (issue #513, PR #510).
+/// paste balloons the row into a blank unscrollable area.
 /// macOS keeps the inline `TextEditor`, which is unaffected.
 struct CypherMultilineTextInput: View {
     @Binding var text: String
@@ -213,25 +213,17 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
             textView.keyboardType = .asciiCapable
         }
 
-        if #available(iOS 17.0, *) {
-            textView.inlinePredictionType = .no
-        }
+        textView.inlinePredictionType = .no
 
-        if #available(iOS 18.0, *) {
-            textView.writingToolsBehavior = .none
-            textView.allowedWritingToolsResultOptions = []
-            textView.mathExpressionCompletionType = .no
-        }
+        textView.writingToolsBehavior = .none
+        textView.allowedWritingToolsResultOptions = []
+        textView.mathExpressionCompletionType = .no
 
         #if os(iOS)
-        if #available(iOS 18.4, *) {
-            textView.conversationContext = nil
-        }
+        textView.conversationContext = nil
         #endif
 
-        if #available(iOS 16.0, *) {
-            textView.isFindInteractionEnabled = false
-        }
+        textView.isFindInteractionEnabled = false
 
         #if os(iOS)
         textView.inputAssistantItem.leadingBarButtonGroups = []
@@ -317,9 +309,7 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
             textDragDelegate = nil
             textDropDelegate = nil
             textDragInteraction?.isEnabled = false
-            if #available(iOS 16.0, *) {
-                isFindInteractionEnabled = false
-            }
+            isFindInteractionEnabled = false
         }
     }
 

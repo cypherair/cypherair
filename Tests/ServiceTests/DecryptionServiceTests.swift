@@ -1131,7 +1131,7 @@ final class DecryptionServiceTests: XCTestCase {
         try assertNoDecryptedOperationArtifacts()
     }
 
-    // MARK: - H1: High Security Biometrics Blocking
+    // MARK: - High Security Biometrics Blocking
 
     func test_decrypt_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
         let (_, _, phase1) = try await encryptAndPreparePhase1(profile: .universal)

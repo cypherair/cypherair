@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C5.2B Certificate Merge / Update
+    // MARK: - Certificate Merge / Update
 
     func test_certificateMergeUpdate_legacy_expiryRefreshReturnsUpdated() throws {
         let generated = try engine.generateKey(
@@ -165,7 +165,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.profile, .universal)
     }
 
-    // MARK: - C5.2C Selector Discovery
+    // MARK: - Selector Discovery
 
     func test_discoverCertificateSelectors_gpgPublicAndSecretFixtures_matchAcrossFFI() throws {
         let publicCert = try loadArmoredFixtureAsBinary("gpg_pubkey")

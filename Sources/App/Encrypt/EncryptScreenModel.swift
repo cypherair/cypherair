@@ -80,8 +80,8 @@ final class EncryptScreenModel {
 
     /// Quantum-safety of the currently displayed result, classified from the
     /// produced artifact's PKESK algorithms — never from the live selection,
-    /// which can change after encryption (design doc §5: the quantum-safe
-    /// claim is never shown for a mixed message). nil = no result, or the
+    /// which can change after encryption (the quantum-safe claim is never shown
+    /// for a mixed message). nil = no result, or the
     /// artifact could not be classified (no claim either way).
     var resultQuantumSafety: MessageQuantumSafety?
 

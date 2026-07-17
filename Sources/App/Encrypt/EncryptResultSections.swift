@@ -89,10 +89,10 @@ struct EncryptResultSections: View {
     }
 }
 
-/// Quiet quantum-safety state for the encryption result (design doc §5,
-/// campaign #567): a small badge when every session-key packet of the
-/// produced message is post-quantum, a neutral caption when the artifact
-/// is mixed, nothing otherwise — with a help sheet for the fuller story.
+/// Quiet quantum-safety state for the encryption result: a small badge when
+/// every session-key packet of the produced message is post-quantum, a neutral
+/// caption when the artifact is mixed, nothing otherwise — with a help sheet for
+/// the fuller story.
 struct EncryptQuantumSafetyFooter: View {
     let model: EncryptScreenModel
     @State private var showHelp = false

@@ -3,13 +3,13 @@ import Foundation
 /// Owns selective (subkey and User ID) revocation-export workflows behind the key-management facade.
 ///
 /// Consumes selector-bearing carrier options (`SubkeySelectionOption`, `UserIdSelectionOption`)
-/// produced by the Workstream 3.1 discovery surface and re-validates them against the stored
+/// produced by the selector-discovery surface and re-validates them against the stored
 /// public certificate *before* any Secure Enclave unwrap. This validation includes both
 /// selector membership and metadata/public-certificate fingerprint consistency, guaranteeing
 /// that a bogus, stale, cross-certificate, or metadata-corrupted selector path fails fast with
 /// `CypherAirError.invalidKeyData(...)` without triggering a Face ID / passcode prompt.
 ///
-/// v1 policy (plan §3.4): selective revocations are generated on demand and returned armored.
+/// Selective revocations are generated on demand and returned armored.
 /// They are not persisted; `KeyCatalogStore` state is not mutated by this service.
 final class SelectiveRevocationService {
     private let certificateAdapter: PGPCertificateOperationAdapter

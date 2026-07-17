@@ -4,11 +4,11 @@ import Security
 import LocalAuthentication
 @testable import CypherAir
 
-/// C4.5: Real-device memory guard tests.
+/// Real-device memory guard tests.
 final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
-    // MARK: - C4.5: Argon2id Memory Guard (Device)
+    // MARK: - Argon2id Memory Guard (Device)
 
-    /// C4.5: Verify SystemMemoryInfo returns a sane value on real hardware.
+    /// Verify SystemMemoryInfo returns a sane value on real hardware.
     func test_systemMemoryInfo_returnsNonZero() {
         let memoryInfo = SystemMemoryInfo()
         let available = memoryInfo.availableMemoryBytes()
@@ -23,7 +23,7 @@ final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
             "Available memory must not exceed physical memory")
     }
 
-    /// C4.5: Real 512 MB Argon2id import with guard on device.
+    /// Real 512 MB Argon2id import with guard on device.
     /// Validates the full pipeline: parseS2kParams → guard → importSecretKey.
     func test_argon2idGuard_realDevice_512MB_import_succeeds() throws {
         let engine = PgpEngine()

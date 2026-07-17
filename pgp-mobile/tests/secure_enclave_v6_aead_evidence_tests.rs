@@ -1,4 +1,4 @@
-//! Secure Enclave custody v6 RFC 9580 / AEAD evidence (Phase 8, issue #501).
+//! Secure Enclave custody v6 RFC 9580 / AEAD evidence.
 //!
 //! Validates RFC 9580 / SEIPDv2 AEAD-OCB correctness for the device-bound *modern*
 //! (v6) family through the PRODUCTION external key-agreement decrypt seam, driven by
@@ -16,7 +16,7 @@ use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{encrypt, PgpEngine};
 
 /// Emit a sanitized one-line v6 evidence record (scenario label only) for harvesting
-/// into the Phase 8 evidence matrix.
+/// into the Secure Enclave custody evidence matrix.
 fn record_evidence(scenario: &str) {
     println!("SE-V6-AEAD-EVIDENCE scenario={scenario} version=v6 outcome=passed");
 }

@@ -10,10 +10,10 @@ import XCTest
 /// hop pattern `AppContainer.wireOperationPromptLifecycle` uses, with closure-spy
 /// dependencies (grace 0, auto-success auth, relock counter).
 ///
-/// This is the test class that was missing when #495 shipped: unit tests covered
-/// the mutation flow and the `.authenticating` rule separately, so a prompt that
-/// ran OUTSIDE any operation-prompt session — and therefore locked the app
-/// mid-action on its own sheet resign — was invisible to both. Flow tests inject
+/// This harness covers the composition seam that per-unit tests miss: a prompt
+/// that runs OUTSIDE any operation-prompt session — and therefore would lock the
+/// app mid-action on its own sheet resign — is invisible when the mutation flow
+/// and the `.authenticating` rule are tested separately. Flow tests inject
 /// `coordinator` into the production seam under test, suspend inside the prompt,
 /// and use `deliverResign()` / `deliverReturn()` + `settle()` to drive the
 /// deferred-away decision.

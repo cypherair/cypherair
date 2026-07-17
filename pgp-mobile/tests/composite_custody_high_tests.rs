@@ -1,5 +1,5 @@
-//! Device-Bound Post-Quantum · High split-custody tests (RFC 9980 — issue #591
-//! Phase 3). Mirrors the 65/768 composite coverage for the ML-DSA-87 + Ed448 /
+//! Device-Bound Post-Quantum · High split-custody tests (RFC 9980). Mirrors
+//! the 65/768 composite coverage for the ML-DSA-87 + Ed448 /
 //! ML-KEM-1024 + X448 tier. The foreign-sender round-trip is the correctness
 //! proof for the vendored ML-KEM-1024 + X448 KEM combiner: stock Sequoia
 //! encapsulates through its native composite path, and our split-custody

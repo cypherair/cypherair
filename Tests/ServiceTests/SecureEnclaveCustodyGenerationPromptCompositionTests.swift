@@ -4,7 +4,7 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// Short operation-prompt window — Secure Enclave custody generation (P7D):
+/// Short operation-prompt window — Secure Enclave custody generation:
 /// only custody authorization plus immediate handle loading runs inside the
 /// session; certificate building and metadata commit stay outside it.
 @MainActor
@@ -166,7 +166,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         )
 
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
-            name: "SE Custody P7F",
+            name: "SE Custody",
             email: nil,
             expirySeconds: nil,
             configurationIdentity: .compatibleP256V4

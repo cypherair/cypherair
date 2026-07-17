@@ -2,9 +2,9 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C5.6 Concurrent Encrypt (Thread Safety)
+    // MARK: - Concurrent Encrypt (Thread Safety)
 
-    /// C5.6: 10 concurrent encryption tasks must all succeed.
+    /// 10 concurrent encryption tasks must all succeed.
     func test_concurrentEncrypt_threadsafe() async throws {
         let key = try engine.generateKey(
             name: "Concurrent", email: nil, expirySeconds: nil, profile: .universal
@@ -34,9 +34,9 @@ extension FFIIntegrationTests {
         }
     }
 
-    // MARK: - C5.7 Concurrent Encrypt + Decrypt (Thread Safety)
+    // MARK: - Concurrent Encrypt + Decrypt (Thread Safety)
 
-    /// C5.7: Mixed concurrent encrypt and decrypt operations.
+    /// Mixed concurrent encrypt and decrypt operations.
     func test_concurrentEncryptDecrypt_threadsafe() async throws {
         let key = try engine.generateKey(
             name: "MixedConcurrent", email: nil, expirySeconds: nil, profile: .universal
@@ -94,7 +94,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.7: Concurrent operations with Modern High (AEAD).
+    /// Concurrent operations with Modern High (AEAD).
     func test_concurrentEncryptDecrypt_modernHigh_threadsafe() async throws {
         let key = try engine.generateKey(
             name: "ConcurrentB", email: nil, expirySeconds: nil, profile: .advanced

@@ -218,10 +218,6 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
                                     account: account))
     }
 
-    // The former `_partialPermanentAndCompletePending_replacesPermanent` case was removed:
-    // with the single-row envelope, a partially-present permanent bundle is impossible, so
-    // that scenario collapses to `_onlyPendingExists_promotesToPermanent` above.
-
     func test_modifyExpiryCrashRecovery_retryableFailure_keepsFlags() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Retry Test")
         let fp = identity.fingerprint

@@ -137,7 +137,7 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
     assert!(result.is_err(), "Legacy SEIPD without MDC must be rejected");
 }
 
-// ── H1: AeadAuthenticationFailed exercisability analysis ──────────────────
+// ── AeadAuthenticationFailed exercisability analysis ──────────────────
 //
 // FINDING: PgpError::AeadAuthenticationFailed is never produced by self-generated
 // Modern High messages because v6 PKESK uses AEAD-protected session key transport.

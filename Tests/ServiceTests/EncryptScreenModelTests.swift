@@ -638,7 +638,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_resultQuantumSafety_derivesFromArtifactAndSurvivesSelectionChanges() async throws {
-        // Design doc §5 (campaign #567): the quantum-safe claim describes the
+        // The quantum-safe claim describes the
         // produced message — its actual PKESK algorithms — never the live
         // selection, which can change after encryption without re-encrypting.
         let signer = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")

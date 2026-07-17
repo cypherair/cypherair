@@ -321,9 +321,9 @@ final class KeyDetailScreenModelTests: XCTestCase {
             model.deleteConfirmationMessage,
             KeyDetailScreenModel.deleteConfirmationMessage(isDeviceBound: false)
         )
-        // Device-bound keys get distinct, custody-appropriate copy. (#512: the
-        // shared message wrongly told device-bound users to back up a key that
-        // cannot be exported or backed up.)
+        // Device-bound keys get distinct, custody-appropriate copy: a shared
+        // message would wrongly tell device-bound users to back up a key that
+        // cannot be exported or backed up.
         XCTAssertNotEqual(
             KeyDetailScreenModel.deleteConfirmationMessage(isDeviceBound: true),
             KeyDetailScreenModel.deleteConfirmationMessage(isDeviceBound: false)

@@ -306,7 +306,7 @@ final class AppLockControllerTests: XCTestCase {
     /// Repro of the reported bug: at grace=0, after a normal unlock, the lock surface
     /// is inserted during the `.background` lock transition and its `.task` fires
     /// `handleForegroundActive` while backgrounded. That call must be a no-op so the
-    /// FIRST genuine return auto-authenticates (previously it was gated as spurious).
+    /// FIRST genuine return auto-authenticates.
     func test_graceZero_lockSurfaceTaskDuringBackground_thenGenuineReturnAutoAuths() async {
         let spy = Spy()
         spy.gracePeriod = 0

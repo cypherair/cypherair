@@ -80,12 +80,8 @@ struct AppLaunchConfiguration {
 
     private static func tutorialModule(for value: String) -> TutorialModuleID? {
         switch value {
-        case "understandSandbox", "sandbox": .sandbox
-        case "generateAliceKey", "createDemoIdentity": .createDemoIdentity
-        case "importBobKey", "addDemoContact": .addDemoContact
-        case "composeAndEncryptMessage", "encryptDemoMessage": .encryptDemoMessage
-        case "parseRecipients", "decryptMessage", "decryptAndVerify": .decryptAndVerify
-        case "exportBackup", "backupKey": .backupKey
+        case "createDemoIdentity": .createDemoIdentity
+        case "addDemoContact": .addDemoContact
         case "enableHighSecurity": .enableHighSecurity
         default: nil
         }

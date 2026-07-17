@@ -1,8 +1,7 @@
 import Foundation
 import LocalAuthentication
 
-/// Owns the App Access Protection policy-switch action (previously an inline
-/// closure in `CypherAirApp`, untestable there). Only the app-session
+/// Owns the App Access Protection policy-switch action. Only the app-session
 /// authentication and immediate root-secret re-protection window is enrolled in
 /// an operation-prompt session; the rest of the policy switch remains a normal
 /// action so genuine macOS away events still lock immediately at grace period 0.

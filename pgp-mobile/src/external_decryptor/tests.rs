@@ -1418,7 +1418,7 @@ fn test_external_decryptor_payload_authentication_hard_fails_after_session_key_a
     }
 }
 
-// ── Streaming file decrypt (Phase 6C) ───────────────────────────────────
+// ── Streaming file decrypt ───────────────────────────────────
 
 /// RAII temporary directory for streaming-file decrypt tests.
 struct StreamingTempDir {
@@ -1864,7 +1864,7 @@ fn test_runtime_external_key_agreement_file_api_early_cancellation_maps_to_cance
     );
 }
 
-// ── Phase 6D closure: mixed recipients, repeated operations, no partial plaintext ──
+// ── Mixed recipients, repeated operations, no partial plaintext ──
 
 /// A file encrypted to several named ECDH recipients (the external key-agreement
 /// recipient emitted second) must select the matching PKESK by key-agreement subkey

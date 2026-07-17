@@ -4,11 +4,11 @@ import XCTest
 @testable import CypherAir
 
 /// Tests for the app-session-authentication concerns `AppSessionOrchestrator`
-/// retained after P1 of the auth-lifecycle redesign: the authenticated-`LAContext`
-/// handoff custody (D1), the `lastAuthenticationDate` record, the view-observed
-/// `contentClearGeneration` signal, and the Local Data Reset hook.
+/// owns: the authenticated-`LAContext` handoff custody, the
+/// `lastAuthenticationDate` record, the view-observed `contentClearGeneration`
+/// signal, and the Local Data Reset hook.
 ///
-/// The lock state machine (lock/blur/grace/away/settle/resume) moved to
+/// The lock state machine (lock/cover/grace/away/foreground) lives in
 /// `AppLockController`; its behavior is covered by `AppLockControllerTests`. The
 /// Protected App-Data access gate is covered by `ProtectedDataAccessGatePostUnlockTests`.
 @MainActor

@@ -236,7 +236,7 @@ fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
 
 /// A cert whose ONLY encryption subkey carries a hard revocation (KeyCompromised)
 /// must be rejected: `.alive()` checks expiry only, so recipient selection also
-/// filters revoked subkeys via `.revoked(false)` (WCR-01). The primary key is
+/// filters revoked subkeys via `.revoked(false)`. The primary key is
 /// live, so this isolates subkey revocation from key-level revocation.
 #[test]
 fn test_encrypt_rejects_cert_with_only_revoked_encryption_subkey() {
@@ -288,7 +288,7 @@ fn test_encrypt_rejects_cert_with_only_revoked_encryption_subkey() {
 
 /// A cert with a revoked encryption subkey PLUS a second live encryption subkey
 /// must still encrypt: the filter skips the revoked subkey rather than rejecting
-/// the whole cert (WCR-01 positive case).
+/// the whole cert.
 #[test]
 fn test_encrypt_skips_revoked_subkey_but_uses_live_subkey() {
     use openpgp::cert::prelude::*;
@@ -346,7 +346,7 @@ fn test_encrypt_skips_revoked_subkey_but_uses_live_subkey() {
 
 /// The key_info capability mirror must agree with the engine: a cert whose only
 /// encryption subkey is hard-revoked reports `has_encryption_subkey == false`
-/// (WCR-01 UI-mirror case, matching test_encrypt_rejects_cert_with_only_revoked_encryption_subkey).
+/// (matching test_encrypt_rejects_cert_with_only_revoked_encryption_subkey).
 #[test]
 fn test_key_info_reports_not_encryptable_for_revoked_only_subkey() {
     use openpgp::cert::prelude::*;

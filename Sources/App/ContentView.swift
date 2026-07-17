@@ -67,7 +67,7 @@ struct MacAppShellView: View {
     }
 
     // UITest-only: auto-present the auth-mode confirmation in the main window when launched
-    // with UITEST_OPEN_AUTHMODE_CONFIRMATION (relocated from the removed MacSettingsRootView).
+    // with UITEST_OPEN_AUTHMODE_CONFIRMATION.
     private func presentLaunchAuthModeConfirmationIfNeeded() {
         guard opensAuthModeConfirmation,
               navigationState.activePresentation == nil else {

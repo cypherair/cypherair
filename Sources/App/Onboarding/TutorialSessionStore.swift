@@ -610,7 +610,7 @@ final class TutorialSessionStore {
                 ),
                 email: "bob@demo.invalid",
                 expirySeconds: nil,
-                family: .modernHighSoftwareV6
+                family: .modernSoftwareV6
             )
             guard isCurrentTutorialSession(
                 container: activeContainer,

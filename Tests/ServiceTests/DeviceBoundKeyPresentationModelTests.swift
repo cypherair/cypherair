@@ -3,7 +3,7 @@ import XCTest
 @testable import CypherAir
 
 /// Screen-model presentation behavior for device-bound Secure Enclave custody
-/// keys (stage 7B): key-detail custody flags, degraded-availability mapping,
+/// keys: key-detail custody flags, degraded-availability mapping,
 /// and the backup-surface fail-closed flag.
 final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
     private var defaultsSuiteName: String!

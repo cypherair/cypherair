@@ -1,4 +1,4 @@
-//! Secure Enclave custody v4 GnuPG interop evidence (Phase 8, issue #501).
+//! Secure Enclave custody v4 GnuPG interop evidence.
 //!
 //! Drives the PRODUCTION Secure Enclave seams (certificate construction, external
 //! signer, external key-agreement decrypt) with the shared software-P256 stand-in
@@ -23,8 +23,8 @@ use pgp_mobile::{armor, encrypt, sign, PgpEngine};
 use tempfile::TempDir;
 
 /// Emit a sanitized one-line interop evidence record (scenario label only — never
-/// key material, plaintext, or fingerprints) for harvesting into the Phase 8
-/// evidence matrix.
+/// key material, plaintext, or fingerprints) for harvesting into the Secure Enclave
+/// custody evidence matrix.
 fn record_evidence(scenario: &str) {
     println!("SE-GNUPG-INTEROP-EVIDENCE scenario={scenario} version=v4 outcome=passed");
 }

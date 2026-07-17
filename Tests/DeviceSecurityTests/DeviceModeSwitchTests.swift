@@ -4,9 +4,9 @@ import Security
 import LocalAuthentication
 @testable import CypherAir
 
-/// C7.4-C7.6 and related mode-switch stress tests.
+/// and related mode-switch stress tests.
 final class DeviceModeSwitchTests: DeviceSecurityTestCase {
-    // MARK: - C7.4: Mode Switch with Mock SE (Logic Test)
+    // MARK: - Mode Switch with Mock SE (Logic Test)
 
     func test_switchMode_noIdentities_throwsNoIdentities() async throws {
         let mockAuth = MockAuthenticator()
@@ -42,7 +42,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         try await authManager.switchMode(to: .standard, fingerprints: ["abc123"], hasBackup: true, authenticator: mockAuth)
     }
 
-    // MARK: - C7.5: Mode Switch Migration Flow on Device (SE + Keychain)
+    // MARK: - Mode Switch Migration Flow on Device (SE + Keychain)
 
     /// Verifies the migration flow completes on real device infrastructure.
     /// This test intentionally uses a mock authenticator and a non-ACL initial key so it
@@ -97,7 +97,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account))
     }
 
-    // MARK: - C7.5A: Mode Switch Access Control Validation (Manual Device)
+    // MARK: - Mode Switch Access Control Validation (Manual Device)
 
     func test_switchMode_standardToHighSecurity_reappliesRealAccessControl_manual() async throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -165,7 +165,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account))
     }
 
-    // MARK: - C7.6: Mode Switch Rollback on Failure (Mock-based)
+    // MARK: - Mode Switch Rollback on Failure (Mock-based)
 
     /// Verifies that when a Keychain save fails mid-way through mode switch,
     /// the original keys remain intact and all temporary items are cleaned up.

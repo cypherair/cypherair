@@ -4,9 +4,9 @@ import Security
 import LocalAuthentication
 @testable import CypherAir
 
-/// C6: Secure Enclave and Keychain integration tests on real hardware.
+/// Secure Enclave and Keychain integration tests on real hardware.
 final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
-    // MARK: - C6.1: SE Key Generation
+    // MARK: - SE Key Generation
 
     func test_seGenerateKey_noAccessControl_succeeds() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -47,7 +47,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         XCTAssertFalse(handle.dataRepresentation.isEmpty)
     }
 
-    // MARK: - C6.2: SE Wrap / Unwrap Round-Trip
+    // MARK: - SE Wrap / Unwrap Round-Trip
 
     func test_seWrapUnwrap_ed25519Size_roundTrip_returnsIdentical() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -159,7 +159,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         XCTAssertEqual(unwrapped, randomKey, "Random key data must survive wrap/unwrap")
     }
 
-    // MARK: - C6.3: Keychain Integration
+    // MARK: - Keychain Integration
 
     func test_keychain_saveLoad_roundTrip() throws {
         let service = "com.cypherair.test.\(UUID().uuidString)"
@@ -267,9 +267,9 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         XCTAssertEqual(unwrapped, fakePrivateKey, "Full Keychain round-trip must preserve key data")
     }
 
-    // MARK: - C6.4: SE Unwrap → FFI Decrypt (End-to-End)
+    // MARK: - SE Unwrap → FFI Decrypt (End-to-End)
 
-    /// C6.4: Full pipeline — generate key via FFI, SE wrap certData, store in Keychain,
+    /// Full pipeline — generate key via FFI, SE wrap certData, store in Keychain,
     /// load + SE unwrap, then decrypt via FFI. Legacy (v4, SEIPDv1).
     func test_seUnwrapThenDecrypt_legacy_succeeds() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -277,11 +277,11 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let engine = PgpEngine()
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
-        let plaintext = Data("C6.4 Legacy: SE → FFI decrypt test".utf8)
+        let plaintext = Data("Legacy: SE → FFI decrypt test".utf8)
 
         // 1. Generate Legacy key via FFI.
         let generated = try engine.generateKey(
-            name: "C6.4 Test A", email: nil, expirySeconds: nil, profile: .universal
+            name: "Test A", email: nil, expirySeconds: nil, profile: .universal
         )
 
         // 2. Encrypt a message using the public key (signed).
@@ -330,18 +330,18 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             "Signature must verify after SE round-trip")
     }
 
-    /// C6.4: Same end-to-end pipeline for Modern High (v6, Ed448+X448, SEIPDv2 AEAD OCB).
+    /// Same end-to-end pipeline for Modern High (v6, Ed448+X448, SEIPDv2 AEAD OCB).
     func test_seUnwrapThenDecrypt_modernHigh_succeeds() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
-        let plaintext = Data("C6.4 Modern High: SE → FFI decrypt test (AEAD OCB)".utf8)
+        let plaintext = Data("Modern High: SE → FFI decrypt test (AEAD OCB)".utf8)
 
         // 1. Generate Modern High key via FFI.
         let generated = try engine.generateKey(
-            name: "C6.4 Test B", email: nil, expirySeconds: nil, profile: .advanced
+            name: "Test B", email: nil, expirySeconds: nil, profile: .advanced
         )
 
         // 2. Encrypt a message (SEIPDv2 AEAD for v6 recipient).
@@ -390,9 +390,9 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             "Modern High signature must verify after SE round-trip")
     }
 
-    // MARK: - C6.5: SE Key Deletion → Unwrap Fails
+    // MARK: - SE Key Deletion → Unwrap Fails
 
-    /// C6.5: After deleting the envelope row for an identity,
+    /// After deleting the envelope row for an identity,
     /// attempting to load it should fail with .itemNotFound.
     func test_seKeyDeletion_thenLoadFails_withItemNotFound() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -438,9 +438,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             account: account), "Envelope row must not exist after deletion")
     }
 
-    /// C6.5: Tampered envelope row — flipping a stored byte must make unwrap fail closed.
-    /// The single-row envelope replaces the former partial-deletion scenario, which is
-    /// structurally impossible now that the bundle is one atomic row.
+    /// Tampered envelope row — flipping a stored byte must make unwrap fail closed.
     func test_seWrap_tamperedEnvelope_unwrapFailsClosed() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 

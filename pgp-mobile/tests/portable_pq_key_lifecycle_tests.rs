@@ -1,4 +1,4 @@
-//! Portable Post-Quantum key lifecycle tests (RFC 9980 — issue #567 Phase 2).
+//! Portable Post-Quantum key lifecycle tests (RFC 9980).
 //! Covers generation shape, algorithm-aware profile classification,
 //! passphrase export/import (Argon2id), and profile-mismatch guards.
 

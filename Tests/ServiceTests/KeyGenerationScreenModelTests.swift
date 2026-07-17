@@ -104,10 +104,8 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             [.compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6, .postQuantumHighSoftwareV6]
         )
 
-        // Production policy + wired service (the shipping configuration since
-        // P7D; Portable Post-Quantum exposed since campaign #567 Phase 4 and
-        // Device-Bound Post-Quantum since Phase 3): all nine families are
-        // offered, in stable order.
+        // Production policy + wired service: all nine families are offered, in
+        // stable order.
         let availableServiceModel = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(),
             isSecureEnclaveGenerationAvailable: true

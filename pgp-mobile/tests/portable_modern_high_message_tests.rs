@@ -18,7 +18,7 @@ fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
     input
 }
 
-/// C2B.1: Generate Ed448+X448 v6 key pair.
+/// Generate Ed448+X448 v6 key pair.
 /// Pass: key version is 6, algo is Ed448/X448.
 #[test]
 fn test_generate_key_modern_high_produces_v6() {
@@ -38,7 +38,7 @@ fn test_generate_key_modern_high_produces_v6() {
     assert!(!result.revocation_cert.is_empty());
 }
 
-/// C2B.1 (extended): Verify key algorithms and parse info.
+/// (extended): Verify key algorithms and parse info.
 #[test]
 fn test_generate_key_modern_high_algorithms() {
     let result = keys::generate_key_with_profile(
@@ -72,7 +72,7 @@ fn test_generate_key_modern_high_algorithms() {
     );
 }
 
-/// C2B.2: Sign + verify text (Modern High).
+/// Sign + verify text (Modern High).
 #[test]
 fn test_sign_verify_text_modern_high() {
     let key =
@@ -97,7 +97,7 @@ fn test_sign_verify_text_modern_high() {
     );
 }
 
-/// C2B.3: Encrypt + decrypt text (SEIPDv2 AEAD OCB).
+/// Encrypt + decrypt text (SEIPDv2 AEAD OCB).
 #[test]
 fn test_encrypt_decrypt_text_modern_high() {
     let key =
@@ -115,7 +115,7 @@ fn test_encrypt_decrypt_text_modern_high() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// C2B.3 (extended): Encrypt + decrypt with signature.
+/// (extended): Encrypt + decrypt with signature.
 #[test]
 fn test_encrypt_decrypt_signed_modern_high() {
     let sender =
@@ -147,7 +147,7 @@ fn test_encrypt_decrypt_signed_modern_high() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// C2B.4: Encrypt-to-self (Modern High).
+/// Encrypt-to-self (Modern High).
 #[test]
 fn test_encrypt_to_self_modern_high() {
     let sender =
@@ -179,7 +179,7 @@ fn test_encrypt_to_self_modern_high() {
     assert_eq!(result_sender.plaintext, plaintext);
 }
 
-/// C2B.5: File encrypt/decrypt 1 MB (Modern High).
+/// File encrypt/decrypt 1 MB (Modern High).
 #[test]
 fn test_file_encrypt_decrypt_1mb_modern_high() {
     let key =
@@ -198,7 +198,7 @@ fn test_file_encrypt_decrypt_1mb_modern_high() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// C2B.5: File encrypt/decrypt 10 MB (Modern High).
+/// File encrypt/decrypt 10 MB (Modern High).
 #[test]
 fn test_file_encrypt_decrypt_10mb_modern_high() {
     let key =
@@ -327,7 +327,7 @@ fn test_encrypt_decrypt_empty_plaintext_modern_high() {
     );
 }
 
-/// C5.7: Concurrent encrypt + decrypt on separate key pairs (Modern High).
+/// Concurrent encrypt + decrypt on separate key pairs (Modern High).
 #[test]
 fn test_concurrent_encrypt_decrypt_modern_high() {
     let key1 =
@@ -389,7 +389,7 @@ fn test_decrypt_wrong_key_modern_high() {
     }
 }
 
-// ── M3: Multi-recipient encrypt/decrypt (Modern High) ──────────────────────
+// ── Multi-recipient encrypt/decrypt (Modern High) ──────────────────────
 
 /// Encrypt to multiple v6 recipients → each can independently decrypt.
 #[test]

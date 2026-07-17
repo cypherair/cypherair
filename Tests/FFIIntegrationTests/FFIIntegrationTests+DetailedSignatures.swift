@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C5.4B Detailed Signature Results
+    // MARK: - Detailed Signature Results
 
     func test_detailedVerifyCleartext_fixtureMultiSigner_preservesEntries() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")

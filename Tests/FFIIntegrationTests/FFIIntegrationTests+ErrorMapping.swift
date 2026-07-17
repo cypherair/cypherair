@@ -2,9 +2,9 @@ import XCTest
 @testable import CypherAir
 
 extension FFIIntegrationTests {
-    // MARK: - C5.3 Error Enum Mapping
+    // MARK: - Error Enum Mapping
 
-    /// C5.3: NoMatchingKey error when decrypting with wrong key.
+    /// NoMatchingKey error when decrypting with wrong key.
     func test_errorMapping_noMatchingKey() throws {
         let keyA = try engine.generateKey(
             name: "Alice", email: nil, expirySeconds: nil, profile: .universal
@@ -39,7 +39,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: IntegrityCheckFailed / AeadAuthenticationFailed on tampered ciphertext.
+    /// IntegrityCheckFailed / AeadAuthenticationFailed on tampered ciphertext.
     func test_errorMapping_integrityCheckFailed_legacy() throws {
         let key = try engine.generateKey(
             name: "Tamper A", email: nil, expirySeconds: nil, profile: .universal
@@ -78,7 +78,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: AeadAuthenticationFailed on tampered Modern High (SEIPDv2) ciphertext.
+    /// AeadAuthenticationFailed on tampered Modern High (SEIPDv2) ciphertext.
     func test_errorMapping_aeadAuthenticationFailed_modernHigh() throws {
         let key = try engine.generateKey(
             name: "Tamper B", email: nil, expirySeconds: nil, profile: .advanced
@@ -117,7 +117,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: CorruptData on garbage input.
+    /// CorruptData on garbage input.
     func test_errorMapping_corruptData() throws {
         let key = try engine.generateKey(
             name: "Corrupt", email: nil, expirySeconds: nil, profile: .universal
@@ -145,7 +145,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: WrongPassphrase on incorrect passphrase.
+    /// WrongPassphrase on incorrect passphrase.
     func test_errorMapping_wrongPassphrase() throws {
         let key = try engine.generateKey(
             name: "Export", email: nil, expirySeconds: nil, profile: .universal
@@ -175,7 +175,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: InvalidKeyData on garbage key input.
+    /// InvalidKeyData on garbage key input.
     func test_errorMapping_invalidKeyData() throws {
         let garbage = Data("not a key".utf8)
 
@@ -214,7 +214,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: BadSignature when verifying a tampered cleartext signature.
+    /// BadSignature when verifying a tampered cleartext signature.
     func test_errorMapping_badSignature_cleartextVerify() throws {
         let key = try engine.generateKey(
             name: "Signer", email: nil, expirySeconds: nil, profile: .universal
@@ -247,7 +247,7 @@ extension FFIIntegrationTests {
         )
     }
 
-    /// C5.3: UnknownSigner status when signer key not in verification keys.
+    /// UnknownSigner status when signer key not in verification keys.
     func test_errorMapping_unknownSigner_viaCleartextVerify() throws {
         let signerKey = try engine.generateKey(
             name: "Unknown Signer", email: nil, expirySeconds: nil, profile: .universal
@@ -273,7 +273,7 @@ extension FFIIntegrationTests {
         )
     }
 
-    /// C5.3: ArmorError on malformed armor input.
+    /// ArmorError on malformed armor input.
     func test_errorMapping_armorError() throws {
         let malformedArmor = Data("""
         -----BEGIN PGP MESSAGE-----
@@ -297,7 +297,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: SigningFailed with garbage signing key data.
+    /// SigningFailed with garbage signing key data.
     func test_errorMapping_signingFailed_invalidKey() throws {
         let garbage = Data("not a secret key".utf8)
 
@@ -319,7 +319,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: EncryptionFailed with empty recipients list.
+    /// EncryptionFailed with empty recipients list.
     func test_errorMapping_encryptionFailed_noRecipients() throws {
         XCTAssertThrowsError(
             try engine.encrypt(
@@ -341,7 +341,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: RevocationError with garbage revocation cert data.
+    /// RevocationError with garbage revocation cert data.
     func test_errorMapping_revocationError_invalidData() throws {
         let key = try engine.generateKey(
             name: "RevTest", email: nil, expirySeconds: nil, profile: .universal
@@ -366,7 +366,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: S2kError / WrongPassphrase on Modern High export-import with wrong passphrase.
+    /// S2kError / WrongPassphrase on Modern High export-import with wrong passphrase.
     func test_errorMapping_s2kError_modernHigh_wrongPassphrase() throws {
         let key = try engine.generateKey(
             name: "S2K Test", email: nil, expirySeconds: nil, profile: .advanced
@@ -396,7 +396,7 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: BadSignature via detached signature verification with tampered data.
+    /// BadSignature via detached signature verification with tampered data.
     func test_errorMapping_badSignature_detachedVerify() throws {
         let key = try engine.generateKey(
             name: "DetachedSig", email: nil, expirySeconds: nil, profile: .universal

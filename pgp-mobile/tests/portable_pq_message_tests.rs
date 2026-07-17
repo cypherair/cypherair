@@ -1,6 +1,6 @@
-//! Portable Post-Quantum message tests (RFC 9980 — issue #567 Phase 2).
+//! Portable Post-Quantum message tests (RFC 9980).
 //! Covers the recipient matrix (PQ-only, PQ+v4, PQ+v6, PQ+PQ), the
-//! AES-256 format floor (design doc §5), and signing round-trips —
+//! AES-256 format floor, and signing round-trips —
 //! all through the engine's public module functions.
 
 mod common;

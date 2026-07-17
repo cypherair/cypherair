@@ -986,16 +986,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(reloaded.guidedTutorialCompletionState, .completedCurrentVersion)
     }
 
-    func test_protectedOrdinarySettings_guidedTutorial_previousVersionIsRecognized() {
-        var snapshot = ProtectedOrdinarySettingsSnapshot.firstRunDefaults
-        snapshot.guidedTutorialCompletedVersion = GuidedTutorialVersion.current - 1
-
-        let coordinator = makeLoadedProtectedOrdinarySettings(
-            store: InMemoryOrdinarySettingsStore(snapshot: snapshot)
-        )
-        XCTAssertEqual(coordinator.guidedTutorialCompletionState, .completedPreviousVersion)
-    }
-
     // MARK: - Factory Helpers
 
     private func makeContactKeyRecord(

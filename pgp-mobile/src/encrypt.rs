@@ -124,7 +124,7 @@ pub(crate) fn setup_signer<'a>(
             })?;
 
         // `.revoked(false)` skips a revoked signing subkey, mirroring recipient
-        // selection above (WCR-01): a cert with a live primary but a hard-revoked
+        // selection above: a cert with a live primary but a hard-revoked
         // signing subkey must not sign the message. If another live, unrevoked
         // signing key remains it is used; only when none does the
         // no-valid-signing-key error fire.
@@ -295,7 +295,7 @@ fn signer_error(context: &'static str) -> impl FnOnce(String) -> PgpError {
 /// - All v6 recipients → SEIPDv2 (AEAD OCB)
 /// - Mixed v4+v6 → SEIPDv1 (lowest common denominator)
 ///
-/// SECURITY NOTE (audit finding M1): Format auto-selection is intentionally
+/// SECURITY NOTE: Format auto-selection is intentionally
 /// delegated to Sequoia's `Encryptor`, which inspects recipient certificates'
 /// Features subpackets to determine the correct message format. This invariant
 /// is verified by packet-level assertions in `pgp-mobile/tests/cross_profile_tests.rs`
