@@ -77,7 +77,7 @@ struct SystemSecureEnclaveCustodyDigestSigner: SecureEnclaveCustodyDigestSigning
 /// CryptoKit's digest-signing entry point verbatim: `signature(for:)` over a
 /// `Digest` signs exactly these bytes as the ECDSA message representative and
 /// never re-hashes them.
-private struct SecureEnclaveP256SHA256Digest: Digest {
+struct SecureEnclaveP256SHA256Digest: Digest {
     static var byteCount: Int { 32 }
 
     private let bytes: [UInt8]

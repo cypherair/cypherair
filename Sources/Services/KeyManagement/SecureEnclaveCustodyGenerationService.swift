@@ -229,6 +229,10 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         let tierHandleStore: SecureEnclaveCustodyHandleStore?
         switch tier {
         case .classicalP256:
+            // generateKey dispatches classical tiers to the classical path
+            // before this function; reaching here is a wiring bug. Fail loudly
+            // in debug; the guard below still fails closed in release.
+            assertionFailure("Classical P-256 tier routed to composite generation")
             tierHandleStore = nil
         case .postQuantum:
             tierHandleStore = compositeHandleStore

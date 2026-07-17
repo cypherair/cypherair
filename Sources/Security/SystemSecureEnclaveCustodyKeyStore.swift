@@ -78,7 +78,14 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
                 blob = key.dataRepresentation
             }
         } catch {
-            throw SecureEnclaveCustodyHandleError.hardwareUnavailable
+            switch SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error) {
+            case .operationCancelled:
+                throw SecureEnclaveCustodyHandleError.localAuthenticationCancelled(reference.role)
+            case .authenticationFailed:
+                throw SecureEnclaveCustodyHandleError.localAuthenticationFailed(reference.role)
+            default:
+                throw SecureEnclaveCustodyHandleError.hardwareUnavailable
+            }
         }
 
         let binding = try SecureEnclaveCustodyHandlePublicBinding(

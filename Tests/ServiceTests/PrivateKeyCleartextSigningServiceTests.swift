@@ -269,37 +269,9 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
 
     private func makeSecureEnclaveRouteFixture() async throws -> SecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
-        let signingPublicKeyX963 = custodyMaterial.signingPublicKeyX963
-        let keyAgreementPublicKeyX963 = custodyMaterial.keyAgreementPublicKeyX963
-        let handleSetIdentifier = try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
-        let signingReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .signing,
-            tier: .classicalP256
-        )
-        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement,
-            tier: .classicalP256
-        )
-        let signingHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try SecureEnclaveCustodyHandlePublicBinding(
-                reference: signingReference,
-                publicKeyRaw: signingPublicKeyX963
-            ),
-            privateKey: nil
-        )
-        let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try SecureEnclaveCustodyHandlePublicBinding(
-                reference: keyAgreementReference,
-                publicKeyRaw: keyAgreementPublicKeyX963
-            ),
-            privateKey: nil
-        )
-        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: signingHandle,
-            keyAgreement: keyAgreementHandle
-        )
+        let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
+        let signingHandle = handlePair.signing
+        let keyAgreementHandle = handlePair.keyAgreement
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
         ).generatePublicCertificate(

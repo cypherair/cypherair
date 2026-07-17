@@ -142,9 +142,8 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
             data.append(Data(repeating: publicKeyCounter, count: 64))
             return data
         case .postQuantum, .postQuantumHigh:
-            let length = reference.role == .signing
-                ? reference.tier.signingPublicKeyLength
-                : reference.tier.keyAgreementPublicKeyLength
+            let lengths = reference.tier.postQuantumPublicKeyLengths!
+            let length = reference.role == .signing ? lengths.signing : lengths.keyAgreement
             return Data(repeating: publicKeyCounter, count: length)
         }
     }

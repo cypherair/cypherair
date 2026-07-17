@@ -12,23 +12,15 @@ enum SecureEnclaveCustodyTier: String, CaseIterable, Hashable, Sendable {
     /// ML-DSA-87 + ML-KEM-1024 components (Device-Bound Post-Quantum · High).
     case postQuantumHigh = "post-quantum-high"
 
-    /// Public-key byte length for this tier's signing handle: an uncompressed
-    /// X9.63 P-256 point, or the FIPS 204 ML-DSA verification key.
-    var signingPublicKeyLength: Int {
+    /// Raw public-key byte lengths for the split-custody (post-quantum) tiers'
+    /// handles: the FIPS 204 ML-DSA verification key and the FIPS 203 ML-KEM
+    /// encapsulation key. Nil for `.classicalP256`, whose handles are validated
+    /// structurally as uncompressed X9.63 points rather than by length.
+    var postQuantumPublicKeyLengths: (signing: Int, keyAgreement: Int)? {
         switch self {
-        case .classicalP256: 65
-        case .postQuantum: 1952
-        case .postQuantumHigh: 2592
-        }
-    }
-
-    /// Public-key byte length for this tier's key-agreement handle: an
-    /// uncompressed X9.63 P-256 point, or the FIPS 203 ML-KEM encapsulation key.
-    var keyAgreementPublicKeyLength: Int {
-        switch self {
-        case .classicalP256: 65
-        case .postQuantum: 1184
-        case .postQuantumHigh: 1568
+        case .classicalP256: nil
+        case .postQuantum: (signing: 1952, keyAgreement: 1184)
+        case .postQuantumHigh: (signing: 2592, keyAgreement: 1568)
         }
     }
 

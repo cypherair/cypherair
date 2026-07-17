@@ -288,7 +288,19 @@ struct SecureEnclaveCustodyHandleStore {
             }
         }
 
-        let remainingCount = (try? keyStore.inventory().totalRowCount) ?? 0
+        // The deleted count is inferred from a verification re-read; if that
+        // read fails, no deletions are verifiable, so report zero and a
+        // failure instead of inferring success from an unreadable store.
+        let remainingCount: Int
+        do {
+            remainingCount = try keyStore.inventory().totalRowCount
+        } catch {
+            return SecureEnclaveCustodyHandleCleanupResult(
+                inspectedHandleCount: inspectedCount,
+                deletedHandleCount: 0,
+                failureCategory: .cleanupOrRollbackFailure
+            )
+        }
         return SecureEnclaveCustodyHandleCleanupResult(
             inspectedHandleCount: inspectedCount,
             deletedHandleCount: max(0, inspectedCount - remainingCount),

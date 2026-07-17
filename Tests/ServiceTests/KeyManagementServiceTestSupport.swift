@@ -881,33 +881,7 @@ class KeyManagementServiceTestCase: XCTestCase {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let signingPublicKeyX963 = custodyMaterial.signingPublicKeyX963
         let keyAgreementPublicKeyX963 = custodyMaterial.keyAgreementPublicKeyX963
-        let handleSetIdentifier = try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
-        let signingReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .signing,
-            tier: .classicalP256
-        )
-        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement,
-            tier: .classicalP256
-        )
-        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: SecureEnclaveCustodyLoadedHandle(
-                binding: SecureEnclaveCustodyHandlePublicBinding(
-                    reference: signingReference,
-                    publicKeyRaw: signingPublicKeyX963
-                ),
-                privateKey: nil
-            ),
-            keyAgreement: SecureEnclaveCustodyLoadedHandle(
-                binding: SecureEnclaveCustodyHandlePublicBinding(
-                    reference: keyAgreementReference,
-                    publicKeyRaw: keyAgreementPublicKeyX963
-                ),
-                privateKey: nil
-            )
-        )
+        let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
         let adapter = PGPSecureEnclaveCustodyGenerationAdapter(engine: engine)
         let material = try await adapter.generatePublicCertificate(
             name: "Hidden Export \(configurationIdentity.rawValue)",

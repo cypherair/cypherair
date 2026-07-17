@@ -121,7 +121,7 @@ struct SoftwareP256CustodyDigestSigner: SecureEnclaveCustodyDigestSigning {
                 actual: handle.role
             )
         }
-        guard let rawDigest = SoftwareP256RawSHA256Digest(digest) else {
+        guard let rawDigest = SecureEnclaveP256SHA256Digest(digest) else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
         guard let privateKey = provider.signingKey(
@@ -178,32 +178,5 @@ struct SoftwareP256CustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement {
         return try SecureEnclaveP256RawSharedSecret(
             raw: sharedSecret.withUnsafeBytes { Data($0) }
         )
-    }
-}
-
-/// Carries a precomputed 32-byte digest into CryptoKit's digest-signing entry
-/// point, mirroring the production signer's digest wrapper.
-struct SoftwareP256RawSHA256Digest: Digest {
-    static var byteCount: Int { 32 }
-
-    private let bytes: [UInt8]
-
-    init?(_ digest: Data) {
-        guard digest.count == Self.byteCount else {
-            return nil
-        }
-        self.bytes = [UInt8](digest)
-    }
-
-    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
-        try bytes.withUnsafeBytes(body)
-    }
-
-    func makeIterator() -> Array<UInt8>.Iterator {
-        bytes.makeIterator()
-    }
-
-    var description: String {
-        "SoftwareP256RawSHA256Digest"
     }
 }

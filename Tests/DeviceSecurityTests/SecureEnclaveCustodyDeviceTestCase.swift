@@ -65,7 +65,7 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         let ecdsaSignature = try P256.Signing.ECDSASignature(
             rawRepresentation: signature.r + signature.s
         )
-        let rawDigest = try XCTUnwrap(DeviceRawSHA256Digest(digest), file: file, line: line)
+        let rawDigest = try XCTUnwrap(SecureEnclaveP256SHA256Digest(digest), file: file, line: line)
         XCTAssertTrue(
             publicKey.isValidSignature(ecdsaSignature, for: rawDigest),
             "Enclave signature failed software verification",
@@ -186,32 +186,5 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
                 completeSetCount: completeSetCount
             )
         )
-    }
-}
-
-/// Carries a precomputed 32-byte digest into CryptoKit's digest verification,
-/// mirroring the production signer's digest wrapper.
-struct DeviceRawSHA256Digest: Digest {
-    static var byteCount: Int { 32 }
-
-    private let bytes: [UInt8]
-
-    init?(_ digest: Data) {
-        guard digest.count == Self.byteCount else {
-            return nil
-        }
-        self.bytes = [UInt8](digest)
-    }
-
-    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
-        try bytes.withUnsafeBytes(body)
-    }
-
-    func makeIterator() -> Array<UInt8>.Iterator {
-        bytes.makeIterator()
-    }
-
-    var description: String {
-        "DeviceRawSHA256Digest"
     }
 }

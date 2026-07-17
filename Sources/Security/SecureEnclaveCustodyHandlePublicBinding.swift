@@ -35,11 +35,14 @@ struct SecureEnclaveCustodyHandlePublicBinding: Hashable, Sendable {
         case .classicalP256:
             return hasUncompressedP256X963PublicKeyShape(publicKeyRaw)
         case .postQuantum, .postQuantumHigh:
+            guard let lengths = tier.postQuantumPublicKeyLengths else {
+                return false
+            }
             switch role {
             case .signing:
-                return publicKeyRaw.count == tier.signingPublicKeyLength
+                return publicKeyRaw.count == lengths.signing
             case .keyAgreement:
-                return publicKeyRaw.count == tier.keyAgreementPublicKeyLength
+                return publicKeyRaw.count == lengths.keyAgreement
             }
         }
     }

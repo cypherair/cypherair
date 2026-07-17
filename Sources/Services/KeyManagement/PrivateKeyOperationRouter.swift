@@ -283,6 +283,10 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         let tierHandleStore: SecureEnclaveCustodyHandleStore?
         switch tier {
         case .classicalP256:
+            // The tier switch upstream routes classical tiers to the classical
+            // path before this function; reaching here is a wiring bug. Fail
+            // loudly in debug; the guard below still fails closed in release.
+            assertionFailure("Classical P-256 tier routed to the composite path")
             tierHandleStore = nil
         case .postQuantum:
             tierHandleStore = compositeHandleStore
