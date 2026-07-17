@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 final class ContactServicePersonModelTests: ContactServiceTestCase {
-    // MARK: - PR5 Contact Identities
+    // MARK: - Contact Identities
 
     func test_importMatcher_sameFingerprintDoesNotReturnCandidate() throws {
         var snapshot = ContactsDomainSnapshot.empty()
@@ -281,7 +281,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedImport_sameEmailDifferentFingerprintCreatesNewIdentityAndStrongCandidate() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5StrongCandidate")
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelStrongCandidate")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
@@ -320,7 +320,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedImport_sameUserIdWithoutEmailCreatesWeakCandidateAndNeverAutoLinks() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5WeakCandidate")
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelWeakCandidate")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
@@ -355,7 +355,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedSameFingerprintUpdatePreservesCanonicalIdentityAndKeyIds() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5SameFingerprintUpdate")
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelSameFingerprintUpdate")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
@@ -389,7 +389,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedMergePreservesKeyStateAndHistoricalSignerRecognition() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5MergeState")
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelMergeState")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
@@ -439,7 +439,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedMergeUnionsTags() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5MergeMembership")
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelMergeMembership")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
@@ -507,7 +507,7 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedPreferredKeySelectionPersistsAndMissingPreferredFailsClosed() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5PreferredPersistence")
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelPreferredPersistence")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
