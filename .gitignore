@@ -28,6 +28,10 @@ SQLCipher.xcframework.sha256
 SQLCipher.xcframework.zip
 SQLCipher.xcframework.release.json
 
+# App Store candidate gate verdict, written by ci_scripts/ci_post_clone.sh
+# (WF2) for the archive scheme pre-action; only ever exists on a CI machine
+.app-store-candidate-verdict.json
+
 # Claude Code local/personal config (not shared project config)
 .claude/worktrees/
 .claude/settings.local.json

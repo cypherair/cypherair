@@ -28,6 +28,7 @@ from validate_arm64e_stage1_toolchain import (  # noqa: E402
 
 
 DEFAULT_REPOSITORY = "cypherair/cypherair"
+CANDIDATE_VERDICT_SCHEMA_VERSION = 1
 ARM64E_MANIFEST_ASSET_NAME = "PgpMobile.arm64e-build-manifest.json"
 ARM64E_STATUS_RELATIVE_PATH = Path("docs/ARM64E_STATUS.md")
 ARM64E_STAGE1_PIN_RELATIVE_PATH = Path("third_party/arm64e-stage1-toolchain.pin.json")
@@ -51,6 +52,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--build-number", required=True)
     parser.add_argument("--github-repository", default=DEFAULT_REPOSITORY)
     parser.add_argument("--output-metadata-file", type=Path)
+    parser.add_argument("--emit-verdict-file", type=Path)
+    parser.add_argument("--trust-verdict-file", type=Path)
     parser.add_argument(
         "--require-stable-release",
         default=os.environ.get("SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE", "NO"),
@@ -128,6 +131,83 @@ def write_candidate_release_metadata(
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def write_candidate_verdict(
+    output_path: Path,
+    *,
+    commit_sha: str,
+    repository_full_name: str,
+    release_tag: str,
+    marketing_version: str,
+    build_number: str,
+    arm64e_release_manifest_verified: bool,
+) -> None:
+    payload = {
+        "schemaVersion": CANDIDATE_VERDICT_SCHEMA_VERSION,
+        "repository": repository_full_name,
+        "releaseTag": release_tag,
+        "commitSHA": commit_sha,
+        "marketingVersion": marketing_version,
+        "buildNumber": build_number,
+        "arm64eReleaseManifestVerified": arm64e_release_manifest_verified,
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def load_bound_candidate_verdict(
+    verdict_path: Path,
+    *,
+    repository_full_name: str,
+    release_tag: str,
+    head_sha: str,
+    marketing_version: str,
+    build_number: str,
+) -> dict[str, object] | None:
+    """Load the authenticated candidate gate's verdict and bind it to this archive.
+
+    Draft stable releases are invisible to unauthenticated release lookups, and
+    the archive pre-action runs after the Xcode Cloud post-clone hook has
+    destroyed its scoped gh credentials. The hook's authenticated validator run
+    therefore records its verdict, and the pre-action trusts it only when every
+    identity field matches this archive. Absent file: return None so callers
+    run the live release checks (the local break-glass path). A file that
+    exists but does not bind fails closed.
+    """
+    if not verdict_path.is_file():
+        return None
+    try:
+        payload = json.loads(verdict_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CandidateValidationError(
+            f"Candidate verdict file is unreadable: {verdict_path}: {error}"
+        ) from error
+    if not isinstance(payload, dict):
+        raise CandidateValidationError(
+            f"Candidate verdict file must contain a JSON object: {verdict_path}"
+        )
+
+    expected = {
+        "schemaVersion": CANDIDATE_VERDICT_SCHEMA_VERSION,
+        "repository": repository_full_name,
+        "releaseTag": release_tag,
+        "commitSHA": head_sha,
+        "marketingVersion": marketing_version,
+        "buildNumber": build_number,
+    }
+    mismatches = [
+        f"{key}: verdict {payload.get(key)!r} != expected {expected_value!r}"
+        for key, expected_value in expected.items()
+        if payload.get(key) != expected_value
+    ]
+    if mismatches:
+        raise CandidateValidationError(
+            "Candidate verdict does not bind to this archive; delete "
+            f"{verdict_path} or re-run the authenticated candidate validation.\n"
+            + "\n".join(mismatches)
+        )
+    return payload
 
 
 def run_git(repo_root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -454,6 +534,7 @@ def validate_candidate_release(
     require_stable_release: bool,
     require_arm64e_release_manifest: bool = True,
     require_sqlcipher_release_pin: bool = False,
+    trust_verdict_file: Path | None = None,
 ) -> str:
     if not require_stable_release:
         return derived_release_tag(marketing_version.strip(), build_number.strip())
@@ -499,16 +580,33 @@ def validate_candidate_release(
             f"Tracked changes:\n{details}"
         )
 
-    if not stable_release_exists(repository_full_name, release_tag):
-        raise CandidateValidationError(
-            f"Missing GitHub stable release {release_tag}. Publish the stable release before archiving an App Store candidate."
+    verdict: dict[str, object] | None = None
+    if trust_verdict_file is not None:
+        verdict = load_bound_candidate_verdict(
+            trust_verdict_file,
+            repository_full_name=repository_full_name,
+            release_tag=release_tag,
+            head_sha=head_commit_sha(repo_root),
+            marketing_version=marketing_version.strip(),
+            build_number=build_number.strip(),
         )
 
-    if require_arm64e_release_manifest:
-        validate_stable_release_arm64e_manifest(
-            repository_full_name,
-            release_tag,
-            pinned_rust_stage1_release(repo_root),
+    if verdict is None:
+        if not stable_release_exists(repository_full_name, release_tag):
+            raise CandidateValidationError(
+                f"Missing GitHub stable release {release_tag}. Publish the stable release before archiving an App Store candidate."
+            )
+
+        if require_arm64e_release_manifest:
+            validate_stable_release_arm64e_manifest(
+                repository_full_name,
+                release_tag,
+                pinned_rust_stage1_release(repo_root),
+            )
+    elif require_arm64e_release_manifest and verdict.get("arm64eReleaseManifestVerified") is not True:
+        raise CandidateValidationError(
+            "Candidate verdict was produced without arm64e release manifest verification; "
+            "re-run the authenticated candidate validation with the manifest check enabled."
         )
 
     if require_sqlcipher_release_pin:
@@ -547,6 +645,7 @@ def main() -> None:
             require_sqlcipher_release_pin=requires_stable_release(
                 args.require_sqlcipher_release_pin
             ),
+            trust_verdict_file=args.trust_verdict_file,
         )
         if stable_release_required and args.output_metadata_file is not None:
             write_candidate_release_metadata(
@@ -554,6 +653,18 @@ def main() -> None:
                 commit_sha=head_commit_sha(repo_root),
                 repository_full_name=args.github_repository,
                 release_tag=release_tag,
+            )
+        if stable_release_required and args.emit_verdict_file is not None:
+            write_candidate_verdict(
+                args.emit_verdict_file,
+                commit_sha=head_commit_sha(repo_root),
+                repository_full_name=args.github_repository,
+                release_tag=release_tag,
+                marketing_version=args.marketing_version.strip(),
+                build_number=args.build_number.strip(),
+                arm64e_release_manifest_verified=requires_stable_release(
+                    args.require_arm64e_release_manifest
+                ),
             )
     except CandidateValidationError as error:
         print(f"error: {error}", file=sys.stderr)

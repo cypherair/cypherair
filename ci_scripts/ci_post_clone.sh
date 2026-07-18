@@ -37,9 +37,32 @@ GITHUB_REPOSITORY_SLUG="${GITHUB_REPOSITORY_SLUG:-cypherair/cypherair}"
 XCFRAMEWORK_ZIP="PgpMobile.xcframework.zip"
 XCFRAMEWORK_CHECKSUM="PgpMobile.xcframework.sha256"
 ARM64E_MANIFEST="PgpMobile.arm64e-build-manifest.json"
+# Written by the authenticated WF2 candidate gate below and consumed by the
+# archive scheme pre-action, which runs after this hook's gh credentials are
+# destroyed and therefore cannot see the still-draft stable release itself.
+CANDIDATE_VERDICT_FILE=".app-store-candidate-verdict.json"
 
 log() { echo "[ci_post_clone] $*"; }
 fail() { echo "[ci_post_clone] error: $*" >&2; exit 1; }
+
+# Retry a network-dependent command. Transient GitHub API resets (connection
+# reset by peer) have killed an archive action, and three parallel platform
+# VMs make such flakes routine. Deterministic failures still fail — just after
+# the final attempt.
+NET_RETRY_ATTEMPTS="${CI_NET_RETRY_ATTEMPTS:-3}"
+retry_net() {
+    local label="$1"; shift
+    local attempt=1
+    while true; do
+        if "$@"; then return 0; fi
+        if [ "$attempt" -ge "$NET_RETRY_ATTEMPTS" ]; then
+            fail "$label failed after $NET_RETRY_ATTEMPTS attempts"
+        fi
+        log "$label failed (attempt $attempt/$NET_RETRY_ATTEMPTS); retrying in $((attempt * 10))s"
+        sleep $((attempt * 10))
+        attempt=$((attempt + 1))
+    done
+}
 
 # Xcode Cloud exports workflow secrets into the hook environment, where every
 # child process would inherit them. Capture what this script needs into an
@@ -185,7 +208,10 @@ release_consumer_workflow() {
     require_gh_auth
 
     log "WF2: downloading attested xcframework assets for $CI_TAG"
-    gh release download "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" \
+    # --clobber keeps a retry after a partial download idempotent.
+    retry_net "xcframework asset download" \
+        gh release download "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" \
+        --clobber \
         --pattern "$XCFRAMEWORK_ZIP" \
         --pattern "$XCFRAMEWORK_CHECKSUM" \
         --pattern "$ARM64E_MANIFEST"
@@ -212,8 +238,9 @@ release_consumer_workflow() {
         --marketing-version "$marketing_version" \
         --build-number "$build_number" \
         --github-repository "$GITHUB_REPOSITORY_SLUG" \
-        --require-stable-release YES
-    log "WF2: candidate gate passed"
+        --require-stable-release YES \
+        --emit-verdict-file "$PWD/$CANDIDATE_VERDICT_FILE"
+    log "WF2: candidate gate passed; verdict for the archive pre-action at $CANDIDATE_VERDICT_FILE"
 }
 
 main() {

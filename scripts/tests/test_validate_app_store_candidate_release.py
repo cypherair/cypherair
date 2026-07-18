@@ -171,6 +171,26 @@ def valid_arm64e_manifest(release_tag: str) -> dict[str, object]:
     }
 
 
+def write_bound_verdict(
+    repo_root: Path,
+    verdict_path: Path,
+    *,
+    marketing_version: str = "1.2.9",
+    build_number: str = "3",
+    arm64e_release_manifest_verified: bool = True,
+    commit_sha: str | None = None,
+) -> None:
+    module.write_candidate_verdict(
+        verdict_path,
+        commit_sha=commit_sha if commit_sha is not None else head_sha(repo_root),
+        repository_full_name="cypherair/cypherair",
+        release_tag=f"cypherair-v{marketing_version}-build{build_number}",
+        marketing_version=marketing_version,
+        build_number=build_number,
+        arm64e_release_manifest_verified=arm64e_release_manifest_verified,
+    )
+
+
 def replace_nested(payload: dict[str, object], path: tuple[str, ...], value: object) -> None:
     current = payload
     for key in path[:-1]:
@@ -348,6 +368,126 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         require_stable_release=True,
                         require_arm64e_release_manifest=False,
                     )
+
+    def test_trusted_verdict_skips_release_visibility_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            release_tag = create_annotated_stable_tag(repo_root)
+            verdict_path = Path(temp_dir_name) / "verdict.json"
+            write_bound_verdict(repo_root, verdict_path)
+            with mock.patch.object(
+                module,
+                "stable_release_exists",
+                side_effect=AssertionError("live release lookup must not run"),
+            ):
+                with mock.patch.object(
+                    module,
+                    "validate_stable_release_arm64e_manifest",
+                    side_effect=AssertionError("live manifest download must not run"),
+                ):
+                    with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                        validated_tag = module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=True,
+                            trust_verdict_file=verdict_path,
+                        )
+            self.assertEqual(validated_tag, release_tag)
+
+    def test_trust_verdict_commit_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            verdict_path = Path(temp_dir_name) / "verdict.json"
+            write_bound_verdict(repo_root, verdict_path, commit_sha="f" * 40)
+            with self.assertRaisesRegex(module.CandidateValidationError, "does not bind"):
+                module.validate_candidate_release(
+                    repo_root=repo_root,
+                    marketing_version="1.2.9",
+                    build_number="3",
+                    repository_full_name="cypherair/cypherair",
+                    require_stable_release=True,
+                    require_arm64e_release_manifest=False,
+                    trust_verdict_file=verdict_path,
+                )
+
+    def test_trust_verdict_for_different_build_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            verdict_path = Path(temp_dir_name) / "verdict.json"
+            write_bound_verdict(repo_root, verdict_path, build_number="4")
+            with self.assertRaisesRegex(module.CandidateValidationError, "does not bind"):
+                module.validate_candidate_release(
+                    repo_root=repo_root,
+                    marketing_version="1.2.9",
+                    build_number="3",
+                    repository_full_name="cypherair/cypherair",
+                    require_stable_release=True,
+                    require_arm64e_release_manifest=False,
+                    trust_verdict_file=verdict_path,
+                )
+
+    def test_trust_verdict_absent_falls_back_to_live_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            verdict_path = Path(temp_dir_name) / "missing-verdict.json"
+            with mock.patch.object(module, "stable_release_exists", return_value=False):
+                with self.assertRaisesRegex(module.CandidateValidationError, "Missing GitHub stable release"):
+                    module.validate_candidate_release(
+                        repo_root=repo_root,
+                        marketing_version="1.2.9",
+                        build_number="3",
+                        repository_full_name="cypherair/cypherair",
+                        require_stable_release=True,
+                        require_arm64e_release_manifest=False,
+                        trust_verdict_file=verdict_path,
+                    )
+
+    def test_trust_verdict_without_arm64e_verification_fails_when_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            verdict_path = Path(temp_dir_name) / "verdict.json"
+            write_bound_verdict(
+                repo_root,
+                verdict_path,
+                arm64e_release_manifest_verified=False,
+            )
+            with self.assertRaisesRegex(
+                module.CandidateValidationError,
+                "without arm64e release manifest verification",
+            ):
+                module.validate_candidate_release(
+                    repo_root=repo_root,
+                    marketing_version="1.2.9",
+                    build_number="3",
+                    repository_full_name="cypherair/cypherair",
+                    require_stable_release=True,
+                    require_arm64e_release_manifest=True,
+                    trust_verdict_file=verdict_path,
+                )
+
+    def test_trust_verdict_malformed_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            verdict_path = Path(temp_dir_name) / "verdict.json"
+            verdict_path.write_text("not json", encoding="utf-8")
+            with self.assertRaisesRegex(module.CandidateValidationError, "unreadable"):
+                module.validate_candidate_release(
+                    repo_root=repo_root,
+                    marketing_version="1.2.9",
+                    build_number="3",
+                    repository_full_name="cypherair/cypherair",
+                    require_stable_release=True,
+                    require_arm64e_release_manifest=False,
+                    trust_verdict_file=verdict_path,
+                )
 
     def test_fork_origin_tag_mismatch_does_not_override_canonical_stable_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -571,6 +711,8 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 build_number="4",
                 github_repository="cypherair/cypherair",
                 output_metadata_file=output_path,
+                emit_verdict_file=None,
+                trust_verdict_file=None,
                 require_stable_release="YES",
                 require_arm64e_release_manifest="NO",
                 require_sqlcipher_release_pin="NO",
@@ -590,6 +732,42 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 },
             )
 
+    def test_main_emits_verdict_on_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root, build_number="4")
+            verdict_path = Path(temp_dir_name) / "verdict.json"
+            args = argparse.Namespace(
+                repo_root=repo_root,
+                marketing_version="1.2.9",
+                build_number="4",
+                github_repository="cypherair/cypherair",
+                output_metadata_file=None,
+                emit_verdict_file=verdict_path,
+                trust_verdict_file=None,
+                require_stable_release="YES",
+                require_arm64e_release_manifest="NO",
+                require_sqlcipher_release_pin="NO",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args):
+                with mock.patch.object(module, "stable_release_exists", return_value=True):
+                    with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                        module.main()
+
+            self.assertEqual(
+                json.loads(verdict_path.read_text(encoding="utf-8")),
+                {
+                    "schemaVersion": module.CANDIDATE_VERDICT_SCHEMA_VERSION,
+                    "repository": "cypherair/cypherair",
+                    "releaseTag": "cypherair-v1.2.9-build4",
+                    "commitSHA": head_sha(repo_root),
+                    "marketingVersion": "1.2.9",
+                    "buildNumber": "4",
+                    "arm64eReleaseManifestVerified": False,
+                },
+            )
+
     def test_main_does_not_write_metadata_when_validation_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
@@ -601,6 +779,8 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 build_number="4",
                 github_repository="cypherair/cypherair",
                 output_metadata_file=output_path,
+                emit_verdict_file=None,
+                trust_verdict_file=None,
                 require_stable_release="YES",
                 require_arm64e_release_manifest="NO",
                 require_sqlcipher_release_pin="NO",
