@@ -25,13 +25,6 @@ Ineligible destinations for the "CypherAir" scheme:
 """
 
 
-MACOS_READY_DESTINATIONS = """\
-Available destinations for the "CypherAir" scheme:
-    { platform:macOS, arch:arm64e, id:00008142-001C31D02609401C, name:My Mac }
-    { platform:macOS, name:Any Mac }
-"""
-
-
 AVAILABLE_RUNTIMES = {
     "runtimes": [
         {
@@ -143,107 +136,6 @@ Available destinations for the "CypherAir" scheme:
         self.assertEqual(result.outputs["ready"], "false")
         self.assertIn("iOS 26.5 simulator runtime is not available", result.outputs["skip_reason"])
         self.assertIn("platform probes are required", result.combined_output)
-
-    def test_macos_unit_ready_when_host_and_destination_are_available(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations=MACOS_READY_DESTINATIONS,
-        )
-
-        self.assertEqual(result.process.returncode, 0, result.combined_output)
-        self.assertEqual(result.outputs["ready"], "true")
-        self.assertEqual(result.outputs["skip_reason"], "")
-        self.assertIn("Hosted Swift unit tests are ready", result.process.stdout)
-
-    def test_macos_unit_accepts_arm64e_host_destination(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations="""\
-Available destinations for the "CypherAir" scheme:
-    { platform:macOS, arch:arm64e, id:00008142-001C31D02609401C, name:My Mac }
-""",
-        )
-
-        self.assertEqual(result.process.returncode, 0, result.combined_output)
-        self.assertEqual(result.outputs["ready"], "true")
-
-    def test_macos_unit_rejects_arm64_only_host_destination(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations="""\
-Available destinations for the "CypherAir" scheme:
-    { platform:macOS, arch:arm64, id:00008142-001C31D02609401C, name:My Mac }
-""",
-        )
-
-        self.assertEqual(result.process.returncode, 1, result.combined_output)
-        self.assertNotIn("ready", result.outputs)
-        self.assertIn("macOS arm64e test destination is not eligible", result.combined_output)
-
-    def test_macos_unit_host_below_deployment_target_is_skippable(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations=MACOS_READY_DESTINATIONS,
-            host_macos_version="26.4",
-        )
-
-        self.assertEqual(result.process.returncode, 0, result.combined_output)
-        self.assertEqual(result.outputs["ready"], "false")
-        self.assertIn(
-            "host macOS is 26.4, below MACOSX_DEPLOYMENT_TARGET 26.5",
-            result.outputs["skip_reason"],
-        )
-        self.assertIn("Skipping hosted Swift unit tests", result.combined_output)
-
-    def test_macos_unit_xcode_and_sdk_mismatch_are_skippable(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations=MACOS_READY_DESTINATIONS,
-            xcode_version="26.4.1",
-            macosx_version="26.4",
-        )
-
-        self.assertEqual(result.process.returncode, 0, result.combined_output)
-        self.assertEqual(result.outputs["ready"], "false")
-        self.assertIn("selected Xcode is 26.4.1, not 26.5", result.outputs["skip_reason"])
-        self.assertIn("macosx SDK is 26.4, not 26.5", result.outputs["skip_reason"])
-
-    def test_macos_unit_missing_destination_is_blocking(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations="""\
-Available destinations for the "CypherAir" scheme:
-    { platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
-""",
-        )
-
-        self.assertEqual(result.process.returncode, 1, result.combined_output)
-        self.assertNotIn("ready", result.outputs)
-        self.assertIn("macOS arm64e test destination is not eligible", result.combined_output)
-
-    def test_macos_unit_showdestinations_failure_is_blocking(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight"],
-            destinations="xcodebuild: error: Scheme CypherAir is not configured for this project.\n",
-            destinations_status=65,
-        )
-
-        self.assertEqual(result.process.returncode, 1, result.combined_output)
-        self.assertNotIn("ready", result.outputs)
-        self.assertIn("::error::", result.combined_output)
-        self.assertIn("xcodebuild -showdestinations failed", result.combined_output)
-
-    def test_macos_unit_strict_environment_mismatch_fails(self) -> None:
-        result = self.run_preflight(
-            args=["macos-unit-test-preflight", "--strict"],
-            destinations=MACOS_READY_DESTINATIONS,
-            host_macos_version="26.4",
-        )
-
-        self.assertEqual(result.process.returncode, 1, result.combined_output)
-        self.assertEqual(result.outputs["ready"], "false")
-        self.assertIn("host macOS is 26.4", result.outputs["skip_reason"])
-        self.assertIn("Hosted Swift unit tests are required", result.combined_output)
 
     def run_preflight(
         self,

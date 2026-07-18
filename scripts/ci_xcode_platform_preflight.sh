@@ -6,25 +6,22 @@ usage() {
 Usage:
   scripts/ci_xcode_platform_preflight.sh select
   scripts/ci_xcode_platform_preflight.sh preflight [--strict]
-  scripts/ci_xcode_platform_preflight.sh macos-unit-test-preflight [--strict]
 
 select writes DEVELOPER_DIR using the same Xcode candidate order as the
 GitHub Actions workflows. preflight also checks whether the selected Xcode is
 ready to run the iOS and visionOS generic app build probes.
-macos-unit-test-preflight checks whether the hosted runner is ready to run the
-macOS Swift unit-test preview.
 EOF
 }
 
 mode="${1:-}"
 strict="false"
 
-if [ "$mode" != "select" ] && [ "$mode" != "preflight" ] && [ "$mode" != "macos-unit-test-preflight" ]; then
+if [ "$mode" != "select" ] && [ "$mode" != "preflight" ]; then
   usage
   exit 2
 fi
 
-if [ "$mode" = "preflight" ] || [ "$mode" = "macos-unit-test-preflight" ]; then
+if [ "$mode" = "preflight" ]; then
   if [ $# -eq 2 ] && [ "${2:-}" = "--strict" ]; then
     strict="true"
   elif [ $# -ne 1 ]; then
@@ -145,53 +142,6 @@ sdk_version() {
   local sdk="$1"
 
   DEVELOPER_DIR="$DEVELOPER_DIR" xcrun --sdk "$sdk" --show-sdk-version 2>/dev/null || true
-}
-
-version_at_least() {
-  local actual="$1"
-  local minimum="$2"
-
-  python3 -c '
-import re
-import sys
-
-def parts(version):
-    values = []
-    for part in version.split("."):
-        match = re.match(r"^([0-9]+)", part)
-        if not match:
-            raise ValueError(version)
-        values.append(int(match.group(1)))
-    return values
-
-try:
-    actual = parts(sys.argv[1])
-    minimum = parts(sys.argv[2])
-except Exception:
-    sys.exit(1)
-
-width = max(len(actual), len(minimum))
-actual.extend([0] * (width - len(actual)))
-minimum.extend([0] * (width - len(minimum)))
-sys.exit(0 if actual >= minimum else 1)
-' "$actual" "$minimum"
-}
-
-project_build_setting() {
-  local setting="$1"
-  local output_file
-
-  output_file="$(mktemp "${TMPDIR:-/tmp}/cypherair-build-settings.XXXXXX")"
-  if ! DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -showBuildSettings \
-      -scheme CypherAir \
-      -project CypherAir.xcodeproj \
-      > "$output_file" 2>&1; then
-    rm -f "$output_file"
-    return 1
-  fi
-
-  sed -n "s/^[[:space:]]*${setting} = //p" "$output_file" | head -n1
-  rm -f "$output_file"
 }
 
 show_destinations() {
@@ -325,64 +275,6 @@ check_platform_readiness() {
   return 0
 }
 
-check_macos_unit_test_readiness() {
-  local blocking_failures="" skippable_failures=""
-  local xcode_version macosx_version host_macos_version project_macos_target destinations_file
-  local destinations_status
-
-  xcode_version="$(DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -version 2>/dev/null | sed -n 's/^Xcode //p' | head -n1)"
-  case "$xcode_version" in
-    "$required_version"|"$required_version".*) ;;
-    *)
-      record_failure skippable_failures "selected Xcode is ${xcode_version:-unknown}, not $required_version"
-      ;;
-  esac
-
-  macosx_version="$(sdk_version macosx)"
-  if [ "$macosx_version" != "$required_sdk_version" ]; then
-    record_failure skippable_failures "macosx SDK is ${macosx_version:-missing}, not $required_sdk_version"
-  fi
-
-  host_macos_version="$(sw_vers -productVersion 2>/dev/null || true)"
-  if ! project_macos_target="$(project_build_setting MACOSX_DEPLOYMENT_TARGET)"; then
-    record_failure blocking_failures "xcodebuild -showBuildSettings failed"
-  elif [ -z "$project_macos_target" ]; then
-    record_failure blocking_failures "MACOSX_DEPLOYMENT_TARGET is missing"
-  elif ! version_at_least "$host_macos_version" "$project_macos_target"; then
-    record_failure skippable_failures "host macOS is ${host_macos_version:-unknown}, below MACOSX_DEPLOYMENT_TARGET $project_macos_target"
-  fi
-
-  destinations_file="$(mktemp "${TMPDIR:-/tmp}/cypherair-destinations.XXXXXX")"
-  if show_destinations "$destinations_file"; then
-    destinations_status=0
-  else
-    destinations_status=$?
-  fi
-
-  if [ "$destinations_status" -ne 0 ]; then
-    record_failure blocking_failures "xcodebuild -showdestinations failed"
-  elif ! grep -Eq "platform:macOS.*arch:arm64e" "$destinations_file"; then
-    record_failure blocking_failures "macOS arm64e test destination is not eligible"
-  fi
-
-  rm -f "$destinations_file"
-
-  if [ -n "$blocking_failures" ]; then
-    printf '%s\n' "$blocking_failures"
-    if [ -n "$skippable_failures" ]; then
-      printf '%s\n' "$skippable_failures"
-    fi
-    return 2
-  fi
-
-  if [ -n "$skippable_failures" ]; then
-    printf '%s\n' "$skippable_failures"
-    return 1
-  fi
-
-  return 0
-}
-
 failure_summary() {
   awk 'NF { sub(/^- /, ""); printf "%s%s", sep, $0; sep="; " }'
 }
@@ -420,14 +312,6 @@ case "$mode" in
     required_message="Xcode $required_version platform probes are required but this runner is not ready"
     blocking_message="Xcode $required_version platform probe preflight failed due to project configuration"
     readiness_failures="$(check_platform_readiness)" || readiness_status=$?
-    ;;
-  macos-unit-test-preflight)
-    readiness_title="Hosted Swift Unit Test Readiness"
-    ready_message="Hosted Swift unit tests are ready."
-    warning_message="Skipping hosted Swift unit tests because this runner is not ready"
-    required_message="Hosted Swift unit tests are required but this runner is not ready"
-    blocking_message="Hosted Swift unit-test preflight failed due to project configuration"
-    readiness_failures="$(check_macos_unit_test_readiness)" || readiness_status=$?
     ;;
 esac
 
