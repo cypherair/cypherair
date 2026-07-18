@@ -4,5 +4,5 @@ description: Per-stage adversarial verification for multi-stage campaign work. U
 ---
 
 Have a fresh-context subagent adversarially verify each completed stage
-against the governing spec, and resolve its findings. Record verdicts in the
-campaign worklog.
+against the governing spec, and resolve its findings. Open any PR or PRs
+before the verification runs. Record verdicts in the campaign worklog.
