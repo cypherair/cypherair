@@ -17,7 +17,7 @@ env:
 
 jobs:
   rust-dependency-audit:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -35,7 +35,7 @@ jobs:
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
   rust-full-tests:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -71,7 +71,7 @@ jobs:
     # Job key kept as rust-gnupg-interop (branch protection may pin the check
     # name); the display name covers both cross-tool interop lanes.
     name: Rust cross-tool interop (GnuPG + sq)
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -101,7 +101,7 @@ jobs:
 
   xcframework-package:
     needs: rust-full-tests
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -148,7 +148,7 @@ jobs:
 
   apple-platform-probes:
     needs: xcframework-package
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -197,7 +197,7 @@ jobs:
 
   swift-unit-tests-hosted-preview:
     needs: xcframework-package
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
