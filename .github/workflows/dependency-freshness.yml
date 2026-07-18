@@ -1,0 +1,34 @@
+name: Dependency Freshness Report
+
+# On-demand drift visibility for machine-consumed dependencies (tracker #674,
+# lane 6). Run manually from the Actions tab when a freshness check is wanted;
+# there is deliberately no schedule. The report never modifies a pin, never
+# opens issues, and never fails: scripts/report_dependency_freshness.py always
+# exits 0. Exact pins are updated exclusively through their owning lanes
+# (repin-arm64e, the fork-release repin flow, tracker dependency PRs).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness-report:
+    name: On-demand dependency freshness report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Generate dependency freshness report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/report_dependency_freshness.py | tee freshness-report.txt
+          {
+            echo '## Dependency freshness'
+            echo '```'
+            cat freshness-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

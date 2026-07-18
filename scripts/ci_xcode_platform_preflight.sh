@@ -36,12 +36,13 @@ elif [ $# -ne 1 ]; then
   exit 2
 fi
 
-required_version="${XCODE_PLATFORM_REQUIRED_VERSION:-26.6}"
+required_version="${XCODE_PLATFORM_REQUIRED_VERSION:-27.0}"
 required_xcode_path="/Applications/Xcode_${required_version}.app/Contents/Developer"
-# Xcode 26.6 is an IDE-only update: it ships the 26.5 SDKs and simulator
-# runtimes, so the SDK/runtime expectation is pinned independently of the
-# Xcode release that hosts it.
-required_sdk_version="${XCODE_PLATFORM_REQUIRED_SDK_VERSION:-26.5}"
+# The hosted xcode-27 image ships Xcode 27.0 beta with the matching 27.0 SDKs
+# and simulator runtimes. The SDK/runtime expectation stays pinned separately
+# from the Xcode release that hosts it (IDE-only Xcode updates keep the prior
+# SDK set, as Xcode 26.6/26.5 did).
+required_sdk_version="${XCODE_PLATFORM_REQUIRED_SDK_VERSION:-27.0}"
 
 github_env_set() {
   local name="$1"
@@ -85,8 +86,11 @@ end_group() {
 select_xcode() {
   local selected_developer_dir=""
 
-  if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
-    selected_developer_dir="${XCODE_26_DEVELOPER_DIR}"
+  # Hosted images export XCODE_<major>_DEVELOPER_DIR only for stable Xcode
+  # releases; on the xcode-27 beta preview image no such variable exists and
+  # selection falls through to the pinned /Applications/Xcode_27.0.app symlink.
+  if [ -n "${XCODE_27_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_27_DEVELOPER_DIR}" ]; then
+    selected_developer_dir="${XCODE_27_DEVELOPER_DIR}"
   elif [ -d "$required_xcode_path" ]; then
     selected_developer_dir="$required_xcode_path"
   else

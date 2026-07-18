@@ -25,7 +25,7 @@ env:
 
 jobs:
   rust-dependency-audit:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -44,7 +44,7 @@ jobs:
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
   build-edge-release-assets:
-    runs-on: macos-26
+    runs-on: xcode-27
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       release_title: ${{ steps.resolve.outputs.release_title }}
@@ -359,7 +359,7 @@ jobs:
     needs:
       - rust-dependency-audit
       - build-edge-release-assets
-    runs-on: macos-26
+    runs-on: xcode-27
     permissions:
       contents: write
       id-token: write
@@ -395,7 +395,7 @@ jobs:
           shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
 
       - name: Generate artifact attestation
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
           subject-path: |
             ${{ env.XCFRAMEWORK_ZIP }}

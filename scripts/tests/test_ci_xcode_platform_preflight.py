@@ -366,8 +366,9 @@ exit 64
             env.update(
                 {
                     "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
-                    "XCODE_26_DEVELOPER_DIR": str(developer_dir),
+                    "XCODE_27_DEVELOPER_DIR": str(developer_dir),
                     "XCODE_PLATFORM_REQUIRED_VERSION": "26.5",
+                    "XCODE_PLATFORM_REQUIRED_SDK_VERSION": "26.5",
                     "FAKE_DESTINATIONS_FILE": str(destinations_file),
                     "FAKE_DESTINATIONS_STATUS": str(destinations_status),
                     "FAKE_RUNTIMES_JSON": json.dumps(runtimes or AVAILABLE_RUNTIMES),
