@@ -44,6 +44,26 @@ done
 
 log() { echo "[restore_sqlcipher_xcframework] $*"; }
 
+# Retry a network-dependent command. Transient GitHub API resets (connection
+# reset by peer) have killed a release archive action mid-verification, and
+# parallel CI machines make such flakes routine. Deterministic failures (bad
+# pin, failed attestation) still fail — just after the final attempt.
+NET_RETRY_ATTEMPTS="${SQLCIPHER_RESTORE_NET_ATTEMPTS:-3}"
+retry_net() {
+    local label="$1"; shift
+    local attempt=1
+    while true; do
+        if "$@"; then return 0; fi
+        if [ "$attempt" -ge "$NET_RETRY_ATTEMPTS" ]; then
+            echo "error: $label failed after $NET_RETRY_ATTEMPTS attempts" >&2
+            exit 1
+        fi
+        log "$label failed (attempt $attempt/$NET_RETRY_ATTEMPTS); retrying in $((attempt * 10))s"
+        sleep $((attempt * 10))
+        attempt=$((attempt + 1))
+    done
+}
+
 pin_value() {
     local path="$1"
     python3 - "$PIN_FILE" "$path" <<'PY'
@@ -161,7 +181,8 @@ copy_or_download_asset() {
         }
         cp "$source_path" "$WORK_DIR/$asset"
     else
-        curl -fL --proto '=https' --tlsv1.2 \
+        retry_net "download of $asset" \
+            curl -fL --proto '=https' --tlsv1.2 \
             -o "$WORK_DIR/$asset" \
             "$RELEASE_BASE_URL/$asset"
     fi
@@ -189,12 +210,20 @@ verify_asset_size() {
     fi
 }
 
+fetch_release_metadata() {
+    gh release view "$RELEASE_TAG" -R "$RELEASE_REPOSITORY" \
+        --json tagName,isDraft,isPrerelease,isImmutable,targetCommitish,url \
+        > "$1"
+}
+
+gh_release_verify() {
+    gh release verify "$RELEASE_TAG" -R "$RELEASE_REPOSITORY" >/dev/null
+}
+
 verify_release_integrity() {
     local release_json
     release_json="$(mktemp)"
-    gh release view "$RELEASE_TAG" -R "$RELEASE_REPOSITORY" \
-        --json tagName,isDraft,isPrerelease,isImmutable,targetCommitish,url \
-        > "$release_json"
+    retry_net "SQLCipher release metadata fetch" fetch_release_metadata "$release_json"
     python3 - "$release_json" "$RELEASE_TAG" "$RELEASE_COMMIT" <<'PY'
 import json
 import sys
@@ -218,21 +247,29 @@ if errors:
     raise SystemExit("error: " + "; ".join(errors))
 PY
     rm -f "$release_json"
-    gh release verify "$RELEASE_TAG" -R "$RELEASE_REPOSITORY" >/dev/null
+    retry_net "SQLCipher release tag verification" gh_release_verify
 }
 
-verify_attestation() {
-    local asset="$1"
+gh_verify_release_asset() {
     (
         cd "$WORK_DIR"
-        gh release verify-asset "$RELEASE_TAG" "$asset" -R "$RELEASE_REPOSITORY" >/dev/null
+        gh release verify-asset "$RELEASE_TAG" "$1" -R "$RELEASE_REPOSITORY" >/dev/null
     )
-    gh attestation verify "$WORK_DIR/$asset" \
+}
+
+gh_verify_asset_attestation() {
+    gh attestation verify "$WORK_DIR/$1" \
         -R "$RELEASE_REPOSITORY" \
         --signer-workflow "$RELEASE_SIGNER_WORKFLOW" \
         --source-ref "$RELEASE_SOURCE_REF" \
         --source-digest "$RELEASE_COMMIT" \
         --deny-self-hosted-runners >/dev/null
+}
+
+verify_attestation() {
+    local asset="$1"
+    retry_net "SQLCipher release asset verification of $asset" gh_verify_release_asset "$asset"
+    retry_net "SQLCipher attestation verification of $asset" gh_verify_asset_attestation "$asset"
 }
 
 # The zip's sha256 is pinned, but extraction still runs with full filesystem
