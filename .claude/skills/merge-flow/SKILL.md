@@ -14,9 +14,9 @@ Safe to delegate to a cheaper sub-agent — every step is mechanical.
 3. If the branch lived in a `.claude/worktrees/` checkout, remove the
    worktree.
 4. Sync local `main` (`git checkout main && git pull --ff-only`).
-5. Post the merge note naming the merging model (e.g. "Merged by Claude
-   (Fable 5)") as a PR comment or description edit — mandatory for agent
-   merges under the CLAUDE.md policy.
+5. Post the merge note naming the merging model (e.g. "Merged-By:
+   Claude Fable 5") as a PR comment or description edit — mandatory for
+   agent merges under the CLAUDE.md policy.
 6. Update or close the linked issue as instructed (progress comment or close).
 
 **Verify:** `gh pr view <N>` shows MERGED; `git status` is clean;
