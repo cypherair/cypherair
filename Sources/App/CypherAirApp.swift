@@ -46,8 +46,21 @@ struct CypherAirApp: App {
         #else
         container = AppContainer.makeDefault()
         #endif
-        if launchConfiguration.usesUITestAppContainer && !launchConfiguration.requiresManualAuthentication {
-            container.appSessionOrchestrator.recordAuthentication()
+        if launchConfiguration.usesUITestAppContainer {
+            if !launchConfiguration.requiresManualAuthentication {
+                container.appSessionOrchestrator.recordAuthentication()
+            } else if launchConfiguration.manualAuthStartsUnlocked {
+                // UI-test seam (DEBUG-only via AppLaunchConfiguration's
+                // release kill switch): boot the manual-auth container
+                // already unlocked so MacUITests can drive a REAL lock
+                // transition — and assert the lock shield's coverage —
+                // without a human biometric at launch. Reuses the existing
+                // controller hook that settles `.unlocked` and marks the
+                // away epoch handled; auth bypass stays OFF, so any
+                // subsequent unlock still requires real authentication.
+                container.appLockController.resetAfterLocalDataReset(preserveAuthentication: true)
+                container.appSessionOrchestrator.recordAuthentication()
+            }
         }
         if launchConfiguration.shouldSkipOnboarding {
             container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)
@@ -344,11 +357,11 @@ struct CypherAirApp: App {
                         await prepareUITestContactsIfNeeded()
                     }
                     .cosmeticPrivacyCover(isCovered: container.appLockController.isCosmeticallyCovered)
-                    .overlay {
-                        if container.appLockController.isLocked {
-                            AppLockSurfaceView(appLockController: container.appLockController)
-                        }
-                    }
+                    // The lock surface lives in a shield window layered above
+                    // the whole presentation stack (sheets, covers, macOS
+                    // window-modal sheets), not in an in-scene overlay that
+                    // presentations would render above. See issue #697.
+                    .appLockShieldWindow(appLockController: container.appLockController)
                     .appLifecycleObserver(
                         appLockController: container.appLockController
                     )

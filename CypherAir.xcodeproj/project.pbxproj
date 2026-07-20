@@ -71,6 +71,7 @@
 				App/AppShellComposition.swift,
 				App/AppStartupCoordinator.swift,
 				App/Shell/AppLifecycleObserver.swift,
+				App/Shell/AppLockShieldWindow.swift,
 				App/Shell/AppLockSurfaceView.swift,
 				App/Shell/AppProductIdentity.swift,
 				App/FileIO/AppTemporaryArtifact.swift,
