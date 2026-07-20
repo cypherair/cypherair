@@ -83,7 +83,7 @@ Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, an
 
 ## Security-Sensitive Code — Edit, Then Explain
 
-You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description, and receives human review before merge (docs/WORKFLOW.md). The authoritative security-critical file list, per-file rationale, and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care, and the maintainer reviews and merges (docs/WORKFLOW.md §3). The authoritative security-critical file list, per-file rationale, and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
 
 ## Encryption Profiles & Authentication Modes
 
@@ -109,14 +109,15 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 ## Releases & Versioning
 
-- Stable releases are tag-first per docs/RELEASE.md; never treat `workflow_dispatch` alone as a substitute for the stable tag. Ask before publishing any release or tag.
-- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of preparing a release — read the current values, choose the next pair, and commit them (docs/RELEASE.md §1). Confirm the intended version with the maintainer before creating the release tag, since publishing is outward-facing.
+- Stable releases are tag-first per docs/RELEASE.md; never treat `workflow_dispatch` alone as a substitute for the stable tag.
+- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of preparing a release — read the current values, choose the next pair, and commit them (docs/RELEASE.md §1). Releases are maintainer-initiated; confirm the intended version pair while preparing one.
 
 ## Git & Workflow
 
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
 - Prefer the architecturally-correct solution over the smallest patch — this sets the *depth* of a change, not its *scope*. See docs/WORKFLOW.md "The development loop".
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
-- Work on a topic branch and submit a PR; do not commit directly to `main` unless the user explicitly asks. Prefer regular merge commits over squash or rebase merges.
+- Changes land through PRs; the session manages branches, worktrees, and delegation itself (topic branch, topic worktree, or a delegated agent worktree — its call). Do not commit directly to `main` unless the maintainer explicitly asks. Prefer regular merge commits over squash or rebase merges.
+- A PR's verification is its stage-verify (docs/WORKFLOW.md §1–2; the validation lanes pass as part of it). Once it has passed and both the authoring agent and the merging session hold high confidence, the PR may be merged without waiting for the maintainer; every agent merge leaves a note naming the merging model (e.g. "Merged by Claude (Fable 5)"). Security-critical changes (docs/SECURITY.md §10) and the governance documents themselves (CLAUDE.md, AGENTS.md, docs/WORKFLOW.md) are always reviewed and merged by the maintainer.
 - Commits are SSH-signed and use conventional prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). If the agent has no signing identity, run `ssh-add --apple-load-keychain` and retry; never create an unsigned commit.
 - Do not run destructive git operations (checkout, reset, restore) on project files (`*.pbxproj`, `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user approval — they are difficult to reconstruct if lost.
