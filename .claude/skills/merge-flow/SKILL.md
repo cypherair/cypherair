@@ -1,6 +1,6 @@
 ---
 name: merge-flow
-description: Merge an approved PR and fully close it out — branch/worktree cleanup, main sync, clean-workspace check, linked-issue update. Use when the maintainer says to merge a PR, or when merging under the agent-merge policy (CLAUDE.md Git & Workflow — verification passed, high confidence held by both author and merger; security-critical and governance changes stay with the maintainer).
+description: Merge an approved PR and fully close it out — branch/worktree cleanup, main sync, clean-workspace check, linked-issue update. Use when the maintainer says to merge a PR, or when merging under the agent-merge policy (CLAUDE.md Git & Workflow — verification passed, high confidence held by both the authoring agent and the main session; security-critical and governance changes stay with the maintainer).
 ---
 
 Safe to delegate to a cheaper sub-agent — every step is mechanical.
