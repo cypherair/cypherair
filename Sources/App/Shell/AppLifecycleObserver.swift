@@ -15,12 +15,9 @@ import AppKit
 ///   away event — this is how grace=0 "no double-auth" holds structurally.
 /// - macOS: away = app-resign ∪ screen-lock ∪ explicit "Lock Now", filtered by the
 ///   controller's `.authenticating` rule: a resign during an in-flight
-///   system-sheet app-session evaluation (the Standard-mode password path) or the
-///   post-auth fan-out is the auth sheet's own; a resign during the EMBEDDED
-///   in-window evaluation (issue #724) is a real app switch and processes as a
-///   genuine away; and a resign during a private-key operation prompt is deferred
-///   and decided when the prompts end. The observer stays signal-only — every
-///   resign is still routed; the controller decides.
+///   app-session unlock is the auth sheet's own, and a resign during a private-key
+///   operation prompt is deferred and decided when the prompts end. The observer
+///   stays signal-only — every resign is still routed; the controller decides.
 struct AppLifecycleObserverModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     let appLockController: AppLockController

@@ -344,7 +344,6 @@
 				Security/ProtectedData/Registry/ProtectedDataRegistryStore.swift,
 				Security/ProtectedData/Session/AppLockController.swift,
 				Security/ProtectedData/Session/AppSessionOrchestrator.swift,
-				Security/ProtectedData/Session/AppSessionUnlockPresenter.swift,
 				Security/ProtectedData/Session/ProtectedDataPostUnlockCoordinator.swift,
 				Security/ProtectedData/Session/ProtectedDataRelockParticipant.swift,
 				Security/ProtectedData/Session/ProtectedDataRootSecretCoordinator.swift,
@@ -917,7 +916,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15401;
+				CURRENT_PROJECT_VERSION = 15402;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1144,7 +1143,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15401;
+				CURRENT_PROJECT_VERSION = 15402;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1291,7 +1290,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15401;
+				CURRENT_PROJECT_VERSION = 15402;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
