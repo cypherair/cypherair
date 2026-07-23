@@ -296,6 +296,44 @@ final class AppSessionUnlockPresenterTests: XCTestCase {
         XCTAssertNil(fixture.presenter.presentedEmbeddedContext)
     }
 
+    func test_genuineAwayCancellation_clearsPendingPasswordRequest() async throws {
+        // A "Use Password…" click racing a genuine away: the away's
+        // cancellation must clear the one-shot request so the attempt
+        // rethrows into the controller's stale path instead of presenting a
+        // system sheet while another app is frontmost.
+        let fixture = Fixture()
+        fixture.embedded.pause = true
+        let embeddedStarted = expectation(description: "embedded evaluation started")
+        fixture.embedded.onSuspended = { embeddedStarted.fulfill() }
+
+        let driver = AttemptDriver(fixture.presenter)
+        try await waitUntil("the embedded context publication") {
+            fixture.presenter.presentedEmbeddedContext != nil
+        }
+        let context = try XCTUnwrap(fixture.presenter.presentedEmbeddedContext)
+        fixture.presenter.embeddedAuthenticationViewDidMount(for: context)
+        await fulfillment(of: [embeddedStarted], timeout: 2)
+
+        // The user clicks "Use Password…" …
+        fixture.presenter.requestPasswordUnlock()
+        // …and a genuine away lands before the pending evaluation settles:
+        // the controller cancels through the seam, which clears the request.
+        XCTAssertTrue(fixture.presenter.cancelEmbeddedEvaluationIfInFlight())
+
+        fixture.embedded.outcome = .failure(AuthenticationError.cancelled)
+        fixture.embedded.resume()
+
+        let outcome = try await driver.settledOutcome()
+        if case .success = outcome {
+            XCTFail("Expected the cancelled attempt to rethrow.")
+        }
+        XCTAssertEqual(
+            fixture.password.invocationCount,
+            0,
+            "The cleared request must not present the detached sheet."
+        )
+    }
+
     // MARK: - Availability refresh
 
     func test_availabilityRefreshes_atAttemptBoundaries() async {

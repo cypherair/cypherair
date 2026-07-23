@@ -47,11 +47,16 @@ import AppKit
 //   for #720), so the elevated level is applied only AFTER attachment.
 //   Because AppKit window levels are global across apps, the shield drops
 //   back to `.normal` on a REAL app switch so it can never float above other
-//   apps' windows. An app-resign caused by the lock surface's own unlock
-//   prompt is NOT a real app switch: the shield holds its elevated level
-//   while `AppLockController.isAuthenticating` spans the attempt, and drops
-//   to `.normal` only if the attempt ends unresolved with the app still
-//   inactive. At `.normal` an attached sheet still beats the shield, so while
+//   apps' windows. An app-resign caused by a SYSTEM-SHEET evaluation the
+//   lock flow itself is driving (the Standard-mode "Use Password…" leg of
+//   the #724 in-window unlock) is NOT a real app switch: the shield holds
+//   its elevated level while `AppLockController.isAuthenticating` spans the
+//   attempt, and drops to `.normal` only if the attempt ends unresolved with
+//   the app still inactive. The EMBEDDED in-window evaluation (#724) resigns
+//   nothing — a resign during it is a genuine away, which cancels the
+//   attempt and ends `.authenticating`, so the elevated exception cannot pin
+//   the level while another app is frontmost beyond the cancellation
+//   settling. At `.normal` an attached sheet still beats the shield, so while
 //   the shield is presented every window in the host's attached-sheet chain
 //   additionally carries an opaque cover CHILD OF THE SHEET at the sheet's
 //   own level, which does order above it (probed for #723) — that is what
@@ -464,16 +469,21 @@ final class AppLockShieldWindowCoordinator {
 
     /// The activation-level policy, kept pure so it is unit-testable.
     /// Elevated while the app is active — the case the #697 invariant is
-    /// about — and while an app-session unlock attempt is in flight:
-    /// LocalAuthentication's prompt resigns the app (the exact resign
+    /// about — and while an app-session unlock attempt is in flight. The
+    /// in-flight exception exists for the SYSTEM-SHEET evaluation (the
+    /// Standard-mode "Use Password…" leg of the #724 in-window unlock):
+    /// that detached prompt resigns the app (the exact resign
     /// `AppLockController.handleAwayEvent`'s `.authenticating` rule treats as
     /// the auth sheet's own), and a `.normal`-level child window falls behind
     /// an attached sheet (probed for #697) — dropping on that resign would
-    /// expose the covered sheet for the whole prompt. Only a real app switch
-    /// — inactive with no unlock in flight — drops to `.normal`, preserving
-    /// the recorded deviation that the shield never floats above other apps'
-    /// windows. (At `.normal` the attached-sheet chain is covered by the
-    /// per-sheet cover children instead.)
+    /// expose the covered sheet for the whole prompt. The EMBEDDED in-window
+    /// evaluation (#724) resigns nothing; a resign during it is a genuine
+    /// away that cancels the attempt and ends `.authenticating`, so this
+    /// exception holds only for the cancellation-settling moment there. Only
+    /// a real app switch — inactive with no unlock in flight — drops to
+    /// `.normal`, preserving the recorded deviation that the shield never
+    /// floats above other apps' windows. (At `.normal` the attached-sheet
+    /// chain is covered by the per-sheet cover children instead.)
     static func shieldLevel(appIsActive: Bool, isUnlockAuthenticationInFlight: Bool) -> NSWindow.Level {
         appIsActive || isUnlockAuthenticationInFlight ? activeShieldLevel : .normal
     }

@@ -202,16 +202,21 @@ struct AppLockSurfaceView: View {
     /// an embedded attempt the request cancels the pending evaluation and the
     /// in-flight attempt continues on the sheet (`retryUnlock` no-ops on
     /// `.authenticating`); from a settled state it starts a fresh attempt
-    /// that consumes the request. The `isLocked` re-check closes the race
-    /// where the click lands in the same instant an attempt unlocks.
+    /// that consumes the request. The request is made INSIDE the `isLocked`
+    /// re-check (both on the main actor, so the check and the request are one
+    /// atomic slice): a click landing after the attempt already unlocked
+    /// must set nothing — a leaked one-shot request would auto-pop the
+    /// system sheet on some FUTURE attempt, violating the
+    /// sheet-only-on-explicit-action decision.
     @ViewBuilder
     private func passwordUnlockButton(prominent: Bool) -> some View {
         let button = Button {
-            unlockPresenter?.requestPasswordUnlock()
             Task {
-                if appLockController.isLocked {
-                    await appLockController.retryUnlock(source: "usePassword")
+                guard appLockController.isLocked else {
+                    return
                 }
+                unlockPresenter?.requestPasswordUnlock()
+                await appLockController.retryUnlock(source: "usePassword")
             }
         } label: {
             Text(String(localized: "privacy.usePassword", defaultValue: "Use Password…"))

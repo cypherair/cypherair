@@ -196,13 +196,15 @@ final class AppSessionUnlockPresenter {
     /// embedded attempt this cancels the pending evaluation and the in-flight
     /// attempt continues on the detached sheet; from a settled state the
     /// surface follows up with `AppLockController.retryUnlock`, whose attempt
-    /// consumes the request.
+    /// consumes the request. Ordering: cancel FIRST, then set the request —
+    /// the cancellation seam clears any pending request (see below), so the
+    /// reverse order would erase its own request.
     func requestPasswordUnlock() {
         guard offersPasswordUnlock else {
             return
         }
-        passwordUnlockRequested = true
         cancelEmbeddedEvaluationIfInFlight()
+        passwordUnlockRequested = true
     }
 
     /// Invalidate the in-flight embedded evaluation, if any. Returns whether
@@ -211,8 +213,15 @@ final class AppSessionUnlockPresenter {
     /// (the in-window prompt resigns nothing), so the controller cancels here
     /// and processes the away as genuine; a resign with no embedded attempt
     /// in flight keeps today's system-sheet swallow.
+    ///
+    /// Cancellation also CLEARS any pending password request: a "Use
+    /// Password…" click that raced a genuine away must rethrow into the
+    /// controller's stale path, not present a system sheet while another app
+    /// is frontmost. (`requestPasswordUnlock` re-sets the request after
+    /// cancelling for the deliberate switch.)
     @discardableResult
     func cancelEmbeddedEvaluationIfInFlight() -> Bool {
+        passwordUnlockRequested = false
         guard let context = presentedEmbeddedContext else {
             return false
         }
