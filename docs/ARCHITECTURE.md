@@ -54,9 +54,8 @@ Cross-cutting app infrastructure grouped by concern — file-I/O and async-opera
 | `OperationController` | `FileIO/` | Shared task lifecycle, cancellation, progress, error presentation, and clipboard notices for encrypt/decrypt/sign/verify flows |
 | `SecurityScopedFileAccess` | `FileIO/` | Uniform wrapper around security-scoped file URL access |
 | `FileExportController` | `FileIO/` | Shared `fileExporter` state for exporting generated data or existing files |
-| `CosmeticPrivacyCover` | `Shell/` | Pure content-obscuring overlay whenever the app is not foreground-active; zero coupling to authentication (cover ≠ lock) |
-| `AppLockSurfaceView` | `Shell/` | Opaque lock surface driven by `AppLockController.lockState`; auto-invokes system authentication on appear, hosts retry/lockout messaging |
-| `AppLockShieldWindow` | `Shell/` | Per-platform window bridge (UIKit/AppKit) that hosts `AppLockSurfaceView` in a shield window above the entire presentation stack while locked — sheets, covers, and macOS window-modal sheets included — without dismissing any presentation |
+| `AppLockSurfaceView` | `Shell/` | The shield window's two opaque faces: the lock surface driven by `AppLockController.lockState` (auto-invokes system authentication on appear, hosts retry/lockout messaging) and the quiet privacy face (`AppPrivacySurfaceView`, app name only — cover ≠ lock) |
+| `AppLockShieldWindow` | `Shell/` | Per-platform window bridge (UIKit/AppKit) presenting the unified shield above the entire presentation stack — sheets, covers, and macOS window-modal sheets included — whenever the app is cosmetically covered or locked, rendering lock or privacy mode by lock state, without dismissing any presentation; on macOS it also attaches an opaque cover child to every window in the host's attached-sheet chain while presented |
 | `AppLifecycleObserver` | `Shell/` | Routes platform lifecycle signals (ScenePhase / app-resign / screen-lock) into `AppLockController` foreground-active and away events |
 
 ### Guided Tutorial (`Sources/App/Onboarding/Tutorial/`)

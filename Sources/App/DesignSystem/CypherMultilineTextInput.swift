@@ -92,9 +92,11 @@ private struct CypherMultilineInputRow: View {
                 title: title
             )
         }
-        // The relock signal (docs/SECURITY.md session model): the sheet is
-        // window-level and floats above the in-hierarchy lock surface, so it
-        // must dismiss itself when content clears.
+        // The relock signal (docs/SECURITY.md session model): locking clears
+        // the bound content, so the editor sheet dismisses on the
+        // content-clear generation instead of lingering — now empty — over
+        // the tool screen after unlock. Privacy is not the reason: the shield
+        // window (#697/#723) covers this sheet while locked or away.
         .onChange(of: appSessionOrchestrator?.contentClearGeneration) { _, _ in
             isEditorPresented = false
         }
@@ -123,7 +125,6 @@ private struct CypherMultilineEditorSheet: View {
     let title: String
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppLockController.self) private var appLockController: AppLockController?
 
     var body: some View {
         NavigationStack {
@@ -142,11 +143,9 @@ private struct CypherMultilineEditorSheet: View {
                 }
             }
         }
-        // The sheet escapes the main window content's cosmetic cover, so it
-        // carries its own (docs/SECURITY.md: sensitive content never appears
-        // in the app-switcher snapshot). Binds the same resolve-aware predicate
-        // so it holds across a foreground return while the editor is open.
-        .cosmeticPrivacyCover(isCovered: appLockController?.isCosmeticallyCovered ?? false)
+        // No local privacy cover: the shield window (issue #723) covers the
+        // whole presentation stack — this sheet included — whenever the app
+        // is not foreground-active.
     }
 }
 

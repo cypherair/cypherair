@@ -362,11 +362,11 @@ struct CypherAirApp: App {
                     .task {
                         await prepareUITestContactsIfNeeded()
                     }
-                    .cosmeticPrivacyCover(isCovered: container.appLockController.isCosmeticallyCovered)
-                    // The lock surface lives in a shield window layered above
+                    // The lock surface AND the cosmetic privacy cover are the
+                    // two rendering modes of one shield window layered above
                     // the whole presentation stack (sheets, covers, macOS
-                    // window-modal sheets), not in an in-scene overlay that
-                    // presentations would render above. See issue #697.
+                    // window-modal sheets) — an in-scene overlay would render
+                    // beneath presentations. See issues #697 and #723.
                     .appLockShieldWindow(appLockController: container.appLockController)
                     .appLifecycleObserver(
                         appLockController: container.appLockController
