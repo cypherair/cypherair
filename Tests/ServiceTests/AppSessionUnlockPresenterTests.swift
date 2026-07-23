@@ -82,6 +82,22 @@ final class AppSessionUnlockPresenterTests: XCTestCase {
         }
     }
 
+    /// Bounded main-actor spin: a presenter regression fails the test instead
+    /// of hanging the suite (no per-test timeout exists in this lane).
+    private func waitUntil(
+        _ what: String,
+        _ condition: () -> Bool
+    ) async throws {
+        for _ in 0..<10_000 where !condition() {
+            await Task.yield()
+        }
+        guard condition() else {
+            struct ConditionTimeout: Error {}
+            XCTFail("Timed out waiting for \(what).")
+            throw ConditionTimeout()
+        }
+    }
+
     /// Drive one attempt to completion, sending the mount signal as soon as
     /// the presenter publishes an embedded context (the surface's job in
     /// production).
@@ -91,10 +107,10 @@ final class AppSessionUnlockPresenterTests: XCTestCase {
         let embeddedInvocationsBefore = fixture.embedded.invocationCount
         let passwordInvocationsBefore = fixture.password.invocationCount
         let driver = AttemptDriver(fixture.presenter)
-        while fixture.presenter.presentedEmbeddedContext == nil,
-              fixture.embedded.invocationCount == embeddedInvocationsBefore,
-              fixture.password.invocationCount == passwordInvocationsBefore {
-            await Task.yield()
+        try await waitUntil("the attempt to publish a context or reach an evaluator") {
+            fixture.presenter.presentedEmbeddedContext != nil
+                || fixture.embedded.invocationCount != embeddedInvocationsBefore
+                || fixture.password.invocationCount != passwordInvocationsBefore
         }
         if let context = fixture.presenter.presentedEmbeddedContext {
             fixture.presenter.embeddedAuthenticationViewDidMount(for: context)
@@ -123,8 +139,8 @@ final class AppSessionUnlockPresenterTests: XCTestCase {
     func test_embeddedEvaluation_waitsForViewMount() async throws {
         let fixture = Fixture()
         let driver = AttemptDriver(fixture.presenter)
-        while fixture.presenter.presentedEmbeddedContext == nil {
-            await Task.yield()
+        try await waitUntil("the embedded context publication") {
+            fixture.presenter.presentedEmbeddedContext != nil
         }
         // Context published, mount signal not yet sent: evaluation must not
         // have started (the empirically load-bearing ordering — a context
@@ -229,8 +245,8 @@ final class AppSessionUnlockPresenterTests: XCTestCase {
         fixture.embedded.onSuspended = { embeddedStarted.fulfill() }
 
         let driver = AttemptDriver(fixture.presenter)
-        while fixture.presenter.presentedEmbeddedContext == nil {
-            await Task.yield()
+        try await waitUntil("the embedded context publication") {
+            fixture.presenter.presentedEmbeddedContext != nil
         }
         let context = try XCTUnwrap(fixture.presenter.presentedEmbeddedContext)
         fixture.presenter.embeddedAuthenticationViewDidMount(for: context)
@@ -264,8 +280,8 @@ final class AppSessionUnlockPresenterTests: XCTestCase {
 
         fixture.embedded.outcome = .failure(AuthenticationError.cancelled)
         let driver = AttemptDriver(fixture.presenter)
-        while fixture.presenter.presentedEmbeddedContext == nil {
-            await Task.yield()
+        try await waitUntil("the embedded context publication") {
+            fixture.presenter.presentedEmbeddedContext != nil
         }
 
         // Cancel BEFORE any mount signal: the pending mount wait must resolve
