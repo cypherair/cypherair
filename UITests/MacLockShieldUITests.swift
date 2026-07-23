@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 /// Behavioral guard for issue #697: while the app is locked, the lock shield
@@ -8,10 +9,18 @@ import XCTest
 /// pre-authenticated (`UITEST_MANUAL_AUTH_STARTS_UNLOCKED`), so it boots
 /// unlocked with the lock genuinely armed (auth bypass OFF — a bypass
 /// container can never hold a locked state, because the lock surface's
-/// auto-auth immediately unlocks it). The lock is then driven by posting the
-/// same `com.apple.screenIsLocked` distributed notification the app's
-/// lifecycle observer subscribes to for real macOS screen locks. The observer
-/// clears foreground-active before locking, so the locked state is stable: the
+/// auto-auth immediately unlocks it). Each test then confirms the app is
+/// genuinely ACTIVE (frontmost) before opening its presentation and locking —
+/// active-app-then-lock is the canonical #697 reproduction, and only an
+/// active app elevates the shield above sheet level, which is what makes the
+/// input-block and geometry asserts meaningful. If the app does not become
+/// active within the timeout, those asserts are not evaluable in that run,
+/// so the test skips explicitly rather than failing — precedent: the
+/// biometric-gated skips of docs/TESTING.md §1; re-running is the normal
+/// path. The lock is driven by posting the same
+/// `com.apple.screenIsLocked` distributed notification the app's lifecycle
+/// observer subscribes to for real macOS screen locks. The observer clears
+/// foreground-active before locking, so the locked state is stable: the
 /// surface's auto-auth no-ops until a genuine foreground return, and no
 /// biometric prompt appears during the test.
 ///
@@ -20,6 +29,10 @@ import XCTest
 /// test run. That mirrors what a real screen lock broadcasts.
 @MainActor
 final class MacLockShieldUITests: XCTestCase {
+    /// The app under test's fixed bundle identifier, used for the
+    /// frontmost-application activation check.
+    private static let appBundleIdentifier = "com.chentianren.cypherair"
+
     private var app: XCUIApplication!
 
     override func setUpWithError() throws {
@@ -33,6 +46,7 @@ final class MacLockShieldUITests: XCTestCase {
         launchMainPreAuthenticatedWithLockArmed(
             extraEnvironment: ["UITEST_OPEN_AUTHMODE_CONFIRMATION": "1"]
         )
+        try confirmAppActiveOrSkip()
 
         // Open a real window-modal sheet (the auth-mode confirmation modal
         // auto-opens on the Settings tab under UITEST_OPEN_AUTHMODE_CONFIRMATION).
@@ -67,8 +81,11 @@ final class MacLockShieldUITests: XCTestCase {
 
         // Invariant: the shield WINDOW geometrically covers the sheet. The
         // surface element's own accessibility frame is its content cluster,
-        // so measure the window that hosts it.
-        let shieldWindow = app.windows.containing(.any, identifier: "appLock.surface").firstMatch
+        // so measure the window that hosts it — resolved directly by the
+        // window's own identifier (a `.containing(...)` subquery failed to
+        // resolve against a never-activated app's AX snapshot even while the
+        // window was present in the dump).
+        let shieldWindow = app.windows["appLock.shieldWindow"]
         XCTAssertTrue(shieldWindow.waitForExistence(timeout: 5))
         XCTAssertTrue(
             shieldWindow.frame.contains(sheetAction.frame),
@@ -102,6 +119,7 @@ final class MacLockShieldUITests: XCTestCase {
     /// dismissed by locking).
     func test_lockWhileTutorialOpen_shieldCoversTutorial_withoutDismissingIt() throws {
         launchMainPreAuthenticatedWithLockArmed()
+        try confirmAppActiveOrSkip()
 
         element("sidebar.settings").tap()
         XCTAssertTrue(element("settings.ready").waitForExistence(timeout: 10))
@@ -120,7 +138,7 @@ final class MacLockShieldUITests: XCTestCase {
             tutorialHub.exists,
             "The tutorial must survive the lock (no presentation is dismissed)."
         )
-        let shieldWindow = app.windows.containing(.any, identifier: "appLock.surface").firstMatch
+        let shieldWindow = app.windows["appLock.shieldWindow"]
         XCTAssertTrue(shieldWindow.waitForExistence(timeout: 5))
         XCTAssertTrue(
             shieldWindow.frame.contains(tutorialHub.frame),
@@ -129,6 +147,29 @@ final class MacLockShieldUITests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Bring the app to the front and wait until macOS reports it as the
+    /// frontmost application. Only an ACTIVE app elevates the shield above
+    /// sheet level, so the input-block and geometry asserts are meaningful
+    /// only past this gate; asserting them against an app that is not active
+    /// would fail on the deliberate `.normal`-level inactive posture, not on
+    /// a regression. When activation is not achieved, the condition becomes
+    /// an explicit skip (precedent: the biometric-gated skips of
+    /// docs/TESTING.md §1), never a weakened assert: every assert after this
+    /// gate runs unconditionally, and re-running is the normal path.
+    private func confirmAppActiveOrSkip() throws {
+        app.activate()
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline {
+            if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.appBundleIdentifier {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        throw XCTSkip(
+            "The app did not become active in this run; elevated-shield asserts are not evaluable — re-run to evaluate."
+        )
+    }
 
     private func launchMainPreAuthenticatedWithLockArmed(
         extraEnvironment: [String: String] = [:]

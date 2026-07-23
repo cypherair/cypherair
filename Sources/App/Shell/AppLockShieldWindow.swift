@@ -49,6 +49,14 @@ import AppKit
 // Locking hides nothing and dismisses nothing — after unlock the user is
 // exactly where they left off.
 
+/// Accessibility identifier carried by the shield WINDOW itself (the hosted
+/// surface carries `appLock.surface`). Inert AX metadata: UI tests resolve
+/// the shield window directly by this identifier — a `.containing(...)`
+/// window subquery proved fragile against the AX snapshot of a
+/// never-activated app (PR #720), while direct identifier matching does not
+/// depend on resolving child elements.
+private let shieldWindowAccessibilityIdentifier = "appLock.shieldWindow"
+
 extension View {
     /// Install the app-lock shield: a window-level bridge that presents
     /// `AppLockSurfaceView` above all app content while
@@ -161,6 +169,7 @@ final class AppLockShieldWindowCoordinator {
         guard shieldWindow == nil, let windowScene else { return }
         let window = UIWindow(windowScene: windowScene)
         window.windowLevel = Self.shieldWindowLevel
+        window.accessibilityIdentifier = shieldWindowAccessibilityIdentifier
         window.rootViewController = UIHostingController(
             rootView: AppLockSurfaceView(appLockController: appLockController)
         )
@@ -340,6 +349,7 @@ final class AppLockShieldWindowCoordinator {
         )
         shield.isReleasedWhenClosed = false
         shield.isExcludedFromWindowsMenu = true
+        shield.setAccessibilityIdentifier(shieldWindowAccessibilityIdentifier)
         shield.hasShadow = false
         shield.isOpaque = true
         shield.backgroundColor = .windowBackgroundColor
