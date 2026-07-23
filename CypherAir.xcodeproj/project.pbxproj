@@ -327,6 +327,7 @@
 				Security/PrivateKeyRewrapWorkflow.swift,
 				Security/ProtectedData/Session/AppLockController.swift,
 				Security/ProtectedData/Session/AppSessionOrchestrator.swift,
+				Security/ProtectedData/Session/AppSessionUnlockPresenter.swift,
 				Security/ProtectedData/DomainStores/ContactsDomainStore.swift,
 				Security/ProtectedData/DomainStores/ContactsSQLCipherDatabase.swift,
 				Security/ProtectedData/DomainStores/KeychainProtectedDataRootSecretStore.swift,

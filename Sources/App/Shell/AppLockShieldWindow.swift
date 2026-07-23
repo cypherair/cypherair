@@ -133,11 +133,23 @@ enum AppLockShieldPolicy {
 /// mode flip are applied by the coordinator, not here.
 private struct AppShieldContentView: View {
     let appLockController: AppLockController
+    #if os(macOS)
+    /// The macOS in-window unlock owner the lock surface renders the
+    /// embedded authentication for (issue #724).
+    let unlockPresenter: AppSessionUnlockPresenter?
+    #endif
 
     var body: some View {
         switch AppLockShieldPolicy.mode(isLocked: appLockController.isLocked) {
         case .lock:
+            #if os(macOS)
+            AppLockSurfaceView(
+                appLockController: appLockController,
+                unlockPresenter: unlockPresenter
+            )
+            #else
             AppLockSurfaceView(appLockController: appLockController)
+            #endif
         case .privacy:
             AppPrivacySurfaceView()
         }
@@ -149,10 +161,27 @@ extension View {
     /// the lock surface or the cosmetic privacy cover above ALL app content
     /// while `appLockController.isCosmeticallyCovered || isLocked`. Replaces
     /// both the previous in-scene lock overlay (#697) and the previous
-    /// in-scene cosmetic cover overlay (#723).
+    /// in-scene cosmetic cover overlay (#723). On macOS the lock mode also
+    /// hosts the in-window app-session authentication, so the shield carries
+    /// the unlock presenter to the surface (issue #724); the UIKit-family
+    /// platforms keep the system-sheet presentation and ignore it.
     @MainActor
-    func appLockShieldWindow(appLockController: AppLockController) -> some View {
-        background(
+    func appLockShieldWindow(
+        appLockController: AppLockController,
+        unlockPresenter: AppSessionUnlockPresenter? = nil
+    ) -> some View {
+        #if os(macOS)
+        return background(
+            AppLockShieldWindowHost(
+                appLockController: appLockController,
+                unlockPresenter: unlockPresenter,
+                isCosmeticallyCovered: appLockController.isCosmeticallyCovered,
+                isLocked: appLockController.isLocked,
+                isAuthenticating: appLockController.isAuthenticating
+            )
+        )
+        #else
+        return background(
             AppLockShieldWindowHost(
                 appLockController: appLockController,
                 isCosmeticallyCovered: appLockController.isCosmeticallyCovered,
@@ -160,6 +189,7 @@ extension View {
                 isAuthenticating: appLockController.isAuthenticating
             )
         )
+        #endif
     }
 }
 
@@ -351,6 +381,9 @@ private let sheetCoverAccessibilityIdentifier = "appLock.sheetCover"
 
 private struct AppLockShieldWindowHost: NSViewRepresentable {
     let appLockController: AppLockController
+    /// The macOS in-window unlock owner, carried to the hosted lock surface
+    /// (issue #724).
+    let unlockPresenter: AppSessionUnlockPresenter?
     /// The synchronous away-signal cover trigger (see the UIKit twin).
     let isCosmeticallyCovered: Bool
     let isLocked: Bool
@@ -363,7 +396,10 @@ private struct AppLockShieldWindowHost: NSViewRepresentable {
     let isAuthenticating: Bool
 
     func makeCoordinator() -> AppLockShieldWindowCoordinator {
-        AppLockShieldWindowCoordinator(appLockController: appLockController)
+        AppLockShieldWindowCoordinator(
+            appLockController: appLockController,
+            unlockPresenter: unlockPresenter
+        )
     }
 
     func makeNSView(context: Context) -> AppLockShieldAnchorView {
@@ -457,6 +493,11 @@ final class AppLockShieldWindowCoordinator {
     }
 
     private let appLockController: AppLockController
+    /// Carried to the hosted lock surface, which renders the embedded
+    /// in-window authentication for it (issue #724). The coordinator itself
+    /// never reads it — the level policy keys on
+    /// `appLockController.isAuthenticating` exactly as before.
+    private let unlockPresenter: AppSessionUnlockPresenter?
     private weak var hostWindow: NSWindow?
     private var shieldWindow: AppLockShieldPanel?
     private weak var restoreKeyWindow: NSWindow?
@@ -485,8 +526,12 @@ final class AppLockShieldWindowCoordinator {
     // `self` weakly, so they could never fire meaningfully after teardown
     // anyway.
 
-    init(appLockController: AppLockController) {
+    init(
+        appLockController: AppLockController,
+        unlockPresenter: AppSessionUnlockPresenter?
+    ) {
         self.appLockController = appLockController
+        self.unlockPresenter = unlockPresenter
     }
 
     func anchorDidMove(to window: NSWindow?) {
@@ -557,7 +602,10 @@ final class AppLockShieldWindowCoordinator {
         // Join a full-screen host's space instead of being stranded outside it.
         shield.collectionBehavior.insert(.fullScreenAuxiliary)
         shield.contentView = NSHostingView(
-            rootView: AppShieldContentView(appLockController: appLockController)
+            rootView: AppShieldContentView(
+                appLockController: appLockController,
+                unlockPresenter: unlockPresenter
+            )
         )
         hostWindow.addChildWindow(shield, ordered: .above)
         shieldWindow = shield

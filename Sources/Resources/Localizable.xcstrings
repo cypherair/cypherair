@@ -11909,6 +11909,38 @@
         }
       }
     },
+    "privacy.usePassword" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Password…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用密码…"
+          }
+        }
+      }
+    },
+    "privacy.usePassword.a11y" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock with your Mac password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Mac 密码解锁"
+          }
+        }
+      }
+    },
     "protectedData.postUnlock.reason" : {
       "localizations" : {
         "en" : {

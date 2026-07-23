@@ -91,7 +91,8 @@ final class AppLockControllerTests: XCTestCase {
 
     private func makeController(
         spy: Spy,
-        operationPromptInProgressProvider: (() -> Bool)? = nil
+        operationPromptInProgressProvider: (() -> Bool)? = nil,
+        cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)? = nil
     ) -> AppLockController {
         AppLockController(
             gracePeriodProvider: { spy.gracePeriod },
@@ -103,7 +104,8 @@ final class AppLockControllerTests: XCTestCase {
             postAuthenticationHandler: { await spy.postAuth($0, $1) },
             contentClearHandler: { spy.contentClear() },
             shouldBypassAuthentication: { spy.bypass },
-            operationPromptInProgressProvider: operationPromptInProgressProvider
+            operationPromptInProgressProvider: operationPromptInProgressProvider,
+            cancelEmbeddedUnlockEvaluationIfInFlight: cancelEmbeddedUnlockEvaluationIfInFlight
         )
     }
 
@@ -553,6 +555,114 @@ final class AppLockControllerTests: XCTestCase {
         spy.resumeAuth()
         await unlock
         XCTAssertEqual(controller.lockState, .unlocked, "The unlock completes despite the resign.")
+    }
+
+    // MARK: - macOS in-window unlock (issue #724): the embedded exception to
+    // the `.authenticating` swallow.
+
+    func test_awayDuringEmbeddedUnlockEvaluation_cancelsAndProcessesGenuineAway() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        spy.pauseAuth = true
+        var cancelCount = 0
+        let controller = makeController(
+            spy: spy,
+            cancelEmbeddedUnlockEvaluationIfInFlight: {
+                cancelCount += 1
+                return true
+            }
+        )
+        let suspended = expectation(description: "auth suspended")
+        spy.onAuthSuspended = { suspended.fulfill() }
+
+        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        await fulfillment(of: [suspended], timeout: 2)
+
+        // The embedded in-window prompt resigns nothing, so this resign is a
+        // REAL app switch: the attempt is cancelled and the away processes
+        // as genuine (grace 0 → immediate relock).
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+        XCTAssertEqual(cancelCount, 1, "The in-flight embedded evaluation is cancelled.")
+        XCTAssertEqual(controller.lockState, .locked, "The genuine away relocks at grace 0.")
+        XCTAssertGreaterThan(spy.relockCount, 1, "A real relock cycle ran (beyond the unlock flow's own).")
+
+        // The cancelled evaluation lands as an error against the bumped away
+        // generation and settles without a failure flash.
+        spy.authOutcome = .failure(AuthenticationError.cancelled)
+        spy.resumeAuth()
+        await unlock
+        XCTAssertEqual(controller.lockState, .locked)
+        XCTAssertEqual(spy.recordedContexts.count, 0, "No context is handed off for an invalidated attempt.")
+
+        // The away epoch was NOT consumed by the interrupted attempt: the next
+        // genuine foreground return auto-authenticates afresh.
+        let evaluationsBefore = spy.evaluateCount
+        spy.pauseAuth = false
+        spy.authOutcome = .success(.authenticated(context: nil))
+        controller.noteForegroundActive(true)
+        await controller.handleForegroundActive(source: "return")
+        XCTAssertEqual(spy.evaluateCount, evaluationsBefore + 1)
+        XCTAssertEqual(controller.lockState, .unlocked)
+    }
+
+    func test_awayDuringSystemSheetUnlockEvaluation_staysSwallowedWithPresenterWired() async {
+        // The production posture during the Standard-mode password sheet: the
+        // cancel seam is WIRED but reports no embedded evaluation in flight —
+        // the sheet's own resign must keep today's swallow.
+        let spy = Spy()
+        spy.pauseAuth = true
+        let controller = makeController(
+            spy: spy,
+            cancelEmbeddedUnlockEvaluationIfInFlight: { false }
+        )
+        let suspended = expectation(description: "auth suspended")
+        spy.onAuthSuspended = { suspended.fulfill() }
+
+        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        await fulfillment(of: [suspended], timeout: 2)
+        let relocksDuringAuth = spy.relockCount
+
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+        XCTAssertEqual(controller.lockState, .authenticating, "The sheet's own resign is not an away event.")
+        XCTAssertEqual(spy.relockCount, relocksDuringAuth)
+
+        spy.resumeAuth()
+        await unlock
+        XCTAssertEqual(controller.lockState, .unlocked, "The sheet unlock completes despite the resign.")
+    }
+
+    func test_lockNow_cancelsInFlightEmbeddedEvaluation() async {
+        let spy = Spy()
+        spy.pauseAuth = true
+        var cancelCount = 0
+        let controller = makeController(
+            spy: spy,
+            cancelEmbeddedUnlockEvaluationIfInFlight: {
+                cancelCount += 1
+                return true
+            }
+        )
+        let suspended = expectation(description: "auth suspended")
+        spy.onAuthSuspended = { suspended.fulfill() }
+
+        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        await fulfillment(of: [suspended], timeout: 2)
+
+        controller.lockNow(source: "screenLock")
+        XCTAssertEqual(
+            cancelCount,
+            1,
+            "An explicit lock dismisses the pending in-window prompt instead of leaving it armed."
+        )
+        await settle()
+
+        spy.authOutcome = .failure(AuthenticationError.cancelled)
+        spy.resumeAuth()
+        await unlock
+        XCTAssertEqual(controller.lockState, .locked)
     }
 
     func test_authenticatingRule_resignDuringOperationPrompt_isDeferredNotProcessed() async {

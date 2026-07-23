@@ -1,8 +1,17 @@
 import Foundation
+#if os(macOS)
+import LocalAuthentication
+#endif
 
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
     let appLockController: AppLockController
+    /// The macOS in-window app-session unlock owner (issue #724): decides the
+    /// unlock method per attempt and publishes the embedded-evaluation
+    /// context the shield's lock surface renders. Non-nil exactly on macOS
+    /// (production and UI-test containers); nil on the UIKit-family
+    /// platforms, which keep the system-sheet presentation.
+    let appSessionUnlockPresenter: AppSessionUnlockPresenter?
     let authPromptCoordinator: AuthenticationPromptCoordinator
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
@@ -34,6 +43,7 @@ final class AppContainer: @unchecked Sendable {
 
     init(
         appLockController: AppLockController,
+        appSessionUnlockPresenter: AppSessionUnlockPresenter? = nil,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
@@ -63,6 +73,7 @@ final class AppContainer: @unchecked Sendable {
         defaultsSuiteName: String? = nil
     ) {
         self.appLockController = appLockController
+        self.appSessionUnlockPresenter = appSessionUnlockPresenter
         self.authPromptCoordinator = authPromptCoordinator
         self.keychain = keychain
         self.authManager = authManager
@@ -591,6 +602,50 @@ final class AppContainer: @unchecked Sendable {
         )
     }
 
+    #if os(macOS)
+    /// Build the macOS in-window app-session unlock presenter (issue #724)
+    /// over the live authentication dependencies. Shared by the production
+    /// and UI-test composition roots — both platforms' lock surfaces render
+    /// the same method matrix.
+    @MainActor
+    private static func makeAppSessionUnlockPresenter(
+        authManager: AuthenticationManager,
+        config: AppConfiguration
+    ) -> AppSessionUnlockPresenter {
+        AppSessionUnlockPresenter(
+            appSessionPolicy: { config.appSessionAuthenticationPolicy },
+            probeEmbeddedBiometricsAvailability: {
+                let context = LAContext()
+                var error: NSError?
+                if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+                    return .available
+                }
+                if let error,
+                   error.domain == LAError.errorDomain,
+                   error.code == LAError.Code.biometryLockout.rawValue {
+                    return .lockedOut
+                }
+                return .unavailable
+            },
+            evaluateEmbeddedBiometrics: { context, reason in
+                try await authManager.evaluateAppSessionWithEmbeddedBiometrics(
+                    context: context,
+                    reason: reason
+                )
+            },
+            evaluatePasswordWithSystemSheet: { reason in
+                // The Standard-mode "Use Password…" action: today's detached
+                // system-sheet machinery under the user-presence policy. The
+                // presenter never invokes this in High Security mode.
+                try await authManager.evaluateAppSession(
+                    policy: .userPresence,
+                    reason: reason
+                )
+            }
+        )
+    }
+    #endif
+
     // `@MainActor`: this composition root constructs `AppSessionOrchestrator`,
     // which is main-actor-isolated. Called from `CypherAirApp.init` (App is
     // main-actor) and from `@MainActor` test cases.
@@ -838,16 +893,38 @@ final class AppContainer: @unchecked Sendable {
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
+        // macOS in-window unlock (issue #724): the presenter owns the unlock
+        // METHOD (embedded biometric vs the explicit detached password sheet)
+        // and the embedded presentation state the shield's lock surface
+        // renders; the controller keeps the flow. Other platforms keep the
+        // system-sheet evaluation and a nil presenter.
+        #if os(macOS)
+        let appSessionUnlockPresenter: AppSessionUnlockPresenter? =
+            makeAppSessionUnlockPresenter(authManager: authManager, config: config)
+        let cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)? = {
+            appSessionUnlockPresenter?.cancelEmbeddedEvaluationIfInFlight() ?? false
+        }
+        #else
+        let appSessionUnlockPresenter: AppSessionUnlockPresenter? = nil
+        let cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)? = nil
+        #endif
         let appLockController = AppLockController(
             gracePeriodProvider: {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
             lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
             evaluateAppSessionAuthentication: { reason, _ in
-                try await authManager.evaluateAppSession(
+                #if os(macOS)
+                guard let appSessionUnlockPresenter else {
+                    throw AuthenticationError.failed
+                }
+                return try await appSessionUnlockPresenter.evaluateAppSessionUnlock(reason: reason)
+                #else
+                return try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
                     reason: reason
                 )
+                #endif
             },
             recordSuccessfulAuthentication: { context in
                 appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
@@ -909,7 +986,8 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassAuthentication: { false },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
-            }
+            },
+            cancelEmbeddedUnlockEvaluationIfInFlight: cancelEmbeddedUnlockEvaluationIfInFlight
         )
         #if os(macOS)
         wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
@@ -949,6 +1027,7 @@ final class AppContainer: @unchecked Sendable {
 
         return AppContainer(
             appLockController: appLockController,
+            appSessionUnlockPresenter: appSessionUnlockPresenter,
             authPromptCoordinator: authPromptCoordinator,
             keychain: keychain,
             authManager: authManager,
@@ -1167,16 +1246,38 @@ final class AppContainer: @unchecked Sendable {
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
+        // macOS in-window unlock (issue #724): the presenter owns the unlock
+        // METHOD (embedded biometric vs the explicit detached password sheet)
+        // and the embedded presentation state the shield's lock surface
+        // renders; the controller keeps the flow. Other platforms keep the
+        // system-sheet evaluation and a nil presenter.
+        #if os(macOS)
+        let appSessionUnlockPresenter: AppSessionUnlockPresenter? =
+            makeAppSessionUnlockPresenter(authManager: authManager, config: config)
+        let cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)? = {
+            appSessionUnlockPresenter?.cancelEmbeddedEvaluationIfInFlight() ?? false
+        }
+        #else
+        let appSessionUnlockPresenter: AppSessionUnlockPresenter? = nil
+        let cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)? = nil
+        #endif
         let appLockController = AppLockController(
             gracePeriodProvider: {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
             lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
             evaluateAppSessionAuthentication: { reason, _ in
-                try await authManager.evaluateAppSession(
+                #if os(macOS)
+                guard let appSessionUnlockPresenter else {
+                    throw AuthenticationError.failed
+                }
+                return try await appSessionUnlockPresenter.evaluateAppSessionUnlock(reason: reason)
+                #else
+                return try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
                     reason: reason
                 )
+                #endif
             },
             recordSuccessfulAuthentication: { context in
                 appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
@@ -1236,7 +1337,8 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassAuthentication: { !requiresManualAuthentication },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
-            }
+            },
+            cancelEmbeddedUnlockEvaluationIfInFlight: cancelEmbeddedUnlockEvaluationIfInFlight
         )
         #if os(macOS)
         wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
@@ -1278,6 +1380,7 @@ final class AppContainer: @unchecked Sendable {
 
         let container = AppContainer(
             appLockController: appLockController,
+            appSessionUnlockPresenter: appSessionUnlockPresenter,
             authPromptCoordinator: authPromptCoordinator,
             keychain: keychain,
             authManager: authManager,
