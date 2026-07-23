@@ -34,10 +34,11 @@ struct AppLockSurfaceView: View {
             await appLockController.handleForegroundActive(source: "lockSurface.appear")
         }
         .accessibilityIdentifier("appLock.surface")
-        // The surface is layered as an `.overlay` over the (obscured) app
-        // content. Mark it modal so VoiceOver confines navigation to the lock
-        // surface and never reaches the locked content behind it; the opaque
-        // fill already blocks pointer hit-testing.
+        // The surface is hosted in the shield window
+        // (`AppLockShieldWindow.swift`), layered above all app content and
+        // presentations. Mark it modal so VoiceOver confines navigation to the
+        // lock surface and never reaches the locked content beneath; the
+        // opaque fill already blocks pointer hit-testing within the shield.
         .accessibilityAddTraits(.isModal)
     }
 

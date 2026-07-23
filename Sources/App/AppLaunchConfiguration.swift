@@ -12,6 +12,11 @@ struct AppLaunchConfiguration {
     let isUITestMode: Bool
     let isXCTestHost: Bool
     let requiresManualAuthentication: Bool
+    /// Manual-auth UI-test variant that boots pre-authenticated (lock armed,
+    /// auth bypass off) so UI tests can drive a real lock transition without a
+    /// human biometric at launch. Meaningful only with
+    /// `requiresManualAuthentication`; the derivation enforces that pairing.
+    let manualAuthStartsUnlocked: Bool
     let opensAuthModeConfirmation: Bool
     let preloadsUITestContact: Bool
 
@@ -41,6 +46,7 @@ struct AppLaunchConfiguration {
             self.isUITestMode = false
             self.isXCTestHost = false
             self.requiresManualAuthentication = false
+            self.manualAuthStartsUnlocked = false
             self.opensAuthModeConfirmation = false
             self.preloadsUITestContact = false
             self.shouldSkipOnboarding = false
@@ -51,7 +57,10 @@ struct AppLaunchConfiguration {
         self.root = Root(rawValue: environment["UITEST_ROOT"] ?? "main") ?? .main
         self.isUITestMode = environment["UITEST_ROOT"] != nil || environment["UITEST_SKIP_ONBOARDING"] != nil
         self.isXCTestHost = detectsXCTestHost
-        self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
+        let requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
+        self.requiresManualAuthentication = requiresManualAuthentication
+        self.manualAuthStartsUnlocked = requiresManualAuthentication
+            && environment["UITEST_MANUAL_AUTH_STARTS_UNLOCKED"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
         self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main

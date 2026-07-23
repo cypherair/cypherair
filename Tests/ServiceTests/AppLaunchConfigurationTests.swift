@@ -27,6 +27,45 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertTrue(configuration.preloadsUITestContact)
     }
 
+    func test_manualAuthStartsUnlocked_requiresTheManualAuthPairing() {
+        // The boot-unlocked lock-shield seam must never arm without the
+        // manual-auth container: alone, the flag is inert.
+        let withoutManualAuth = AppLaunchConfiguration(
+            environment: [
+                "UITEST_SKIP_ONBOARDING": "1",
+                "UITEST_MANUAL_AUTH_STARTS_UNLOCKED": "1"
+            ],
+            detectsXCTestHost: false,
+            allowsUITestLaunchOverrides: true
+        )
+        XCTAssertFalse(withoutManualAuth.manualAuthStartsUnlocked)
+
+        let withManualAuth = AppLaunchConfiguration(
+            environment: [
+                "UITEST_SKIP_ONBOARDING": "1",
+                "UITEST_REQUIRE_MANUAL_AUTH": "1",
+                "UITEST_MANUAL_AUTH_STARTS_UNLOCKED": "1"
+            ],
+            detectsXCTestHost: false,
+            allowsUITestLaunchOverrides: true
+        )
+        XCTAssertTrue(withManualAuth.manualAuthStartsUnlocked)
+    }
+
+    func test_releaseGateIgnoresManualAuthStartsUnlocked() {
+        let configuration = AppLaunchConfiguration(
+            environment: [
+                "UITEST_SKIP_ONBOARDING": "1",
+                "UITEST_REQUIRE_MANUAL_AUTH": "1",
+                "UITEST_MANUAL_AUTH_STARTS_UNLOCKED": "1"
+            ],
+            detectsXCTestHost: false,
+            allowsUITestLaunchOverrides: false
+        )
+
+        XCTAssertFalse(configuration.manualAuthStartsUnlocked)
+    }
+
     func test_debugGateHonorsXCTestHostDetection() {
         let configuration = AppLaunchConfiguration(
             environment: [:],
