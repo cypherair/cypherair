@@ -114,7 +114,7 @@
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "base64-0.22.1.txt",
     "kind": "thirdParty",
-    "isDirectDependency": true,
+    "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "LICENSE-MIT",
