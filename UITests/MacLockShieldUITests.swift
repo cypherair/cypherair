@@ -1,9 +1,10 @@
 import AppKit
 import XCTest
 
-/// Behavioral guard for issue #697: while the app is locked, the lock shield
-/// window covers ALL app content — including window-modal sheets, which render
-/// above any in-scene overlay — and locking dismisses no presentation.
+/// Behavioral guard for issue #697 (and the #723 sheet covers): while the app
+/// is locked, the lock shield window covers ALL app content — including
+/// window-modal sheets, which render above any in-scene overlay — and locking
+/// dismisses no presentation.
 ///
 /// Mechanics: the app launches the manual-auth UI-test container
 /// pre-authenticated (`UITEST_MANUAL_AUTH_STARTS_UNLOCKED`), so it boots
@@ -90,6 +91,23 @@ final class MacLockShieldUITests: XCTestCase {
         XCTAssertTrue(
             shieldWindow.frame.contains(sheetAction.frame),
             "The shield window frame \(shieldWindow.frame) must cover the sheet action frame \(sheetAction.frame)."
+        )
+
+        // #723: while the shield is presented, the window-modal sheet carries
+        // its own opaque cover child. While the app is INACTIVE the shield
+        // sits at `.normal`, where an attached sheet always beats it — the
+        // per-sheet cover is then the only thing covering the sheet's
+        // content, so its presence and geometry are asserted here in the
+        // active-app scenario (the inactive posture is not reliably drivable
+        // from a UI test).
+        let sheetCover = app.windows["appLock.sheetCover"]
+        XCTAssertTrue(
+            sheetCover.waitForExistence(timeout: 5),
+            "Expected the sheet to carry an opaque cover child while the shield is presented."
+        )
+        XCTAssertTrue(
+            sheetCover.frame.contains(sheetAction.frame),
+            "The sheet cover frame \(sheetCover.frame) must cover the sheet action frame \(sheetAction.frame)."
         )
 
         // Optional human-driven tail for the manual verification lane: unlock

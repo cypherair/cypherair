@@ -7,10 +7,10 @@ import SwiftUI
 /// The surface is deliberately OPAQUE — an app-identified screen, not a
 /// material over content: locked content must never show through. The header
 /// is text-only (app name + locked-state caption) by maintainer decision —
-/// no decorative lock imagery. The cosmetic privacy cover
-/// (`CosmeticPrivacyCover`) is a separate, unrelated layer with its own
-/// role. Native platform chrome only; no `.glassEffect()` on a security
-/// surface (PRD §4.9).
+/// no decorative lock imagery. The cosmetic privacy cover is the same shield
+/// window's OTHER rendering mode (`AppPrivacySurfaceView` below; issue #723)
+/// — same visual family, no authentication role. Native platform chrome
+/// only; no `.glassEffect()` on a security surface (PRD §4.9).
 struct AppLockSurfaceView: View {
     let appLockController: AppLockController
 
@@ -196,5 +196,27 @@ struct AppLockSurfaceView: View {
             defaultValue: "Retry biometric authentication after re-enabling it with the system passcode"
         )
         #endif
+    }
+}
+
+/// The shield window's privacy face (issue #723): shown while the app is
+/// cosmetically covered but not locked (multitasking snapshot,
+/// shoulder-surfing). Same visual family as the lock surface minus the
+/// authentication affordance and lock texts — an opaque, app-identified
+/// screen carrying only the existing localized display name, so it adds no
+/// String Catalog entries. Purely visual: the per-mode input discipline (no
+/// key status, no text-editing interruption) lives in the shield coordinator
+/// (`AppLockShieldWindow.swift`), not here.
+struct AppPrivacySurfaceView: View {
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.background)
+                .ignoresSafeArea()
+
+            Text(AppProductIdentity.localizedDisplayName)
+                .font(.title2.weight(.semibold))
+        }
+        .accessibilityIdentifier("appLock.privacySurface")
     }
 }

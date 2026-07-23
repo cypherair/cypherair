@@ -185,12 +185,15 @@ final class AppLockController {
         return nil
     }
 
-    /// The single predicate every cosmetic-cover site binds to. True while the app
-    /// is not foreground-active, and additionally while a foreground return is
-    /// still resolving its lock decision (`isResolvingForegroundLock`) so content
-    /// cannot flash between the synchronous foreground signal and the asynchronous
-    /// lock surface. Distinct from `isLocked`: the cover is cosmetic (app-switcher
-    /// snapshot / shoulder-surfing), the lock surface is the authentication gate.
+    /// The cosmetic-cover trigger: the shield window (`AppLockShieldWindow`)
+    /// presents on this predicate OR `isLocked`, and renders its privacy face
+    /// when covered but not locked (issue #723). True while the app is not
+    /// foreground-active, and additionally while a foreground return is still
+    /// resolving its lock decision (`isResolvingForegroundLock`) so content
+    /// cannot flash between the synchronous foreground signal and the
+    /// asynchronous lock surface. Distinct from `isLocked`: the cover is
+    /// cosmetic (app-switcher snapshot / shoulder-surfing), the lock surface
+    /// is the authentication gate.
     var isCosmeticallyCovered: Bool {
         !isForegroundActive || isResolvingForegroundLock
     }
