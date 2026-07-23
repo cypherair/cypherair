@@ -26,6 +26,8 @@ import AppKit
 //   within-level ordering NEVER beats an attached sheet — the sheet stays in
 //   front of a same-level child regardless of explicit reordering — so the
 //   shield runs at an elevated `NSWindow.Level` while the app is active.
+//   `addChildWindow` itself resets the child's level to the parent's (probed
+//   for #720), so the elevated level is applied only AFTER attachment.
 //   Because AppKit window levels are global across apps, the shield drops
 //   back to `.normal` on a REAL app switch so it can never float above other
 //   apps' windows; that inactive posture degrades exactly to the pre-shield
@@ -348,17 +350,19 @@ final class AppLockShieldWindowCoordinator {
         shield.contentView = NSHostingView(
             rootView: AppLockSurfaceView(appLockController: appLockController)
         )
-        shield.level = Self.shieldLevel(
-            appIsActive: NSApp.isActive,
-            isUnlockAuthenticationInFlight: appLockController.isAuthenticating
-        )
         restoreKeyWindow = NSApp.keyWindow ?? hostWindow
         hostWindow.addChildWindow(shield, ordered: .above)
-        if NSApp.isActive {
-            shield.makeKey()
-        }
         shieldWindow = shield
         beginObservations(hostWindow: hostWindow)
+        // The level is applied strictly AFTER `addChildWindow`:
+        // `addChildWindow` resets the child's level to the parent's (probed
+        // for #720 — a pre-attach `modalPanel + 1` reads `.normal` post-
+        // attach, leaving an attached sheet in front of the shield), so a
+        // level set before attachment is silently lost. A post-attach level
+        // sticks and covers the sheet. `applyActivationState()` is the single
+        // level writer (level policy + key restore + frame), and every other
+        // call to it happens after attachment by construction.
+        applyActivationState()
     }
 
     private func removeShield(restoringKey: Bool) {
