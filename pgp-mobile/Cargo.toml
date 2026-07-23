@@ -21,7 +21,7 @@ sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
 uniffi = { version = "0.32", features = ["cli"] }
 openssl = { version = "0.10", features = ["vendored"] }
 zeroize = { version = "1", features = ["derive"] }
-base64 = "0.22"
+base64 = { version = "0.23", default-features = false, features = ["std"] }
 thiserror = "2"
 
 [dev-dependencies]

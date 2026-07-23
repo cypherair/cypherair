@@ -62,12 +62,12 @@
     ]
   },
   {
-    "id": "anyhow@1.0.103",
+    "id": "anyhow@1.0.104",
     "displayName": "anyhow",
-    "version": "1.0.103",
+    "version": "1.0.104",
     "repositoryURL": "https://github.com/dtolnay/anyhow",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "anyhow-1.0.103.txt",
+    "licenseFileResourceName": "anyhow-1.0.104.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -113,6 +113,21 @@
     "repositoryURL": "https://github.com/marshallpierce/rust-base64",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "base64-0.22.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "base64@0.23.0",
+    "displayName": "base64",
+    "version": "0.23.0",
+    "repositoryURL": "https://github.com/marshallpierce/rust-base64",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "base64-0.23.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -269,12 +284,12 @@
     ]
   },
   {
-    "id": "clap@4.6.2",
+    "id": "clap@4.6.4",
     "displayName": "clap",
-    "version": "4.6.2",
+    "version": "4.6.4",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap-4.6.2.txt",
+    "licenseFileResourceName": "clap-4.6.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -434,12 +449,12 @@
     ]
   },
   {
-    "id": "fastrand@2.4.1",
+    "id": "fastrand@2.5.0",
     "displayName": "fastrand",
-    "version": "2.4.1",
+    "version": "2.5.0",
     "repositoryURL": "https://github.com/smol-rs/fastrand",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "fastrand-2.4.1.txt",
+    "licenseFileResourceName": "fastrand-2.5.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -552,12 +567,12 @@
     ]
   },
   {
-    "id": "glob@0.3.3",
+    "id": "glob@0.3.4",
     "displayName": "glob",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "repositoryURL": "https://github.com/rust-lang/glob",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "glob-0.3.3.txt",
+    "licenseFileResourceName": "glob-0.3.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -784,12 +799,12 @@
     ]
   },
   {
-    "id": "libc@0.2.186",
+    "id": "libc@0.2.189",
     "displayName": "libc",
-    "version": "0.2.186",
+    "version": "0.2.189",
     "repositoryURL": "https://github.com/rust-lang/libc",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "libc-0.2.186.txt",
+    "licenseFileResourceName": "libc-0.2.189.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1165,12 +1180,12 @@
     ]
   },
   {
-    "id": "serde@1.0.228",
+    "id": "serde@1.0.229",
     "displayName": "serde",
-    "version": "1.0.228",
+    "version": "1.0.229",
     "repositoryURL": "https://github.com/serde-rs/serde",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "serde-1.0.228.txt",
+    "licenseFileResourceName": "serde-1.0.229.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1180,12 +1195,12 @@
     ]
   },
   {
-    "id": "serde_core@1.0.228",
+    "id": "serde_core@1.0.229",
     "displayName": "serde_core",
-    "version": "1.0.228",
+    "version": "1.0.229",
     "repositoryURL": "https://github.com/serde-rs/serde",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "serde_core-1.0.228.txt",
+    "licenseFileResourceName": "serde_core-1.0.229.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1195,12 +1210,12 @@
     ]
   },
   {
-    "id": "serde_json@1.0.150",
+    "id": "serde_json@1.0.151",
     "displayName": "serde_json",
-    "version": "1.0.150",
+    "version": "1.0.151",
     "repositoryURL": "https://github.com/serde-rs/json",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "serde_json-1.0.150.txt",
+    "licenseFileResourceName": "serde_json-1.0.151.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1383,12 +1398,12 @@
     ]
   },
   {
-    "id": "thiserror@2.0.18",
+    "id": "thiserror@2.0.19",
     "displayName": "thiserror",
-    "version": "2.0.18",
+    "version": "2.0.19",
     "repositoryURL": "https://github.com/dtolnay/thiserror",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "thiserror-2.0.18.txt",
+    "licenseFileResourceName": "thiserror-2.0.19.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -1412,12 +1427,12 @@
     ]
   },
   {
-    "id": "toml@0.9.12+spec-1.1.0",
+    "id": "toml@1.1.3+spec-1.1.0",
     "displayName": "toml",
-    "version": "0.9.12+spec-1.1.0",
+    "version": "1.1.3+spec-1.1.0",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml-0.9.12-spec-1.1.0.txt",
+    "licenseFileResourceName": "toml-1.1.3-spec-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1427,12 +1442,12 @@
     ]
   },
   {
-    "id": "toml_datetime@0.7.5+spec-1.1.0",
+    "id": "toml_datetime@1.1.1+spec-1.1.0",
     "displayName": "toml_datetime",
-    "version": "0.7.5+spec-1.1.0",
+    "version": "1.1.1+spec-1.1.0",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml_datetime-0.7.5-spec-1.1.0.txt",
+    "licenseFileResourceName": "toml_datetime-1.1.1-spec-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1615,20 +1630,6 @@
     ]
   },
   {
-    "id": "winnow@0.7.15",
-    "displayName": "winnow",
-    "version": "0.7.15",
-    "repositoryURL": "https://github.com/winnow-rs/winnow",
-    "licenseName": "MIT",
-    "licenseFileResourceName": "winnow-0.7.15.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT"
-    ]
-  },
-  {
     "id": "winnow@1.0.4",
     "displayName": "winnow",
     "version": "1.0.4",
@@ -1657,12 +1658,12 @@
     ]
   },
   {
-    "id": "xxhash-rust@0.8.17",
+    "id": "xxhash-rust@0.8.18",
     "displayName": "xxhash-rust",
-    "version": "0.8.17",
+    "version": "0.8.18",
     "repositoryURL": "https://github.com/DoumanAsh/xxhash-rust",
     "licenseName": "BSL-1.0",
-    "licenseFileResourceName": "xxhash-rust-0.8.17.txt",
+    "licenseFileResourceName": "xxhash-rust-0.8.18.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
