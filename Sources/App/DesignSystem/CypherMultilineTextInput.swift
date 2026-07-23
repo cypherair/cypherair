@@ -92,9 +92,11 @@ private struct CypherMultilineInputRow: View {
                 title: title
             )
         }
-        // The relock signal (docs/SECURITY.md session model): the sheet is
-        // window-level and floats above the in-hierarchy lock surface, so it
-        // must dismiss itself when content clears.
+        // The relock signal (docs/SECURITY.md session model): locking clears
+        // the bound content, so the editor sheet dismisses on the
+        // content-clear generation instead of lingering — now empty — over
+        // the tool screen after unlock. Privacy is not the reason: the shield
+        // window (#697/#723) covers this sheet while locked or away.
         .onChange(of: appSessionOrchestrator?.contentClearGeneration) { _, _ in
             isEditorPresented = false
         }

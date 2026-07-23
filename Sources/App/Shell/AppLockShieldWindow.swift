@@ -397,10 +397,22 @@ final class AppLockShieldAnchorView: NSView {
 }
 
 /// Borderless windows refuse key status by default; the shield must be able
-/// to become key while in lock mode so keyboard events cannot reach covered
-/// windows. (Privacy mode simply never asks for key status.)
+/// to become key while in LOCK mode so keyboard events cannot reach covered
+/// windows. `canBecomeKey` is gated on the presented mode rather than
+/// unconditionally true: AppKit's click-to-front makes a clicked window key
+/// with no code call involved, so an unconditional override would let a
+/// click on the PRIVACY cover (returning within grace from another app) hand
+/// the panel key status behind the coordinator's back — `shieldTookKeyStatus`
+/// would stay false and `removeShield` would skip restoring the pre-away
+/// sheet/field focus, leaving AppKit to reassign key arbitrarily. The gate
+/// controls acquisition only: a lock→privacy flip does not strip key status
+/// already held (key restoration happens when the shield hides, by design).
 private final class AppLockShieldPanel: NSWindow {
-    override var canBecomeKey: Bool { true }
+    /// Set by the coordinator to the presented mode's `takesKeyStatus`;
+    /// false until a mode is applied.
+    var allowsKeyStatus = false
+
+    override var canBecomeKey: Bool { allowsKeyStatus }
     override var canBecomeMain: Bool { false }
 }
 
@@ -446,7 +458,7 @@ final class AppLockShieldWindowCoordinator {
 
     private let appLockController: AppLockController
     private weak var hostWindow: NSWindow?
-    private var shieldWindow: NSWindow?
+    private var shieldWindow: AppLockShieldPanel?
     private weak var restoreKeyWindow: NSWindow?
     private var sheetCovers: [SheetCover] = []
     /// The mode whose window-level side effects have been applied to the
@@ -563,9 +575,13 @@ final class AppLockShieldWindowCoordinator {
     }
 
     private func applyMode(_ mode: AppLockShieldPolicy.Mode) {
-        guard shieldWindow != nil, mode != presentedMode else { return }
+        guard let shieldWindow, mode != presentedMode else { return }
         let previousMode = presentedMode
         presentedMode = mode
+        // Structural key gate, applied BEFORE any `makeKey()` below: privacy
+        // mode cannot become key even via AppKit's click-to-front (which
+        // involves no coordinator code); lock mode can.
+        shieldWindow.allowsKeyStatus = mode.takesKeyStatus
         guard AppLockShieldPolicy.appliesLockModeInputDiscipline(
             transitioningFrom: previousMode,
             to: mode

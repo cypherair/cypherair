@@ -384,6 +384,10 @@ final class AppLockControllerTests: XCTestCase {
         await fulfillment(of: [suspended], timeout: 1.0)
 
         XCTAssertEqual(controller.lockState, .authenticating)
+        XCTAssertTrue(
+            controller.isLocked,
+            "`.authenticating` must read as locked — the shield renders its lock face off `isLocked`, so this is what makes the lock face win during auth prompts (#723)."
+        )
         XCTAssertTrue(controller.isResolvingForegroundLock, "Cover stays held through the authentication.")
         XCTAssertTrue(controller.isCosmeticallyCovered)
 

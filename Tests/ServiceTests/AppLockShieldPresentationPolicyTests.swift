@@ -8,15 +8,17 @@ import XCTest
 ///   system snapshots a backgrounding scene (the lock lands on an async
 ///   `Task`), so presentation must never collapse to lock-machine state
 ///   alone.
-/// - The rendering mode follows `isLocked` exclusively, which is already true
-///   for `.authenticating`/`.authenticationFailed` — the lock face winning
-///   during auth prompts needs no extra precedence state.
 /// - Privacy mode is purely visual: it must never take key status or end the
 ///   text-editing session it covers (a within-grace return resumes focus and
 ///   keyboard untouched); lock mode must do both.
 /// - The lock-mode input side effects apply exactly on entering lock mode —
 ///   including the async lock landing while the window is already visible in
 ///   privacy mode — and never on staying in or leaving it.
+///
+/// The mode rule itself (`isLocked ? lock : privacy`) is a one-line ternary
+/// not restated here; its load-bearing half — `.authenticating` reads as
+/// locked, so the lock face wins during auth prompts — is asserted on the
+/// controller in `AppLockControllerTests`.
 final class AppLockShieldPresentationPolicyTests: XCTestCase {
     func test_presentation_coveredOrLocked() {
         XCTAssertFalse(AppLockShieldPolicy.isPresented(isCosmeticallyCovered: false, isLocked: false))
@@ -24,11 +26,6 @@ final class AppLockShieldPresentationPolicyTests: XCTestCase {
         XCTAssertTrue(AppLockShieldPolicy.isPresented(isCosmeticallyCovered: true, isLocked: false))
         XCTAssertTrue(AppLockShieldPolicy.isPresented(isCosmeticallyCovered: false, isLocked: true))
         XCTAssertTrue(AppLockShieldPolicy.isPresented(isCosmeticallyCovered: true, isLocked: true))
-    }
-
-    func test_mode_followsLockStateAlone() {
-        XCTAssertEqual(AppLockShieldPolicy.mode(isLocked: true), .lock)
-        XCTAssertEqual(AppLockShieldPolicy.mode(isLocked: false), .privacy)
     }
 
     func test_lockMode_takesKeyAndEndsTextEditing() {
