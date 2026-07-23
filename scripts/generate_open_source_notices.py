@@ -159,12 +159,12 @@ def reachable_package_ids(metadata: dict) -> set[str]:
 def reachable_packages(metadata_items: list[dict]) -> list[PackageRecord]:
     packages: dict[str, dict] = {}
     seen: set[str] = set()
-    direct_dependency_names: set[str] = set()
+    direct_dependency_ids: set[str] = set()
 
     for metadata in metadata_items:
         packages.update(package_map(metadata))
         seen.update(reachable_package_ids(metadata))
-        direct_dependency_names.update(direct_dependency_name_set(metadata))
+        direct_dependency_ids.update(direct_dependency_id_set(metadata))
 
     records: list[PackageRecord] = []
     for package_id in sorted(seen):
@@ -179,7 +179,7 @@ def reachable_packages(metadata_items: list[dict]) -> list[PackageRecord]:
                 license_name=package.get("license") or "Unknown",
                 repository_url=normalize_url(package.get("repository") or ""),
                 manifest_path=Path(package["manifest_path"]),
-                is_direct_dependency=package["name"] in direct_dependency_names,
+                is_direct_dependency=package_id in direct_dependency_ids,
             )
         )
 
@@ -202,12 +202,13 @@ def normalize_url(url: str) -> str:
     return normalized
 
 
-def direct_dependency_name_set(metadata: dict) -> set[str]:
-    root_package = next(package for package in metadata["packages"] if package["name"] == "pgp-mobile")
+def direct_dependency_id_set(metadata: dict) -> set[str]:
+    root_id = next(package["id"] for package in metadata["packages"] if package["name"] == "pgp-mobile")
+    root_node = node_map(metadata)[root_id]
     return {
-        dependency["name"]
-        for dependency in root_package["dependencies"]
-        if (dependency["kind"] or "normal") == "normal"
+        dependency["pkg"]
+        for dependency in root_node.get("deps", [])
+        if "normal" in {item["kind"] or "normal" for item in dependency.get("dep_kinds", [])}
     }
 
 
