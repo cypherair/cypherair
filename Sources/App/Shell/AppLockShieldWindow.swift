@@ -27,16 +27,25 @@ import AppKit
 //   front of a same-level child regardless of explicit reordering — so the
 //   shield runs at an elevated `NSWindow.Level` while the app is active.
 //   Because AppKit window levels are global across apps, the shield drops
-//   back to `.normal` while the app is inactive so it can never float above
-//   other apps' windows; that inactive posture degrades exactly to the
-//   pre-shield in-scene behavior, never below it. The shield frame is the
-//   union of the app-window frame and any attached-sheet chain, because
-//   sheets may extend outside the parent frame.
+//   back to `.normal` on a REAL app switch so it can never float above other
+//   apps' windows; that inactive posture degrades exactly to the pre-shield
+//   in-scene behavior, never below it. An app-resign caused by the lock
+//   surface's own unlock prompt is NOT a real app switch: LocalAuthentication
+//   resigns the app for the evaluation (the same resign the controller's
+//   `.authenticating` rule recognizes as the auth sheet's own), and a
+//   `.normal`-level child would fall back behind an attached sheet for the
+//   whole prompt — so the shield holds its elevated level while
+//   `AppLockController.isAuthenticating` spans the attempt, and drops to
+//   `.normal` only if the attempt ends unresolved with the app still
+//   inactive. The shield frame is the union of the app-window frame and any
+//   attached-sheet chain, because sheets may extend outside the parent frame.
 //
-// The shield observes exactly the state that previously drove the in-scene
-// overlay (`AppLockController.isLocked`); it contains no lock logic of its
-// own and never touches presentation state. Locking hides nothing and
-// dismisses nothing — after unlock the user is exactly where they left off.
+// The shield observes only `AppLockController` state that already existed:
+// `isLocked` (exactly the state that previously drove the in-scene overlay)
+// plus, on macOS, `isAuthenticating` for the activation-level policy above.
+// It contains no lock logic of its own and never touches presentation state.
+// Locking hides nothing and dismisses nothing — after unlock the user is
+// exactly where they left off.
 
 extension View {
     /// Install the app-lock shield: a window-level bridge that presents
@@ -48,7 +57,8 @@ extension View {
         background(
             AppLockShieldWindowHost(
                 appLockController: appLockController,
-                isLocked: appLockController.isLocked
+                isLocked: appLockController.isLocked,
+                isAuthenticating: appLockController.isAuthenticating
             )
         )
     }
@@ -59,6 +69,12 @@ extension View {
 private struct AppLockShieldWindowHost: UIViewRepresentable {
     let appLockController: AppLockController
     let isLocked: Bool
+    /// Unused on the UIKit family: `UIWindow.Level` is scene-local — it can
+    /// never place the shield above another app's windows — so there is no
+    /// inactive level drop and therefore no auth-prompt exception to it.
+    /// Carried so the shared `appLockShieldWindow(appLockController:)` entry
+    /// point has one shape across platforms.
+    let isAuthenticating: Bool
 
     func makeCoordinator() -> AppLockShieldWindowCoordinator {
         AppLockShieldWindowCoordinator(appLockController: appLockController)
@@ -176,6 +192,13 @@ final class AppLockShieldWindowCoordinator {
 private struct AppLockShieldWindowHost: NSViewRepresentable {
     let appLockController: AppLockController
     let isLocked: Bool
+    /// `AppLockController.isAuthenticating`, wired through the SwiftUI update
+    /// path (a stored property, so the representable value changes and
+    /// `updateNSView` fires on every `.authenticating` transition — including
+    /// the attempt that ends unresolved while the app is still inactive,
+    /// which produces no NSApplication activation notification to re-derive
+    /// the level from).
+    let isAuthenticating: Bool
 
     func makeCoordinator() -> AppLockShieldWindowCoordinator {
         AppLockShieldWindowCoordinator(appLockController: appLockController)
@@ -188,7 +211,7 @@ private struct AppLockShieldWindowHost: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: AppLockShieldAnchorView, context: Context) {
-        context.coordinator.setLocked(isLocked)
+        context.coordinator.setState(locked: isLocked, authenticating: isAuthenticating)
     }
 
     static func dismantleNSView(_ nsView: AppLockShieldAnchorView, coordinator: AppLockShieldWindowCoordinator) {
@@ -218,16 +241,39 @@ private final class AppLockShieldPanel: NSWindow {
 final class AppLockShieldWindowCoordinator {
     /// Above `.modalPanel` so window-modal sheets and modal panels are
     /// covered while the app is active; below the menu-bar/status levels so
-    /// system chrome stays on top. Applied only while the app is active —
-    /// AppKit levels order globally across apps, and the shield must never
-    /// float above another app's windows.
+    /// system chrome stays on top. Applied per
+    /// `shieldLevel(appIsActive:isUnlockAuthenticationInFlight:)` — AppKit
+    /// levels order globally across apps, and the shield must never float
+    /// above another app's windows on a real app switch.
     static let activeShieldLevel = NSWindow.Level(rawValue: NSWindow.Level.modalPanel.rawValue + 1)
+
+    /// The activation-level policy, kept pure so it is unit-testable.
+    /// Elevated while the app is active — the case the #697 invariant is
+    /// about — and while an app-session unlock attempt is in flight:
+    /// LocalAuthentication's prompt resigns the app (the exact resign
+    /// `AppLockController.handleAwayEvent`'s `.authenticating` rule treats as
+    /// the auth sheet's own), and a `.normal`-level child window falls behind
+    /// an attached sheet (probed for #697) — dropping on that resign would
+    /// expose the covered sheet for the whole prompt. Only a real app switch
+    /// — inactive with no unlock in flight — drops to `.normal`, preserving
+    /// the recorded deviation that the shield never floats above other apps'
+    /// windows.
+    static func shieldLevel(appIsActive: Bool, isUnlockAuthenticationInFlight: Bool) -> NSWindow.Level {
+        appIsActive || isUnlockAuthenticationInFlight ? activeShieldLevel : .normal
+    }
 
     private let appLockController: AppLockController
     private weak var hostWindow: NSWindow?
     private var shieldWindow: NSWindow?
     private weak var restoreKeyWindow: NSWindow?
     private var isLocked = false
+    /// SwiftUI-mirrored `AppLockController.isAuthenticating`, used only as a
+    /// change signal in `setState`. Level decisions read the controller live:
+    /// it sets `.authenticating` synchronously before the LA prompt exists,
+    /// so a live read can never be stale when the prompt's resign
+    /// notification arrives — this mirror could be, if that resign outruns
+    /// the next SwiftUI render.
+    private var isAuthenticating = false
     private var observers: [any NSObjectProtocol] = []
 
     // Observer lifetime: `endObservations()` runs on every shield removal,
@@ -251,10 +297,22 @@ final class AppLockShieldWindowCoordinator {
         apply()
     }
 
-    func setLocked(_ locked: Bool) {
-        guard locked != isLocked else { return }
-        isLocked = locked
-        apply()
+    func setState(locked: Bool, authenticating: Bool) {
+        let authenticatingChanged = authenticating != isAuthenticating
+        isAuthenticating = authenticating
+        if locked != isLocked {
+            isLocked = locked
+            apply()
+        } else if authenticatingChanged {
+            // `.authenticating` begins and ends without `isLocked` changing.
+            // Re-derive the level on each flip: the begin re-elevates a
+            // shield whose level a racing prompt-resign notification may
+            // already have processed, and the end drops an elevated shield
+            // back to `.normal` when the attempt resolves while the app is
+            // still inactive (the system cancels the prompt on a real app
+            // switch; no NSApplication activation notification follows).
+            applyActivationState()
+        }
     }
 
     func tearDown() {
@@ -290,7 +348,10 @@ final class AppLockShieldWindowCoordinator {
         shield.contentView = NSHostingView(
             rootView: AppLockSurfaceView(appLockController: appLockController)
         )
-        shield.level = NSApp.isActive ? Self.activeShieldLevel : .normal
+        shield.level = Self.shieldLevel(
+            appIsActive: NSApp.isActive,
+            isUnlockAuthenticationInFlight: appLockController.isAuthenticating
+        )
         restoreKeyWindow = NSApp.keyWindow ?? hostWindow
         hostWindow.addChildWindow(shield, ordered: .above)
         if NSApp.isActive {
@@ -379,11 +440,15 @@ final class AppLockShieldWindowCoordinator {
 
     private func applyActivationState() {
         guard let shieldWindow else { return }
+        shieldWindow.level = Self.shieldLevel(
+            appIsActive: NSApp.isActive,
+            isUnlockAuthenticationInFlight: appLockController.isAuthenticating
+        )
+        // Key status is restored only on genuine activation — never
+        // `makeKey()` while the app is inactive, including the elevated
+        // auth-prompt posture (the LA sheet owns focus during the prompt).
         if NSApp.isActive {
-            shieldWindow.level = Self.activeShieldLevel
             shieldWindow.makeKey()
-        } else {
-            shieldWindow.level = .normal
         }
         applyShieldFrame()
     }
