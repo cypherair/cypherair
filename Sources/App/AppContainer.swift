@@ -982,6 +982,7 @@ final class AppContainer: @unchecked Sendable {
     @MainActor
     static func makeUITest(
         requiresManualAuthentication: Bool = false,
+        manualAuthStartsUnlocked: Bool = false,
         preloadContact: Bool = false
     ) -> AppContainer {
         let authPromptCoordinator = AuthenticationPromptCoordinator()
@@ -1066,13 +1067,29 @@ final class AppContainer: @unchecked Sendable {
             }
         )
         let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
-        if requiresManualAuthentication {
+        if requiresManualAuthentication && !manualAuthStartsUnlocked {
+            // Plain manual-auth container: ordinary settings stay behind the
+            // real gate — protected-settings-backed persistence, LOCKED until
+            // a genuine unlock's post-auth fan-out loads them, exactly like
+            // production.
             protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
                 persistence: ProtectedSettingsOrdinarySettingsPersistence(
                     protectedSettingsStore: protectedSettingsStore
                 )
             )
         } else {
+            // Auth-bypass graph AND the pre-authenticated manual-auth seam
+            // (`manualAuthStartsUnlocked`): both boot as an already-
+            // authenticated session, but the post-auth fan-out that loads
+            // ordinary settings through the protected-settings domain has not
+            // run at boot. Give them the ungated ephemeral persistence so the
+            // boot state is, for UI purposes, indistinguishable from a
+            // genuinely authenticated one — otherwise every settings-gated
+            // control (e.g. the Guided Tutorial entry, which requires
+            // `isProtectedOrdinarySettingsEditable`) boots disabled. This
+            // loosens no production gating: DEBUG-only container, and any
+            // unlock after the seam's boot still requires real
+            // authentication.
             protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
                 persistence: InMemoryOrdinarySettingsStore()
             )

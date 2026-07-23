@@ -38,6 +38,7 @@ struct CypherAirApp: App {
         if launchConfiguration.usesUITestAppContainer {
             container = AppContainer.makeUITest(
                 requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
+                manualAuthStartsUnlocked: launchConfiguration.manualAuthStartsUnlocked,
                 preloadContact: launchConfiguration.preloadsUITestContact
             )
         } else {
@@ -58,6 +59,11 @@ struct CypherAirApp: App {
                 // controller hook that settles `.unlocked` and marks the
                 // away epoch handled; auth bypass stays OFF, so any
                 // subsequent unlock still requires real authentication.
+                // The container side pairs with this: `makeUITest` gives the
+                // seam variant the ungated ordinary-settings persistence
+                // (already loaded), because the post-auth fan-out that would
+                // load settings through the protected domain never runs at a
+                // pre-authenticated boot.
                 container.appLockController.resetAfterLocalDataReset(preserveAuthentication: true)
                 container.appSessionOrchestrator.recordAuthentication()
             }
