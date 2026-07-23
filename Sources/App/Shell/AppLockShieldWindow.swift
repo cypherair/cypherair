@@ -47,11 +47,16 @@ import AppKit
 //   for #720), so the elevated level is applied only AFTER attachment.
 //   Because AppKit window levels are global across apps, the shield drops
 //   back to `.normal` on a REAL app switch so it can never float above other
-//   apps' windows. An app-resign caused by the lock surface's own unlock
-//   prompt is NOT a real app switch: the shield holds its elevated level
-//   while `AppLockController.isAuthenticating` spans the attempt, and drops
-//   to `.normal` only if the attempt ends unresolved with the app still
-//   inactive. At `.normal` an attached sheet still beats the shield, so while
+//   apps' windows. An app-resign caused by a SYSTEM-SHEET evaluation the
+//   lock flow itself is driving (the Standard-mode "Use Password…" leg of
+//   the #724 in-window unlock) is NOT a real app switch: the shield holds
+//   its elevated level while `AppLockController.isAuthenticating` spans the
+//   attempt, and drops to `.normal` only if the attempt ends unresolved with
+//   the app still inactive. The EMBEDDED in-window evaluation (#724) resigns
+//   nothing — a resign during it is a genuine away, which cancels the
+//   attempt and ends `.authenticating`, so the elevated exception cannot pin
+//   the level while another app is frontmost beyond the cancellation
+//   settling. At `.normal` an attached sheet still beats the shield, so while
 //   the shield is presented every window in the host's attached-sheet chain
 //   additionally carries an opaque cover CHILD OF THE SHEET at the sheet's
 //   own level, which does order above it (probed for #723) — that is what
@@ -133,11 +138,23 @@ enum AppLockShieldPolicy {
 /// mode flip are applied by the coordinator, not here.
 private struct AppShieldContentView: View {
     let appLockController: AppLockController
+    #if os(macOS)
+    /// The macOS in-window unlock owner the lock surface renders the
+    /// embedded authentication for (issue #724).
+    let unlockPresenter: AppSessionUnlockPresenter?
+    #endif
 
     var body: some View {
         switch AppLockShieldPolicy.mode(isLocked: appLockController.isLocked) {
         case .lock:
+            #if os(macOS)
+            AppLockSurfaceView(
+                appLockController: appLockController,
+                unlockPresenter: unlockPresenter
+            )
+            #else
             AppLockSurfaceView(appLockController: appLockController)
+            #endif
         case .privacy:
             AppPrivacySurfaceView()
         }
@@ -149,10 +166,27 @@ extension View {
     /// the lock surface or the cosmetic privacy cover above ALL app content
     /// while `appLockController.isCosmeticallyCovered || isLocked`. Replaces
     /// both the previous in-scene lock overlay (#697) and the previous
-    /// in-scene cosmetic cover overlay (#723).
+    /// in-scene cosmetic cover overlay (#723). On macOS the lock mode also
+    /// hosts the in-window app-session authentication, so the shield carries
+    /// the unlock presenter to the surface (issue #724); the UIKit-family
+    /// platforms keep the system-sheet presentation and ignore it.
     @MainActor
-    func appLockShieldWindow(appLockController: AppLockController) -> some View {
-        background(
+    func appLockShieldWindow(
+        appLockController: AppLockController,
+        unlockPresenter: AppSessionUnlockPresenter? = nil
+    ) -> some View {
+        #if os(macOS)
+        return background(
+            AppLockShieldWindowHost(
+                appLockController: appLockController,
+                unlockPresenter: unlockPresenter,
+                isCosmeticallyCovered: appLockController.isCosmeticallyCovered,
+                isLocked: appLockController.isLocked,
+                isAuthenticating: appLockController.isAuthenticating
+            )
+        )
+        #else
+        return background(
             AppLockShieldWindowHost(
                 appLockController: appLockController,
                 isCosmeticallyCovered: appLockController.isCosmeticallyCovered,
@@ -160,6 +194,7 @@ extension View {
                 isAuthenticating: appLockController.isAuthenticating
             )
         )
+        #endif
     }
 }
 
@@ -351,6 +386,9 @@ private let sheetCoverAccessibilityIdentifier = "appLock.sheetCover"
 
 private struct AppLockShieldWindowHost: NSViewRepresentable {
     let appLockController: AppLockController
+    /// The macOS in-window unlock owner, carried to the hosted lock surface
+    /// (issue #724).
+    let unlockPresenter: AppSessionUnlockPresenter?
     /// The synchronous away-signal cover trigger (see the UIKit twin).
     let isCosmeticallyCovered: Bool
     let isLocked: Bool
@@ -363,7 +401,10 @@ private struct AppLockShieldWindowHost: NSViewRepresentable {
     let isAuthenticating: Bool
 
     func makeCoordinator() -> AppLockShieldWindowCoordinator {
-        AppLockShieldWindowCoordinator(appLockController: appLockController)
+        AppLockShieldWindowCoordinator(
+            appLockController: appLockController,
+            unlockPresenter: unlockPresenter
+        )
     }
 
     func makeNSView(context: Context) -> AppLockShieldAnchorView {
@@ -428,16 +469,21 @@ final class AppLockShieldWindowCoordinator {
 
     /// The activation-level policy, kept pure so it is unit-testable.
     /// Elevated while the app is active — the case the #697 invariant is
-    /// about — and while an app-session unlock attempt is in flight:
-    /// LocalAuthentication's prompt resigns the app (the exact resign
+    /// about — and while an app-session unlock attempt is in flight. The
+    /// in-flight exception exists for the SYSTEM-SHEET evaluation (the
+    /// Standard-mode "Use Password…" leg of the #724 in-window unlock):
+    /// that detached prompt resigns the app (the exact resign
     /// `AppLockController.handleAwayEvent`'s `.authenticating` rule treats as
     /// the auth sheet's own), and a `.normal`-level child window falls behind
     /// an attached sheet (probed for #697) — dropping on that resign would
-    /// expose the covered sheet for the whole prompt. Only a real app switch
-    /// — inactive with no unlock in flight — drops to `.normal`, preserving
-    /// the recorded deviation that the shield never floats above other apps'
-    /// windows. (At `.normal` the attached-sheet chain is covered by the
-    /// per-sheet cover children instead.)
+    /// expose the covered sheet for the whole prompt. The EMBEDDED in-window
+    /// evaluation (#724) resigns nothing; a resign during it is a genuine
+    /// away that cancels the attempt and ends `.authenticating`, so this
+    /// exception holds only for the cancellation-settling moment there. Only
+    /// a real app switch — inactive with no unlock in flight — drops to
+    /// `.normal`, preserving the recorded deviation that the shield never
+    /// floats above other apps' windows. (At `.normal` the attached-sheet
+    /// chain is covered by the per-sheet cover children instead.)
     static func shieldLevel(appIsActive: Bool, isUnlockAuthenticationInFlight: Bool) -> NSWindow.Level {
         appIsActive || isUnlockAuthenticationInFlight ? activeShieldLevel : .normal
     }
@@ -457,6 +503,11 @@ final class AppLockShieldWindowCoordinator {
     }
 
     private let appLockController: AppLockController
+    /// Carried to the hosted lock surface, which renders the embedded
+    /// in-window authentication for it (issue #724). The coordinator itself
+    /// never reads it — the level policy keys on
+    /// `appLockController.isAuthenticating` exactly as before.
+    private let unlockPresenter: AppSessionUnlockPresenter?
     private weak var hostWindow: NSWindow?
     private var shieldWindow: AppLockShieldPanel?
     private weak var restoreKeyWindow: NSWindow?
@@ -485,8 +536,12 @@ final class AppLockShieldWindowCoordinator {
     // `self` weakly, so they could never fire meaningfully after teardown
     // anyway.
 
-    init(appLockController: AppLockController) {
+    init(
+        appLockController: AppLockController,
+        unlockPresenter: AppSessionUnlockPresenter?
+    ) {
         self.appLockController = appLockController
+        self.unlockPresenter = unlockPresenter
     }
 
     func anchorDidMove(to window: NSWindow?) {
@@ -557,7 +612,10 @@ final class AppLockShieldWindowCoordinator {
         // Join a full-screen host's space instead of being stranded outside it.
         shield.collectionBehavior.insert(.fullScreenAuxiliary)
         shield.contentView = NSHostingView(
-            rootView: AppShieldContentView(appLockController: appLockController)
+            rootView: AppShieldContentView(
+                appLockController: appLockController,
+                unlockPresenter: unlockPresenter
+            )
         )
         hostWindow.addChildWindow(shield, ordered: .above)
         shieldWindow = shield

@@ -366,8 +366,14 @@ struct CypherAirApp: App {
                     // two rendering modes of one shield window layered above
                     // the whole presentation stack (sheets, covers, macOS
                     // window-modal sheets) — an in-scene overlay would render
-                    // beneath presentations. See issues #697 and #723.
-                    .appLockShieldWindow(appLockController: container.appLockController)
+                    // beneath presentations. See issues #697 and #723. On
+                    // macOS the lock mode also hosts the in-window
+                    // app-session unlock (issue #724); the presenter slot is
+                    // nil on the UIKit-family platforms.
+                    .appLockShieldWindow(
+                        appLockController: container.appLockController,
+                        unlockPresenter: container.appSessionUnlockPresenter
+                    )
                     .appLifecycleObserver(
                         appLockController: container.appLockController
                     )

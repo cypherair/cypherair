@@ -258,12 +258,58 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
         let context = LAContext()
         policy.configure(context)
+        return try await evaluateAppSessionCore(
+            context: context,
+            policy: policy.localAuthenticationPolicy,
+            reason: reason
+        )
+    }
 
+    #if os(macOS)
+    /// The macOS in-window app-session unlock evaluation (issue #724 stage 2):
+    /// evaluate the app-session BIOMETRIC policy on a caller-supplied context —
+    /// the context the shield lock surface's embedded `LAAuthenticationView`
+    /// displays IS the context evaluated. On success the returned context
+    /// follows the existing app-session custody unchanged
+    /// (`recordSuccessfulAppSessionAuthentication` → `AppSessionOrchestrator`
+    /// handoff → Protected App-Data); like every app-session context it is
+    /// NEVER routed into a private-key operation and never becomes
+    /// `lastEvaluatedContext` (that context is the private-key mode-switch
+    /// reuse seam). Error normalization is byte-identical to
+    /// `evaluateAppSession` (the shared core below) — no new failure states.
+    func evaluateAppSessionWithEmbeddedBiometrics(
+        context: LAContext,
+        reason: String
+    ) async throws -> AppSessionAuthenticationResult {
+        if isUITestAuthenticationBypassEnabled {
+            return .authenticated(context: nil)
+        }
+
+        // The password affordance is the lock surface's explicit action (a
+        // detached system-sheet evaluation), never LocalAuthentication's own
+        // fallback button.
+        context.localizedFallbackTitle = ""
+        return try await evaluateAppSessionCore(
+            context: context,
+            policy: .deviceOwnerAuthenticationWithBiometrics,
+            reason: reason
+        )
+    }
+    #endif
+
+    /// Shared app-session evaluation core: privacy-prompt bracketing plus the
+    /// single app-session error normalization every app-session evaluation
+    /// (system-sheet and macOS embedded) flows through.
+    private func evaluateAppSessionCore(
+        context: LAContext,
+        policy: LAPolicy,
+        reason: String
+    ) async throws -> AppSessionAuthenticationResult {
         do {
             let success = try await authenticationPromptCoordinator.withPrivacyPrompt { _ in
-                try await evaluateLocalAuthenticationPolicyWithCallback(
+                try await evaluateLocalAuthenticationPolicy(
                     context,
-                    appSessionPolicy: policy,
+                    policy: policy,
                     reason: reason
                 )
             }
@@ -306,18 +352,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 }
             }
         }
-    }
-
-    private func evaluateLocalAuthenticationPolicyWithCallback(
-        _ context: LAContext,
-        appSessionPolicy policy: AppSessionAuthenticationPolicy,
-        reason: String
-    ) async throws -> Bool {
-        try await evaluateLocalAuthenticationPolicy(
-            context,
-            policy: policy.localAuthenticationPolicy,
-            reason: reason
-        )
     }
 
     // MARK: - Access Control Creation
