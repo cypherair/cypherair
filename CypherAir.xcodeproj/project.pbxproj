@@ -344,7 +344,6 @@
 				Security/ProtectedData/Registry/ProtectedDataRegistryStore.swift,
 				Security/ProtectedData/Session/AppLockController.swift,
 				Security/ProtectedData/Session/AppSessionOrchestrator.swift,
-				Security/ProtectedData/Session/AppSessionUnlockPresenter.swift,
 				Security/ProtectedData/Session/ProtectedDataPostUnlockCoordinator.swift,
 				Security/ProtectedData/Session/ProtectedDataRelockParticipant.swift,
 				Security/ProtectedData/Session/ProtectedDataRootSecretCoordinator.swift,

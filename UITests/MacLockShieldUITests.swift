@@ -110,27 +110,13 @@ final class MacLockShieldUITests: XCTestCase {
             "The sheet cover frame \(sheetCover.frame) must cover the sheet action frame \(sheetAction.frame)."
         )
 
-        // #724: the Standard-mode lock surface always composes the explicit
-        // password affordance — secondary beside the biometric affordance
-        // when biometrics can evaluate, primary when they cannot — so its
-        // existence is assertable without a fingerprint on any hardware.
-        XCTAssertTrue(
-            element("appLock.passwordUnlock").waitForExistence(timeout: 5),
-            "Expected the Standard-mode lock surface to offer the password unlock action."
-        )
-
         // Optional human-driven tail for the manual verification lane: unlock
-        // with a real authentication and confirm the sheet is exactly where
-        // it was. Activating the app auto-starts the unlock attempt; on a
-        // Touch ID Mac the embedded in-window prompt renders in the lock
-        // surface (#724) — authenticate there. If the attempt settles into a
-        // failure state instead, drive the retry affordance once.
+        // with a real biometric and confirm the sheet is exactly where it was.
         if ProcessInfo.processInfo.environment["UITEST_LOCK_SHIELD_HUMAN_UNLOCK"] == "1" {
             app.activate()
             let retryButton = app.buttons["Tap to Authenticate"].firstMatch
-            if retryButton.waitForExistence(timeout: 5) {
-                retryButton.tap()
-            }
+            XCTAssertTrue(retryButton.waitForExistence(timeout: 10))
+            retryButton.tap()
             XCTAssertTrue(
                 sheetAction.waitForExistence(timeout: 45),
                 "Expected the sheet to still exist after a human-driven unlock."

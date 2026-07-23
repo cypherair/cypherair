@@ -66,18 +66,6 @@ final class AppLockController {
     /// absent, tests that exercise the controller directly fall back to the
     /// main-actor mirror.
     private let operationPromptInProgressProvider: (() -> Bool)?
-    /// macOS in-window unlock seam (issue #724): invalidate an in-flight
-    /// EMBEDDED app-session evaluation and report whether one was in flight
-    /// (`AppSessionUnlockPresenter.cancelEmbeddedEvaluationIfInFlight`). The
-    /// embedded prompt lives in the app's own shield window and resigns
-    /// nothing, so a resign during it is a REAL app switch — `handleAwayEvent`
-    /// cancels through this seam and processes the away as genuine, while the
-    /// detached system-sheet path (the Standard-mode password action) keeps
-    /// the `.authenticating` swallow. `lockNow` also cancels here so a bumped
-    /// away generation never leaves a pending in-window prompt behind. Nil on
-    /// the UIKit-family platforms and in controller tests that exercise the
-    /// system-sheet behavior.
-    private let cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)?
 
     private(set) var lockState: LockState = .locked
 
@@ -160,8 +148,7 @@ final class AppLockController {
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
-        operationPromptInProgressProvider: (() -> Bool)? = nil,
-        cancelEmbeddedUnlockEvaluationIfInFlight: (@MainActor () -> Bool)? = nil
+        operationPromptInProgressProvider: (() -> Bool)? = nil
     ) {
         self.gracePeriodProvider = gracePeriodProvider
         self.lastAuthenticationDateProvider = lastAuthenticationDateProvider
@@ -173,7 +160,6 @@ final class AppLockController {
         self.contentClearHandler = contentClearHandler
         self.shouldBypassAuthentication = shouldBypassAuthentication
         self.operationPromptInProgressProvider = operationPromptInProgressProvider
-        self.cancelEmbeddedUnlockEvaluationIfInFlight = cancelEmbeddedUnlockEvaluationIfInFlight
     }
 
     // MARK: - Computed projections (read by views)
@@ -242,31 +228,17 @@ final class AppLockController {
     func handleAwayEvent(source: String = "awayEvent") {
         #if os(macOS)
         // The `.authenticating` rule: an app-resign during an
-        // app-driven authentication is explicit state, never an away event —
-        // EXCEPT during an embedded in-window evaluation, which resigns
-        // nothing and therefore has no "own" resign to excuse.
+        // app-driven authentication is explicit state, never an away event.
         //
         // (a) An app-session unlock is in flight (`.authenticating` spans the
-        //     evaluation AND the post-auth fan-out):
-        //     - If the in-flight evaluation is the EMBEDDED in-window one
-        //       (issue #724), this resign is a REAL app switch: the in-window
-        //       prompt never resigns the app. Cancel the embedded evaluation
-        //       and fall through to genuine-away processing — the generation
-        //       bump discards the attempt's result ("real background wins")
-        //       and the flow settles `.locked`, so the next genuine
-        //       foreground return auto-authenticates afresh.
-        //     - Otherwise (the detached system-sheet password evaluation, or
-        //       the post-auth fan-out) the resign is the auth sheet's own and
-        //       must not invalidate the unlock it belongs to. Every exit from
-        //       the unlock flow settles an explicit lock state, and the
-        //       genuine lock signals — screen-lock and "Lock Now" — flow
-        //       through `lockNow`, which is not routed here and therefore
-        //       still wins (it bumps `awayGeneration`, so the in-flight
-        //       result is discarded).
+        //     evaluation AND the post-auth fan-out): the system auth sheet's own
+        //     resign must not invalidate the unlock it belongs to. Every exit from
+        //     the unlock flow settles an explicit lock state, and the genuine lock
+        //     signals — screen-lock and "Lock Now" — flow through `lockNow`, which
+        //     is not routed here and therefore still wins (it bumps
+        //     `awayGeneration`, so the in-flight result is discarded).
         if isAuthenticating {
-            guard cancelEmbeddedUnlockEvaluationIfInFlight?() == true else {
-                return
-            }
+            return
         }
         // (b) A private-key operation prompt is in flight: the resign is ambiguous
         //     (the prompt's own resign vs. a genuine app switch), so the away
@@ -437,12 +409,6 @@ final class AppLockController {
         // task, and must not process the now-moot deferral into a second relock
         // cycle. An explicit lock always supersedes the deferred decision.
         pendingOperationPromptAway = nil
-        // Cancel an in-flight EMBEDDED unlock evaluation (issue #724): the
-        // explicit lock bumps `awayGeneration`, so the attempt's result is
-        // discarded either way — cancelling here additionally dismisses the
-        // pending in-window prompt instead of leaving it armed behind the
-        // lock (the system sheet needs no equivalent: the system cancels it).
-        _ = cancelEmbeddedUnlockEvaluationIfInFlight?()
         #endif
         Task { await enterLocked(source: "lockNow:\(source)") }
     }
@@ -500,13 +466,9 @@ final class AppLockController {
 
             // The app genuinely left the foreground during authentication: discard
             // the result and stay locked ("real background wins"). On macOS the
-            // system sheet's own resign never bumps the generation (the
-            // `.authenticating` rule), so this fires for a real iOS
-            // `.background`, a macOS `lockNow` (screen-lock / "Lock Now")
-            // during the prompt, or a macOS app switch during an EMBEDDED
-            // in-window evaluation (issue #724 — that resign is a genuine
-            // away; the cancelled evaluation usually settles through the
-            // stale-throw path in the catch below).
+            // sheet's own resign never bumps the generation (the `.authenticating`
+            // rule), so this fires only for a real iOS `.background` or a macOS
+            // `lockNow` (screen-lock / "Lock Now") during the prompt.
             guard attemptAwayGeneration == awayGeneration else {
                 // The freshly produced context was never handed to the orchestrator
                 // (recordSuccessfulAuthentication is skipped on this path), so invalidate
