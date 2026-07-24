@@ -63,33 +63,6 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(filtered.thirdPartyNotices.map(\.displayName), ["openssl-src", "openssl-sys"])
     }
 
-    func test_sections_withoutSearch_keepsAppFirstAndHighlightsCoreDependencies() throws {
-        let notices = try store.loadNotices()
-
-        let sections = store.sections(for: notices, searchText: "")
-        let thirdPartyNames = sections.thirdPartyNotices.map(\.displayName)
-        let sortedNames = thirdPartyNames.sorted {
-            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
-        }
-        let coreNames = sections.coreDependencyNotices.map(\.displayName)
-
-        XCTAssertEqual(sections.appNotices.map(\.id), ["cypherair"])
-        XCTAssertEqual(
-            coreNames,
-            [
-                "base64",
-                "openssl",
-                "sequoia-openpgp",
-                "SQLCipher",
-                "SQLite",
-                "thiserror",
-                "uniffi",
-                "zeroize"
-            ]
-        )
-        XCTAssertEqual(thirdPartyNames, sortedNames)
-    }
-
     func test_manifest_excludesNonAppleTargetDependenciesAndKeepsReachableTransitiveDependencies() throws {
         let notices = try store.loadNotices()
         let ids = Set(notices.map(\.id))

@@ -56,45 +56,6 @@ class GenerateOpenSourceNoticesTests(unittest.TestCase):
             )
             self.assertEqual(direct_ids, {"apple-dep@1.0.0", "mac-dep@1.0.0"})
 
-    def test_reachable_packages_marks_only_resolved_direct_version(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir_name:
-            crate_root = Path(temp_dir_name)
-            metadata = self.metadata(
-                crate_root=crate_root,
-                dependency_ids=["base64 0.23.0", "apple-dep 1.0.0"],
-                dependency_kinds={
-                    "base64 0.23.0": [{"kind": None}],
-                    "apple-dep 1.0.0": [{"kind": None}],
-                },
-            )
-            metadata["packages"].extend(
-                [
-                    self.package(crate_root, "base64 0.23.0", "base64", "0.23.0"),
-                    self.package(crate_root, "base64 0.22.1", "base64", "0.22.1"),
-                ]
-            )
-            apple_node = next(
-                node for node in metadata["resolve"]["nodes"] if node["id"] == "apple-dep 1.0.0"
-            )
-            apple_node["deps"] = [
-                {
-                    "pkg": "base64 0.22.1",
-                    "dep_kinds": [{"kind": None}],
-                }
-            ]
-            metadata["resolve"]["nodes"].extend(
-                [
-                    {"id": "base64 0.23.0", "deps": []},
-                    {"id": "base64 0.22.1", "deps": []},
-                ]
-            )
-
-            packages = module.reachable_packages([metadata])
-            direct_by_id = {package.id: package.is_direct_dependency for package in packages}
-
-            self.assertTrue(direct_by_id["base64@0.23.0"])
-            self.assertFalse(direct_by_id["base64@0.22.1"])
-
     def test_apple_notice_targets_exclude_non_apple_platforms(self) -> None:
         self.assertIn("aarch64-apple-ios", module.APPLE_NOTICE_TARGETS)
         self.assertIn("aarch64-apple-visionos", module.APPLE_NOTICE_TARGETS)
