@@ -2,13 +2,13 @@
 
 Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
-This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately for Codex; keep shared project constraints semantically aligned, but do not force the two files to be identical. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` is the source of truth for Apple arm64e support. Documentation classes and precedence are defined in docs/WORKFLOW.md.
+This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately for Codex; keep shared project constraints semantically aligned, but do not force the two files to be identical. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` owns the machine-parsed arm64e stage1 pin; the arm64e toolchain contract lives in docs/BUILD.md §3. Documentation classes and precedence are defined in docs/WORKFLOW.md.
 
 ## Tech Stack
 
 - **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
 - **Language:** Apple Swift — 6.4 beta on the development toolchain, 6.3.3 on the release toolchain (see Build) — SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release. Where each UI framework is used is described in docs/ARCHITECTURE.md; framework choices during investigation are made on evidence, not by rule.
-- **OpenPGP:** Sequoia PGP 2.4.1 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/RELEASE.md.
+- **OpenPGP:** Sequoia PGP 2.4.1 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/BUILD.md.
 - **Key families:** nine, chosen at key generation and immutable per key. Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible), Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024). Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody). Per-family canon: `Sources/Models/Keys/PGPKeyFamily.swift` + `pgp-mobile/src/keys.rs`; product promises: docs/PRODUCT.md; custody: docs/CUSTODY.md.
 - **FFI:** Mozilla UniFFI 0.32.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
@@ -44,6 +44,9 @@ Detailed module breakdown: docs/ARCHITECTURE.md
 # .claude/skills/rust-sync.
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 
+# Restore the pinned SQLCipher XCFramework (git-ignored; attested fetch; needs network)
+scripts/restore_sqlcipher_xcframework.sh
+
 # Run Rust tests
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
@@ -68,7 +71,7 @@ xcodebuild build -scheme CypherAir \
     -destination 'generic/platform=visionOS'
 ```
 
-Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, and stale-artifact troubleshooting live in docs/TESTING.md Section 2.4. When the `xcode` MCP server is available (setup: README.md "Xcode MCP"), use `DocumentationSearch` for Apple API behavior instead of memory.
+The Rust↔Xcode sync contract, the per-change rebuild table, and stale-artifact troubleshooting live in docs/BUILD.md §6. When the `xcode` MCP server is available (see: README.md "Xcode MCP"), use `DocumentationSearch` for Apple API behavior instead of memory.
 
 ## Hard Constraints — NEVER Violate
 
@@ -103,14 +106,14 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 - Use your judgment on tests — you don't need to justify each one, and you don't need to test everything. A test worth writing guards behavior a later change could quietly break; an empty one just restates the code, or exists because a test felt expected. Write the first kind freely; skip the second. Most changes need none — but when something genuinely deserves a test, don't talk yourself out of it.
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
-- SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
+- SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator. New test classes under `Tests/DeviceSecurityTests/` must join `CypherAir-UnitTests.xctestplan`'s `skippedTests`; a repo-tracked check fails CI when one is missing.
 - Docs-only PRs may use the documentation path in docs/WORKFLOW.md Section 2 instead of Rust/Xcode runs.
 - Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review gates: docs/WORKFLOW.md.
 
 ## Releases & Versioning
 
-- Stable releases are tag-first per docs/RELEASE.md; never treat `workflow_dispatch` alone as a substitute for the stable tag.
-- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of preparing a release — read the current values, choose the next pair, and commit them (docs/RELEASE.md §1). Releases are maintainer-initiated; confirm the intended version pair while preparing one.
+- Stable releases are tag-first per docs/BUILD.md §1; never treat `workflow_dispatch` alone as a substitute for the stable tag.
+- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of preparing a release — read the current values, choose the next pair, and commit them (docs/BUILD.md §1). Releases are maintainer-initiated; confirm the intended version pair while preparing one.
 
 ## Git & Workflow
 
