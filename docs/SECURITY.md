@@ -98,7 +98,7 @@ Argon2id S2K applies to **private-key export and passphrase-protected import onl
 
 MIE (hardware memory tagging) protects all C/C++ code — **including vendored OpenSSL, which is why the requirement exists** — against buffer overflows and use-after-free on supported hardware; tag mismatches terminate the process, converting silent corruption into a detectable, non-exploitable crash. The capability is additive: unsupported devices run normally.
 
-Enablement is the Enhanced Security capability (`ENABLE_ENHANCED_SECURITY = YES` for Debug and Release via project-level inheritance), which writes the `com.apple.security.hardened-process*` keys into `CypherAir.entitlements` and `CypherAirMacOS.entitlements`. **The entitlements files are the canonical key list and must stay committed to source control.** (The iOS file also carries the §7 memory resource entitlements — a separate axis from MIE.) Validation pass criteria: TESTING.md §6.
+Enablement is the Enhanced Security capability (`ENABLE_ENHANCED_SECURITY = YES` for Debug and Release via project-level inheritance), which writes the `com.apple.security.hardened-process*` keys into `CypherAir.entitlements` and `CypherAirMacOS.entitlements`. **The entitlements files are the canonical key list and must stay committed to source control.** (The iOS file also carries the §7 memory resource entitlements — a separate axis from MIE.) Validation pass criteria: [TESTING.md](TESTING.md) §6.
 
 ## 9. Known Limitations
 
@@ -134,7 +134,7 @@ Any function or change matching one of these requires the §10 process:
 - Filters fingerprints by custody kind for mode-switch re-wrap or its recovery (`PGPKeyIdentity.softwareCustodyFingerprints` and its call sites) — this one-line filter is the sole enforcement of the device-bound re-wrap exemption (§4, [CUSTODY.md](CUSTODY.md) §4).
 - Touches the decrypt Phase 1/Phase 2 boundary, AEAD hard-fail handling, or the `.tmp`-then-rename output contract (Swift decryption services; `pgp-mobile/src/decrypt.rs`, `streaming.rs`).
 - Changes custody routing or capability resolution for private-key operations (`PrivateKeyOperationRouter`, `PGPKeyCapabilityResolver`) — the enforcement points behind §3's never-falls-back rule and [CUSTODY.md](CUSTODY.md)'s operation surface.
-- Changes the sanitized failure-category vocabulary or any error surface crossing the FFI boundary — categories must stay stable, 1:1-mapped at the adapter chokepoint, and free of the §3 leak-set.
+- Changes the sanitized failure-category vocabulary or any error surface crossing the FFI boundary — categories must stay stable and lossless through the adapter chokepoint's category translation, and free of the §3 leak-set.
 - Is a `pub` function in `pgp-mobile/src/lib.rs` (the FFI surface), or changes the vendored RFC 9980 combiner / external-operation seams (`composite_kem.rs`, `external_*` modules).
 - Parses untrusted external input from the URL scheme or QR path (`QRService` and its Rust counterpart).
 - Selects key family, `CipherSuite`, or S2K parameters in key generation/export, or changes the Argon2id memory-guard threshold logic (`os_proc_available_memory` path).
