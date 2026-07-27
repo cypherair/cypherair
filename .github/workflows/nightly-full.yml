@@ -16,6 +16,25 @@ env:
   ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1
 
 jobs:
+  sqlcipher-release-input:
+    name: SQLCipher immutable release input
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test SQLCipher pin and restore gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_sqlcipher_xcframework_validation.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_restore_sqlcipher_xcframework.py'
+      # Unconditional: the restore verifies an immutable release, its asset
+      # attestations, and the pinned digests. None of that needs an Xcode
+      # platform, so it must not sit behind the platform preflight.
+      - name: Restore and validate attested SQLCipher XCFramework
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
+
   rust-dependency-audit:
     runs-on: xcode-27
     steps:
@@ -57,6 +76,16 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_arm64e_release_metadata.py'
           python3 -m unittest discover -s scripts/tests -p 'test_validate_arm64e_stage1_toolchain.py'
           python3 -m unittest discover -s scripts/tests -p 'test_validate_app_store_candidate_release.py'
+      - name: Test repository freshness gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_xcframework_source_fingerprint.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_check_open_source_notices_freshness.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_check_device_test_skip_list.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_validate_xcframework_archive.py'
+      - name: Check open source notices freshness
+        run: python3 scripts/check_open_source_notices_freshness.py --check
+      - name: Check device-only test skip list
+        run: python3 scripts/check_device_test_skip_list.py
       - name: Report localization catalog health
         continue-on-error: true
         run: |
@@ -133,6 +162,21 @@ jobs:
         env:
           ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
+      - name: Check XCFramework source fingerprint
+        run: python3 scripts/xcframework_source_fingerprint.py --check
+      - name: Check generated bindings match the crate
+        run: |
+          # build-xcframework.sh regenerates the UniFFI bindings and the sandbox
+          # input list and copies them over the tracked ones. Anything left in
+          # the working tree means the committed copies did not match
+          # pgp-mobile/src. --porcelain rather than `git diff`: a regenerated
+          # binding for a *new* interface file is untracked, which a diff misses.
+          if [ -n "$(git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist)" ]; then
+            git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
+            git diff -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
+            echo "::error::Generated UniFFI bindings or the XCFramework input list are stale. Run ./build-xcframework.sh --release and commit bindings/, Sources/PgpMobile/, and PgpMobileSourceInputs.xcfilelist."
+            exit 1
+          fi
       - name: Package XCFramework artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
@@ -164,8 +208,18 @@ jobs:
       - name: Restore XCFramework from artifact
         if: steps.platform_preflight.outputs.ready == 'true'
         run: |
+          set -euo pipefail
+          # Same containment rules as every other XCFramework restore.
+          python3 scripts/validate_xcframework_archive.py \
+            --zip "$XCFRAMEWORK_ZIP" \
+            --expected-root PgpMobile.xcframework
+          staging="$(mktemp -d "$PWD/.pgpmobile-extract.XXXXXX")"
+          trap 'rm -rf "$staging"' EXIT
+          ditto -x -k "$XCFRAMEWORK_ZIP" "$staging"
+          python3 scripts/validate_xcframework_archive.py \
+            --tree "$staging/PgpMobile.xcframework"
           rm -rf PgpMobile.xcframework
-          ditto -x -k "$XCFRAMEWORK_ZIP" .
+          mv "$staging/PgpMobile.xcframework" PgpMobile.xcframework
       - name: Restore SQLCipher XCFramework
         if: steps.platform_preflight.outputs.ready == 'true'
         env:

@@ -685,9 +685,13 @@
 			files = (
 			);
 			inputFileListPaths = (
+				"$(SRCROOT)/PgpMobileSourceInputs.xcfilelist",
 			);
 			inputPaths = (
 				"$(SRCROOT)/PgpMobile.xcframework/Info.plist",
+				"$(SRCROOT)/PgpMobile.xcframework/cypherair-source-fingerprint.json",
+				"$(SRCROOT)/PgpMobileSourceInputs.xcfilelist",
+				"$(SRCROOT)/scripts/xcframework_source_fingerprint.py",
 			);
 			name = "Check PgpMobile XCFramework";
 			outputFileListPaths = (
@@ -696,7 +700,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ ! -f \"${SRCROOT}/PgpMobile.xcframework/Info.plist\" ]; then\n    echo \"error: PgpMobile.xcframework is missing. Run ./build-xcframework.sh --release\"\n    exit 1\nfi\n";
+			shellScript = "if [ ! -f \"${SRCROOT}/PgpMobile.xcframework/Info.plist\" ]; then\n    echo \"error: PgpMobile.xcframework is missing. Run ./build-xcframework.sh --release\"\n    exit 1\nfi\n\npython3 \"${SRCROOT}/scripts/xcframework_source_fingerprint.py\" --check --repo-root \"${SRCROOT}\"\n";
 		};
 		CE58C0042F96000000000001 /* Generate Source Compliance Info */ = {
 			isa = PBXShellScriptBuildPhase;

@@ -431,6 +431,21 @@ verify_xcframework() {
     done < <(find "$XCFRAMEWORK_OUTPUT" -type f -name 'libpgp_mobile.a' | sort)
 }
 
+# Record which pgp-mobile sources produced this artifact, inside the bundle so
+# the fingerprint travels with every zip, CI artifact, and release asset. The
+# Xcode "Check PgpMobile XCFramework" phase and pr-checks compare it against the
+# checkout being built, which turns a silently stale library or stale generated
+# bindings into a build failure. Written last: a run that fails earlier must not
+# leave a fingerprint claiming the artifact is current.
+record_source_fingerprint() {
+    log_step "fingerprint" "Recording pgp-mobile source fingerprint..."
+    env -u GH_TOKEN -u GITHUB_TOKEN \
+        "$PYTHON_BIN" "$SCRIPT_DIR/xcframework_source_fingerprint.py" \
+        --write \
+        --repo-root "$REPO_ROOT" \
+        --xcframework "$XCFRAMEWORK_OUTPUT"
+}
+
 echo "=== CypherAir: Apple arm64e XCFramework Build ==="
 echo "Build mode: $BUILD_DIR"
 echo "Cargo target dir: $CARGO_TARGET_DIR"
@@ -485,6 +500,7 @@ combine_archives "visionos-device-universal" "$VISIONOS_DEVICE_LIB" "$VISIONOS_D
 generate_bindings
 create_xcframework "$IOS_DEVICE_LIB" "$IOS_SIM_LIB" "$MACOS_LIB" "$VISIONOS_DEVICE_LIB" "$VISIONOS_SIM_LIB"
 verify_xcframework
+record_source_fingerprint
 
 echo
 echo "=== Build Complete ==="

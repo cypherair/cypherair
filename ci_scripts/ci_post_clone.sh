@@ -87,6 +87,16 @@ clear_gh_auth() {
     fi
 }
 
+# Staging directory for the WF2 xcframework extraction. Removed on every exit
+# path so a rejected archive leaves nothing half-extracted in the workspace.
+XCFRAMEWORK_STAGING_DIR=""
+clear_xcframework_staging_dir() {
+    if [ -n "$XCFRAMEWORK_STAGING_DIR" ]; then
+        rm -rf "$XCFRAMEWORK_STAGING_DIR"
+        XCFRAMEWORK_STAGING_DIR=""
+    fi
+}
+
 # Keep stdout active so Xcode Cloud's ~30 minute inactivity timeout does not
 # cancel the long, deliberately uncached Rust build.
 HEARTBEAT_PID=""
@@ -103,6 +113,7 @@ stop_heartbeat() {
 cleanup_on_exit() {
     stop_heartbeat
     clear_gh_auth
+    clear_xcframework_staging_dir
 }
 trap cleanup_on_exit EXIT INT TERM
 
@@ -220,9 +231,23 @@ release_consumer_workflow() {
     shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
 
     log "WF2: extracting xcframework"
+    # The asset checksum is verified above, but `ditto -x -k` still extracts
+    # with full filesystem privileges: validate entry containment before any
+    # byte lands, extract into a staging directory on the same volume, and move
+    # the bundle into place only once the extracted symlinks are known to stay
+    # inside it. Same rules as the SQLCipher restore.
+    python3 scripts/validate_xcframework_archive.py \
+        --zip "$XCFRAMEWORK_ZIP" \
+        --expected-root PgpMobile.xcframework
+    XCFRAMEWORK_STAGING_DIR="$(mktemp -d "$PWD/.pgpmobile-extract.XXXXXX")"
+    ditto -x -k "$XCFRAMEWORK_ZIP" "$XCFRAMEWORK_STAGING_DIR"
+    [ -f "$XCFRAMEWORK_STAGING_DIR/PgpMobile.xcframework/Info.plist" ] \
+        || fail "extracted xcframework is missing Info.plist"
+    python3 scripts/validate_xcframework_archive.py \
+        --tree "$XCFRAMEWORK_STAGING_DIR/PgpMobile.xcframework"
     rm -rf PgpMobile.xcframework
-    ditto -x -k "$XCFRAMEWORK_ZIP" .
-    [ -f "PgpMobile.xcframework/Info.plist" ] || fail "extracted xcframework is missing Info.plist"
+    mv "$XCFRAMEWORK_STAGING_DIR/PgpMobile.xcframework" PgpMobile.xcframework
+    clear_xcframework_staging_dir
     log "WF2: restoring pinned SQLCipher.xcframework for app archive"
     scripts/restore_sqlcipher_xcframework.sh --require-attestation
 
