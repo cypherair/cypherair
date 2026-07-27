@@ -1,6 +1,6 @@
 # Architecture
 
-*Layer and boundary rules only. The directory listing is the source of truth for structure — this document never inventories modules, files, or flows. Security invariants: [SECURITY.md](SECURITY.md); custody: [CUSTODY.md](CUSTODY.md); storage: [STORAGE.md](STORAGE.md); the XCFramework/bindings artifact decision: [FFI_ARTIFACT_DECISION.md](FFI_ARTIFACT_DECISION.md).*
+*Layer and boundary rules only. The directory listing is the source of truth for structure — this document never inventories modules, files, or flows. Security invariants: [SECURITY.md](SECURITY.md); custody: [CUSTODY.md](CUSTODY.md); storage: [STORAGE.md](STORAGE.md); the XCFramework/bindings artifact decision: [BUILD.md](BUILD.md) §5.*
 
 ## Layers
 

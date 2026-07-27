@@ -100,7 +100,7 @@ xcodebuild build -scheme CypherAir \
 
 Secure Enclave / biometrics / MIE coverage runs on real hardware (an Apple Silicon Mac or a physical device) via the `CypherAir-DeviceTests` plan; macOS UI smoke coverage via `CypherAir-MacUITests`. There is no dedicated visionOS test plan — the build probe above plus the Rust and macOS lanes cover it. Full workflow, CI lanes, hosted-runner caveats, and stale-artifact troubleshooting: [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
 
-Prebuilt `PgpMobile.xcframework` binaries are published on edge and stable channels, and the SQLCipher dependency is refreshed by re-pinning a release of `cypherair/sqlcipher-xcframework` — see [docs/RELEASE.md](docs/RELEASE.md) for channels, verification, and the stable asset contract.
+Prebuilt `PgpMobile.xcframework` binaries are published on edge and stable channels, and the SQLCipher dependency is refreshed by re-pinning a release of `cypherair/sqlcipher-xcframework` — see [docs/BUILD.md](docs/BUILD.md) for channels, verification, and the stable asset contract.
 
 ## Security Model
 
@@ -136,10 +136,8 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [STORAGE](docs/STORAGE.md) | Storage posture, domains, exceptions, envelope version map |
 | [TESTING](docs/TESTING.md) | Test lanes, commands, and validation workflow |
 | [WORKFLOW](docs/WORKFLOW.md) | Development loop, "done" requirements, security gate, documentation contract |
-| [RELEASE](docs/RELEASE.md) | Stable releases, Xcode Cloud flow, asset contract, SDK channels |
-| [ARM64E_STATUS](docs/ARM64E_STATUS.md) | Pinned arm64e stage1 toolchain and re-pin rule |
-| [ARM64E_UPSTREAMING](docs/ARM64E_UPSTREAMING.md) | arm64e fork-carry ownership split, validation contract, rebase guidance |
-| [FFI_ARTIFACT_DECISION](docs/FFI_ARTIFACT_DECISION.md) | FFI artifact shape — decision record and revisit triggers |
+| [BUILD](docs/BUILD.md) | Stable releases, published artifacts, arm64e toolchain and carry chains, FFI artifact shape |
+| [ARM64E_STATUS](docs/ARM64E_STATUS.md) | The machine-parsed arm64e stage1 pin |
 
 ## License
 
