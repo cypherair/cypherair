@@ -142,7 +142,6 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARM64E_STATUS](docs/ARM64E_STATUS.md) | Pinned arm64e stage1 toolchain and re-pin rule |
 | [ARM64E_UPSTREAMING](docs/ARM64E_UPSTREAMING.md) | arm64e fork-carry ownership split, validation contract, rebase guidance |
 | [FFI_ARTIFACT_DECISION](docs/FFI_ARTIFACT_DECISION.md) | FFI artifact shape — decision record and revisit triggers |
-| [APP_STORE_LISTING](docs/APP_STORE_LISTING.md) | Canonical App Store product-page copy |
 
 ## License
 
