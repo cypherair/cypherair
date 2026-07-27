@@ -5,8 +5,8 @@ CypherAir is an offline OpenPGP encryption app for Apple platforms.
 This file is the Codex-facing agent guide. `CLAUDE.md` is maintained separately
 for Claude-facing sessions; keep shared project constraints semantically
 aligned, but do not force the two files to be identical. Canonical project docs
-live under `docs/`. `docs/ARM64E_STATUS.md` owns Apple arm64e support and pinned
-stage1 toolchain policy.
+live under `docs/`. `docs/ARM64E_STATUS.md` owns the machine-parsed arm64e
+stage1 pin; the toolchain contract lives in `docs/BUILD.md` Section 3.
 
 ## Project Snapshot
 
@@ -58,6 +58,9 @@ Detailed module breakdown: `docs/ARCHITECTURE.md`.
 # docs/ARM64E_STATUS.md — never pass `latest`).
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 
+# Restore the pinned SQLCipher XCFramework (git-ignored; attested fetch; needs network)
+scripts/restore_sqlcipher_xcframework.sh
+
 # Run Rust tests.
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
@@ -93,7 +96,8 @@ everything. A test worth writing guards behavior a later change could quietly
 break; an empty one just restates the code or exists because a test felt
 expected. Write the first kind freely, skip the second; most changes need none.
 Secure Enclave and biometric code must guard with `SecureEnclave.isAvailable`
-and skip in simulator.
+and skip in simulator. New test classes under `Tests/DeviceSecurityTests/` must
+join the unit plan's `skippedTests`; a repo-tracked check fails CI otherwise.
 
 When Xcode MCP or Apple documentation tools are available, prefer live Apple
 documentation lookup for API behavior instead of relying on memory.
@@ -104,8 +108,8 @@ documentation lookup for API behavior instead of relying on memory.
    `NWConnection`, or `URLSession`.
 2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription`
    for LocalAuthentication-backed biometric flows. No camera, photo library,
-   contacts, or network entitlements. All I/O goes through system pickers, Share
-   Sheet, or URL scheme.
+   contacts, or network entitlements. All I/O goes through system pickers or the
+   URL scheme.
 3. **AEAD hard-fail.** Authentication failure during decryption must abort
    immediately. Never show partial plaintext.
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or
@@ -143,18 +147,17 @@ the code alone:
 - Design identity is quiet and system-native — system accent only, no brand
   tint. Reuse the `Sources/App/DesignSystem/` primitives instead of per-view
   literals.
-- One type per file, grouped by feature; test doubles under `Tests/Support/SecurityMocks/` (Sources ships no mocks); all user
+- Files are grouped by feature; test doubles under `Tests/Support/SecurityMocks/` (Sources ships no mocks); all user
   strings in the String Catalog.
 - Prefer architecturally correct fixes while keeping scope limited to the user
   request. Do not normalize, revert, or clean up unrelated local changes.
 
 ## Releases, Git, And Workflow
 
-- Stable releases are tag-first per `docs/RELEASE.md`. Never treat
-  `workflow_dispatch` alone as a substitute for the stable tag. Ask before
-  publishing any release or tag.
+- Stable releases are tag-first per `docs/BUILD.md` Section 1. Never treat
+  `workflow_dispatch` alone as a substitute for the stable tag.
 - Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope
-  part of preparing a release (`docs/RELEASE.md` Section 1); confirm the
+  part of preparing a release (`docs/BUILD.md` Section 1); confirm the
   intended version with the maintainer before creating the release tag.
 - Work on a topic branch and submit a PR. Do not commit directly to `main`
   unless the user explicitly asks.

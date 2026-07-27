@@ -26,8 +26,8 @@ Before considering a code task complete:
 
 - Rust compiles for all targets (`aarch64-apple-ios`, `-ios-sim`, `-darwin`, `-visionos`, `-visionos-sim`) and `cargo +stable test --manifest-path pgp-mobile/Cargo.toml` passes.
 - The relevant Swift lane passes locally — `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` is the source of truth for Swift validation. Device/SE-hardware behavior runs under `CypherAir-DeviceTests` on Apple Silicon or a physical device.
-- **rust-sync when needed.** Rust changes under `pgp-mobile/src`, `Cargo.toml`/`Cargo.lock`, or the UniFFI interface do **not** auto-refresh the `PgpMobile.xcframework` and generated bindings that Xcode links. When Swift-visible behavior can change, run the full pinned sync **before** Swift validation (`.claude/skills/rust-sync`). Rust-only test changes, comments, and docs do not need it.
-- Tests follow CLAUDE.md's Testing rule — judgment-based, most changes need none. New `Tests/` files need only `git add`; a new `Sources/` file needs its pbxproj test-target membership exception. New `Device*` test classes must be added to the unit plan's `skippedTests` or they will run — and prompt for biometrics — in the unit lane.
+- **rust-sync when needed.** Rust changes under `pgp-mobile/src`, `Cargo.toml`/`Cargo.lock`, or the UniFFI interface do **not** auto-refresh the `PgpMobile.xcframework` and generated bindings that Xcode links. When Swift-visible behavior can change, run the full pinned sync **before** Swift validation (`.claude/skills/rust-sync`). Rust-only test changes (`pgp-mobile/tests/**`) and non-crate docs do not need it; comment edits in fingerprinted crate sources DO — the staleness gate hashes content (docs/BUILD.md §6).
+- Tests follow CLAUDE.md's Testing rule — judgment-based, most changes need none. New `Tests/` files need only `git add`; a new `Sources/` file needs its pbxproj test-target membership exception. New test classes under `Tests/DeviceSecurityTests/` must be added to the unit plan's `skippedTests` or they will run — and prompt for biometrics — in the unit lane; a repo-tracked check enforces it.
 - Commits are SSH-signed with a conventional prefix (`feat:`/`fix:`/`refactor:`/`test:`/`docs:`). Load the signing key with `ssh-add --apple-load-keychain` if the agent has no identity. Never create an unsigned commit.
 
 Docs-only changes that touch no code, generated files, project files, entitlements, release metadata, or build settings skip the Rust/Xcode runs — just keep the text-hygiene check clean (`python3 scripts/check_text_hygiene.py`) and links valid.
@@ -46,7 +46,7 @@ The maintainer's independent Codex security review (run outside this repository,
 
 ## 4. Documentation contract
 
-Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient and point to canon), **canonical current-state** (must match shipped code — PRODUCT, SECURITY, CUSTODY, STORAGE, ARCHITECTURE, TESTING, RELEASE, ARM64E_STATUS, this doc), **decision records** (a recorded choice plus the triggers that reopen it — FFI_ARTIFACT_DECISION, ARM64E_UPSTREAMING), and **roadmap/rationale** (future-facing or design-why — the explicitly marked roadmap-class sections inside canonical docs, e.g. STORAGE's target design; must say so explicitly and never describe shipped behavior). Canonical docs carry a short metadata header (status, purpose, audience, update triggers). Agent skills under `.claude/skills/` are workflow choreography, not documentation — they defer to the canonical docs they cite and never become the sole home of a rule.
+Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient and point to canon), **canonical current-state** (must match shipped code — PRODUCT, SECURITY, CUSTODY, STORAGE, ARCHITECTURE, TESTING, BUILD, this doc — plus ARM64E_STATUS as a machine-parsed pin stub), **decision records** (a recorded choice plus the triggers that reopen it — now marked sections inside canonical docs, e.g. BUILD §5's FFI-artifact decision and §4's carry chains), and **roadmap/rationale** (future-facing or design-why — the explicitly marked roadmap-class sections inside canonical docs, e.g. STORAGE's target design; must say so explicitly and never describe shipped behavior). Canonical docs carry a short metadata header (status, purpose, audience, update triggers). Agent skills under `.claude/skills/` are workflow choreography, not documentation — they defer to the canonical docs they cite and never become the sole home of a rule.
 
 **Keep docs load-bearing.** Record the project-specific contracts a reader genuinely needs; do not narrate stage history, restate what the code already shows, or spell out what a capable model knows by default. When a durable fact ships, move it into the canonical doc that owns it and let the roadmap doc shrink toward rationale.
 
@@ -56,7 +56,7 @@ Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient 
 |---|---|
 | Build / linkage model | README, CLAUDE.md, AGENTS.md, TESTING |
 | Test plans or the dev workflow | CLAUDE.md, AGENTS.md, TESTING, this doc |
-| Release / compliance surface | RELEASE, CLAUDE.md, AGENTS.md |
+| Release / compliance surface | BUILD, CLAUDE.md, AGENTS.md |
 | Rust / FFI contract, service ownership | ARCHITECTURE (contract rules), TESTING |
 | User-visible product surface | PRODUCT |
 | Secret lifecycle, auth boundary, custody | SECURITY, CUSTODY, PRODUCT |
