@@ -136,8 +136,7 @@ the code alone:
 
 - Errors: `CypherAirError` is the app vocabulary; generated `PgpError` is
   normalized at the `Services/FFI/` adapter boundary before app/service code.
-- Never edit generated `Sources/PgpMobile/pgp_mobile.swift`; where strict
-  concurrency trips on it, `@preconcurrency import PgpMobile` at call sites.
+- Never edit generated `Sources/PgpMobile/pgp_mobile.swift`.
 - Views stay thin; workflow-heavy screens move async orchestration, cleanup, and
   transient state into an owning `@Observable` ScreenModel (`SignView` +
   `SignScreenModel` baseline).
