@@ -2,9 +2,9 @@
 
 **Fully offline OpenPGP encryption for Apple platforms — zero network, minimal permissions.** CypherAir X is an open-source OpenPGP tool for people who want to communicate securely without cryptographic knowledge: encrypt, decrypt, sign, and verify, with keys and contacts managed entirely on device. It is a SwiftUI app over a Rust OpenPGP engine (Sequoia PGP) bridged through UniFFI.
 
-- **Platforms** — iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+.
+- **Platforms** — iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+; 8 GB RAM minimum.
 - **Zero network access** — no HTTP(S), no networked SDKs, no telemetry, no update checks; the app works in airplane mode. The evidence chain lives in [docs/SECURITY.md](docs/SECURITY.md).
-- **One usage description** — `NSFaceIDUsageDescription`, for local biometric authentication, injected from the `INFOPLIST_KEY_NSFaceIDUsageDescription` build setting in `CypherAir.xcodeproj` (`CypherAir-Info.plist` declares none). No camera, photo library, contacts, or network permission; the memory and hardened-process entitlements are resource and hardening entitlements, not privacy permissions.
+- **One usage description** — `NSFaceIDUsageDescription`, for local biometric authentication, injected from the `INFOPLIST_KEY_NSFaceIDUsageDescription` build setting in `CypherAir.xcodeproj` (`CypherAir-Info.plist` declares none). No camera, photo library, contacts, or network permission; any other entitlement in the project is a resource, sandbox, or hardening entitlement, not a privacy permission.
 - **Nine key families** — five portable (software custody, exportable) and four device-bound (Secure Enclave custody, never exportable), chosen at key generation and immutable per key. Canon: `Sources/Models/Keys/PGPKeyFamily.swift`; promises: [docs/PRODUCT.md](docs/PRODUCT.md); custody: [docs/CUSTODY.md](docs/CUSTODY.md).
 
 ## Build
@@ -49,8 +49,8 @@ Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple S
 - [CUSTODY](docs/CUSTODY.md) — per-family custody, access control, split custody, interop position
 - [STORAGE](docs/STORAGE.md) — storage posture, protected domains, documented exceptions, envelope version map
 - [ARCHITECTURE](docs/ARCHITECTURE.md) — layer boundaries and the Rust/FFI contract rules
-- [BUILD](docs/BUILD.md) — stable release flow, published artifacts, arm64e toolchain contract, carry chains
-- [TESTING](docs/TESTING.md) — test layers, plans, CI lanes, and the Rust↔Xcode validation workflow
+- [BUILD](docs/BUILD.md) — stable release flow, published artifacts, arm64e toolchain contract, carry chains, and the Rust↔Xcode sync contract
+- [TESTING](docs/TESTING.md) — test layers, plans, and CI lanes
 - [WORKFLOW](docs/WORKFLOW.md) — development loop, "done" requirements, security gate, documentation contract
 - [ARM64E_STATUS](docs/ARM64E_STATUS.md) — the machine-parsed arm64e stage1 pin
 
