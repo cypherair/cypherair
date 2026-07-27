@@ -7,7 +7,7 @@
 Six statements an auditor needs that the code cannot make:
 
 1. **Secure Enclave-bound blobs are inert off-device.** Keychain extraction without the SE hardware yields ciphertext that cannot be decrypted; SE key `dataRepresentation` is bound to the SoC UID.
-2. **Software custody accepts a named tradeoff:** the raw private key exists briefly in app memory during use. Device-bound families avoid it entirely — operations run inside the enclave (CUSTODY.md).
+2. **Software custody accepts a named tradeoff:** the raw private key exists briefly in app memory during use. Device-bound families avoid it entirely — operations run inside the enclave ([CUSTODY.md](CUSTODY.md)).
 3. **ProtectedData has no path that opens without the SE factor.** There is no fallback (§3).
 4. **Passphrase `String` cannot be reliably zeroized.** Scope: key import/export passphrases and password-message (SKESK) flows only — it does **not** affect routine recipient-key decryption or signing, which use SE-unwrapped `Data` that is zeroized. Honest accounting: §9.
 5. **ASLR, sandboxing, and MIE are the defense-in-depth floor** under the accepted residuals in §9 — they raise the cost of memory scanning; they do not eliminate it.
@@ -15,7 +15,7 @@ Six statements an auditor needs that the code cannot make:
 
 ## 2. Format & Interop Security Rules
 
-- **Read-support contract:** the app reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Legacy SEIPD without an MDC (tag 9) is hard-rejected on decrypt.
+- **Read-support contract:** the app reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. The legacy Symmetrically Encrypted Data packet (tag 9, no MDC) is hard-rejected on decrypt.
 - **Outgoing messages are never compressed.** `deflate` is read-only for compatibility; bzip2 is excluded (a second C dependency).
 - **Any post-quantum recipient enforces an AES-256 floor**, inside both SEIPDv1 and SEIPDv2 containers.
 - **The quantum-safety badge derives from the produced artifact** — the session-key (PKESK) algorithms of the message — never from the live recipient selection. Classification fails closed on a truncated prefix (`pgp-mobile/src/decrypt.rs`, `message_quantum_safety`); callers map the failure to *no badge*, never a misleading one.
@@ -40,7 +40,7 @@ Device-bound custody — access policy, split custody, the mode-switch exemption
 
 ### ProtectedData Device-Binding Note
 
-ProtectedData uses a separate app-data root-secret model — do not conflate it with private-key envelope wrapping. The root-secret Keychain payload is a single self-contained `CAPDSEV5` envelope; a ProtectedData-only P-256 SE device-binding key (`WhenPasscodeSetThisDeviceOnly` + `[.privateKeyUsage]` — never `.userPresence`/`.biometryAny`/`.devicePasscode`, *because* the user-facing prompt remains the app-session Keychain gate) is folded into the envelope and reconstructed at open time as a silent second factor. `CAPDSEV5` and `CAPKEV5` share the ECDH construction but are domain-separated by magic and HKDF/AAD prefixes, so neither blob can be misread as the other (all four envelope magics and their version map: [STORAGE.md](STORAGE.md) §5). If the enclave cannot reconstruct the folded key or its public key mismatches, ProtectedData fails closed into framework recovery — **there is no fallback that opens ProtectedData without the SE factor**.
+ProtectedData uses a separate app-data root-secret model — do not conflate it with private-key envelope wrapping. The root secret's `CAPDSEV5` Keychain row (shape: [STORAGE.md](STORAGE.md) §2) folds in a ProtectedData-only P-256 SE device-binding key (`WhenPasscodeSetThisDeviceOnly` + `[.privateKeyUsage]` — never `.userPresence`/`.biometryAny`/`.devicePasscode`, *because* the user-facing prompt remains the app-session Keychain gate), reconstructed at open time as a silent second factor. `CAPDSEV5` and `CAPKEV5` share the ECDH construction but are domain-separated by magic and HKDF/AAD prefixes, so neither blob can be misread as the other (all four envelope magics and their version map: [STORAGE.md](STORAGE.md) §5). If the enclave cannot reconstruct the folded key or its public key mismatches, ProtectedData fails closed into framework recovery — **there is no fallback that opens ProtectedData without the SE factor**.
 
 ## 4. Authentication
 
@@ -51,22 +51,22 @@ ProtectedData uses a separate app-data root-secret model — do not conflate it 
 - **Access-control shapes, as values** (the code authors them; these are the facts):
   - Standard Mode private keys: `WhenUnlockedThisDeviceOnly` + `[.privateKeyUsage, .biometryAny, .or, .devicePasscode]`.
   - High Security Mode private keys: the same minus `.or, .devicePasscode` — no passcode fallback, hidden fallback button.
-  - Device-bound custody keys: **fixed** `[.privateKeyUsage, .biometryAny]` at creation, never mode-dependent (CUSTODY.md §3).
+  - Device-bound custody keys: **fixed** `[.privateKeyUsage, .biometryAny]` at creation, never mode-dependent ([CUSTODY.md](CUSTODY.md) §3).
   - ProtectedData device-binding key: `WhenPasscodeSetThisDeviceOnly` + `[.privateKeyUsage]`, promptless (§3 note).
   - The root-secret row's own LA gate follows `AppSessionAuthenticationPolicy` (`.userPresence` or `.biometryAny`).
 - **`.biometryAny` means keys survive biometric re-enrollment.** In High Security Mode, if biometrics are unavailable (sensor damage, lockout), all private-key operations are blocked until restored.
 
 ### Mode Switching
 
-Switching re-wraps every **software-custody** key under a single authentication: record the target in the `private-key-control` recovery journal, authenticate under the **current** mode, re-wrap each key into its pending row, and only after **all** pending rows are verified: delete old rows, promote pending rows, persist the new mode, clear the journal. **Device-bound keys are exempt — and the exemption is enforced by the caller-side custody-kind filter** (`PGPKeyIdentity.softwareCustodyFingerprints`), not by their fixed access policy: the split-custody classical envelope lives in the same Keychain namespace and the re-wrap workflow would succeed on it if the filter were removed (CUSTODY.md §4). The High Security backup check applies to software-custody keys only.
+Switching re-wraps every **software-custody** key under a single authentication: record the target in the `private-key-control` recovery journal, authenticate under the **current** mode, re-wrap each key into its pending row, and only after **all** pending rows are verified: delete old rows, promote pending rows, persist the new mode, clear the journal. **Device-bound keys are exempt; the exemption is enforced by the caller-side custody-kind filter, not by their fixed access policy** — mechanism and consequences: [CUSTODY.md](CUSTODY.md) §4. The High Security backup check applies to software-custody keys only.
 
-**Crash-recovery invariant:** old rows stay authoritative until every new row is confirmed. Recovery (after unlock opens `private-key-control`) prefers an existing permanent row over a pending one; promotes a complete pending row only when the permanent row is absent or invalid; keeps the journal on retryable Keychain failures so recovery re-runs after the next unlock; treats no-complete-row-anywhere as unrecoverable (clear journal, surface a generic warning that never includes fingerprints); and persists the new auth mode only after a full successful promotion — cleaning stale pending rows alone never changes the mode. All four outcomes are test-pinned (TESTING.md §4).
+**Crash-recovery invariant:** old rows stay authoritative until every new row is confirmed. Recovery (after unlock opens `private-key-control`) prefers an existing permanent row over a pending one; promotes a complete pending row only when the permanent row is absent or invalid; keeps the journal on retryable Keychain failures so recovery re-runs after the next unlock; treats no-complete-row-anywhere as unrecoverable (clear journal, surface a generic warning that never includes fingerprints); and persists the new auth mode only after a full successful promotion — cleaning stale pending rows alone never changes the mode. All four outcomes are test-pinned ([TESTING.md](TESTING.md) §4).
 
 ## 5. Protected App Data
 
 Protected app data is the security domain for CypherAir-owned local state outside private-key material. Rows, domains, and exceptions: [STORAGE.md](STORAGE.md). The invariants:
 
-- **Domains open only after app privacy authentication.** `appSessionAuthenticationPolicy` is the sole early-readable boot exception. Pre-auth startup may classify the registry and bootstrap metadata but must not retrieve the root secret, unwrap any domain master key, or open protected payloads.
+- **Domains open only after app privacy authentication.** `appSessionAuthenticationPolicy` is the sole **ordinary-settings** boot-authentication exception (the full pre-unlock exception set, including the test-only bypass preference: [STORAGE.md](STORAGE.md) §4). Pre-auth startup may classify the registry and bootstrap metadata but must not retrieve the root secret, unwrap any domain master key, or open protected payloads.
 - **Prompt hygiene.** App unlock runs one post-unlock opener pass that reuses the authenticated `LAContext` across all registered committed domains without a second prompt, skipping pending-mutation, missing-context, and no-domain states without fetching the root secret or prompting again; Contacts joins the session through its own post-auth gate. Settings refresh may auto-open protected settings only by **consuming** an existing app-session context handoff — the handoff-only path never starts a new interactive prompt.
 - **The raw root secret exists only to derive the wrapping root key and is immediately zeroized.** Unwrapped domain master keys and decrypted payloads are session-local.
 - **No silent reset, anywhere.** Missing or corrupt payloads enter recovery instead of resetting to defaults; no domain ever resets unreadable state to empty; encryption never silently uses a default encrypt-to-self value; while settings are unavailable, resume grace fails closed to immediate authentication.
@@ -74,8 +74,8 @@ Protected app data is the security domain for CypherAir-owned local state outsid
 - **The registry is the only authority for committed domain membership.** Membership is never inferred from directory listings. Invalid registry state enters framework recovery; domain corruption enters that domain's recovery.
 - **Relock is fail-closed.** Block new access, fan out to all relock participants, zeroize the wrapping root key, clear unwrapped keys and snapshots, and return to the locked session only if teardown succeeds; any participant failure latches **runtime-only** `restartRequired` (never persisted).
 - **File protection is verified, not assumed** — registry files, bootstrap metadata, scratch writes, committed domain files, and SQLCipher **sidecars** (`-wal`, `-shm`, `-journal`); storage outside the app-owned container is never a fallback.
-- **Storage-migration invariant:** any migration preserves readable source state until the protected destination is created, opened, and verified through the normal post-auth path. The full migration contract: STORAGE.md §6.
-- **Contacts:** manual verification is a local fingerprint assertion, not OpenPGP certification; certification-signature export is an explicit artifact boundary, not a Contacts backup. The mandatory-encrypted rule for any future Contacts exchange is product law (PRODUCT.md §2).
+- **Storage-migration invariant:** any migration preserves readable source state until the protected destination is created, opened, and verified through the normal post-auth path. The full migration contract: [STORAGE.md](STORAGE.md) §6.
+- **Contacts:** manual verification is a local fingerprint assertion, not OpenPGP certification; certification-signature export is an explicit artifact boundary, not a Contacts backup. The mandatory-encrypted rule for any future Contacts exchange is product law ([PRODUCT.md](PRODUCT.md) §2).
 
 ## 6. Guided Tutorial Containment
 
@@ -98,7 +98,7 @@ Argon2id S2K applies to **private-key export and passphrase-protected import onl
 
 MIE (hardware memory tagging) protects all C/C++ code — **including vendored OpenSSL, which is why the requirement exists** — against buffer overflows and use-after-free on supported hardware; tag mismatches terminate the process, converting silent corruption into a detectable, non-exploitable crash. The capability is additive: unsupported devices run normally.
 
-Enablement is the Enhanced Security capability (`ENABLE_ENHANCED_SECURITY = YES` in every configuration), which writes the `com.apple.security.hardened-process*` keys into `CypherAir.entitlements` and `CypherAirMacOS.entitlements`. **The entitlements files are the canonical key list and must stay committed to source control.** (The iOS file also carries the §7 memory resource entitlements — a separate axis from MIE.) Validation pass criteria: TESTING.md §6.
+Enablement is the Enhanced Security capability (`ENABLE_ENHANCED_SECURITY = YES` for Debug and Release via project-level inheritance), which writes the `com.apple.security.hardened-process*` keys into `CypherAir.entitlements` and `CypherAirMacOS.entitlements`. **The entitlements files are the canonical key list and must stay committed to source control.** (The iOS file also carries the §7 memory resource entitlements — a separate axis from MIE.) Validation pass criteria: TESTING.md §6.
 
 ## 9. Known Limitations
 
@@ -130,9 +130,11 @@ Any function or change matching one of these requires the §10 process:
 - Calls `AES.GCM.seal`/`AES.GCM.open` or `HKDF<SHA256>.deriveKey` on key material.
 - Writes to or deletes from the Keychain.
 - Seals, opens, validates, or re-encodes any of the four authenticated envelopes (`CAPKEV5`, `CAPDSEV5`, `CADMKV5`, `CPDENV5`) — magic, binding, or AAD changes break domain separation.
-- Implements or calls a **zeroization barrier**. There are exactly two: `Data.zeroize()` (`Sources/Extensions/Data+Zeroing.swift` — the cross-module `resetBytes(in:)` call is itself the optimization barrier) and the `@_optimize(none)` `opaqueZero` in `Sources/Services/Common/SQLCipherRawKey.swift`. Weakening either may let the optimizer eliminate zeroing as a dead store.
-- Filters fingerprints by custody kind for mode-switch re-wrap or its recovery (`PGPKeyIdentity.softwareCustodyFingerprints` and its call sites) — this one-line filter is the sole enforcement of the device-bound re-wrap exemption (§4, CUSTODY.md §4).
+- Implements, calls, or removes a function that **overwrites a secret buffer**. Today that is `Data.zeroize()` (`Sources/Extensions/Data+Zeroing.swift`), `Data.protectedDataZeroize()` (`Sources/Security/ProtectedData/Envelopes/ProtectedDataDomain.swift`), the direct `resetBytes(in:)` calls on key material and plaintext, and the `@_optimize(none)` `opaqueZero` in `Sources/Services/Common/SQLCipherRawKey.swift`. The `Data`-based barriers rely on the cross-module Foundation call to defeat dead-store elimination; weakening any of them may let the optimizer eliminate zeroing. (**Roadmap:** the zeroing-constitution work consolidates these into one primitive with one owner.)
+- Filters fingerprints by custody kind for mode-switch re-wrap or its recovery (`PGPKeyIdentity.softwareCustodyFingerprints` and its call sites) — this one-line filter is the sole enforcement of the device-bound re-wrap exemption (§4, [CUSTODY.md](CUSTODY.md) §4).
 - Touches the decrypt Phase 1/Phase 2 boundary, AEAD hard-fail handling, or the `.tmp`-then-rename output contract (Swift decryption services; `pgp-mobile/src/decrypt.rs`, `streaming.rs`).
+- Changes custody routing or capability resolution for private-key operations (`PrivateKeyOperationRouter`, `PGPKeyCapabilityResolver`) — the enforcement points behind §3's never-falls-back rule and [CUSTODY.md](CUSTODY.md)'s operation surface.
+- Changes the sanitized failure-category vocabulary or any error surface crossing the FFI boundary — categories must stay stable, 1:1-mapped at the adapter chokepoint, and free of the §3 leak-set.
 - Is a `pub` function in `pgp-mobile/src/lib.rs` (the FFI surface), or changes the vendored RFC 9980 combiner / external-operation seams (`composite_kem.rs`, `external_*` modules).
 - Parses untrusted external input from the URL scheme or QR path (`QRService` and its Rust counterpart).
 - Selects key family, `CipherSuite`, or S2K parameters in key generation/export, or changes the Argon2id memory-guard threshold logic (`os_proc_available_memory` path).

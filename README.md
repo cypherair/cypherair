@@ -7,7 +7,7 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+
 ## Key Features
 
 - **Truly Offline** — No HTTP(S), no networked SDKs, no update checks. Works fully in airplane mode.
-- **Minimal Permissions** — Only the biometric usage description is configured for local authentication. No camera, photo library, contacts, or network permissions. All I/O goes through system-provided pickers and the Share Sheet.
+- **Minimal Permissions** — Only the biometric usage description is configured for local authentication. No camera, photo library, contacts, or network permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.
 - **Nine Key Families** — Five portable software tiers (Legacy, Modern, Modern · High, Post-Quantum, Post-Quantum · High) and four device-bound Secure Enclave tiers (Legacy, Modern, Post-Quantum, Post-Quantum · High). Legacy is GnuPG-compatible (RFC 4880); the Modern tiers follow RFC 9580 and the Post-Quantum tiers RFC 9980. Modern · High (Ed448/X448) is portable-only.
 - **Secure Enclave Custody** — Device-bound keys perform signing and decryption inside the Secure Enclave and can never be exported; portable software keys are wrapped at rest via Secure Enclave P-256 ECDH + AES-GCM with biometric authentication.
 - **Usable by Anyone** — No cryptographic knowledge required. Clean, accessible UI built with SwiftUI, using iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere.
@@ -118,12 +118,12 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 ## User Workflows
 
-- **Key Exchange** — QR code (via system Camera + URL scheme), Share Sheet (.asc file), or clipboard paste. Post-quantum public keys are too large for QR (~30 KB armored) and exchange via file, share sheet, or clipboard.
-- **Text Encryption** — Select recipients, toggle encrypt-to-self and signature, encrypt, then copy or share the ciphertext.
+- **Key Exchange** — QR code (via system Camera + URL scheme), `.asc` file through the system file picker, or clipboard paste. Post-quantum public keys are too large for QR and exchange via file or clipboard.
+- **Text Encryption** — Select recipients, toggle encrypt-to-self and signature, encrypt, then copy or save the ciphertext.
 - **File Encryption** — Pick a file, same flow as text. Produces binary `.gpg` output. Streaming I/O with progress reporting. Cancellable. File size validated against available disk space at runtime.
 - **Decryption** — Paste or import ciphertext → two-phase flow → biometric auth → plaintext displayed in memory only, cleared on dismiss.
 - **Signing & Verification** — Cleartext signatures for text, detached `.sig` for files. Auto-verification during decryption with graded results.
-- **Backup & Restore** — Export passphrase-protected private key via Share Sheet (S2K protection matches the key's profile); device-bound keys are never exportable. Import from `.asc` file.
+- **Backup & Restore** — Export passphrase-protected private key via the system file exporter (S2K protection matches the key's profile); device-bound keys are never exportable. Import from `.asc` file.
 
 ## Documentation
 

@@ -13,7 +13,7 @@ import os
 /// prefix (`CADMKAD5`) so a wrapped-DMK blob can never be misread as another format.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 3 and Section 10.
+/// See SECURITY.md Section 5 and Section 10.
 struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
     static let magic = "CADMKV5"
     static let currentFormatVersion = 5

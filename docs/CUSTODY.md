@@ -6,11 +6,11 @@
 
 Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates three concepts: OpenPGP **configuration** (version/algorithms/format), private-key **custody** (software secret certificate vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state) — validity is decided by *family*, never by suite alone.
 
-All four device-bound families are production-exposed wherever Secure Enclave hardware is present, gated only by `SecureEnclave.isAvailable` — there is no per-platform guard (accepted risks: §9).
+All four device-bound families are production-exposed wherever Secure Enclave hardware is present — the generation surface and capability resolution gate on `SecureEnclave.isAvailable` alone; there is no per-platform guard (accepted risks: §9).
 
 ## 2. Custody promises
 
-- **Private material is never exportable in any operable form.** Export/backup of device-bound private material is a hard-unsupported operation independent of policy (`PGPKeyCapabilityResolver`), and no export or backup path may reach it.
+- **Private material is never exportable in any operable form.** The enforcement is the custody-kind guard at the export service boundary — `KeyExportService` throws `.operationUnsupportedForCustody` for anything but software custody before touching any secret — backed by the UI never offering a backup flow for device-bound keys. `PGPKeyCapabilityResolver`'s hard-unsupported `exportPrivateMaterial` arm is belt-and-braces with no production caller today.
 - **Import into the enclave is not an operation** — `PGPKeyOperationKind` has no such case, by design.
 - **Existing private keys are never converted into Secure Enclave custody**, and the product must not imply otherwise.
 - **A Keychain handle, public key, or locator is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
@@ -19,7 +19,7 @@ All four device-bound families are production-exposed wherever Secure Enclave ha
 
 ## 3. Access control
 
-Every device-bound tier persists role-separated CryptoKit Secure Enclave keys as `dataRepresentation` blobs in tier/role-namespaced Keychain rows (row promises: STORAGE.md §3), with access control **fixed at creation**: `WhenUnlockedThisDeviceOnly` + `[.privateKeyUsage, .biometryAny]` — no passcode fallback, never the mode-dependent app policy. `SecureEnclaveCustodyAccessControlPolicy` authors it for every tier's enclave handles; the split-custody classical wrapping key (§7) fixes the same shape at its own creation site.
+Every device-bound tier persists role-separated CryptoKit Secure Enclave keys as `dataRepresentation` blobs in tier/role-namespaced Keychain rows (row promises: [STORAGE.md](STORAGE.md) §3), with access control **fixed at creation**: `WhenUnlockedThisDeviceOnly` + `[.privateKeyUsage, .biometryAny]` — no passcode fallback, never the mode-dependent app policy. `SecureEnclaveCustodyAccessControlPolicy` authors it for every tier's enclave handles; the split-custody classical wrapping key (§7) fixes the same shape at its own creation site.
 
 Two product rules ride on the flag choice: `biometryAny` keeps the key usable when the enrolled biometric set changes, and `biometryCurrentSet` must **never** be exposed as a user-selectable option — for a non-exportable key, biometric-set invalidation is permanent key loss.
 
@@ -27,13 +27,13 @@ Two product rules ride on the flag choice: `biometryAny` keeps the key usable wh
 
 **Invariant:** a Standard ↔ High Security mode switch never re-wraps device-bound custody state.
 
-**Mechanism (corrected):** the exemption is enforced **entirely by caller-side custody-kind filtering** — `PGPKeyIdentity.softwareCustodyFingerprints` selects `.softwareSecretCertificate` identities, and both the mode-switch caller and interrupted-rewrap recovery enumerate only that set. The fixed access policy (§3) does *not* enforce it: the split-custody classical envelope (§7) lives in the same Keychain namespace as software envelopes, so `PrivateKeyRewrapWorkflow` **would load and re-wrap it under a mode-dependent policy if the filter were removed** — a silent custody downgrade with no error. For the pure-enclave families the filter matters differently: they have no envelope at all, and a bundleless fingerprint classifies as unrecoverable and poisons the whole mode-switch recovery. The filter is therefore a §10 security predicate (SECURITY.md), not a redundant safety net.
+**Mechanism (corrected):** the exemption is enforced **entirely by caller-side custody-kind filtering** — `PGPKeyIdentity.softwareCustodyFingerprints` selects `.softwareSecretCertificate` identities, and both the mode-switch caller and interrupted-rewrap recovery enumerate only that set. The fixed access policy (§3) does *not* enforce it: the split-custody classical envelope (§7) lives in the same Keychain namespace as software envelopes, so `PrivateKeyRewrapWorkflow` **would load and re-wrap it under a mode-dependent policy if the filter were removed** — a silent custody downgrade with no error. For the pure-enclave families the filter matters differently: they have no envelope at all, and a bundleless fingerprint classifies as unrecoverable and poisons the whole mode-switch recovery. The filter is therefore a [SECURITY.md](SECURITY.md) §10 predicate, not a redundant safety net.
 
 ## 5. Operation routing
 
 - **Locate before authentication.** Handle lookup by the certificate's public-key bindings is non-prompting; a missing or mismatched handle blocks the operation **without ever showing a biometric sheet**.
 - **One approval per operation.** A single authenticated window covers the enclave-handle load and — for split custody — the classical-component unwrap in the same breath.
-- **Roles are distinct handles.** Signing and key agreement route by required role; wrong-role or wrong-public-binding requests fail closed. A Secure Enclave route never falls back to software material (SECURITY.md §3).
+- **Roles are distinct handles.** Signing and key agreement route by required role; wrong-role or wrong-public-binding requests fail closed. A Secure Enclave route never falls back to software material ([SECURITY.md](SECURITY.md) §3).
 
 ## 6. Split custody (the single home for this invariant)
 
@@ -53,14 +53,14 @@ Structural red lines:
 
 **Today:** the classical component secrets (Ed25519+X25519, or Ed448+X448 for · High) are concatenated and sealed as one `CAPKEV5` envelope under a fixed-access Secure Enclave wrapping key, stored per fingerprint **in the same Keychain namespace as software-custody envelopes** (`SecureEnclaveCompositeClassicalComponentStore` writes through `KeyBundleStore`). This shared tenancy is exactly why the §4 filter is load-bearing.
 
-**Roadmap:** the decided relocation moves the classical component to its own Keychain namespace with a **payload-kind in the authenticated binding** (`CAPKEV6` — version map: STORAGE.md §5) and a custody-health existence check. The §6 red lines survive the move unchanged; the location does not.
+**Roadmap:** the decided relocation moves the classical component to its own Keychain namespace with a **payload-kind in the authenticated binding** (`CAPKEV6` — version map: [STORAGE.md](STORAGE.md) §5) and a custody-health existence check. The §6 red lines survive the move unchanged; the location does not.
 
 ## 8. Interop position
 
-- **The PQ families make no GnuPG claim, and product copy must never imply one.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only; the two do not interoperate. Portable Legacy remains the GnuPG-compatibility story (PRODUCT.md §6).
+- **The PQ families make no GnuPG claim, and product copy must never imply one.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only; the two do not interoperate. Portable Legacy remains the GnuPG-compatibility story ([PRODUCT.md](PRODUCT.md) §6).
 - **The interop target for PQ artifacts is the Sequoia lineage** (`sq` at RFC 9980-capable releases). Device-Bound Modern (v6) likewise makes no GnuPG claim (GnuPG has no v6 support); Device-Bound Legacy (v4) is the GnuPG-oriented device-bound family.
-- **GnuPG floor decision:** the v4 interop contract (ECDSA/ECDH P-256, PKESK v3, SEIPDv1/MDC, v6 rejection) is stable across GnuPG ≥ 2.4, so the mandatory lane asserts a `>= 2.4.0` floor and never pins a release (`scripts/assert_min_gpg_version.sh`; lanes: TESTING.md §5).
-- **QR surfaces show an explicit "not available for this key type" state, never a silent omission** — PQ certificates are an order of magnitude beyond single-QR capacity, and multi-part QR is rejected by decision.
+- **GnuPG floor decision:** the v4 interop contract (ECDSA/ECDH P-256, PKESK v3, SEIPDv1/MDC, v6 rejection) is stable across GnuPG ≥ 2.4, so the mandatory lane asserts a `>= 2.4.0` floor and never pins a release (`scripts/assert_min_gpg_version.sh`; lanes: [TESTING.md](TESTING.md) §5).
+- **QR surfaces show an explicit unavailable state, never a silent omission** — PQ certificates are an order of magnitude beyond single-QR capacity (the size classification is Rust-side), and multi-part QR is rejected by decision.
 - **Scope declinations** (recorded so they are not re-proposed): SLH-DSA; multi-part QR; LibrePGP-format PQ; first-party constant-time / side-channel auditing of the PQ dependency chain — CypherAir consumes pinned upstream releases and carries no cryptographic delta beyond the byte-verified combiner (§6), so side-channel posture belongs to the upstreams.
 
 ## 9. Evidence rules
