@@ -103,8 +103,10 @@ enum AuthenticationMode: String, Codable, Sendable {
     /// `kSecClassKey` items; the SE-level access control is the primary
     /// enforcement mechanism.
     ///
-    /// SECURITY-CRITICAL: These flags must match SECURITY.md Section 4.
-    /// Any change requires human review.
+    /// SECURITY-CRITICAL: this function authors the mode flag sets — the code
+    /// is the source of truth for the exact flags; docs/SECURITY.md Section 4
+    /// states the invariant (Standard adds the passcode fallback, High
+    /// Security does not). Any change requires human review.
     func createAccessControl() throws -> SecAccessControl {
         let flags: SecAccessControlCreateFlags = switch self {
         case .standard:

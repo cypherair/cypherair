@@ -11,8 +11,9 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     let mut salt = [0u8; 16];
     openpgp::crypto::random(&mut salt)?;
 
-    // PRD target: roughly 3 seconds on contemporary hardware —
-    // t=3 passes, p=4 lanes, m=2^19 KiB = 512 MiB.
+    // Project-chosen parameters (docs/SECURITY.md §7 records this set and the
+    // decided RFC 9106 high-memory target): t=3 passes, p=4 lanes,
+    // m=2^19 KiB = 512 MiB.
     let s2k = openpgp::crypto::S2K::Argon2 {
         salt,
         t: 3,
@@ -61,8 +62,8 @@ pub fn export_secret_key(cert_data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
     // Encrypt each secret key component with the passphrase.
     // For the legacy suite: Sequoia's default S2K (Iterated+Salted) is appropriate.
     // For the v6 suites: We must explicitly use Argon2id S2K, because Sequoia's
-    // S2K::default() returns Iterated+Salted for all key versions, and the PRD
-    // requires Argon2id (512 MB / p=4 / ~3s) for v6 exports.
+    // S2K::default() returns Iterated+Salted for all key versions, and the
+    // project requires Argon2id for every v6 export (docs/SECURITY.md §7).
     let mut encrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
     // Encrypt primary key

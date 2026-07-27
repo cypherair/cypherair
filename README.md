@@ -7,7 +7,7 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+
 ## Key Features
 
 - **Truly Offline** — No HTTP(S), no networked SDKs, no update checks. Works fully in airplane mode.
-- **Minimal Permissions** — Only the biometric usage description is configured for local authentication. No camera, photo library, contacts, or network permissions. All I/O goes through system-provided pickers and the Share Sheet.
+- **Minimal Permissions** — Only the biometric usage description is configured for local authentication. No camera, photo library, contacts, or network permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.
 - **Nine Key Families** — Five portable software tiers (Legacy, Modern, Modern · High, Post-Quantum, Post-Quantum · High) and four device-bound Secure Enclave tiers (Legacy, Modern, Post-Quantum, Post-Quantum · High). Legacy is GnuPG-compatible (RFC 4880); the Modern tiers follow RFC 9580 and the Post-Quantum tiers RFC 9980. Modern · High (Ed448/X448) is portable-only.
 - **Secure Enclave Custody** — Device-bound keys perform signing and decryption inside the Secure Enclave and can never be exported; portable software keys are wrapped at rest via Secure Enclave P-256 ECDH + AES-GCM with biometric authentication.
 - **Usable by Anyone** — No cryptographic knowledge required. Clean, accessible UI built with SwiftUI, using iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere.
@@ -26,7 +26,7 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+
 | Device-Bound Post-Quantum | RFC 9980 (v6) | ML-DSA-65+Ed25519 / ML-KEM-768+X25519 | Split custody: post-quantum in Secure Enclave, classical sealed to device | Not compatible |
 | Device-Bound Post-Quantum · High | RFC 9980 (v6) | ML-DSA-87+Ed448 / ML-KEM-1024+X448 | Split custody: post-quantum in Secure Enclave, classical sealed to device | Not compatible |
 
-Message format is selected automatically by recipient key version; any post-quantum recipient enforces an AES-256 floor. Full family and format canon: [docs/PRD.md](docs/PRD.md) §3 and [docs/TDD.md](docs/TDD.md) §1.
+Message format is selected automatically by recipient key version; any post-quantum recipient enforces an AES-256 floor. Family canon: `Sources/Models/Keys/PGPKeyFamily.swift`; product promises: [docs/PRODUCT.md](docs/PRODUCT.md); format security rules: [docs/SECURITY.md](docs/SECURITY.md) §2.
 
 ## Tech Stack
 
@@ -60,7 +60,7 @@ docs/                 # Canonical project documents
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
-Module breakdown: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Layer and boundary rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Build
 
@@ -118,24 +118,22 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 ## User Workflows
 
-- **Key Exchange** — QR code (via system Camera + URL scheme), Share Sheet (.asc file), or clipboard paste. Post-quantum public keys are too large for QR (~30 KB armored) and exchange via file, share sheet, or clipboard.
-- **Text Encryption** — Select recipients, toggle encrypt-to-self and signature, encrypt, then copy or share the ciphertext.
+- **Key Exchange** — QR code (via system Camera + URL scheme), `.asc` file through the system file picker, or clipboard paste. Post-quantum public keys are too large for QR and exchange via file or clipboard.
+- **Text Encryption** — Select recipients, toggle encrypt-to-self and signature, encrypt, then copy or save the ciphertext.
 - **File Encryption** — Pick a file, same flow as text. Produces binary `.gpg` output. Streaming I/O with progress reporting. Cancellable. File size validated against available disk space at runtime.
 - **Decryption** — Paste or import ciphertext → two-phase flow → biometric auth → plaintext displayed in memory only, cleared on dismiss.
 - **Signing & Verification** — Cleartext signatures for text, detached `.sig` for files. Auto-verification during decryption with graded results.
-- **Backup & Restore** — Export passphrase-protected private key via Share Sheet (S2K protection matches the key's profile); device-bound keys are never exportable. Import from `.asc` file.
+- **Backup & Restore** — Export passphrase-protected private key via the system file exporter (S2K protection matches the key's profile); device-bound keys are never exportable. Import from `.asc` file.
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [PRD](docs/PRD.md) | Product requirements, key families, and workflows |
-| [TDD](docs/TDD.md) | Technical design — profiles, formats, FFI, SE wrapping |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
-| [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
-| [SECURE_ENCLAVE_CUSTODY](docs/SECURE_ENCLAVE_CUSTODY.md) | Device-bound custody model, split custody, hardware evidence |
-| [PERSISTED_STATE_INVENTORY](docs/PERSISTED_STATE_INVENTORY.md) | Row-level classification of all persisted state |
-| [POST_QUANTUM](docs/POST_QUANTUM.md) | RFC 9980 design rationale and remaining scope |
+| [PRODUCT](docs/PRODUCT.md) | Product promises, non-features, consent gates, compatibility |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Layer, boundary, and FFI contract rules |
+| [SECURITY](docs/SECURITY.md) | Threat model, fail-closed rules, authentication, coding red lines |
+| [CUSTODY](docs/CUSTODY.md) | Device-bound custody promises, split custody, interop position, evidence rules |
+| [STORAGE](docs/STORAGE.md) | Storage posture, domains, exceptions, envelope version map |
 | [TESTING](docs/TESTING.md) | Test lanes, commands, and validation workflow |
 | [WORKFLOW](docs/WORKFLOW.md) | Development loop, "done" requirements, security gate, documentation contract |
 | [RELEASE](docs/RELEASE.md) | Stable releases, Xcode Cloud flow, asset contract, SDK channels |

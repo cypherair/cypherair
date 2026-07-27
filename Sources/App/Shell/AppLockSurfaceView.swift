@@ -9,8 +9,9 @@ import SwiftUI
 /// is text-only (app name + locked-state caption) by maintainer decision —
 /// no decorative lock imagery. The cosmetic privacy cover is the same shield
 /// window's OTHER rendering mode (`AppPrivacySurfaceView` below; issue #723)
-/// — same visual family, no authentication role. Native platform chrome
-/// only; no `.glassEffect()` on a security surface (PRD §4.9).
+/// — same visual family, no authentication role (cover ≠ lock:
+/// docs/PRODUCT.md §4). Native platform chrome only; no `.glassEffect()`
+/// on a security surface.
 struct AppLockSurfaceView: View {
     let appLockController: AppLockController
 

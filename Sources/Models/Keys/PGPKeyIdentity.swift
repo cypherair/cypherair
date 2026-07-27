@@ -73,11 +73,15 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         keyFamily.softwareGenerationSuite
     }
 
-    /// Fingerprints of software-custody identities — the keys with SE-wrapped
-    /// private-key bundles subject to auth-mode re-wrap and re-wrap recovery.
-    /// Device-bound Secure Enclave custody keys have no bundle and must never
-    /// enter those enumerations: a bundleless fingerprint classifies as
-    /// unrecoverable and poisons the whole mode-switch recovery.
+    /// Fingerprints of software-custody identities — the only keys the
+    /// auth-mode re-wrap and its recovery may enumerate. This custody-kind
+    /// filter IS the enforcement of the device-bound mode-switch exemption
+    /// (docs/CUSTODY.md §4), not a redundant safety net: the split-custody
+    /// classical envelope shares the software envelope namespace, so an
+    /// unfiltered device-bound fingerprint would be silently re-wrapped under
+    /// a mode-dependent policy; the pure-enclave families have no bundle at
+    /// all, and a bundleless fingerprint classifies as unrecoverable and
+    /// poisons the whole mode-switch recovery.
     static func softwareCustodyFingerprints(in identities: [PGPKeyIdentity]) -> [String] {
         identities
             .filter { $0.privateKeyCustodyKind == .softwareSecretCertificate }

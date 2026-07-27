@@ -40,6 +40,8 @@ ossl = { version = "1.5.2", default-features = false, features = ["openssl-sys"]
 uniffi = { version = "0.32", features = ["build"] }
 
 [profile.release]
+# Keep LTO and strip disabled: enabling either causes linker failures with the
+# vendored OpenSSL static objects.
 lto = false
 strip = "none"
 codegen-units = 1

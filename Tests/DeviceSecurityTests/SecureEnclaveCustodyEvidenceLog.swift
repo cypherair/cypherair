@@ -1,8 +1,8 @@
 import Foundation
 @testable import CypherAir
 
-/// A Secure Enclave custody evidence scenario (the rows of the evidence
-/// matrix in docs/SECURE_ENCLAVE_CUSTODY.md §8.1).
+/// A Secure Enclave custody evidence scenario. Evidence output follows the
+/// sanitizer vocabulary in docs/CUSTODY.md §9.
 enum SecureEnclaveCustodyEvidenceScenario: String, CaseIterable, Sendable {
     case handlePairGenerationPersistence
     case signing
