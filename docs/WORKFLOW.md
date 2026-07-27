@@ -12,7 +12,7 @@ This document assumes a capable model that knows how to write correct, idiomatic
 Most work follows one loop: **discuss the goal → investigate → design → implement → verify → open a PR → merge.**
 
 - **Discuss the goal.** The maintainer describes what they want. Clarify scope only where a wrong assumption would cost real rework; otherwise proceed.
-- **Investigate and design.** Read the relevant code and canonical docs. For a substantial or multi-part feature, settle the shape (invariants, red lines, seam boundaries) before writing code — a short design pass, not a document series. Large designs may land as a design doc when the invariants deserve a durable home (e.g. [POST_QUANTUM.md](POST_QUANTUM.md)); most work does not need one. When a design needs maintainer decisions, settle them one at a time — options with a recommendation, the choice recorded on the issue — rather than bundling them into one large plan for wholesale approval.
+- **Investigate and design.** Read the relevant code and canonical docs. For a substantial or multi-part feature, settle the shape (invariants, red lines, seam boundaries) before writing code — a short design pass, not a document series. Large designs may land as a design doc when the invariants deserve a durable home (e.g. the storage-rebuild design sections in [STORAGE.md](STORAGE.md)); most work does not need one. When a design needs maintainer decisions, settle them one at a time — options with a recommendation, the choice recorded on the issue — rather than bundling them into one large plan for wholesale approval.
 - **Implement** at the right altitude: architecturally correct for long-term maintainability over the smallest patch. This sets the *depth* of a change, not its *scope* — keep the work focused on the request; do not fold in unrelated cleanup, and do not hide new behavior in the wrong place to shrink a diff. Shared components live in their own files in the right area, with Xcode file-system sync, target membership, and test-target exclusions reflecting that structure.
 - **Verify** before calling it done (§2).
 - **Multi-phase work.** When a feature lands as several PR-sized stages against a written plan, run a fresh-context adversarial verification after each stage (`.claude/skills/stage-verify`) and resolve its findings before the next stage builds on the seam. The RFC 9980 campaign (#567) is the worked example. Keep campaign state outside the session as it accrues — decisions as issue comments, a worklog, the PR opened early — so any fresh session can resume the work mid-flight.
@@ -46,7 +46,7 @@ The maintainer's independent Codex security review (run outside this repository,
 
 ## 4. Documentation contract
 
-Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient and point to canon), **canonical current-state** (must match shipped code — PRD, TDD, SECURITY, ARCHITECTURE, TESTING, SECURE_ENCLAVE_CUSTODY, PERSISTED_STATE_INVENTORY, RELEASE, ARM64E_STATUS, this doc), **decision records** (a recorded choice plus the triggers that reopen it — FFI_ARTIFACT_DECISION, ARM64E_UPSTREAMING), and **roadmap/rationale** (future-facing or design-why — POST_QUANTUM; must say so explicitly and not describe shipped behavior). Canonical docs carry a short metadata header (status, purpose, audience, update triggers). Agent skills under `.claude/skills/` are workflow choreography, not documentation — they defer to the canonical docs they cite and never become the sole home of a rule.
+Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient and point to canon), **canonical current-state** (must match shipped code — PRODUCT, SECURITY, CUSTODY, STORAGE, ARCHITECTURE, TESTING, RELEASE, ARM64E_STATUS, this doc), **decision records** (a recorded choice plus the triggers that reopen it — FFI_ARTIFACT_DECISION, ARM64E_UPSTREAMING), and **roadmap/rationale** (future-facing or design-why — the explicitly marked roadmap-class sections inside canonical docs, e.g. STORAGE's target design; must say so explicitly and never describe shipped behavior). Canonical docs carry a short metadata header (status, purpose, audience, update triggers). Agent skills under `.claude/skills/` are workflow choreography, not documentation — they defer to the canonical docs they cite and never become the sole home of a rule.
 
 **Keep docs load-bearing.** Record the project-specific contracts a reader genuinely needs; do not narrate stage history, restate what the code already shows, or spell out what a capable model knows by default. When a durable fact ships, move it into the canonical doc that owns it and let the roadmap doc shrink toward rationale.
 
@@ -54,12 +54,12 @@ Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient 
 
 | When you change… | Update |
 |---|---|
-| Build / linkage model | README, CLAUDE.md, AGENTS.md, TDD, TESTING |
+| Build / linkage model | README, CLAUDE.md, AGENTS.md, TESTING |
 | Test plans or the dev workflow | CLAUDE.md, AGENTS.md, TESTING, this doc |
 | Release / compliance surface | RELEASE, CLAUDE.md, AGENTS.md |
-| Rust / FFI contract, service ownership | ARCHITECTURE, TDD (durable semantics), TESTING |
-| User-visible product surface | PRD |
-| Secret lifecycle, auth boundary, custody | SECURITY, SECURE_ENCLAVE_CUSTODY, PRD |
-| Persisted keys, defaults, temp paths, cleanup | PERSISTED_STATE_INVENTORY, ARCHITECTURE, TDD |
+| Rust / FFI contract, service ownership | ARCHITECTURE (contract rules), TESTING |
+| User-visible product surface | PRODUCT |
+| Secret lifecycle, auth boundary, custody | SECURITY, CUSTODY, PRODUCT |
+| Persisted keys, defaults, temp paths, cleanup | STORAGE, ARCHITECTURE |
 
 `CLAUDE.md` (Claude sessions) and `AGENTS.md` (Codex) are separate entry docs; keep shared constraints semantically aligned when either changes, but let tool-specific wording diverge. Active docs are written in English.
