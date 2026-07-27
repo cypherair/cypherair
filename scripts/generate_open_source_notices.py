@@ -494,7 +494,21 @@ def generate() -> None:
 
     notices = build_notice_manifest(packages, license_sources)
     NOTICE_FILE.write_text(json.dumps(notices, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    record_notice_fingerprint()
     print(f"Generated {len(notices)} notices in {RESOURCE_DIR}")
+
+
+def record_notice_fingerprint() -> None:
+    """Record the inputs these notices were generated from.
+
+    scripts/check_open_source_notices_freshness.py compares the recorded values
+    against the working tree in CI, so a dependency change that lands without a
+    regeneration fails instead of shipping a stale legal screen.
+    """
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "check_open_source_notices_freshness.py"), "--write"],
+        check=True,
+    )
 
 
 if __name__ == "__main__":

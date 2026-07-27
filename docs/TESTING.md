@@ -95,12 +95,12 @@ Docs-only changes skip Rust/Xcode runs entirely — the documentation path in [W
 
 ## 2.1 GitHub Actions Lanes
 
-PR Checks and the nightly run are the blocking release-readiness signal. Jobs:
+PR Checks and the nightly run are the blocking release-readiness signal. PR Checks runs on pull requests only; pushes to `main` are validated by `XCFramework Edge Release`, which rebuilds and probes the same commit, plus the nightly run. Jobs:
 
 - `rust-dependency-audit` — `cargo audit --deny warnings` against `pgp-mobile/Cargo.lock`, as an independent failure signal.
-- `rust-full-tests` — the default Rust suite plus the slow targets.
+- `rust-full-tests` — the default Rust suite plus the slow targets, and the repository freshness gates: `scripts/check_open_source_notices_freshness.py` (shipped notices still match the recorded `Cargo.lock` and dependency set) and `scripts/check_device_test_skip_list.py` (every device-only test class is skipped by the unit plan).
 - `rust-gnupg-interop` — installs gpg, asserts the `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs `secure_enclave_gnupg_interop_tests` plus `gnupg_binary_tests` under `CYPHERAIR_REQUIRE_GPG=1`, so a missing gpg fails the lane instead of skipping. Runs parallel to `rust-full-tests`; needs no XCFramework.
-- `xcframework-package` — checks the OpenSSL and Apple `ctor` carry-chain heads for freshness, downloads the pinned arm64e stage1 toolchain in a token-free pre-build step (SHA-256- and byte-size-pinned against `third_party/arm64e-stage1-toolchain.pin.json`), verifies release immutability and asset attestations (`scripts/verify_arm64e_stage1_release.sh`), runs `./build-xcframework.sh --release`, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days.
+- `xcframework-package` — checks the OpenSSL and Apple `ctor` carry-chain heads for freshness, downloads the pinned arm64e stage1 toolchain in a token-free pre-build step (SHA-256- and byte-size-pinned against `third_party/arm64e-stage1-toolchain.pin.json`), verifies release immutability and asset attestations (`scripts/verify_arm64e_stage1_release.sh`), runs `./build-xcframework.sh --release`, verifies the recorded source fingerprint and that the rebuild left the tracked generated bindings and `PgpMobileSourceInputs.xcfilelist` unchanged, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days.
 - `apple-platform-probes` — restores the XCFramework artifact and the pinned SQLCipher dependency (attestation-verified), then runs unsigned `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted install of the pinned Xcode (27.0 beta, which ships the 27.0 SDKs and simulator runtimes — the two expectations are pinned separately in `scripts/ci_xcode_platform_preflight.sh`) is healthy. Hosted runners intentionally carry no CypherAir signing material; signed app builds stay local and on Xcode Cloud.
 
 `XCFramework Edge Release` (main pushes and manual dispatch) audits, rebuilds, probes, then publishes a unique `pgpmobile-edge-*` prerelease; non-main manual runs must use `pgpmobile-drill-*` prefixes. The stable release path runs on Xcode Cloud and is owned by [RELEASE.md](RELEASE.md); `.github/workflows/stable-release-attest.yml` re-verifies the signed tag, checksums, and SQLCipher record on `release.published` and attests the SDK/compliance assets.
@@ -127,6 +127,8 @@ Rust changes under `pgp-mobile/src` do **not** automatically refresh what Xcode 
 - `SQLCipher.xcframework` (git-ignored, restored from the pinned external release) plus its manifest, privacy file, and release record
 
 Treat `pgp-mobile/Cargo.lock` updates as artifact inputs too: even a lockfile-only bump needs the audit, Rust tests, and a full sync before Swift validation, so local artifacts are built from the lockfile being submitted. Never commit the ignored XCFramework directories.
+
+Staleness is machine-checked rather than remembered. Each successful `./build-xcframework.sh --release` records the crate inputs it consumed — `pgp-mobile/src`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `uniffi-bindgen.rs` — into `PgpMobile.xcframework/cypherair-source-fingerprint.json`, and refreshes the tracked `PgpMobileSourceInputs.xcfilelist` that the sandboxed "Check PgpMobile XCFramework" build phase declares. Every Xcode build re-hashes those inputs and fails with the sync command when the artifact no longer matches the checkout, so an edited crate can no longer link yesterday's static library. Because the fingerprint lives inside the bundle it survives `ditto`, so an XCFramework restored from a CI artifact or a release asset is checked the same way. Commit `PgpMobileSourceInputs.xcfilelist` alongside the regenerated bindings; CI fails when a rebuild changes either.
 
 ### A. Rust behavior validation only
 

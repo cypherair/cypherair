@@ -57,6 +57,16 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_arm64e_release_metadata.py'
           python3 -m unittest discover -s scripts/tests -p 'test_validate_arm64e_stage1_toolchain.py'
           python3 -m unittest discover -s scripts/tests -p 'test_validate_app_store_candidate_release.py'
+      - name: Test repository freshness gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_xcframework_source_fingerprint.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_check_open_source_notices_freshness.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_check_device_test_skip_list.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_validate_xcframework_archive.py'
+      - name: Check open source notices freshness
+        run: python3 scripts/check_open_source_notices_freshness.py --check
+      - name: Check device-only test skip list
+        run: python3 scripts/check_device_test_skip_list.py
       - name: Report localization catalog health
         continue-on-error: true
         run: |
@@ -133,6 +143,18 @@ jobs:
         env:
           ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
+      - name: Check XCFramework source fingerprint
+        run: python3 scripts/xcframework_source_fingerprint.py --check
+      - name: Check generated bindings match the crate
+        run: |
+          # build-xcframework.sh regenerates the UniFFI bindings and the sandbox
+          # input list and copies them over the tracked ones. Anything left in
+          # the working tree means the committed copies did not match
+          # pgp-mobile/src.
+          if ! git diff --exit-code -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist; then
+            echo "::error::Generated UniFFI bindings or the XCFramework input list are stale. Run ./build-xcframework.sh --release and commit bindings/, Sources/PgpMobile/, and PgpMobileSourceInputs.xcfilelist."
+            exit 1
+          fi
       - name: Package XCFramework artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"

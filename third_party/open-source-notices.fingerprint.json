@@ -1,0 +1,14 @@
+{
+  "cargoLock": {
+    "path": "pgp-mobile/Cargo.lock",
+    "sha256": "9cf647721d4bc2fb646a3f632f00006268f9af6cd7441a06cf64b781e45137fa"
+  },
+  "generatedBy": "scripts/generate_open_source_notices.py",
+  "notices": {
+    "path": "Sources/Resources/OpenSourceNotices/open_source_notices.json",
+    "recordCount": 122,
+    "sha256": "93ecbace62b17848737cd97f2c3b7df0622db87b09b516b90de8731bf9010d67"
+  },
+  "regenerateCommand": "python3 scripts/generate_open_source_notices.py",
+  "schemaVersion": 1
+}
