@@ -154,12 +154,12 @@ PINNED_REPOSITORY="$(pin_value repository)"
 PINNED_TAG="$(pin_value release.tag)"
 if [ "$ARM64E_RUST_REPOSITORY" != "$PINNED_REPOSITORY" ]; then
     echo "error: ARM64E_RUST_REPOSITORY '$ARM64E_RUST_REPOSITORY' != pinned repository '$PINNED_REPOSITORY'" >&2
-    echo "       update third_party/arm64e-stage1-toolchain.pin.json via the re-pin rule (docs/ARM64E_STATUS.md)" >&2
+    echo "       update third_party/arm64e-stage1-toolchain.pin.json via the re-pin rule (docs/BUILD.md §3)" >&2
     exit 1
 fi
 if [ "$tag" != "$PINNED_TAG" ]; then
     echo "error: ARM64E_STAGE1_RELEASE_TAG '$tag' != pinned tag '$PINNED_TAG'" >&2
-    echo "       update third_party/arm64e-stage1-toolchain.pin.json via the re-pin rule (docs/ARM64E_STATUS.md)" >&2
+    echo "       update third_party/arm64e-stage1-toolchain.pin.json via the re-pin rule (docs/BUILD.md §3)" >&2
     exit 1
 fi
 

@@ -22,8 +22,13 @@ XCFramework` → WF2 `CypherAir Release`); see docs/BUILD.md Section 1.
 4. After WF1→WF2 publish: verify every SDK/compliance asset the
    `stable-release-attest.yml` env block enumerates (plus the three
    `CypherAir-*-AppStore.*` upload artifacts) is attached, that run completed,
-   and the verification commands in the release's own notes pass.
+   and the stable-channel attestation verifies: `gh attestation verify` on the
+   zip and the arm64e build manifest with
+   `--signer-workflow .github/workflows/stable-release-attest.yml`, plus
+   `shasum -c` against the published `.sha256` assets (per-channel guidance:
+   docs/BUILD.md §2 — stable notes do not embed the commands; edge notes do).
 
 **Verify:** the tag matches
 `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>`; the full asset
-set is present; the verification commands pass.
+set is present; the checksums and stable-channel attestation verify per
+docs/BUILD.md §2.

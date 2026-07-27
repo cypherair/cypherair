@@ -28,7 +28,7 @@ enumeration: every location below rotates in ONE commit.
 **Verify:**
 
 - `rg <old-tag>` → zero hits.
-- `rg <new-tag>` → exactly the files enumerated above.
+- `rg <new-tag>` → exactly locations 1–5 above (location 6 pins only the tag *prefix*, never a full tag).
 - `scripts/download_arm64e_stage1_toolchain.sh <tmp-dir>` succeeds against the
   refreshed pin, and `scripts/verify_arm64e_stage1_release.sh <tmp-dir>/download`
   passes (immutability + tag→commit binding + asset attestations).
