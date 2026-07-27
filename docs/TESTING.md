@@ -28,7 +28,7 @@ cargo +stable install cargo-audit --version 0.22.2 --locked
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 ```
 
-**Swift unit + FFI** — macOS is the only working host. The iOS Simulator compiles, but the unit-test host app dies at launch: the ProtectedData storage root requires the volume to report file-protection support *and* re-reads the `.complete` attribute it just wrote, failing closed when either check fails — which is what the simulator's volume does. iOS-only behavior is therefore verified through the macOS lane plus real devices.
+**Swift unit + FFI** — the iOS Simulator cannot host this lane; macOS is where it runs. The Simulator compiles, but the unit-test host app dies at launch: the ProtectedData storage root requires the volume to report file-protection support *and* re-reads the `.complete` attribute it just wrote, failing closed when either check fails — which is what the simulator's volume does. iOS-only behavior is therefore verified through the macOS lane plus real devices.
 
 **Device** — needs a real Secure Enclave. An Apple Silicon Mac runs the whole lane locally (the Mac host has one); SE-capable iPhones and iPads work too; the simulator cannot. Biometric steps use Touch ID or the system authentication prompt. The MIE subset additionally needs memory-tagging hardware (§6).
 
@@ -58,7 +58,7 @@ ProtectedData device tests use test-only shared-right identifiers, never the pro
 
 ### 2.1 CI lanes
 
-**PR Checks** (pull requests) and **Nightly Full Validation** (scheduled, plus manual dispatch) run the same job set and are the blocking release-readiness signal. **XCFramework Edge Release** rebuilds, probes, and publishes an edge prerelease on every push to `main`; **Stable Release Attest** runs on `release.published` ([BUILD.md](BUILD.md) §2); the dependency-freshness report is manual-only and never fails.
+**PR Checks** (pull requests) and **Nightly Full Validation** (scheduled, plus manual dispatch) run the same job set and are the blocking release-readiness signal. **XCFramework Edge Release** rebuilds, probes, and publishes an edge prerelease on every push to `main`; **Stable Release Attestation** runs on `release.published` ([BUILD.md](BUILD.md) §2); the dependency-freshness report is manual-only and never fails.
 
 - Rust and XCFramework jobs deliberately use **no Cargo cache action**: a restored `target/` can mix compiler generations and break proc-macro builds. Clean, slower builds are the accepted trade.
 - Localization catalog health is **reported, never gated** (`scripts/report_localization_catalog.py`, `continue-on-error`). Read the Step Summary when touching `Sources/Resources/*.xcstrings`.
@@ -96,7 +96,7 @@ python3 scripts/check_text_hygiene.py
 
 ### 2.4 Rust artifacts before Swift validation
 
-A Swift lane validates the artifact Xcode last linked, not the working tree. Any edit to a fingerprinted crate input — comments included — needs the pinned sync before a Swift lane means anything, and the build fails closed with the sync command until it runs. The contract, the command, the change-type→run table, and the stale-artifact symptom are in [BUILD.md](BUILD.md) §6; whether a given Rust change needs the rebuild at all is `.claude/skills/rust-sync`.
+A Swift lane validates the artifact Xcode last linked, not the working tree — run the sync first when crate inputs changed. Contract, command, change-type→run table, and stale-artifact symptom: [BUILD.md](BUILD.md) §6. Whether a given Rust change needs the rebuild at all: `.claude/skills/rust-sync`.
 
 ## 3. Family coverage
 
