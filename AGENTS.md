@@ -128,7 +128,9 @@ documentation lookup for API behavior instead of relying on memory.
 
 You may edit security-critical areas directly, but the summary and PR description
 must call out the file, what changed, and why. Security changes get human
-review before merge. The authoritative
+review before merge. Codex sessions do not carry the Claude-side agent-merge
+autonomy: every Codex PR gets maintainer review before merge — a deliberate
+policy choice, not an omission (#719). The authoritative
 security-critical predicates and invariants live in
 `docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
 
