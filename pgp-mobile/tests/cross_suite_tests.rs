@@ -252,7 +252,7 @@ fn test_cross_modern_high_to_a_signed_encrypted_round_trip() {
     let plaintext = b"Full round-trip: B->A signed+encrypted.";
 
     // Encrypt and sign (B sender → A recipient)
-    // Per PRD: v4 recipient → SEIPDv1 format auto-selected
+    // Per CLAUDE.md hard constraint 8: v4 recipient → SEIPDv1 format auto-selected
     let ciphertext = encrypt::encrypt(
         plaintext,
         &[recipient_a.public_key_data.clone()],
@@ -296,7 +296,7 @@ fn test_cross_modern_high_to_a_signed_encrypted_round_trip() {
 }
 
 /// Verify that encrypting to v4 recipient produces SEIPDv1.
-/// This directly validates the PRD Section 3.3 / TDD Section 1.4 format auto-selection rule.
+/// This directly validates the CLAUDE.md hard constraint 8 format auto-selection rule.
 #[test]
 fn test_format_selection_v4_recipient_produces_seipd_v1() {
     let recipient_a =

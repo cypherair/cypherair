@@ -490,9 +490,10 @@ final class SettingsScreenModel {
         return softwareKeys.contains(where: \.isBackedUp)
     }
 
-    /// Mode switching re-wraps SE-wrapped software bundles. Device-bound
-    /// Secure Enclave custody keys have no bundle (their access control is
-    /// fixed, not mode-dependent) and must never enter the rewrap workflow.
+    /// Mode switching re-wraps software-custody bundles only. The custody-kind
+    /// filter is the enforcement of the device-bound exemption — not the fixed
+    /// access policy (docs/CUSTODY.md §4) — so device-bound keys must never
+    /// enter the rewrap workflow.
     nonisolated static func rewrapFingerprints(keys: [PGPKeyIdentity]) -> [String] {
         PGPKeyIdentity.softwareCustodyFingerprints(in: keys)
     }

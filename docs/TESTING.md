@@ -77,7 +77,7 @@ Five Xcode test plans. All test invocations — CLAUDE.md, CI configuration, loc
 - **CypherAir-UnitTests** — Layers 2–3; the default plan on the `CypherAir` scheme. Its `skippedTests` array is a skip-list of `Device*` classes: **every new `Device*` test class must be added there, or it will run — and prompt for biometrics — in the unit lane.**
 - **CypherAir-DeviceTests** — Layer 4, selected tests only. Non-destructive.
 - **CypherAir-DangerousDeviceTests** — manual, destructive: its Reset All Local Data cleanup proof deletes every app-owned Secure Enclave custody handle for the current bundle, not just test-created ones. Run only against a disposable install or device state.
-- **CypherAir-InteropEvidenceTests** — manual macOS-only real-SE↔GnuPG evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`); needs real Secure Enclave hardware, biometric approval, and a local `gpg`. Captured evidence: [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
+- **CypherAir-InteropEvidenceTests** — manual macOS-only real-SE↔GnuPG evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`); needs real Secure Enclave hardware, biometric approval, and a local `gpg`. Evidence rules: [CUSTODY.md](CUSTODY.md) §9.
 - **CypherAir-MacUITests** — targeted macOS UI smoke coverage: routes, settings, and tutorial launch/lifecycle flows.
 
 There is no dedicated visionOS test plan; native visionOS validation is the build probe in §2.4.
@@ -242,7 +242,7 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
 
 ## 5. Cross-Tool Interoperability
 
-**GnuPG.** Interop applies to Portable Legacy (software v4) and the Device-Bound Legacy (v4) custody family. **v6 output — Modern, Modern · High, and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_modern_high_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
+**GnuPG.** Interop applies to Portable Legacy (software v4) and the Device-Bound Legacy (v4) custody family. **v6 output — Modern, Modern · High, and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_modern_high_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([CUSTODY.md](CUSTODY.md) §8).
 
 `gpg` runs on macOS only. Two mechanisms:
 
@@ -252,7 +252,7 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
   - `secure_enclave_gnupg_interop_tests.rs` — device-bound legacy (v4) SE-shaped certificates ↔ gpg, bidirectional, through the production external-signer/key-agreement seams driven by a software-P256 stand-in; asserts PKESK v3 + SEIPDv1/MDC, not AEAD.
   - `secure_enclave_v6_aead_evidence_tests.rs` — device-bound modern (v6) SEIPDv2 AEAD correctness through the production seam (no gpg; runs in `rust-full-tests`).
 
-The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIRE_GPG=1` after asserting the gpg version floor. Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan; captured evidence lives in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
+The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIRE_GPG=1` after asserting the gpg version floor. Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan; evidence and sanitizer rules: [CUSTODY.md](CUSTODY.md) §9.
 
 **sq (sequoia-sq).** The `sq` pack is the cross-implementation evidence for the RFC 9580/9980 families, covering all five portable suites (legacy v4, modern, modern-high, post-quantum, post-quantum-high). Device-bound families share these wire formats; their custody halves are covered by the custody suites and device lanes above. Same two mechanisms:
 
@@ -261,7 +261,7 @@ The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIR
 
 The `rust-gnupg-interop` CI job (displayed as "Rust cross-tool interop (GnuPG + sq)") brews sequoia-sq alongside gnupg, asserts the sq version floor (`scripts/assert_min_sq_version.sh`), and runs both sq suites under `CYPHERAIR_REQUIRE_SQ=1`.
 
-Format nuance: sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2; the v4-only SEIPDv1 floor is asserted with an engine Portable Legacy key mixed into the recipient set (TDD §1.4).
+Format nuance: sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2; the v4-only SEIPDv1 floor is asserted with an engine Portable Legacy key mixed into the recipient set (CLAUDE.md Hard Constraint 8).
 
 ## 6. MIE Validation
 

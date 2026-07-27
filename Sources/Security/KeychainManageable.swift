@@ -79,7 +79,7 @@ extension KeychainManageable {
 }
 
 /// Keychain service name constants.
-/// See ARCHITECTURE.md Section 5 for the full storage layout.
+/// Row promises and the envelope version map: docs/STORAGE.md.
 enum KeychainConstants {
     /// Prefix for all Keychain items. The version segment is the schema
     /// generation of the persisted format family, nothing more.

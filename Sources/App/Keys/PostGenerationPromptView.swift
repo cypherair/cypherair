@@ -1,11 +1,10 @@
 import SwiftUI
 
 /// Shown after key generation to prompt the user to back up and share their key.
-/// Per PRD Section 4.1: "Done → Prompt: back up private key & share public key"
 ///
 /// Device-bound Secure Enclave custody keys have no private-key backup: their
 /// variant states that consequence and makes revocation-certificate export the
-/// primary action instead.
+/// primary action instead (docs/PRODUCT.md §2).
 struct PostGenerationPromptView: View {
     let identity: PGPKeyIdentity
     let onDone: (() -> Void)?

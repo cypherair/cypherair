@@ -26,7 +26,7 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+
 | Device-Bound Post-Quantum | RFC 9980 (v6) | ML-DSA-65+Ed25519 / ML-KEM-768+X25519 | Split custody: post-quantum in Secure Enclave, classical sealed to device | Not compatible |
 | Device-Bound Post-Quantum · High | RFC 9980 (v6) | ML-DSA-87+Ed448 / ML-KEM-1024+X448 | Split custody: post-quantum in Secure Enclave, classical sealed to device | Not compatible |
 
-Message format is selected automatically by recipient key version; any post-quantum recipient enforces an AES-256 floor. Full family and format canon: [docs/PRD.md](docs/PRD.md) §3 and [docs/TDD.md](docs/TDD.md) §1.
+Message format is selected automatically by recipient key version; any post-quantum recipient enforces an AES-256 floor. Family canon: `Sources/Models/Keys/PGPKeyFamily.swift`; product promises: [docs/PRODUCT.md](docs/PRODUCT.md); format security rules: [docs/SECURITY.md](docs/SECURITY.md) §2.
 
 ## Tech Stack
 
@@ -60,7 +60,7 @@ docs/                 # Canonical project documents
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
-Module breakdown: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Layer and boundary rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Build
 
@@ -129,13 +129,11 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 | Document | Description |
 |----------|-------------|
-| [PRD](docs/PRD.md) | Product requirements, key families, and workflows |
-| [TDD](docs/TDD.md) | Technical design — profiles, formats, FFI, SE wrapping |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
-| [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
-| [SECURE_ENCLAVE_CUSTODY](docs/SECURE_ENCLAVE_CUSTODY.md) | Device-bound custody model, split custody, hardware evidence |
-| [PERSISTED_STATE_INVENTORY](docs/PERSISTED_STATE_INVENTORY.md) | Row-level classification of all persisted state |
-| [POST_QUANTUM](docs/POST_QUANTUM.md) | RFC 9980 design rationale and remaining scope |
+| [PRODUCT](docs/PRODUCT.md) | Product promises, non-features, consent gates, compatibility |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Layer, boundary, and FFI contract rules |
+| [SECURITY](docs/SECURITY.md) | Threat model, fail-closed rules, authentication, coding red lines |
+| [CUSTODY](docs/CUSTODY.md) | Device-bound custody promises, split custody, interop position, evidence rules |
+| [STORAGE](docs/STORAGE.md) | Storage posture, domains, exceptions, envelope version map |
 | [TESTING](docs/TESTING.md) | Test lanes, commands, and validation workflow |
 | [WORKFLOW](docs/WORKFLOW.md) | Development loop, "done" requirements, security gate, documentation contract |
 | [RELEASE](docs/RELEASE.md) | Stable releases, Xcode Cloud flow, asset contract, SDK channels |

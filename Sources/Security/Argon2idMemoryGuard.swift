@@ -9,7 +9,7 @@ import Foundation
 ///
 /// Portable Legacy keys use Iterated+Salted S2K (memoryKib=0) — the guard is a no-op.
 ///
-/// See SECURITY.md Section 7, TDD Section 4.
+/// See docs/SECURITY.md Section 7.
 struct Argon2idMemoryGuard {
 
     private let memoryInfo: any MemoryInfoProvidable

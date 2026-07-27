@@ -310,7 +310,7 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_mixedRecipients_v4AndV6_bothCanDecrypt() async throws {
-        // PRD §3.3 / TDD §1.4: mixed v4+v6 recipients → SEIPDv1 (lowest common denominator)
+        // CLAUDE.md Hard Constraint 8: mixed v4+v6 recipients → SEIPDv1 (lowest common denominator)
         let keyV4 = try await generateKeyAndContact(suite: .ed25519LegacyCurve25519Legacy, name: "RecipientV4")
         let keyV6 = try await generateKeyAndContact(suite: .ed448X448, name: "RecipientV6")
 

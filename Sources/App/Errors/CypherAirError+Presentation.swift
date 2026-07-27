@@ -1,7 +1,8 @@
 import Foundation
 
 extension CypherAirError: LocalizedError {
-    /// User-facing error description per PRD Section 4.7.
+    /// User-facing error description. The copy is owned by the String Catalog
+    /// (docs/PRODUCT.md §5); this file only routes each case to its key.
     var errorDescription: String? {
         switch self {
         case .aeadAuthenticationFailed:

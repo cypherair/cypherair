@@ -8,16 +8,20 @@ import Security
 /// (`SecureEnclaveCustodyHandleStore`); this store holds the classical
 /// halves, which alone can neither sign nor decrypt anything — every composite
 /// operation additionally requires the enclave-resident ML-DSA/ML-KEM component
-/// (docs/POST_QUANTUM.md §3).
+/// (docs/CUSTODY.md §6).
 ///
 /// The two component scalars are concatenated and sealed with the existing
 /// per-identity Secure Enclave envelope (ephemeral×static ECDH → HKDF-SHA256 →
 /// AES-GCM). Their lengths depend on the tier: a 32-byte Ed25519 + 32-byte
 /// X25519 pair for `.postQuantum`, or a 57-byte Ed448 + 56-byte X448 pair for
-/// `.postQuantumHigh`. The wrapping key uses FIXED biometric access — never the
-/// app's mode-dependent wrapping key — so the classical component is exempt
-/// from Standard/High-Security mode-switch re-wrap, coherent with the enclave
-/// handles it accompanies.
+/// `.postQuantumHigh`. The wrapping key uses FIXED biometric access — never
+/// the app's mode-dependent wrapping key. NOTE: the fixed policy does NOT by
+/// itself exempt this envelope from Standard/High-Security mode-switch
+/// re-wrap — it is stored through `KeyBundleStore` in the shared
+/// privkey-envelope namespace, and the rewrap workflow would re-wrap it under
+/// a mode-dependent policy if asked. The exemption is enforced entirely by
+/// the caller-side custody-kind filter
+/// (`PGPKeyIdentity.softwareCustodyFingerprints` — docs/CUSTODY.md §4).
 ///
 /// SECURITY-CRITICAL: raw component secrets are handled here. All plaintext
 /// buffers are zeroized after use. See docs/SECURITY.md Section 10.
