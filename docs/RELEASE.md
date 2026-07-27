@@ -70,6 +70,8 @@ The `PgpMobile.xcframework` binary is published on three channels for downstream
 
 CI caches the edge artifact (`pgpmobile-xcframework`) within a run so downstream jobs restore the exact build product on a clean runner.
 
+Every bundle built after the source-fingerprint gate landed carries `cypherair-source-fingerprint.json`, which the Xcode build phase verifies against the checkout it is linked into; assets published before it do not, so re-archiving one of those older bundles fails closed until it is rebuilt from source.
+
 **Verification** — download `PgpMobile.xcframework.zip` and its `.sha256`, confirm `shasum -a 256 -c`, then verify provenance against the workflow that attested the channel:
 
 ```bash

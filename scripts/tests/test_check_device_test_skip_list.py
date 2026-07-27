@@ -29,11 +29,22 @@ PLAN_TEMPLATE = {
 
 
 class CheckDeviceTestSkipListTests(unittest.TestCase):
-    def make_repo(self, root: Path, sources: dict[str, str], skipped: list[str]) -> Path:
+    def make_repo(
+        self,
+        root: Path,
+        sources: dict[str, str],
+        skipped: list[str],
+        other_test_sources: dict[str, str] | None = None,
+    ) -> Path:
         directory = root / module.DEVICE_TESTS_DIR
         directory.mkdir(parents=True)
         for name, contents in sources.items():
             (directory / name).write_text(contents, encoding="utf-8")
+
+        for relative, contents in (other_test_sources or {}).items():
+            path = root / module.TESTS_DIR / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(contents, encoding="utf-8")
 
         plan = json.loads(json.dumps(PLAN_TEMPLATE))
         plan["testTargets"][0]["skippedTests"] = skipped
@@ -173,7 +184,7 @@ class CheckDeviceTestSkipListTests(unittest.TestCase):
                 module.check(root)
             self.assertIn("DeviceSecureEnclaveTests", str(raised.exception))
 
-    def test_non_xctest_helpers_are_ignored(self) -> None:
+    def test_helper_without_test_methods_is_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root = self.make_repo(
                 Path(temp_dir_name),
@@ -186,13 +197,123 @@ class CheckDeviceTestSkipListTests(unittest.TestCase):
                         "\n"
                         "private final class UnusedUnwrapper: SoftwareSecretCertificateUnwrapping, "
                         "@unchecked Sendable {\n"
-                        "    func testHook() {}\n"
+                        "    func unwrapPrivateKey() {}\n"
                         "}\n"
                     )
                 },
                 ["DeviceSecureEnclaveTests"],
             )
             module.check(root)
+            self.assertEqual(module.required_class_names(root), ["DeviceSecureEnclaveTests"])
+
+    def test_base_declared_outside_the_device_directory_still_resolves(self) -> None:
+        # Reproduces the fail-open: four XCTestCase bases live elsewhere under
+        # Tests/, and a device class extending one used to pass unnoticed.
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(
+                Path(temp_dir_name),
+                {
+                    "DeviceProtectedDataTests.swift": (
+                        "final class DeviceProtectedDataTests: ProtectedDataFrameworkTestCase {\n"
+                        "    func testOpensDomain() async throws {}\n"
+                        "}\n"
+                    )
+                },
+                [],
+                other_test_sources={
+                    "ServiceTests/ProtectedDataFrameworkTestSupport.swift": (
+                        "import XCTest\n"
+                        "class ProtectedDataFrameworkTestCase: XCTestCase {\n"
+                        "    func makeStore() {}\n"
+                        "}\n"
+                    )
+                },
+            )
+            with self.assertRaises(module.SkipListError) as raised:
+                module.check(root)
+            self.assertIn("DeviceProtectedDataTests", str(raised.exception))
+
+    def test_unresolvable_superclass_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(
+                Path(temp_dir_name),
+                {
+                    "DeviceOpaqueTests.swift": (
+                        "final class DeviceOpaqueTests: SomeBaseDeclaredSomewhereElse {\n"
+                        "    func testSomething() throws {}\n"
+                        "}\n"
+                    )
+                },
+                [],
+            )
+            with self.assertRaises(module.SkipListError) as raised:
+                module.check(root)
+            self.assertIn("DeviceOpaqueTests", str(raised.exception))
+
+    def test_tests_declared_in_an_extension_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(
+                Path(temp_dir_name),
+                {
+                    "DeviceExtensionTests.swift": (
+                        "import XCTest\n"
+                        "final class DeviceExtensionTests: XCTestCase {\n"
+                        "    private let subject = 1\n"
+                        "}\n"
+                        "\n"
+                        "extension DeviceExtensionTests {\n"
+                        "    func testViaExtension() throws {}\n"
+                        "}\n"
+                    )
+                },
+                [],
+            )
+            with self.assertRaises(module.SkipListError) as raised:
+                module.check(root)
+            self.assertIn("DeviceExtensionTests", str(raised.exception))
+
+    def test_declaration_with_a_brace_on_a_later_line_is_parsed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(
+                Path(temp_dir_name),
+                {
+                    "DeviceWrappedTests.swift": (
+                        "import XCTest\n"
+                        "@MainActor\n"
+                        "final class DeviceWrappedTests:\n"
+                        "    DeviceSecurityTestCase,\n"
+                        "    SomeProtocol\n"
+                        "{\n"
+                        "    func testWrapped() throws {}\n"
+                        "}\n"
+                    ),
+                    "DeviceSecurityTestCase.swift": (
+                        "import XCTest\nclass DeviceSecurityTestCase: XCTestCase {}\n"
+                    ),
+                },
+                [],
+            )
+            with self.assertRaises(module.SkipListError) as raised:
+                module.check(root)
+            self.assertIn("DeviceWrappedTests", str(raised.exception))
+
+    def test_module_qualified_xctest_base_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(
+                Path(temp_dir_name),
+                {
+                    "DeviceQualifiedTests.swift": (
+                        "import XCTest\n"
+                        "final class DeviceQualifiedTests: XCTest.XCTestCase {\n"
+                        "    func testQualified() throws {}\n"
+                        "}\n"
+                    )
+                },
+                [],
+            )
+            with self.assertRaises(module.SkipListError) as raised:
+                module.check(root)
+            self.assertIn("DeviceQualifiedTests", str(raised.exception))
 
     def test_comments_and_string_literals_do_not_declare_classes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:

@@ -40,8 +40,14 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
             REPO_ROOT / "scripts/generate_open_source_notices.py"
         )
         (root / "third_party").mkdir()
+        (root / "third_party/sqlcipher-xcframework.pin.json").write_text(
+            '{"release": {"tag": "sqlcipher-xcframework-v4.17.0-cypherair.1"}}\n', encoding="utf-8"
+        )
         (root / "pgp-mobile").mkdir()
         (root / module.CARGO_LOCK).write_text(CARGO_LOCK, encoding="utf-8")
+        (root / "pgp-mobile/Cargo.toml").write_text(
+            '[package]\nname = "pgp-mobile"\n\n[features]\ndefault = []\n', encoding="utf-8"
+        )
 
         notices_dir = root / module.NOTICES_DIR
         notices_dir.mkdir(parents=True)
@@ -92,9 +98,6 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root = self.make_repo(Path(temp_dir_name))
             module.write_fingerprint(root)
-            external = module.external_notice_ids(root)
-            self.assertIn("sqlcipher@4.17.0", external)
-            self.assertIn("sqlite@3.53.3", external)
             module.check(root)
 
     def test_changed_cargo_lock_fails_with_the_regenerate_command(self) -> None:
@@ -111,6 +114,65 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
             message = str(raised.exception)
             self.assertIn(module.CARGO_LOCK, message)
             self.assertIn(module.REGENERATE_COMMAND, message)
+
+    def test_every_generation_input_is_gated(self) -> None:
+        # A feature change, a SQLCipher pin bump, or a generator edit all change
+        # what the notices should say, and none of them touch Cargo.lock.
+        for relative in (
+            "pgp-mobile/Cargo.toml",
+            "third_party/sqlcipher-xcframework.pin.json",
+        ):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as temp_dir_name:
+                root = self.make_repo(Path(temp_dir_name))
+                module.write_fingerprint(root)
+
+                path = root / relative
+                path.write_text(path.read_text(encoding="utf-8") + "\n# bumped\n", encoding="utf-8")
+
+                with self.assertRaises(module.NoticesFreshnessError) as raised:
+                    module.check(root)
+                self.assertIn(relative, str(raised.exception))
+
+    def test_generator_edit_is_gated(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(Path(temp_dir_name))
+            module.write_fingerprint(root)
+
+            # Replace the symlink with an edited copy of the generator.
+            generator = root / "scripts/generate_open_source_notices.py"
+            source = (REPO_ROOT / "scripts/generate_open_source_notices.py").read_text(encoding="utf-8")
+            generator.unlink()
+            generator.write_text(source + "\n# edited\n", encoding="utf-8")
+
+            with self.assertRaises(module.NoticesFreshnessError) as raised:
+                module.check(root)
+            self.assertIn("scripts/generate_open_source_notices.py", str(raised.exception))
+
+    def test_tampered_license_text_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(Path(temp_dir_name))
+            module.write_fingerprint(root)
+
+            (root / module.NOTICES_DIR / "zeroize-1.8.2.txt").write_text("", encoding="utf-8")
+
+            with self.assertRaises(module.NoticesFreshnessError) as raised:
+                module.check(root)
+            self.assertIn("zeroize-1.8.2.txt", str(raised.exception))
+
+    def test_fingerprint_from_the_previous_schema_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root = self.make_repo(Path(temp_dir_name))
+            module.write_fingerprint(root)
+
+            path = root / module.FINGERPRINT_FILE
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload.pop("generationInputs")
+            payload.pop("licenseTexts")
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(module.NoticesFreshnessError) as raised:
+                module.check(root)
+            self.assertIn("predates this gate", str(raised.exception))
 
     def test_hand_edited_notices_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -155,12 +217,6 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
             with self.assertRaises(module.NoticesFreshnessError) as raised:
                 module.check(root)
             self.assertIn(module.FINGERPRINT_FILE, str(raised.exception))
-
-    def test_cargo_lock_parser_reads_name_and_version_pairs(self) -> None:
-        packages = module.cargo_lock_packages(CARGO_LOCK)
-        self.assertEqual(
-            packages, {"pgp-mobile@0.1.0", "sequoia-openpgp@2.4.1", "zeroize@1.8.2"}
-        )
 
     def test_repository_notices_resolve_against_cargo_lock(self) -> None:
         packages = module.cargo_lock_packages(

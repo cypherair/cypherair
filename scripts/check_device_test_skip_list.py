@@ -12,9 +12,25 @@ This check inverts that default: every XCTestCase-derived class under
 Tests/DeviceSecurityTests/ that declares test methods must be skipped by name in
 the plan, and the run fails with the missing class names when one is not.
 
+The class graph is built from all of Tests/**, not just the device directory,
+because device classes routinely extend bases declared elsewhere
+(KeyManagementServiceTestCase, TutorialSandboxDefaultsSerializedTestCase,
+ProtectedDataFrameworkTestCase, ContactServiceTestCase). Scanning only the
+device directory would leave those subclasses unresolvable, and unresolvable
+used to mean "not a test class" -- a fail-open hole.
+
+Ambiguity now resolves toward failing: a class declared under
+Tests/DeviceSecurityTests/ whose superclass cannot be resolved is treated as
+XCTestCase-derived. That can over-report a helper class whose first conformance
+is a protocol declared in Sources/ *and* which declares a method literally named
+`test...`; the failure names the class, and the fix is to rename the method or
+list the class.
+
 Base classes that declare no test methods of their own (DeviceSecurityTestCase,
 SecureEnclaveCustodyDeviceTestCase) contribute no runnable tests and are exempt;
 the moment such a base declares a `test...` method it becomes a required entry.
+Test methods added to a class through `extension DeviceFooTests { ... }` count
+toward that class.
 """
 
 from __future__ import annotations
@@ -27,22 +43,33 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+TESTS_DIR = "Tests"
 DEVICE_TESTS_DIR = "Tests/DeviceSecurityTests"
 TEST_PLAN = "CypherAir-UnitTests.xctestplan"
 TEST_TARGET_NAME = "CypherAirTests"
-XCTEST_BASE = "XCTestCase"
+XCTEST_BASES = frozenset({"XCTestCase", "XCTest.XCTestCase"})
 
+MODIFIERS = r"(?:(?:public|internal|fileprivate|private|final|open|package)(?:\([\w ]*\))?\s+)*"
+ATTRIBUTES = r"(?:@[\w.]+(?:\([^)]*\))?\s+)*"
+# `\s` rather than `[ \t]` throughout: a declaration's inheritance clause and
+# its opening brace are routinely wrapped onto later lines.
 CLASS_DECLARATION = re.compile(
-    r"^[ \t]*(?:@[\w.]+(?:\([^)]*\))?[ \t]+)*"
-    r"(?:(?:public|internal|fileprivate|private|final|open)[ \t]+)*"
-    r"class[ \t]+(?P<name>\w+)[ \t]*"
-    r"(?:<[^>]*>[ \t]*)?"
-    r"(?::[ \t]*(?P<inherits>[^{]*?))?[ \t]*\{"
+    r"(?:^|\n)[ \t]*" + ATTRIBUTES + MODIFIERS + r"class\s+(?P<name>\w+)\s*"
+    r"(?:<[^>{]*>\s*)?"
+    r"(?::\s*(?P<inherits>[^{]*?))?\s*\{",
+    re.MULTILINE,
+)
+EXTENSION_DECLARATION = re.compile(
+    r"(?:^|\n)[ \t]*" + ATTRIBUTES + MODIFIERS + r"extension\s+(?P<name>[\w.]+)\s*"
+    r"(?:<[^>{]*>\s*)?"
+    r"(?::\s*[^{]*?)?\s*\{",
+    re.MULTILINE,
 )
 TEST_METHOD = re.compile(
-    r"^[ \t]*(?:@[\w.]+(?:\([^)]*\))?[ \t]+)*"
-    r"(?:(?:public|internal|fileprivate|private|final|open|override|static|class|nonisolated)[ \t]+)*"
-    r"func[ \t]+(?P<name>test\w*)[ \t]*\("
+    r"(?:^|\n)[ \t]*" + ATTRIBUTES
+    + r"(?:(?:public|internal|fileprivate|private|final|open|override|static|class|nonisolated|package)\s+)*"
+    r"func\s+(?P<name>test\w*)\s*\(",
+    re.MULTILINE,
 )
 
 
@@ -115,75 +142,147 @@ def superclass_of(inherits: str | None) -> str | None:
     if not inherits:
         return None
     first = inherits.split(",")[0].strip()
+    first = re.split(r"\bwhere\b", first)[0].strip()
     first = re.sub(r"<.*", "", first).strip()
     return first or None
 
 
+def _body_end(text: str, open_brace: int) -> int:
+    """Index just past the `}` matching the `{` at open_brace."""
+    depth = 0
+    for index in range(open_brace, len(text)):
+        character = text[index]
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return len(text)
+
+
 def parse_swift_classes(source: str) -> dict[str, dict]:
-    """Map class name -> {superclass, declaresTestMethods} for one Swift file."""
+    """Map class name -> {superclass, declaresTestMethods} for one Swift file.
+
+    Scoping is offset-based rather than line-based so a declaration whose brace
+    sits on a later line is still recognised, and so a test method is credited
+    to the innermost type that encloses it.
+    """
     cleaned = strip_swift_noise(source)
     classes: dict[str, dict] = {}
-    # Stack of (class name, brace depth at which the class body opened).
-    open_classes: list[tuple[str, int]] = []
-    depth = 0
+    # (name, body start, body end) for every class and every extension body.
+    scopes: list[tuple[str, int, int]] = []
 
-    for line in cleaned.splitlines():
-        declaration = CLASS_DECLARATION.match(line)
-        if declaration:
-            name = declaration.group("name")
-            classes.setdefault(
-                name,
-                {
-                    "superclass": superclass_of(declaration.group("inherits")),
-                    "declaresTestMethods": False,
-                },
-            )
-            open_classes.append((name, depth))
-        elif open_classes:
-            method = TEST_METHOD.match(line)
-            if method:
-                classes[open_classes[-1][0]]["declaresTestMethods"] = True
+    for match in CLASS_DECLARATION.finditer(cleaned):
+        name = match.group("name")
+        classes.setdefault(
+            name,
+            {
+                "superclass": superclass_of(match.group("inherits")),
+                "declaresTestMethods": False,
+            },
+        )
+        open_brace = cleaned.index("{", match.end() - 1)
+        scopes.append((name, open_brace, _body_end(cleaned, open_brace)))
 
-        depth += line.count("{") - line.count("}")
-        while open_classes and depth <= open_classes[-1][1]:
-            open_classes.pop()
+    # `extension DeviceFooTests { func testX() }` adds runnable tests to the
+    # class without declaring anything inside the class body.
+    extension_scopes: list[tuple[str, int, int]] = []
+    for match in EXTENSION_DECLARATION.finditer(cleaned):
+        name = match.group("name").split(".")[-1]
+        open_brace = cleaned.index("{", match.end() - 1)
+        extension_scopes.append((name, open_brace, _body_end(cleaned, open_brace)))
+
+    for match in TEST_METHOD.finditer(cleaned):
+        position = match.start("name")
+        enclosing = [
+            (start, name)
+            for name, start, end in scopes + extension_scopes
+            if start < position < end
+        ]
+        if not enclosing:
+            continue
+        # Innermost wins: the scope that opened last still containing this func.
+        _, owner = max(enclosing)
+        if owner in classes:
+            classes[owner]["declaresTestMethods"] = True
+        else:
+            # An extension of a class declared in another file.
+            classes[owner] = {"superclass": None, "declaresTestMethods": True, "extensionOnly": True}
 
     return classes
 
 
-def collect_device_test_classes(repo_root: Path) -> dict[str, dict]:
-    directory = repo_root / DEVICE_TESTS_DIR
-    if not directory.is_dir():
+def collect_test_classes(repo_root: Path) -> dict[str, dict]:
+    """Build the class graph from every Swift file under Tests/**.
+
+    Device classes extend bases declared elsewhere in Tests/, so the graph has
+    to span the whole test tree even though the requirement applies only to
+    classes declared under Tests/DeviceSecurityTests/.
+    """
+    tests_root = repo_root / TESTS_DIR
+    if not tests_root.is_dir():
+        raise SkipListError(f"test directory is missing: {TESTS_DIR}")
+    if not (repo_root / DEVICE_TESTS_DIR).is_dir():
         raise SkipListError(f"device test directory is missing: {DEVICE_TESTS_DIR}")
 
+    device_prefix = f"{DEVICE_TESTS_DIR}/"
     classes: dict[str, dict] = {}
-    for path in sorted(directory.rglob("*.swift")):
-        for name, info in parse_swift_classes(path.read_text(encoding="utf-8")).items():
-            info = dict(info)
-            info["file"] = path.relative_to(repo_root).as_posix()
-            classes[name] = info
+    for path in sorted(tests_root.rglob("*.swift")):
+        relative = path.relative_to(repo_root).as_posix()
+        in_device_dir = relative.startswith(device_prefix)
+        for name, parsed in parse_swift_classes(path.read_text(encoding="utf-8")).items():
+            entry = classes.setdefault(
+                name,
+                {
+                    "superclass": None,
+                    "declaresTestMethods": False,
+                    "declaredInDeviceDir": False,
+                    "file": None,
+                },
+            )
+            entry["declaresTestMethods"] = entry["declaresTestMethods"] or parsed["declaresTestMethods"]
+            if parsed.get("extensionOnly"):
+                continue
+            entry["superclass"] = parsed["superclass"]
+            entry["file"] = relative
+            if in_device_dir:
+                entry["declaredInDeviceDir"] = True
     return classes
 
 
 def is_xctest_case(name: str, classes: dict[str, dict]) -> bool:
-    """Follow the superclass chain to XCTestCase, tolerating cycles."""
+    """Follow the superclass chain to XCTestCase, failing closed on unknowns.
+
+    A superclass the graph cannot resolve -- declared outside Tests/**, or a
+    protocol -- counts as XCTestCase-derived. Guessing "not a test" there is
+    what let a device class extending a base from Tests/ServiceTests/ slip past
+    the gate.
+    """
     seen: set[str] = set()
     current: str | None = name
-    while current and current not in seen:
+    while current is not None and current not in seen:
         seen.add(current)
-        superclass = classes.get(current, {}).get("superclass")
-        if superclass == XCTEST_BASE:
+        info = classes.get(current)
+        if info is None:
+            return True
+        superclass = info.get("superclass")
+        if superclass is None:
+            return False
+        if superclass in XCTEST_BASES:
             return True
         current = superclass
     return False
 
 
 def required_class_names(repo_root: Path) -> list[str]:
-    classes = collect_device_test_classes(repo_root)
+    classes = collect_test_classes(repo_root)
     return sorted(
         name
         for name, info in classes.items()
-        if info["declaresTestMethods"] and is_xctest_case(name, classes)
+        if info["declaredInDeviceDir"]
+        and info["declaresTestMethods"]
+        and is_xctest_case(name, classes)
     )
 
 

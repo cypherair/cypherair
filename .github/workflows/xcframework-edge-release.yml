@@ -194,6 +194,18 @@ jobs:
         env:
           ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
+      # This workflow publishes the artifact other builds consume, so the
+      # freshness gates matter more here than anywhere else.
+      - name: Check XCFramework source fingerprint
+        run: python3 scripts/xcframework_source_fingerprint.py --check
+      - name: Check generated bindings match the crate
+        run: |
+          if [ -n "$(git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist)" ]; then
+            git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
+            git diff -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
+            echo "::error::Generated UniFFI bindings or the XCFramework input list are stale. Run ./build-xcframework.sh --release and commit bindings/, Sources/PgpMobile/, and PgpMobileSourceInputs.xcfilelist."
+            exit 1
+          fi
       - name: Restore SQLCipher XCFramework
         if: steps.platform_preflight.outputs.ready == 'true'
         env:

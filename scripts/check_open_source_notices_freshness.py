@@ -12,14 +12,18 @@ and falls back to fetching repository archives over the network. Its output is
 also not byte-stable -- two Sequoia LGPL license texts churn on form feeds. So
 this gate compares the *inputs and the dependency set* instead:
 
-  1. pgp-mobile/Cargo.lock still hashes to the value recorded when the notices
-     were generated (any dependency change trips this, which is exactly the
-     documented dependency-update workflow);
+  1. every generation input still hashes to the value recorded when the notices
+     were generated -- pgp-mobile/Cargo.lock and Cargo.toml (features decide
+     which packages are reachable), the SQLCipher pin (a pin bump changes the
+     shipped SQLCipher and SQLite versions, which are hand-declared records),
+     and the generator itself;
   2. open_source_notices.json still hashes to the value recorded at generation
      (a hand-edited manifest trips this);
-  3. every crate-sourced notice names a package that Cargo.lock actually
+  3. every shipped license text still hashes to the value recorded at
+     generation (truncation or tampering trips this);
+  4. every crate-sourced notice names a package that Cargo.lock actually
      resolves at that exact version;
-  4. every notice's license text resource is present in the bundle directory.
+  5. every notice's license text resource is present in the bundle directory.
 
 The recorded values live in third_party/open-source-notices.fingerprint.json,
 which the generator writes at the end of a successful run (--write).
@@ -42,7 +46,18 @@ NOTICES_DIR = "Sources/Resources/OpenSourceNotices"
 NOTICES_FILE = f"{NOTICES_DIR}/open_source_notices.json"
 FINGERPRINT_FILE = "third_party/open-source-notices.fingerprint.json"
 REGENERATE_COMMAND = "python3 scripts/generate_open_source_notices.py"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Everything that decides what the generator produces. Cargo.toml matters
+# because feature selection changes which packages are reachable; the SQLCipher
+# pin drives the two hand-declared external records; the generator is otherwise
+# outside its own gate.
+GENERATION_INPUTS = (
+    CARGO_LOCK,
+    "pgp-mobile/Cargo.toml",
+    "third_party/sqlcipher-xcframework.pin.json",
+    "scripts/generate_open_source_notices.py",
+)
 
 CARGO_LOCK_PACKAGE = re.compile(
     r"^\[\[package\]\]\s*$(?P<body>.*?)(?=^\[\[|\Z)",
@@ -99,20 +114,45 @@ def load_notices(repo_root: Path) -> list[dict]:
     return notices
 
 
+def hash_generation_inputs(repo_root: Path) -> dict[str, str]:
+    entries: dict[str, str] = {}
+    for relative in GENERATION_INPUTS:
+        path = repo_root / relative
+        if not path.is_file():
+            raise NoticesFreshnessError(f"notices generation input is missing: {relative}")
+        entries[relative] = sha256_file(path)
+    return entries
+
+
+def hash_license_texts(repo_root: Path) -> dict[str, str]:
+    """Hash every shipped notice resource, not just the manifest that names them."""
+    directory = repo_root / NOTICES_DIR
+    if not directory.is_dir():
+        raise NoticesFreshnessError(f"notices resource directory is missing: {NOTICES_DIR}")
+    return {
+        path.name: sha256_file(path)
+        for path in sorted(directory.iterdir())
+        if path.is_file() and path.name != Path(NOTICES_FILE).name and path.name != ".gitkeep"
+    }
+
+
 def build_fingerprint(repo_root: Path) -> dict:
     notices = load_notices(repo_root)
+    texts = hash_license_texts(repo_root)
     return {
         "schemaVersion": SCHEMA_VERSION,
         "generatedBy": "scripts/generate_open_source_notices.py",
         "regenerateCommand": REGENERATE_COMMAND,
-        "cargoLock": {
-            "path": CARGO_LOCK,
-            "sha256": sha256_file(repo_root / CARGO_LOCK),
-        },
+        "generationInputs": hash_generation_inputs(repo_root),
         "notices": {
             "path": NOTICES_FILE,
             "sha256": sha256_file(repo_root / NOTICES_FILE),
             "recordCount": len(notices),
+        },
+        "licenseTexts": {
+            "path": NOTICES_DIR,
+            "fileCount": len(texts),
+            "files": texts,
         },
     }
 
@@ -146,13 +186,35 @@ def check(repo_root: Path) -> None:
     current = build_fingerprint(repo_root)
     problems: list[str] = []
 
-    recorded_lock = recorded.get("cargoLock", {}).get("sha256")
-    if recorded_lock != current["cargoLock"]["sha256"]:
+    recorded_inputs = recorded.get("generationInputs")
+    if not isinstance(recorded_inputs, dict) or not recorded_inputs:
         problems.append(
-            f"{CARGO_LOCK} changed since the notices were generated\n"
-            f"         recorded sha256 {recorded_lock}\n"
-            f"         current  sha256 {current['cargoLock']['sha256']}"
+            "the fingerprint records no generation inputs (it predates this gate)"
         )
+        recorded_inputs = {}
+    for relative, digest in current["generationInputs"].items():
+        if recorded_inputs.get(relative) != digest:
+            problems.append(
+                f"{relative} changed since the notices were generated\n"
+                f"         recorded sha256 {recorded_inputs.get(relative)}\n"
+                f"         current  sha256 {digest}"
+            )
+
+    recorded_texts = recorded.get("licenseTexts", {}).get("files")
+    if not isinstance(recorded_texts, dict):
+        problems.append("the fingerprint records no license texts (it predates this gate)")
+    else:
+        current_texts = current["licenseTexts"]["files"]
+        changed = sorted(
+            name
+            for name in set(recorded_texts) | set(current_texts)
+            if recorded_texts.get(name) != current_texts.get(name)
+        )
+        if changed:
+            listed = "\n".join(f"         - {name}" for name in changed[:20])
+            problems.append(
+                f"{len(changed)} shipped license text(s) changed since generation:\n{listed}"
+            )
 
     recorded_notices = recorded.get("notices", {}).get("sha256")
     if recorded_notices != current["notices"]["sha256"]:

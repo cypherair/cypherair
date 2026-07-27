@@ -172,8 +172,11 @@ jobs:
           # build-xcframework.sh regenerates the UniFFI bindings and the sandbox
           # input list and copies them over the tracked ones. Anything left in
           # the working tree means the committed copies did not match
-          # pgp-mobile/src.
-          if ! git diff --exit-code -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist; then
+          # pgp-mobile/src. --porcelain rather than `git diff`: a regenerated
+          # binding for a *new* interface file is untracked, which a diff misses.
+          if [ -n "$(git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist)" ]; then
+            git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
+            git diff -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
             echo "::error::Generated UniFFI bindings or the XCFramework input list are stale. Run ./build-xcframework.sh --release and commit bindings/, Sources/PgpMobile/, and PgpMobileSourceInputs.xcfilelist."
             exit 1
           fi
@@ -208,8 +211,18 @@ jobs:
       - name: Restore XCFramework from artifact
         if: steps.platform_preflight.outputs.ready == 'true'
         run: |
+          set -euo pipefail
+          # Same containment rules as every other XCFramework restore.
+          python3 scripts/validate_xcframework_archive.py \
+            --zip "$XCFRAMEWORK_ZIP" \
+            --expected-root PgpMobile.xcframework
+          staging="$(mktemp -d "$PWD/.pgpmobile-extract.XXXXXX")"
+          trap 'rm -rf "$staging"' EXIT
+          ditto -x -k "$XCFRAMEWORK_ZIP" "$staging"
+          python3 scripts/validate_xcframework_archive.py \
+            --tree "$staging/PgpMobile.xcframework"
           rm -rf PgpMobile.xcframework
-          ditto -x -k "$XCFRAMEWORK_ZIP" .
+          mv "$staging/PgpMobile.xcframework" PgpMobile.xcframework
       - name: Restore SQLCipher XCFramework
         if: steps.platform_preflight.outputs.ready == 'true'
         env:
