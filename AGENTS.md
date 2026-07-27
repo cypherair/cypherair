@@ -24,8 +24,8 @@ stage1 toolchain policy.
   (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024).
   Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern
   (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody).
-  Per-family specs: `docs/TDD.md` Section 1.3; product exposure: `docs/PRD.md`
-  Section 3.
+  Per-family canon: `Sources/Models/Keys/PGPKeyFamily.swift`; product
+  promises: `docs/PRODUCT.md`.
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.
@@ -44,7 +44,7 @@ Sources/
 ├── PgpMobile/        # Generated UniFFI Swift bindings; do not hand-edit
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate
-docs/                 # PRD, TDD, architecture, security, testing, workflow, release
+docs/                 # product, security, custody, storage, architecture, testing, workflow, release
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
@@ -114,7 +114,7 @@ documentation lookup for API behavior instead of relying on memory.
    plaintext must be overwritten when no longer needed. Rust uses `zeroize`;
    Swift uses `resetBytes(in:)`.
 6. **Secure random only.** Swift uses `SecRandomCopyBytes` or CryptoKit; Rust
-   uses `getrandom`.
+   uses Sequoia's `crypto-openssl` CSPRNG.
 7. **MIE enabled.** Enhanced Security with Hardware Memory Tagging must remain
    enabled. Never remove the entitlements.
 8. **Profile-correct message format.** Format is selected by recipient key
@@ -125,7 +125,7 @@ documentation lookup for API behavior instead of relying on memory.
 You may edit security-critical areas directly, but the summary and PR description
 must call out the file, what changed, and why. Security changes get human
 review before merge. The authoritative
-security-critical file list, rationale, and invariants live in
+security-critical predicates and invariants live in
 `docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
 
 ## Code Style And Scope

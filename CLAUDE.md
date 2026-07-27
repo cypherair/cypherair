@@ -9,7 +9,7 @@ This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately
 - **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
 - **Language:** Apple Swift — 6.4 beta on the development toolchain, 6.3.3 on the release toolchain (see Build) — SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release. Where each UI framework is used is described in docs/ARCHITECTURE.md; framework choices during investigation are made on evidence, not by rule.
 - **OpenPGP:** Sequoia PGP 2.4.1 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/RELEASE.md.
-- **Key families:** nine, chosen at key generation and immutable per key. Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible), Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024). Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody). Per-family specs: docs/TDD.md Section 1.3; product exposure: docs/PRD.md Section 3; custody: docs/SECURE_ENCLAVE_CUSTODY.md; post-quantum design: docs/POST_QUANTUM.md.
+- **Key families:** nine, chosen at key generation and immutable per key. Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible), Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024). Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody). Per-family canon: `Sources/Models/Keys/PGPKeyFamily.swift` + `pgp-mobile/src/keys.rs`; product promises: docs/PRODUCT.md; custody: docs/CUSTODY.md.
 - **FFI:** Mozilla UniFFI 0.32.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
 - **Build:** development on Xcode 27.0 beta (27A5228h, `/Applications/Xcode-beta.app`); release toolchain Xcode 26.6 / Swift 6.3.3 for stable and App Store builds; CI runs on the hosted `xcode-27` preview image, pinning Xcode 27.0 beta while separately requiring its bundled 27.0 SDKs and simulator runtimes via `scripts/ci_xcode_platform_preflight.sh`. Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
@@ -29,7 +29,7 @@ Sources/
 ├── PgpMobile/        # Generated UniFFI Swift bindings (do not hand-edit)
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
-docs/                 # PRD, TDD, architecture, security, testing, workflow, release
+docs/                 # product, security, custody, storage, architecture, testing, workflow, release
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
@@ -73,28 +73,28 @@ Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, an
 ## Hard Constraints — NEVER Violate
 
 1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession.
-2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription` as a usage description for LocalAuthentication-backed biometric flows. No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
+2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription` as a usage description for LocalAuthentication-backed biometric flows. No camera, photo library, contacts, or network entitlements. All I/O through system pickers, URL scheme.
 3. **AEAD hard-fail.** Authentication failure during decryption must abort immediately. Never show partial plaintext.
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
-6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: `getrandom` crate.
+6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: Sequoia's `crypto-openssl` CSPRNG (`openpgp::crypto::random`).
 7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See docs/SECURITY.md Section 8.
-8. **Profile-correct message format.** Format is chosen automatically by recipient key version; never send SEIPDv2 to a v4 key holder. See docs/TDD.md Section 1.4.
+8. **Profile-correct message format.** Format is chosen automatically by recipient key version; never send SEIPDv2 to a v4 key holder. See docs/PRODUCT.md Section 5.
 
 ## Security-Sensitive Code — Edit, Then Explain
 
-You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care, and the maintainer reviews and merges (docs/WORKFLOW.md §3). The authoritative security-critical file list, per-file rationale, and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care, and the maintainer reviews and merges (docs/WORKFLOW.md §3). The authoritative security-critical predicates and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
 
 ## Encryption Profiles & Authentication Modes
 
-Multiple keys of different families are allowed; message format is auto-selected by recipient key version (docs/TDD.md Section 1.4). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt). Details: docs/PRD.md Section 3 and docs/SECURITY.md Section 4.
+Multiple keys of different families are allowed; message format is auto-selected by recipient key version (docs/PRODUCT.md Section 5). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt). Details: docs/PRODUCT.md and docs/SECURITY.md Section 4.
 
 ## Code Style
 
 Standard Swift/SwiftUI idiom applies. The rules below are the project-specific ones — the things not inferable from the code alone:
 
 - **Errors:** the app vocabulary is `CypherAirError`; generated `PgpError` is normalized at the `Services/FFI/` adapter boundary before reaching Models/ScreenModels/Views.
-- **Generated bindings:** never edit `Sources/PgpMobile/pgp_mobile.swift` (regenerated by UniFFI); where strict concurrency trips on it, `@preconcurrency import PgpMobile` at call sites.
+- **Generated bindings:** never edit `Sources/PgpMobile/pgp_mobile.swift` (regenerated by UniFFI).
 - **Screens:** views stay thin (no crypto/Keychain/business logic in `body`); workflow-heavy screens move async orchestration, importer/exporter, cleanup, and transient state into an owning `@Observable` ScreenModel (baseline: `SignView` + `SignScreenModel`).
 - **Design identity:** quiet and system-native — system accent only, no brand tint. Reuse the `Sources/App/DesignSystem/` primitives (`CypherSpacing`, `CypherRadius`, `View.cypherSurface(_:)`, `CypherToolScreenLayout`) instead of per-view literals; prefer removing one-off styling over adding tiers.
 - **Structure:** files grouped by feature; test doubles under `Tests/Support/SecurityMocks/` with `Mock*` names (Sources ships no mocks); all user strings in the String Catalog (remove `stale` keys, don't just unmark them).
