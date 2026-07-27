@@ -2,7 +2,7 @@
   "generatedBy": "scripts/generate_open_source_notices.py",
   "generationInputs": {
     "pgp-mobile/Cargo.lock": "9cf647721d4bc2fb646a3f632f00006268f9af6cd7441a06cf64b781e45137fa",
-    "pgp-mobile/Cargo.toml": "91417d5bee74da88921ffc3ae06613c0883b54873d0c52404d4ca5c53511b87b",
+    "pgp-mobile/Cargo.toml": "59786d024f687c3e615f5e56470b6f07623530ba38b932ebe10fa3df377df20b",
     "scripts/generate_open_source_notices.py": "5f264aae262113a58165a833990191ba7fbd82c090580672f28c394daf2008cb",
     "third_party/sqlcipher-xcframework.pin.json": "c556a024a3f9f8f239368938d2a26582fbee50e43a38b1048e071b2e17ecbf64"
   },
