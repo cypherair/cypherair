@@ -40,7 +40,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS'
 ```
 
-Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple Silicon Mac or a physical device — via the `CypherAir-DeviceTests` plan; macOS UI smoke coverage via `CypherAir-MacUITests`. There is no dedicated visionOS test plan; the build probe above plus the Rust and macOS lanes cover it. Lanes, plans, and stale-artifact troubleshooting: [docs/TESTING.md](docs/TESTING.md). Release flow and published artifacts: [docs/BUILD.md](docs/BUILD.md).
+Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple Silicon Mac or a physical device — via the `CypherAir-DeviceTests` plan; macOS UI smoke coverage via `CypherAir-MacUITests`. There is no dedicated visionOS test plan; the build probe above plus the Rust and macOS lanes cover it. Lanes and plans: [docs/TESTING.md](docs/TESTING.md). Release flow, published artifacts, and stale-artifact troubleshooting: [docs/BUILD.md](docs/BUILD.md).
 
 ## Documentation
 
