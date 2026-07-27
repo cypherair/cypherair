@@ -27,8 +27,8 @@ the local artifact — plan the rebuild into any re-pin.
 
 **Procedure:** run the pinned sync command exactly as written in CLAUDE.md
 "Build Commands" (the pinned tag is owned by docs/ARM64E_STATUS.md — never
-substitute `latest`). Then run the Swift validation lane. Troubleshooting for
-stale artifacts: docs/TESTING.md Section 2.4.
+substitute `latest`). Then run the Swift validation lane. The sync contract and
+stale-artifact troubleshooting: docs/BUILD.md Section 6.
 
 **Verify:** the rebuild refreshed `PgpMobile.arm64e-build-manifest.json`, the
 generated bindings, and `PgpMobileSourceInputs.xcfilelist` (commit the last two
