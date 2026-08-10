@@ -63,7 +63,8 @@ Choices, not mechanisms — each could plausibly be built the other way and deli
 
 Honest statements about shipped indicator behavior, recorded so no document or comment re-inflates them:
 
-- The recipient compatibility indicator has exactly **two states**: format-downgrade warning and compatible. There is **no near-expiry warning**, and non-encryptable contacts are filtered out of the chooser rather than shown blocked. A contact key's encryptability is cached at import time, not re-evaluated against the clock.
+- The per-recipient compatibility indicator has exactly **two states**: format-downgrade warning and compatible. It is computed from the format the outgoing message will actually carry — the resolved recipient selection plus the Encrypt to Self copy, never the sender's default key — and the warning marks the v4 keys holding the message at SEIPDv1. An all-v4 message is not flagged; nothing is given up. There is **no near-expiry warning**, and non-encryptable contacts are filtered out of the chooser rather than shown blocked. A contact key's encryptability is cached at import time, not re-evaluated against the clock.
+- The **message-level SEIPDv1 fallback is stated once**, below the recipient list, because the key forcing it can be the Encrypt to Self copy — which has no row to carry a glyph.
 - Encrypt **tags are a filter** over the recipient list (browse-only); batch selection is the separate "Select All Shown" action scoped to the filtered view.
 - The **quantum-safety badge is on the result surface**, derived from the produced artifact's session-key packets — never from the live recipient selection ([SECURITY.md](SECURITY.md) §2). Mixed recipient sets get a visible not-fully-quantum-safe state.
 - Revoked/expired keys are retained and shown for signer recognition, but the app does not surface *why* a key was revoked (the revocation reason is not carried past the FFI boundary).

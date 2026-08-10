@@ -252,8 +252,33 @@ final class EncryptScreenModel {
         keyManagement.keys
     }
 
-    var defaultKeyVersion: UInt8? {
-        keyManagement.defaultKey.map(\.keyVersion)
+    /// What the engine will do with the current selection, before anything is
+    /// sent. Built from the same two inputs the encryption path hands the engine
+    /// — the resolved recipient selection and the Encrypt to Self copy — so the
+    /// chooser cannot describe a different message than the one that goes out.
+    ///
+    /// The sender's signing key is deliberately absent: signing adds no
+    /// recipient, so it cannot move the format.
+    var outgoingMessageFormatPreview: OutgoingMessageFormatPreview {
+        var recipientKeyVersions = selectedRecipientSummaries.map(\.preferredKey.keyVersion)
+        if let encryptToSelfKeyVersion {
+            recipientKeyVersions.append(encryptToSelfKeyVersion)
+        }
+        return OutgoingMessageFormatPreview(recipientKeyVersions: recipientKeyVersions)
+    }
+
+    /// Version of the key the Encrypt to Self copy is addressed to, resolved the
+    /// way the encryption path resolves it. `nil` when the copy is off, when
+    /// protected settings are still locked, or when the chosen key no longer
+    /// resolves — the last of those makes encryption fail rather than retarget,
+    /// so the preview leaves it out instead of guessing a substitute.
+    private var encryptToSelfKeyVersion: UInt8? {
+        guard resolvedEncryptToSelf == true else {
+            return nil
+        }
+        return try? keyManagement
+            .encryptToSelfIdentity(fingerprint: encryptToSelfFingerprint)
+            .keyVersion
     }
 
     var selectedUnverifiedContacts: [ContactRecipientSummary] {
