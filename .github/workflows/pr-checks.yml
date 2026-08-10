@@ -19,7 +19,7 @@ env:
   XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
-  ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1
+  ARM64E_STAGE1_RELEASE_TAG: rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1
 
 jobs:
   sqlcipher-release-input:

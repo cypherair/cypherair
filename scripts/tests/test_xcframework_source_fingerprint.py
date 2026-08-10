@@ -35,7 +35,7 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
         )
         (root / "third_party").mkdir()
         (root / "third_party/arm64e-stage1-toolchain.pin.json").write_text(
-            '{"tag": "rust-arm64e-stage1-stable197"}\n', encoding="utf-8"
+            '{"tag": "rust-stage1-arm64e-toolchain"}\n', encoding="utf-8"
         )
 
         xcframework = root / "PgpMobile.xcframework"

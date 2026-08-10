@@ -2,7 +2,7 @@
 
 *A machine-parsed contract, not a narrative document. `scripts/validate_app_store_candidate_release.py` requires this file to contain exactly one pinned-tag bullet and fails the App Store candidate gate unless it equals the tag in `third_party/arm64e-stage1-toolchain.pin.json`. Keep that line's format byte-identical.*
 
-- **Pinned prerelease tag:** `rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1`
+- **Pinned prerelease tag:** `rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1`
 
 **`latest` is never allowed.** Every consumer force-downloads this exact tag against the digests in the machine pin.
 

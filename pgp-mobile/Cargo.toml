@@ -49,11 +49,8 @@ codegen-units = 1
 # Temporary downstream carry for Apple arm64e experiments:
 # pgp-mobile -> cypherair/openssl-src-rs (carry/apple-arm64e-openssl-fork)
 #            -> cypherair/openssl (carry/apple-arm64e-targets)
-# sequoia-openpgp -> cypherair/linktime/ctor (carry/apple-ctor-1.0.9)
 # The openssl-src-rs carry branch intentionally tracks a CypherAir OpenSSL fork
-# branch. The ctor carry aligns its Apple archive-retention pointer for ld64.
-# Cargo.lock records resolved commits for reproducibility, while the manifest
-# tracks carry branches so branch-local fixes are not left behind.
+# branch. Cargo.lock records the resolved commit for reproducibility, while the
+# manifest tracks the carry branch so branch-local fixes are not left behind.
 [patch.crates-io]
-ctor = { git = "https://github.com/cypherair/linktime", branch = "carry/apple-ctor-1.0.9" }
 openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", branch = "carry/apple-arm64e-openssl-fork" }

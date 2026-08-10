@@ -25,9 +25,9 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
 ARM64E_STAGE1_PIN_FILE="${ARM64E_STAGE1_PIN_FILE:-$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
-ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable197}"
+ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-stage1-arm64e-toolchain}"
 ARM64E_STAGE1_FORCE_DOWNLOAD="${ARM64E_STAGE1_FORCE_DOWNLOAD:-0}"
 ARM64E_STAGE1_DIR="${ARM64E_STAGE1_DIR:-}"
 ARM64E_RUSTC="${ARM64E_RUSTC:-}"
@@ -218,7 +218,7 @@ EOF
         target_libdir="$("$ARM64E_RUSTC" --print target-libdir --target "$target")"
         if ! compgen -G "$target_libdir/libstd-*.rlib" >/dev/null; then
             echo "error: arm64e stage1 toolchain is missing prebuilt std for ${target} at ${target_libdir}" >&2
-            echo "       republish the stable197 Rust fork stage1 with prebuilt std payloads." >&2
+            echo "       republish the Rust fork stage1 with prebuilt std payloads." >&2
             exit 1
         fi
     done

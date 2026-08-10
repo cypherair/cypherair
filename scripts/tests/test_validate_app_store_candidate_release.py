@@ -101,7 +101,7 @@ def valid_rust_stage1_manifest(release_tag: str) -> dict[str, object]:
             stage1_module.PROJECT_REQUIRED_ARM64E_TARGETS
         ),
         "stage1RustcVersionVerbose": (
-            "rustc 1.97.0\n"
+            f"rustc {stage1_module.EXPECTED_STABLE_BASE_RELEASE}\n"
             f"host: {host_triple}\n"
             f"LLVM version: {stage1_module.EXPECTED_LLVM_VERSION}"
         ),
@@ -135,7 +135,6 @@ def valid_arm64e_manifest(release_tag: str) -> dict[str, object]:
         "dependencyChain": {
             "opensslSrc": {"resolvedCommit": "be17d917"},
             "openssl": {"submoduleCommit": "d228bf84"},
-            "ctor": {"resolvedCommit": "1aa46c01"},
         },
         "rustStage1": valid_rust_stage1_manifest(release_tag),
         "xcframework": {
@@ -207,12 +206,12 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             repo_root = Path(temp_dir_name)
             pin = write_stage1_pin(
                 repo_root,
-                "rust-arm64e-stage1-stable197-test",
+                "rust-stage1-arm64e-toolchain-test",
             )
             status_path = repo_root / "docs" / "ARM64E_STATUS.md"
             status_path.parent.mkdir(parents=True)
             status_path.write_text(
-                "- **Pinned prerelease tag:** `rust-arm64e-stage1-stable197-test`\n",
+                "- **Pinned prerelease tag:** `rust-stage1-arm64e-toolchain-test`\n",
                 encoding="utf-8",
             )
 
@@ -224,14 +223,14 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
     def test_pinned_rust_stage1_release_tag_rejects_ambiguous_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             repo_root = Path(temp_dir_name)
-            write_stage1_pin(repo_root, "rust-arm64e-stage1-stable197-test")
+            write_stage1_pin(repo_root, "rust-stage1-arm64e-toolchain-test")
             status_path = repo_root / "docs" / "ARM64E_STATUS.md"
             status_path.parent.mkdir(parents=True)
             status_path.write_text(
                 "\n".join(
                     [
-                        "- **Pinned prerelease tag:** `rust-arm64e-stage1-first`",
-                        "- **Pinned prerelease tag:** `rust-arm64e-stage1-second`",
+                        "- **Pinned prerelease tag:** `rust-stage1-arm64e-first`",
+                        "- **Pinned prerelease tag:** `rust-stage1-arm64e-second`",
                     ]
                 ),
                 encoding="utf-8",
@@ -246,7 +245,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
     def test_pinned_rust_stage1_release_tag_rejects_invalid_utf8(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             repo_root = Path(temp_dir_name)
-            write_stage1_pin(repo_root, "rust-arm64e-stage1-stable197-test")
+            write_stage1_pin(repo_root, "rust-stage1-arm64e-toolchain-test")
             status_path = repo_root / "docs" / "ARM64E_STATUS.md"
             status_path.parent.mkdir(parents=True)
             status_path.write_bytes(b"\xff")
@@ -260,11 +259,11 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
     def test_pinned_rust_stage1_release_rejects_docs_machine_pin_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             repo_root = Path(temp_dir_name)
-            write_stage1_pin(repo_root, "rust-arm64e-stage1-stable197-machine")
+            write_stage1_pin(repo_root, "rust-stage1-arm64e-toolchain-machine")
             status_path = repo_root / "docs" / "ARM64E_STATUS.md"
             status_path.parent.mkdir(parents=True)
             status_path.write_text(
-                "- **Pinned prerelease tag:** `rust-arm64e-stage1-stable197-docs`\n",
+                "- **Pinned prerelease tag:** `rust-stage1-arm64e-toolchain-docs`\n",
                 encoding="utf-8",
             )
 
@@ -570,7 +569,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                     module,
                     "pinned_rust_stage1_release",
                     return_value=make_stage1_release_pin(
-                        "rust-arm64e-stage1-stable197-test"
+                        "rust-stage1-arm64e-toolchain-test"
                     ),
                 ):
                     with mock.patch.object(
@@ -592,7 +591,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir_name:
             repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
-            stage1_tag = "rust-arm64e-stage1-stable197-canonical-test"
+            stage1_tag = "rust-stage1-arm64e-toolchain-canonical-test"
             stage1_pin = write_stage1_pin(repo_root, stage1_tag)
             status_path = repo_root / "docs" / "ARM64E_STATUS.md"
             status_path.parent.mkdir(parents=True)
@@ -628,20 +627,20 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             )
 
     def test_valid_arm64e_manifest_payload_passes(self) -> None:
-        release_tag = "rust-arm64e-stage1-stable197-test"
+        release_tag = "rust-stage1-arm64e-toolchain-test"
         module.validate_arm64e_manifest_payload(
             valid_arm64e_manifest(release_tag),
             make_stage1_release_pin(release_tag),
         )
 
-    def test_arm64e_manifest_rejects_missing_ctor_provenance(self) -> None:
-        release_tag = "rust-arm64e-stage1-stable197-test"
+    def test_arm64e_manifest_rejects_missing_openssl_provenance(self) -> None:
+        release_tag = "rust-stage1-arm64e-toolchain-test"
         payload = valid_arm64e_manifest(release_tag)
-        del payload["dependencyChain"]["ctor"]
+        del payload["dependencyChain"]["openssl"]
 
         with self.assertRaisesRegex(
             module.CandidateValidationError,
-            "missing ctor resolved commit",
+            "missing OpenSSL submodule commit",
         ):
             module.validate_arm64e_manifest_payload(
                 payload,
@@ -649,7 +648,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             )
 
     def test_arm64e_manifest_rejects_missing_rust_stage1_provenance(self) -> None:
-        release_tag = "rust-arm64e-stage1-stable197-test"
+        release_tag = "rust-stage1-arm64e-toolchain-test"
         payload = valid_arm64e_manifest(release_tag)
         del payload["rustStage1"]
 
@@ -663,12 +662,12 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             )
 
     def test_arm64e_manifest_rejects_weakened_or_mismatched_stage1_provenance(self) -> None:
-        release_tag = "rust-arm64e-stage1-stable197-test"
+        release_tag = "rust-stage1-arm64e-toolchain-test"
         cases = (
             (("rustStage1", "schemaVersion"), 2),
-            (("rustStage1", "releaseTag"), "rust-arm64e-stage1-other"),
+            (("rustStage1", "releaseTag"), "rust-stage1-arm64e-other"),
             (("rustStage1", "sourceRepository"), "upstream/rust"),
-            (("rustStage1", "sourceRef"), "carry/cypherair-arm64e-toolchain-stable-1.97"),
+            (("rustStage1", "sourceRef"), "carry/test-stable-1.97"),
             (("rustStage1", "sourceCommit"), "0" * 40),
             (("rustStage1", "stableBaseCommit"), "0" * 40),
             (("rustStage1", "asset", "fileName"), "wrong.tar.zst"),

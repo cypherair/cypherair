@@ -58,12 +58,6 @@ uniffi = { version = "0.32", features = ["build"] }
 
 CARGO_LOCK = """\
 [[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#1aa46c01a33b30f3e979e4d5c0a414a2fcc56ecf"
-dependencies = []
-
-[[package]]
 name = "openssl-src"
 version = "300.6.1+3.6.3"
 source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#1aea076d67ee701d3e9b9ad68177203881542868"
@@ -89,24 +83,24 @@ STAGE1_PIN = {
     "dependencyName": "rust-arm64e-stage1-toolchain",
     "repository": "cypherair/rust",
     "release": {
-        "tag": "rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1",
-        "publishedAt": "2026-07-15T08:07:10Z",
+        "tag": "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
+        "publishedAt": "2026-08-10T10:40:43Z",
     },
 }
 
 STAGE1_RELEASES = [
-    {"tag_name": "some-other-release", "published_at": "2026-07-16T00:00:00Z"},
+    {"tag_name": "some-other-release", "published_at": "2026-08-11T00:00:00Z"},
     {
-        "tag_name": "rust-arm64e-stage1-stable197-20260701T000000Z-aaaaaaa-r1-a1",
+        "tag_name": "rust-stage1-arm64e-toolchain-20260701T000000Z-aaaaaaa-r1-a1",
         "published_at": "2026-07-01T00:00:00Z",
     },
     {
-        "tag_name": "rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1",
-        "published_at": "2026-07-15T08:07:10Z",
+        "tag_name": "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
+        "published_at": "2026-08-10T10:40:43Z",
     },
     {
-        "tag_name": "rust-arm64e-stage1-draft",
-        "published_at": "2026-07-17T00:00:00Z",
+        "tag_name": "rust-stage1-arm64e-toolchain-draft",
+        "published_at": "2026-08-12T00:00:00Z",
         "draft": True,
     },
 ]
@@ -153,7 +147,7 @@ class ParserTests(unittest.TestCase):
         self.assertIsNotNone(latest)
         self.assertEqual(
             latest["tag_name"],
-            "rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1",
+            "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
         )
         self.assertIsNone(freshness.latest_stage1_release([{"tag_name": "unrelated"}]))
 
@@ -181,7 +175,7 @@ class ReportTests(unittest.TestCase):
         (workflows / "a.yml").write_text(WORKFLOW_A, encoding="utf-8")
         return root
 
-    def make_fetchers(self) -> "freshness.Fetchers":
+    def make_fetchers(self, openssl_src_head: str = "f" * 40) -> "freshness.Fetchers":
         checkout_sha = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
         upload_new_sha = "b" * 40
 
@@ -200,8 +194,7 @@ class ReportTests(unittest.TestCase):
                 ("actions/upload-artifact", "v7.1.0"): upload_new_sha,
             }[(repository, tag)],
             branch_head=lambda repository, branch: {
-                "https://github.com/cypherair/openssl-src-rs": "1aea076d67ee701d3e9b9ad68177203881542868",
-                "https://github.com/cypherair/linktime": "f" * 40,
+                "https://github.com/cypherair/openssl-src-rs": openssl_src_head,
             }[repository],
             cargo_dry_run=lambda repo_root: CARGO_DRY_RUN_OUTPUT,
         )
@@ -223,12 +216,26 @@ class ReportTests(unittest.TestCase):
         )
         self.assertEqual(by_name["arm64e stage1 toolchain (cypherair/rust)"]["status"], "current")
         self.assertEqual(
-            by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "current"
+            by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "drift"
         )
-        self.assertEqual(by_name["ctor carry (cypherair/linktime)"]["status"], "drift")
         self.assertEqual(by_name["actions/checkout (a.yml)"]["status"], "current")
         self.assertEqual(by_name["actions/upload-artifact (a.yml)"]["status"], "update-available")
         self.assertEqual(report["summary"]["unavailable"], 0)
+
+    def test_carry_ref_is_current_when_the_lock_matches_the_branch_head(self) -> None:
+        locked_commit = "1aea076d67ee701d3e9b9ad68177203881542868"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = self.make_repo_root(Path(temp_dir))
+            report = freshness.build_report(
+                repo_root,
+                self.make_fetchers(openssl_src_head=locked_commit),
+            )
+
+        by_name = {entry["name"]: entry for entry in report["entries"]}
+
+        self.assertEqual(
+            by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "current"
+        )
 
     def test_render_text_lists_sections_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -242,7 +249,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Owned-fork carry refs (report-only)", text)
         self.assertIn("Pinned GitHub Actions", text)
         self.assertIn("Summary:", text)
-        self.assertIn("[drift] ctor carry (cypherair/linktime)", text)
+        self.assertIn("[drift] openssl-src carry (cypherair/openssl-src-rs)", text)
 
     def test_failing_fetchers_and_missing_files_never_fail_the_run(self) -> None:
         def boom(*args: object, **kwargs: object) -> object:

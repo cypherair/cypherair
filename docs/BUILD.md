@@ -39,13 +39,11 @@ The SDK/compliance asset set is fixed by WF1 and enumerated in the env block of 
 **Re-pin rule.** A new stage1 prerelease becomes the official input only when every pinned location rotates in the same PR — `.claude/skills/repin-arm64e` enumerates them. Two parts of a rotation are not derivable from the scripts:
 
 - Refresh **every** per-asset SHA-256 and byte size for **both** host triples. Take them from `gh api`, then confirm them against a real download — an API-reported digest is not evidence on its own — and run `scripts/verify_arm64e_stage1_release.sh` so the attestation chain is proven before the pin lands.
-- Revisit the semantic constants in `scripts/validate_arm64e_stage1_toolchain.py` (stable-series prefix, stable base, schema, bundled-LLVM gitlink and version) **only when the new release changes a semantic contract**, not when it merely rotates the build identity. Telling those two cases apart is the judgment the rule exists for.
+- Revisit the semantic constants in `scripts/validate_arm64e_stage1_toolchain.py` (tag-family prefix, stable base, schema, bundled-LLVM gitlink and version) **only when the new release changes a semantic contract**, not when it merely rotates the build identity. Telling those two cases apart is the judgment the rule exists for. The prefix names the publishing family and carries no version: the Rust series is pinned solely by the stable-base constants, which is the stronger binding — a prefix can only reject a foreign tag, while the base commit rejects the wrong compiler.
 
 ## 4. Owned carry chains
 
 `pgp-mobile/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — that is the entire reason the chain exists. `Cargo.lock`, never prose, is the machine-checked truth for the current heads. The branches stay downstream until equivalent arm64e support lands upstream.
-
-Sequoia pulls in an early OpenSSL constructor through `ctor`. The published crate emits its Apple archive-retention pointer with one-byte section alignment, which ld64 rejects when producing the final arm64e app image, so `pgp-mobile/Cargo.toml` also patches `ctor` to a fork whose owning assembly aligns that pointer to eight bytes. **Keep this carry isolated to `ctor`:** the real constructor record is already correct, so no LLVM, Rust, `link-section`, Sequoia, or downstream linker-suppression change belongs in the workaround. Remove the patch once an equivalent upstream crate release is adopted.
 
 The compiler fork (`cypherair/rust`, plus the LLVM work it depends on) carries its own rules:
 

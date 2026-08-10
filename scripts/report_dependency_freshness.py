@@ -7,8 +7,8 @@ repository has, without modifying or weakening any pin:
 - compatible-range crates (``cargo update --dry-run`` count),
 - exact pins vs upstream latest (sequoia-openpgp and UniFFI on crates.io,
   the SQLCipher wrapper pin JSON vs the owned fork's latest release, the
-  openssl-src / linktime carry refs vs their fork branch heads, and the
-  arm64e stage1 toolchain pin vs the latest stage1 release),
+  openssl-src carry ref vs its fork branch head, and the arm64e stage1
+  toolchain pin vs the latest stage1 release),
 - pinned GitHub Actions vs each action's latest release.
 
 Visibility only: exact pins are updated exclusively through their owning
@@ -37,7 +37,7 @@ CARGO_LOCK = "pgp-mobile/Cargo.lock"
 WORKFLOWS_DIR = ".github/workflows"
 SQLCIPHER_PIN = "third_party/sqlcipher-xcframework.pin.json"
 STAGE1_PIN = "third_party/arm64e-stage1-toolchain.pin.json"
-STAGE1_TAG_PREFIX = "rust-arm64e-stage1-"
+STAGE1_TAG_PREFIX = "rust-stage1-arm64e-toolchain-"
 USER_AGENT = "cypherair-dependency-freshness (https://github.com/cypherair/cypherair)"
 
 STATUS_CURRENT = "current"
@@ -214,7 +214,7 @@ def parse_locked_version(cargo_lock_text: str, package: str) -> str:
 
 
 def latest_stage1_release(releases: list[dict]) -> dict | None:
-    """Pick the newest ``rust-arm64e-stage1-*`` release by publish time."""
+    """Pick the newest ``rust-stage1-arm64e-toolchain-*`` release by publish time."""
 
     stage1 = [
         release
@@ -354,7 +354,6 @@ def check_carry_refs(repo_root: Path, fetchers: Fetchers) -> list[dict]:
         arm64e = _load_arm64e_module()
         carries = (
             ("openssl-src carry (cypherair/openssl-src-rs)", arm64e.parse_openssl_src_lock),
-            ("ctor carry (cypherair/linktime)", arm64e.parse_ctor_lock),
         )
     except Exception as error:  # noqa: BLE001
         return [unavailable("carries", "carry-lock parsers", error)]

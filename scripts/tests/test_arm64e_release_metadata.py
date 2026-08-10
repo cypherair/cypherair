@@ -87,59 +87,37 @@ source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-a
             "be17d9174a9223a0dfdcbbd9407fe079882214a0",
         )
 
-    def test_parse_ctor_lock_extracts_branch_and_commit(self) -> None:
+    def test_parse_openssl_src_lock_rejects_non_owned_repository(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             lock_path = Path(temp_dir_name) / "Cargo.lock"
             lock_path.write_text(
                 """
 [[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#1aa46c01a33b30f3e979e4d5c0a414a2fcc56ecf"
-""",
-                encoding="utf-8",
-            )
-
-            parsed = module.parse_ctor_lock(lock_path)
-
-        self.assertEqual(parsed["repository"], "https://github.com/cypherair/linktime")
-        self.assertEqual(parsed["branch"], "carry/apple-ctor-1.0.9")
-        self.assertEqual(
-            parsed["resolvedCommit"],
-            "1aa46c01a33b30f3e979e4d5c0a414a2fcc56ecf",
-        )
-
-    def test_parse_ctor_lock_rejects_non_owned_repository(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir_name:
-            lock_path = Path(temp_dir_name) / "Cargo.lock"
-            lock_path.write_text(
-                """
-[[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/example/linktime?branch=carry%2Fapple-ctor-1.0.9#1aa46c01a33b30f3e979e4d5c0a414a2fcc56ecf"
+name = "openssl-src"
+version = "300.6.2+3.6.2"
+source = "git+https://github.com/example/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#be17d9174a9223a0dfdcbbd9407fe079882214a0"
 """,
                 encoding="utf-8",
             )
 
             with self.assertRaisesRegex(module.MetadataError, "required owned fork"):
-                module.parse_ctor_lock(lock_path)
+                module.parse_openssl_src_lock(lock_path)
 
-    def test_parse_ctor_lock_rejects_wrong_branch(self) -> None:
+    def test_parse_openssl_src_lock_rejects_wrong_branch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             lock_path = Path(temp_dir_name) / "Cargo.lock"
             lock_path.write_text(
                 """
 [[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=main#1aa46c01a33b30f3e979e4d5c0a414a2fcc56ecf"
+name = "openssl-src"
+version = "300.6.2+3.6.2"
+source = "git+https://github.com/cypherair/openssl-src-rs?branch=main#be17d9174a9223a0dfdcbbd9407fe079882214a0"
 """,
                 encoding="utf-8",
             )
 
             with self.assertRaisesRegex(module.MetadataError, "required carry branch"):
-                module.parse_ctor_lock(lock_path)
+                module.parse_openssl_src_lock(lock_path)
 
     def test_collect_dependency_chain_reports_stale_lockfile(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -150,11 +128,6 @@ source = "git+https://github.com/cypherair/linktime?branch=main#1aa46c01a33b30f3
 name = "openssl-src"
 version = "300.6.2+3.6.2"
 source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-[[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#cccccccccccccccccccccccccccccccccccccccc"
 """,
                 encoding="utf-8",
             )
@@ -162,7 +135,6 @@ source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.
             with mock.patch.object(module, "remote_branch_head") as remote_branch_head:
                 remote_branch_head.side_effect = [
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                    "cccccccccccccccccccccccccccccccccccccccc",
                     "d228bf84",
                 ]
                 with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
@@ -171,68 +143,6 @@ source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.
         self.assertFalse(chain["freshness"]["isFresh"])
         self.assertTrue(chain["freshness"]["lookupPerformed"])
         self.assertIn("Cargo.lock commit aaaaaaaaaa", chain["freshness"]["messages"][0])
-        self.assertTrue(chain["ctor"]["isFresh"])
-
-    def test_collect_dependency_chain_reports_stale_ctor_lockfile(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir_name:
-            lock_path = Path(temp_dir_name) / "Cargo.lock"
-            lock_path.write_text(
-                """
-[[package]]
-name = "openssl-src"
-version = "300.6.2+3.6.2"
-source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-[[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-""",
-                encoding="utf-8",
-            )
-
-            with mock.patch.object(module, "remote_branch_head") as remote_branch_head:
-                remote_branch_head.side_effect = [
-                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    "cccccccccccccccccccccccccccccccccccccccc",
-                    "d228bf84",
-                ]
-                with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
-                    chain = module.collect_dependency_chain(lock_path, "warn")
-
-        self.assertFalse(chain["freshness"]["isFresh"])
-        self.assertIn("ctor Cargo.lock commit bbbbbbbbbb", chain["freshness"]["messages"][0])
-
-    def test_collect_dependency_chain_errors_for_stale_ctor_lockfile(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir_name:
-            lock_path = Path(temp_dir_name) / "Cargo.lock"
-            lock_path.write_text(
-                """
-[[package]]
-name = "openssl-src"
-version = "300.6.2+3.6.2"
-source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-[[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-""",
-                encoding="utf-8",
-            )
-
-            with mock.patch.object(module, "remote_branch_head") as remote_branch_head:
-                remote_branch_head.side_effect = [
-                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    "cccccccccccccccccccccccccccccccccccccccc",
-                    "d228bf84",
-                ]
-                with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
-                    with self.assertRaisesRegex(
-                        module.MetadataError,
-                        "ctor Cargo.lock commit bbbbbbbbbb",
-                    ):
-                        module.collect_dependency_chain(lock_path, "error")
 
     def test_collect_dependency_chain_skips_remote_lookups_when_freshness_off(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -243,11 +153,6 @@ source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.
 name = "openssl-src"
 version = "300.6.2+3.6.2"
 source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-[[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#cccccccccccccccccccccccccccccccccccccccc"
 """,
                 encoding="utf-8",
             )
@@ -272,8 +177,6 @@ source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.
         self.assertIsNone(chain["openssl"]["submoduleCommit"])
         self.assertIsNone(chain["openssl"]["remoteBranchHead"])
         self.assertIsNone(chain["openssl"]["isFresh"])
-        self.assertIsNone(chain["ctor"]["remoteBranchHead"])
-        self.assertIsNone(chain["ctor"]["isFresh"])
 
     def test_collect_dependency_chain_errors_when_requested(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -284,11 +187,6 @@ source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.
 name = "openssl-src"
 version = "300.6.2+3.6.2"
 source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-[[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#cccccccccccccccccccccccccccccccccccccccc"
 """,
                 encoding="utf-8",
             )
@@ -296,7 +194,6 @@ source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.
             with mock.patch.object(module, "remote_branch_head") as remote_branch_head:
                 remote_branch_head.side_effect = [
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                    "cccccccccccccccccccccccccccccccccccccccc",
                     "d228bf84",
                 ]
                 with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
