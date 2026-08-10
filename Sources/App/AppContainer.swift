@@ -16,7 +16,6 @@ final class AppContainer: @unchecked Sendable {
     let keyMetadataDomainStore: KeyMetadataDomainStore?
     let contactsDomainStore: ContactsDomainStore?
     let protectedSettingsStore: ProtectedSettingsStore
-    let protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
     let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
     let keyManagement: KeyManagementService
@@ -47,7 +46,6 @@ final class AppContainer: @unchecked Sendable {
         keyMetadataDomainStore: KeyMetadataDomainStore? = nil,
         contactsDomainStore: ContactsDomainStore? = nil,
         protectedSettingsStore: ProtectedSettingsStore,
-        protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore,
         appSessionOrchestrator: AppSessionOrchestrator,
         engine: PgpEngine,
         keyManagement: KeyManagementService,
@@ -76,7 +74,6 @@ final class AppContainer: @unchecked Sendable {
         self.keyMetadataDomainStore = keyMetadataDomainStore
         self.contactsDomainStore = contactsDomainStore
         self.protectedSettingsStore = protectedSettingsStore
-        self.protectedDataFrameworkSentinelStore = protectedDataFrameworkSentinelStore
         self.appSessionOrchestrator = appSessionOrchestrator
         self.engine = engine
         self.keyManagement = keyManagement
@@ -271,24 +268,6 @@ final class AppContainer: @unchecked Sendable {
             },
             open: { wrappingRootKey in
                 _ = try await protectedSettingsStore.openDomainIfNeeded(
-                    wrappingRootKey: wrappingRootKey
-                )
-            }
-        )
-    }
-
-    private static func makeProtectedDataFrameworkSentinelPostUnlockOpener(
-        protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
-    ) -> ProtectedDataPostUnlockDomainOpener {
-        ProtectedDataPostUnlockDomainOpener(
-            domainID: ProtectedDataFrameworkSentinelStore.domainID,
-            ensureCommittedIfNeeded: { wrappingRootKey in
-                try await protectedDataFrameworkSentinelStore.ensureCommittedIfNeeded(
-                    wrappingRootKey: wrappingRootKey
-                )
-            },
-            open: { wrappingRootKey in
-                _ = try await protectedDataFrameworkSentinelStore.openDomainIfNeeded(
                     wrappingRootKey: wrappingRootKey
                 )
             }
@@ -659,14 +638,6 @@ final class AppContainer: @unchecked Sendable {
                 protectedSettingsStore: protectedSettingsStore
             )
         )
-        let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
         let keyMetadataDomainStore = KeyMetadataDomainStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
@@ -785,7 +756,6 @@ final class AppContainer: @unchecked Sendable {
         protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
         protectedDataSessionCoordinator.registerRelockParticipant(contactsDomainStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
@@ -831,9 +801,6 @@ final class AppContainer: @unchecked Sendable {
                     protectedSettingsStore: protectedSettingsStore,
                     protectedDataSessionCoordinator: protectedDataSessionCoordinator,
                     firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
-                ),
-                makeProtectedDataFrameworkSentinelPostUnlockOpener(
-                    protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore
                 )
             ]
         )
@@ -985,7 +952,6 @@ final class AppContainer: @unchecked Sendable {
             keyMetadataDomainStore: keyMetadataDomainStore,
             contactsDomainStore: contactsDomainStore,
             protectedSettingsStore: protectedSettingsStore,
-            protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
@@ -1118,14 +1084,6 @@ final class AppContainer: @unchecked Sendable {
             )
             protectedOrdinarySettingsCoordinator.loadFromUngatedEphemeralPersistence()
         }
-        let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
         let contactsWrappingRootKey: Data
         do {
             contactsWrappingRootKey = try EphemeralWrappingRootKey.generate()
@@ -1148,7 +1106,6 @@ final class AppContainer: @unchecked Sendable {
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -1162,9 +1119,6 @@ final class AppContainer: @unchecked Sendable {
                     protectedSettingsStore: protectedSettingsStore,
                     protectedDataSessionCoordinator: protectedDataSessionCoordinator,
                     firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
-                ),
-                makeProtectedDataFrameworkSentinelPostUnlockOpener(
-                    protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore
                 )
             ]
         )
@@ -1328,7 +1282,6 @@ final class AppContainer: @unchecked Sendable {
             privateKeyControlStore: privateKeyControlStore,
             contactsDomainStore: nil,
             protectedSettingsStore: protectedSettingsStore,
-            protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,

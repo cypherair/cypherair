@@ -15,7 +15,7 @@ The key hierarchy, as promises:
 - **Domain-key rows carry no per-row biometric access control** — deliberately: unwrapping still requires the post-auth wrapping root key, and the user-facing prompt is the app-session gate.
 - **Anti-silent-wipe:** a missing registry combined with any surviving app-owned domain-key row enters framework recovery — never a bootstrap into empty state.
 
-Five domains ship today: `contacts`, `key-metadata`, `protected-settings`, `private-key-control`, `protected-framework-sentinel`. Domain-level promises:
+Four domains ship today: `contacts`, `key-metadata`, `protected-settings`, `private-key-control`. Domain-level promises:
 
 - **`key-metadata` is the key-list source of truth.** It stores only the non-secret `PGPKeyIdentity` projection plus public certificate bytes and the key-level revocation artifact — never handle locators, access-control policy, salts, sealed boxes, or secret material. It is recoverable after unlock but **never silently rebuilt from private-key envelope rows**; expected Secure Enclave handles are *derived* from stored public certificate bindings at load time and the classification stays in memory only.
 - **`contacts` is SQLCipher**, keyed directly with the raw domain-master-key bytes (`sqlite3_key_v2` — no second database-key Keychain row); the raw key buffer is zeroized after keying, and the connection is closed on relock and before any reset/recovery deletion. Recovery triggers: missing database authority, wrong key, corrupt database, application-id mismatch, unsupported `user_version`, or integrity failure — this list is the generic per-domain recovery contract the §6 target design adopts for every domain.
@@ -60,7 +60,7 @@ The **`com.cypherair.v5.` Keychain prefix is a separate axis** — the schema ge
 
 Decided, not shipped — nothing in this section describes current behavior:
 
-- **All five protected domains move to per-domain SQLCipher databases** (the contacts model generalized, including its §2 recovery-trigger contract). The three-slot plist payload container — and `CPDENV5` with it — retires. The **framework-sentinel domain is deleted outright**.
+- **All four protected domains move to per-domain SQLCipher databases** (the contacts model generalized, including its §2 recovery-trigger contract). The three-slot plist payload container — and `CPDENV5` with it — retires.
 - **Generation-watermark authority moves into the per-domain databases**; the anti-rollback invariant and its scope bound are unchanged ([SECURITY.md](SECURITY.md) §5).
 - **The migration contract** (every migration of local state into or between protected forms):
   1. preserve readable source state until the protected destination is confirmed valid;

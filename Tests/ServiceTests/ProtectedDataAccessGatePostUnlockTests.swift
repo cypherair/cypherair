@@ -517,11 +517,11 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         XCTAssertFalse(sessionCoordinator.hasActiveWrappingRootKey)
     }
 
-    func test_postUnlockCoordinator_createsAndOpensFrameworkSentinelAsSecondDomain() async throws {
-        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockSentinel"))
+    func test_postUnlockCoordinator_createsAndOpensSecondDomain() async throws {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockSecondDomain"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
-        let sharedRightIdentifier = "com.cypherair.tests.protected-data.post-unlock.sentinel"
+        let sharedRightIdentifier = "com.cypherair.tests.protected-data.post-unlock.second-domain"
         let registryStore = ProtectedDataTestAppProtectedDataRegistryStore(
             storageRoot: storageRoot,
             sharedRightIdentifier: sharedRightIdentifier
@@ -543,7 +543,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
                 try sessionCoordinator.wrappingRootKeyData()
             }
         )
-        let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
+        let practiceStore = MockPracticeProtectedDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -574,14 +574,14 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
                     }
                 ),
                 ProtectedDataTestAppProtectedDataPostUnlockDomainOpener(
-                    domainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID,
+                    domainID: MockPracticeProtectedDomainStore.domainID,
                     ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await sentinelStore.ensureCommittedIfNeeded(
+                        try await practiceStore.ensureCommittedIfNeeded(
                             wrappingRootKey: wrappingRootKey
                         )
                     },
                     open: { wrappingRootKey in
-                        _ = try await sentinelStore.openDomainIfNeeded(
+                        try await practiceStore.openDomainIfNeeded(
                             wrappingRootKey: wrappingRootKey
                         )
                     }
@@ -601,13 +601,13 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
             outcome,
             .opened([
                 CypherAir.ProtectedSettingsStore.domainID,
-                ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID
+                MockPracticeProtectedDomainStore.domainID
             ])
         )
         XCTAssertEqual(registry.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
-        XCTAssertEqual(registry.committedMembership[ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID], .active)
+        XCTAssertEqual(registry.committedMembership[MockPracticeProtectedDomainStore.domainID], .active)
         XCTAssertEqual(registry.pendingMutation, nil)
-        XCTAssertEqual(sentinelStore.payload, .current)
+        XCTAssertEqual(practiceStore.payload, .current)
         XCTAssertEqual(rootSecretStore.loadCallCount, 1)
         XCTAssertTrue(rootSecretStore.lastAuthenticationContext === handoffContext)
         XCTAssertTrue(handoffContext.interactionNotAllowed)

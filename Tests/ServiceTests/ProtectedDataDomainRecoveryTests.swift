@@ -5,7 +5,7 @@ import XCTest
 @testable import CypherAir
 
 @MainActor
-final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTestCase {
+final class ProtectedDataDomainRecoveryTests: ProtectedDataFrameworkTestCase {
     func test_privateKeyControl_emptyRegistryRequiresHandoffContext() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("PrivateKeyControlNoHandoff"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
@@ -166,7 +166,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedResourceLifecycleState: .ready,
             committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
             pendingMutation: .createDomain(
-                targetDomainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID,
+                targetDomainID: MockPracticeProtectedDomainStore.domainID,
                 phase: .journaled
             )
         )
@@ -191,24 +191,26 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         XCTAssertEqual(store.privateKeyControlState, .recoveryNeeded)
     }
 
-    func test_frameworkSentinel_doesNotCreateFirstDomainFromEmptyRegistry() async throws {
-        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataSentinelEmpty"))
+    func test_secondDomainCreate_againstEmptyRegistryIsRejectedBeforeJournaling() async throws {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataSecondDomainEmptyRegistry"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
         let registryStore = ProtectedDataTestAppProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.sentinel.empty"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.second-domain.empty"
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
+        let practiceStore = MockPracticeProtectedDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
 
-        try await sentinelStore.ensureCommittedIfNeeded(
-            wrappingRootKey: Data(repeating: 0xE1, count: 32)
-        )
+        await XCTAssertThrowsErrorAsync {
+            try await practiceStore.ensureCommittedIfNeeded(
+                wrappingRootKey: Data(repeating: 0xE1, count: 32)
+            )
+        }
 
         let registry = try registryStore.loadRegistry()
         XCTAssertTrue(registry.committedMembership.isEmpty)
@@ -216,12 +218,12 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         XCTAssertEqual(registry.sharedResourceLifecycleState, .absent)
     }
 
-    func test_postUnlockCoordinator_emptyRegistryWithSentinelOpenerDoesNotReadRootSecret() async throws {
-        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataSentinelEmptyPostUnlock"))
+    func test_postUnlockCoordinator_emptyRegistryDoesNotReadRootSecret() async throws {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataEmptyRegistryPostUnlock"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
         let registry = ProtectedDataRegistry.emptySteadyState(
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.sentinel.empty-post-unlock"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.empty-post-unlock"
         )
         let rootSecretStore = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -235,9 +237,9 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             protectedDataSessionCoordinator: sessionCoordinator,
             domainOpeners: [
                 ProtectedDataTestAppProtectedDataPostUnlockDomainOpener(
-                    domainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID,
-                    ensureCommittedIfNeeded: { _ in XCTFail("Sentinel should not be created for an empty registry.") },
-                    open: { _ in XCTFail("Sentinel should not open for an empty registry.") }
+                    domainID: MockPracticeProtectedDomainStore.domainID,
+                    ensureCommittedIfNeeded: { _ in XCTFail("No domain should be created for an empty registry.") },
+                    open: { _ in XCTFail("No domain should open for an empty registry.") }
                 )
             ]
         )
@@ -504,16 +506,16 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         XCTAssertTrue(handler.continuedCreatePhases.isEmpty)
     }
 
-    func test_protectedSettings_surfacesSentinelPendingCreateAsRetryable() async throws {
-        let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsSentinelPending")
+    func test_protectedSettings_surfacesOtherDomainPendingCreateAsRetryable() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsOtherDomainPending")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let registryStore = ProtectedDataTestAppProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-sentinel-pending"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-other-domain-pending"
         )
-        let defaultsSuiteName = "com.cypherair.tests.protected-data.settings-sentinel-pending.\(UUID().uuidString)"
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.settings-other-domain-pending.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
@@ -524,11 +526,11 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-sentinel-pending",
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-other-domain-pending",
             sharedResourceLifecycleState: .ready,
             committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
             pendingMutation: .createDomain(
-                targetDomainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID,
+                targetDomainID: MockPracticeProtectedDomainStore.domainID,
                 phase: .journaled
             )
         )
@@ -541,7 +543,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             _ = try await protectedSettingsStore.openDomainIfNeeded(
                 wrappingRootKey: Data(repeating: 0xC1, count: 32)
             )
-            XCTFail("Protected settings must not open while sentinel recovery is pending.")
+            XCTFail("Protected settings must not open while another domain's recovery is pending.")
         } catch {
             XCTAssertEqual(protectedSettingsStore.domainState, .pendingRetryRequired)
         }
@@ -562,7 +564,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             storageRoot: storageRoot,
             keychain: keychain
         )
-        let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
+        let practiceStore = MockPracticeProtectedDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -575,7 +577,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedResourceLifecycleState: .ready,
             committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
             pendingMutation: .createDomain(
-                targetDomainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID,
+                targetDomainID: MockPracticeProtectedDomainStore.domainID,
                 phase: .journaled
             )
         )
@@ -590,7 +592,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let outcome = try await recoveryCoordinator.recoverPendingMutation(
             handlers: [
                 mismatchedHandler,
-                sentinelStore
+                practiceStore
             ],
             removeSharedRight: { _ in
                 XCTFail("Second-domain create recovery must not remove the shared root.")
@@ -600,13 +602,13 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
         XCTAssertEqual(outcome, .resumedToSteadyState)
         XCTAssertEqual(recoveredRegistry.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
-        XCTAssertEqual(recoveredRegistry.committedMembership[ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID], .active)
+        XCTAssertEqual(recoveredRegistry.committedMembership[MockPracticeProtectedDomainStore.domainID], .active)
         XCTAssertNil(recoveredRegistry.pendingMutation)
         XCTAssertEqual(mismatchedHandler.deleteArtifactsCallCount, 0)
         XCTAssertTrue(mismatchedHandler.continuedCreatePhases.isEmpty)
         XCTAssertTrue(keychain.exists(
             service: KeychainConstants.protectedDataDomainKeyService(
-                domainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID
+                domainID: MockPracticeProtectedDomainStore.domainID
             ),
             account: KeychainConstants.defaultAccount
         ))
