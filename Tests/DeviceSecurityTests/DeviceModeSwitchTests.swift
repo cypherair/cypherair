@@ -139,11 +139,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         try await waitForAuthenticationSessionToSettle()
 
-        let authenticated = try await authManager.evaluate(
+        let authentication = try await authManager.evaluate(
             mode: .highSecurity,
             reason: "Authenticate to validate High Security access after mode switch."
         )
-        XCTAssertTrue(authenticated)
+        XCTAssertTrue(authentication.isAuthenticated)
+        defer { authentication.context?.invalidate() }
 
         let newEnvelope = try keychain.load(
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
@@ -152,7 +153,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint)
         let newHandle = try secureEnclave.reconstructKey(
             from: newSEKeyData,
-            authenticationContext: authManager.lastEvaluatedContext
+            authenticationContext: authentication.context
         )
         let newBundle = WrappedKeyBundle(envelope: newEnvelope)
         let unwrapped = try secureEnclave.unwrap(
@@ -380,11 +381,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         try await waitForAuthenticationSessionToSettle()
 
-        let authenticated = try await authManager.evaluate(
+        let authentication = try await authManager.evaluate(
             mode: .standard,
             reason: "Authenticate to validate Standard access after mode switch."
         )
-        XCTAssertTrue(authenticated)
+        XCTAssertTrue(authentication.isAuthenticated)
+        defer { authentication.context?.invalidate() }
 
         let newEnvelope = try keychain.load(
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
@@ -393,7 +395,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint)
         let newHandle = try secureEnclave.reconstructKey(
             from: newSEKeyData,
-            authenticationContext: authManager.lastEvaluatedContext
+            authenticationContext: authentication.context
         )
         let newBundle = WrappedKeyBundle(envelope: newEnvelope)
         let unwrapped = try secureEnclave.unwrap(

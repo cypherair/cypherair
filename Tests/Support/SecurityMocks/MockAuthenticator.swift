@@ -15,9 +15,6 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
 
     var isBiometricsAvailable: Bool { biometricsAvailable }
 
-    /// Mock has no real LAContext — returns nil.
-    var lastEvaluatedContext: LAContext? { nil }
-
     func canEvaluate(mode: AuthenticationMode) -> Bool {
         switch mode {
         case .standard:
@@ -29,14 +26,19 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
         }
     }
 
-    func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
+    /// The mock has no real `LAContext`, so an authenticated result carries a nil
+    /// context: Secure Enclave call sites then authenticate implicitly.
+    func evaluate(
+        mode: AuthenticationMode,
+        reason: String
+    ) async throws -> PrivateKeyAuthenticationResult {
         // High Security mode with no biometrics → always fail
         if mode == .highSecurity && !biometricsAvailable {
             throw AuthenticationError.biometricsUnavailable
         }
 
         if shouldSucceed {
-            return true
+            return .authenticated(context: nil)
         } else {
             throw AuthenticationError.failed
         }

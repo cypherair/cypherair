@@ -28,17 +28,19 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         }
 
         var isBiometricsAvailable: Bool { true }
-        var lastEvaluatedContext: LAContext? { nil }
         func canEvaluate(mode: AuthenticationMode) -> Bool { true }
 
-        func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
+        func evaluate(
+            mode: AuthenticationMode,
+            reason: String
+        ) async throws -> PrivateKeyAuthenticationResult {
             let inSession = coordinator.isOperationPromptInProgress
             lock.withLock { observedInSession = inSession }
             await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                 lock.withLock { continuation = cont }
                 suspendedExpectation.fulfill()
             }
-            return true
+            return .authenticated(context: nil)
         }
 
         func resume() {

@@ -132,6 +132,33 @@ enum AuthenticationMode: String, Codable, Sendable {
     }
 }
 
+/// The outcome of an `AuthenticationMode` evaluation, carrying the authenticated
+/// `LAContext` so the caller can thread it into the Secure Enclave work that this
+/// authentication authorized (the mode-switch re-wrap reuses one context across
+/// every key instead of prompting per key).
+///
+/// The context belongs to the operation that asked for it, and that operation
+/// invalidates it when it ends. Invalidation is what actually revokes it: an
+/// authenticated `LAContext` keeps satisfying Secure Enclave gates until
+/// `invalidate()` is called, so dropping the last reference is not a revocation
+/// and retaining one is a live capability.
+///
+/// Deliberately distinct from `AppSessionAuthenticationResult`: the app-session
+/// and private-key authentication axes are independent and never share a type
+/// (docs/SECURITY.md §4).
+struct PrivateKeyAuthenticationResult {
+    let isAuthenticated: Bool
+    let context: LAContext?
+
+    static func authenticated(context: LAContext?) -> PrivateKeyAuthenticationResult {
+        PrivateKeyAuthenticationResult(isAuthenticated: true, context: context)
+    }
+
+    static var failed: PrivateKeyAuthenticationResult {
+        PrivateKeyAuthenticationResult(isAuthenticated: false, context: nil)
+    }
+}
+
 enum PrivateKeyControlState: Equatable, Sendable {
     case locked
     case unlocked(AuthenticationMode)
@@ -357,8 +384,8 @@ final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unc
 }
 
 /// Protocol for authentication evaluation.
-/// Production: LAContext.
-/// Tests substitute a configurable double.
+/// The production conformer is `AuthenticationManager`, which evaluates through
+/// `LAContext`. Tests substitute a configurable double.
 protocol AuthenticationEvaluable {
     /// Check if a given authentication policy can be evaluated.
     /// For High Security mode, this checks if biometrics are available.
@@ -371,18 +398,14 @@ protocol AuthenticationEvaluable {
     /// - Parameters:
     ///   - mode: The authentication mode to use.
     ///   - reason: The localized reason string shown to the user.
-    /// - Returns: true if authentication succeeded.
-    func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool
+    /// - Returns: The outcome, carrying the authenticated context for the caller
+    ///   to own — thread it into the Secure Enclave work this authentication
+    ///   authorized, then invalidate it when that work ends. Doubles that have no
+    ///   real context return `nil` for it, which means "prompt implicitly".
+    func evaluate(mode: AuthenticationMode, reason: String) async throws -> PrivateKeyAuthenticationResult
 
     /// Check if biometrics are currently available.
     var isBiometricsAvailable: Bool { get }
-
-    /// The LAContext from the most recent successful evaluate() call.
-    /// Used by switchMode to pass a pre-authenticated context to SE key
-    /// reconstruction, avoiding repeated Face ID prompts.
-    /// Production: returns the authenticated LAContext.
-    /// Test mock: returns nil.
-    var lastEvaluatedContext: LAContext? { get }
 }
 
 /// Authentication preference constants.

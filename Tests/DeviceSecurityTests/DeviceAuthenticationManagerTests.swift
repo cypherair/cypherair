@@ -30,8 +30,10 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
 
         try await waitForAuthenticationSessionToSettle()
 
-        let authenticated = try await authManager.evaluate(mode: mode, reason: reason)
-        XCTAssertTrue(authenticated, "Authentication must succeed before SE reconstruction")
+        let authentication = try await authManager.evaluate(mode: mode, reason: reason)
+        XCTAssertTrue(authentication.isAuthenticated, "Authentication must succeed before SE reconstruction")
+        // The caller owns the authenticated context, exactly as production does.
+        defer { authentication.context?.invalidate() }
 
         let loadedEnvelope = try keychain.load(
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
@@ -40,7 +42,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let loadedSEKey = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
         let handle = try secureEnclave.reconstructKey(
             from: loadedSEKey,
-            authenticationContext: authManager.lastEvaluatedContext
+            authenticationContext: authentication.context
         )
         let storedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let unwrapped = try secureEnclave.unwrap(
