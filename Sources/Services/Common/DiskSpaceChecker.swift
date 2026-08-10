@@ -29,14 +29,9 @@ struct SystemDiskSpace: DiskSpaceProvidable {
 /// jetsam other apps). Refusing up front costs the user nothing and names the one
 /// thing they can act on.
 ///
-/// The pre-flight owns the whole estimate: it reads the input's size itself, and
-/// **an input whose size cannot be read is never a reason to refuse** — this check
-/// fails only for missing space, and an unreadable input reports itself through
-/// the pipeline's own file error. Both directions estimate one copy of the data
-/// with no safety margin, because a multiplier refuses operations that would have
-/// succeeded precisely on the nearly-full device the guard exists for; the rare
-/// case that squeaks past the estimate still fails safely, merely late, with the
-/// partial output destroyed and the failure reported.
+/// The pre-flight owns the whole requirement: it reads the input's size itself,
+/// and **an input whose size cannot be read is never a reason to refuse** — it
+/// reports itself through the pipeline's own file error instead.
 ///
 /// Detached signing is deliberately not covered: it produces a small `.sig`, not
 /// a second copy of the payload.
@@ -51,37 +46,47 @@ struct DiskSpaceChecker {
     /// Validate that sufficient disk space is available for streaming file
     /// encryption of the file at `inputPath`.
     ///
-    /// The estimate is the input size with nothing added: file encryption writes
-    /// binary output — it never armors — and the output exceeds the plaintext only
-    /// by packet headers and AEAD chunk tags, a small fraction of a percent. The
-    /// residual error therefore sits on the permissive side, where the struct
-    /// note's safe-but-late failure covers it, instead of on the refusing side.
+    /// Requires twice the input size. That is a deliberately conservative posture,
+    /// not a derived estimate: the output barely exceeds the input — file
+    /// encryption writes binary output, never armored — but a volume within one
+    /// output-copy of full is refused on purpose, because nothing about the app
+    /// works well on a device that low on space and the margin keeps this write
+    /// from driving it there.
     ///
     /// - Parameter inputPath: Path of the plaintext input file.
     /// - Throws: `CypherAirError.insufficientDiskSpace` if available space is insufficient.
     func validateForEncryption(inputPath: String) throws {
         guard let inputFileSize = Self.fileSize(atPath: inputPath) else { return }
-        try validate(requiredBytes: inputFileSize)
+        try validate(requiredBytes: inputFileSize * 2)
     }
 
     /// Validate that sufficient disk space is available for streaming file
     /// decryption of the file at `inputPath`.
     ///
     /// The decrypted size is unknowable before the message is decrypted, so the size
-    /// of the ciphertext is the estimate:
+    /// of the ciphertext is the estimate, with nothing added on top:
     ///
     /// - CypherAir never compresses what it encrypts, and the foreign payloads
     ///   large enough to matter here (media, archives) are already incompressible,
     ///   so plaintext ≈ ciphertext for the dominant case — slightly under it, once
     ///   packet overhead is subtracted.
+    /// - A multiplier would refuse decrypts that would have succeeded, precisely on
+    ///   the nearly-full device this guard exists for. Peak usage really is one
+    ///   copy: the pipeline writes a sibling temp file and renames it into place on
+    ///   the same volume.
     ///
     /// Armored input is the same ciphertext in base64, which encodes 3 bytes as 4
     /// characters (RFC 4648 §4), so the file is a third larger than the ciphertext
     /// inside it and the estimate is three quarters of the file size. The armor
     /// headers, the newline every 64 characters, and the footer are not subtracted,
     /// which leaves that marginally on the demanding side — by well under 2%, where
-    /// dropping the correction entirely would over-demand by a third and refuse
-    /// decrypts that would have succeeded.
+    /// dropping the correction entirely would over-demand by a third and produce
+    /// exactly the refusals the paragraph above rejects.
+    ///
+    /// A message that expands far beyond its ciphertext still fails during the
+    /// write. That path is already safe — the partial output is destroyed and the
+    /// failure is reported — it is merely late, which is what this pre-flight
+    /// removes for the common case.
     ///
     /// - Parameter inputPath: Path of the encrypted input file.
     /// - Throws: `CypherAirError.insufficientDiskSpace` if available space is insufficient.
