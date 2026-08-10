@@ -37,6 +37,12 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
         }
     }
 
+    /// The protection an export of `suite` will apply — see the key adapter's
+    /// counterpart; the self-test runs the same derivation for real.
+    func exportProtectionInfo(suite: PGPKeySuite) -> PGPKeyS2KInfo {
+        PGPKeyS2KInfo(engine.exportS2kParams(suite: suite.ffiValue))
+    }
+
     func exportSecretKey(
         certData: Data,
         passphrase: String

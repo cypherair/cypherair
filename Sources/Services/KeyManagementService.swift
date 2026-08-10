@@ -118,7 +118,8 @@ final class KeyManagementService: @unchecked Sendable {
             keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             catalogStore: catalogStore,
-            privateKeyAccessService: privateKeyAccessService
+            privateKeyAccessService: privateKeyAccessService,
+            memoryInfo: memoryInfo
         )
         self.selectiveRevocationService = SelectiveRevocationService(
             certificateAdapter: certificateAdapter,

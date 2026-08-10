@@ -34,7 +34,7 @@ extension CypherAirError: LocalizedError {
         case .integrityCheckFailed:
             String(localized: "error.integrityCheck", defaultValue: "Message integrity check failed. The content may have been tampered with.")
         case .argon2idMemoryExceeded(let requiredMb):
-            String(localized: "error.argon2idMemory", defaultValue: "This key uses memory-intensive protection (\(requiredMb) MB) that exceeds this device's capacity.")
+            String(localized: "error.argon2idMemory", defaultValue: "This key's passphrase protection needs \(requiredMb) MB of memory, more than this device can provide.")
         case .revocationError:
             String(localized: "error.revocation", defaultValue: "Invalid revocation certificate.")
         case .keyGenerationFailed:

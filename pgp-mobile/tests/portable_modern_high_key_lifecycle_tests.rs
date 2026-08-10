@@ -38,9 +38,10 @@ fn test_revocation_cert_wrong_key_modern_high() {
     );
 }
 
-/// Modern High export uses Argon2id S2K with the shipped parameter set
-/// (docs/SECURITY.md §7: t=3, p=4, m=2^19 KiB). Memory is asserted through the
-/// FFI probe the app uses; t/p are pinned on the exported packets directly.
+/// Modern High export uses Argon2id S2K with the shipped parameter set —
+/// RFC 9106's primary recommendation (docs/SECURITY.md §7: 2 GiB, t=1, p=4).
+/// Memory is asserted through the FFI probe the app uses; t/p are pinned on the
+/// exported packets directly.
 #[test]
 fn test_export_modern_high_uses_argon2id() {
     use sequoia_openpgp::packet::key::SecretKeyMaterial;
@@ -63,8 +64,8 @@ fn test_export_modern_high_uses_argon2id() {
         "Modern High export must use Argon2id S2K"
     );
     assert_eq!(
-        s2k_info.memory_kib, 524288,
-        "Argon2id memory must be 512 MiB (524288 KiB = 2^19 KiB), got {} KiB",
+        s2k_info.memory_kib, 2097152,
+        "Argon2id memory must be 2 GiB (2097152 KiB = 2^21 KiB), got {} KiB",
         s2k_info.memory_kib
     );
 
@@ -77,11 +78,39 @@ fn test_export_modern_high_uses_argon2id() {
         let sequoia_openpgp::crypto::S2K::Argon2 { t, p, .. } = encrypted.s2k() else {
             panic!("Every exported key packet must use Argon2id S2K");
         };
-        assert_eq!(*t, 3, "Argon2id time passes must be 3, got {t}");
+        assert_eq!(*t, 1, "Argon2id time passes must be 1, got {t}");
         assert_eq!(*p, 4, "Argon2id parallelism must be 4, got {p}");
         argon2_keys += 1;
     }
     assert!(argon2_keys >= 2, "Expected primary + subkey packets");
+}
+
+/// The app runs its memory guard on `export_s2k_params` *before* it unwraps the
+/// secret key, so that prediction has to match the packets the export actually
+/// writes. A drift here would let the guard clear a derivation the device
+/// cannot afford — the exact failure the guard exists to prevent.
+#[test]
+fn test_export_s2k_params_matches_what_export_emits() {
+    for suite in [
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeySuite::Ed448X448,
+    ] {
+        let key = keys::generate_key_with_suite("Alice".to_string(), None, None, suite)
+            .expect("Key gen should succeed");
+        let exported = keys::export_secret_key(&key.cert_data, "s2k-prediction-test")
+            .expect("Export should succeed");
+        let emitted = keys::parse_s2k_params(&exported).expect("S2K params should parse");
+        let predicted = keys::export_s2k_params(suite);
+
+        assert_eq!(
+            predicted.s2k_type, emitted.s2k_type,
+            "{suite:?}: predicted S2K type must match the exported packets"
+        );
+        assert_eq!(
+            predicted.memory_kib, emitted.memory_kib,
+            "{suite:?}: predicted memory cost must match the exported packets"
+        );
+    }
 }
 
 /// Expired Modern High key detected.

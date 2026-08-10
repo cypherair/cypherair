@@ -860,7 +860,7 @@ pub use revocation::{
     generate_user_id_revocation_by_selector_with_external_p256_signer, parse_revocation_cert,
 };
 pub(crate) use s2k::argon2_memory_kib;
-pub use s2k::{parse_s2k_params, S2kInfo, S2kType};
+pub use s2k::{export_s2k_params, parse_s2k_params, S2kInfo, S2kType};
 pub use secret_transfer::{export_secret_key, import_secret_key};
 pub use secure_enclave_generation::{
     generate_secure_enclave_public_certificate, inspect_secure_enclave_public_bindings,

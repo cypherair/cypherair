@@ -4330,13 +4330,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key uses memory-intensive protection (%lld MB) that exceeds this device's capacity."
+            "value" : "This key's passphrase protection needs %lld MB of memory, more than this device can provide."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥使用的内存密集型保护（%lld MB）超出了此设备的容量。"
+            "value" : "此密钥的密码短语保护需要 %lld MB 内存，超出此设备可提供的容量。"
           }
         }
       }

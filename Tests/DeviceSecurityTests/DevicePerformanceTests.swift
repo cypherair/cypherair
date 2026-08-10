@@ -172,10 +172,11 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
         }
     }
 
-    /// Argon2id calibration time (512 MB / p=4).
-    /// Target: ~3s. Soft-fail: record actual value.
+    /// Argon2id calibration time at the shipped export parameters
+    /// (2 GiB / t=1 / p=4). Recorded, not asserted — the point is the number,
+    /// and the memory metric matters as much as the clock here.
     /// Measures exportSecretKey with Modern High, which triggers Argon2id S2K.
-    func test_perf_argon2id_512MB_calibrationTime_target3s() throws {
+    func test_perf_argon2id_exportCalibrationTime() throws {
         let engine = PgpEngine()
         let key = try engine.generateKey(
             name: "Perf", email: nil, expirySeconds: nil, suite: .ed448X448

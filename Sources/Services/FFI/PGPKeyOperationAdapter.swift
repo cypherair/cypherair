@@ -76,12 +76,18 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         }
     }
 
-    func importProtectionInfo(armoredData: Data) throws -> PGPKeyImportS2KInfo {
+    func importProtectionInfo(armoredData: Data) throws -> PGPKeyS2KInfo {
         do {
-            return PGPKeyImportS2KInfo(try engine.parseS2kParams(armoredData: armoredData))
+            return PGPKeyS2KInfo(try engine.parseS2kParams(armoredData: armoredData))
         } catch {
             throw PGPErrorMapper.map(error) { .invalidKeyData(reason: $0) }
         }
+    }
+
+    /// The protection an export of `suite` will apply. Derived from the suite
+    /// alone, so the memory guard can run before any secret is unwrapped.
+    func exportProtectionInfo(suite: PGPKeySuite) -> PGPKeyS2KInfo {
+        PGPKeyS2KInfo(engine.exportS2kParams(suite: suite.ffiValue))
     }
 
     func importSecretKey(
@@ -380,13 +386,13 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
     }
 }
 
-extension PGPKeyImportS2KInfo {
+extension PGPKeyS2KInfo {
     /// Normalizes the generated `S2kInfo` into the app's own vocabulary. The
     /// type switch is exhaustive on purpose — an engine-side S2K case cannot
     /// ship without an app-side counterpart, which is what keeps the memory
     /// guard from being silently disabled by a rename.
     init(_ s2kInfo: S2kInfo) {
-        let s2kType: PGPKeyImportS2KType
+        let s2kType: PGPKeyS2KType
         switch s2kInfo.s2kType {
         case .argon2id:
             s2kType = .argon2id

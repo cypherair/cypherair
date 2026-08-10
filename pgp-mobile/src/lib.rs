@@ -1021,6 +1021,14 @@ impl PgpEngine {
         keys::parse_s2k_params(&armored_data)
     }
 
+    /// The S2K parameters an export of `suite` will derive under.
+    /// Use this to check Argon2id memory requirements before calling
+    /// export_secret_key — it needs no certificate, so the check can run
+    /// before any secret material is unwrapped.
+    pub fn export_s2k_params(&self, suite: KeySuite) -> S2kInfo {
+        keys::export_s2k_params(suite)
+    }
+
     /// Import a passphrase-protected secret key.
     /// Auto-detects S2K mode (Iterated+Salted or Argon2id).
     pub fn import_secret_key(

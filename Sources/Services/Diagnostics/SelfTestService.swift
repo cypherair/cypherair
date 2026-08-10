@@ -39,13 +39,16 @@ final class SelfTestService {
 
     private let selfTestAdapter: PGPSelfTestOperationAdapter
     private let messageAdapter: PGPMessageOperationAdapter
+    private let memoryInfo: any MemoryInfoProvidable
 
     init(
         selfTestAdapter: PGPSelfTestOperationAdapter,
-        messageAdapter: PGPMessageOperationAdapter
+        messageAdapter: PGPMessageOperationAdapter,
+        memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo()
     ) {
         self.selfTestAdapter = selfTestAdapter
         self.messageAdapter = messageAdapter
+        self.memoryInfo = memoryInfo
     }
 
     // MARK: - Run Self-Test
@@ -135,7 +138,9 @@ final class SelfTestService {
             ) {
                 try await Self.runExportImportTest(
                     selfTestAdapter: selfTestAdapter,
-                    generated: generated
+                    memoryInfo: memoryInfo,
+                    generated: generated,
+                    suite: suite
                 )
             }
             results.append(exportResult.result)
@@ -346,8 +351,17 @@ final class SelfTestService {
 
     private static func runExportImportTest(
         selfTestAdapter: PGPSelfTestOperationAdapter,
-        generated: PGPSelfTestGeneratedKey
+        memoryInfo: any MemoryInfoProvidable,
+        generated: PGPSelfTestGeneratedKey,
+        suite: PGPKeySuite
     ) async throws -> PGPKeyMetadata {
+        // The self-test runs a real export and a real import, so it runs the
+        // real Argon2id derivation twice. A device that cannot afford it should
+        // report that as the diagnostic result, not be terminated producing one.
+        try Argon2idMemoryGuard(memoryInfo: memoryInfo).validate(
+            protectionInfo: selfTestAdapter.exportProtectionInfo(suite: suite)
+        )
+
         let passphrase = "self-test-passphrase-2024"
         var exported = try await selfTestAdapter.exportSecretKey(
             certData: generated.certData,

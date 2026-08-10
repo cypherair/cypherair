@@ -2120,6 +2120,14 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider) throws  -> Data
 
     /**
+     * The S2K parameters an export of `suite` will derive under.
+     * Use this to check Argon2id memory requirements before calling
+     * export_secret_key — it needs no certificate, so the check can run
+     * before any secret material is unwrapped.
+     */
+    func exportS2kParams(suite: KeySuite)  -> S2kInfo
+
+    /**
      * Export a secret key protected with a passphrase (ASCII-armored).
      * The S2K mode follows the certificate's classified suite: the legacy
      * suite → Iterated+Salted, every v6 suite → Argon2id.
@@ -3085,6 +3093,22 @@ open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: St
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),uniffiCallStatus
+    )
+})
+}
+
+    /**
+     * The S2K parameters an export of `suite` will derive under.
+     * Use this to check Argon2id memory requirements before calling
+     * export_secret_key — it needs no certificate, so the check can run
+     * before any secret material is unwrapped.
+     */
+open func exportS2kParams(suite: KeySuite) -> S2kInfo  {
+    return try!  FfiConverterTypeS2kInfo_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_pgp_mobile_fn_method_pgpengine_export_s2k_params(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeKeySuite_lower(suite),uniffiCallStatus
     )
 })
 }
@@ -5989,8 +6013,10 @@ public func FfiConverterTypePublicCertificateValidationResult_lower(_ value: Pub
 
 
 /**
- * S2K (String-to-Key) parameters extracted from a passphrase-protected key.
- * The app reads these to check the device's memory headroom before importing.
+ * S2K (String-to-Key) parameters of a passphrase-protected key. The app reads
+ * these to check the device's memory headroom before running the derivation —
+ * as declared by an incoming key file (`parse_s2k_params`) or as an outgoing
+ * export will use them (`export_s2k_params`).
  */
 public struct S2kInfo: Equatable, Hashable {
     public var s2kType: S2kType
@@ -9869,6 +9895,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_p256_signer() != 40946) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_s2k_params() != 13926) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 24803) {
