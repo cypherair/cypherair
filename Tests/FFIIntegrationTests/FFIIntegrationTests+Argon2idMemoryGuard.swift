@@ -1,6 +1,13 @@
 import XCTest
 @testable import CypherAir
 
+/// An arbitrary Argon2id memory figure used to exercise the guard's threshold
+/// arithmetic. Deliberately **not** a product parameter and not a value the app
+/// ever emits — what CypherAir actually exports is asserted against a real
+/// artifact in `test_argon2idGuard_modernHighBackup_onDeviceWithHeadroom_passes`
+/// and pinned on the Rust side. Read nothing about the shipped set from it.
+private let syntheticArgon2idMemoryKib: UInt64 = 524_288
+
 extension FFIIntegrationTests {
     // MARK: - Argon2id Memory Guard Tests
 
@@ -101,7 +108,7 @@ extension FFIIntegrationTests {
     /// Guard checks: required * 4 <= available * 3.
     /// Smallest passing available = ceil(required * 4 / 3).
     func test_argon2idGuard_exact75PercentBoundary_passes() throws {
-        let requiredKib: UInt64 = 524_288 // 512 MB
+        let requiredKib = syntheticArgon2idMemoryKib
         let requiredBytes = requiredKib * 1024
 
         // Smallest available where required * 4 <= available * 3 (ceiling division).
@@ -122,7 +129,7 @@ extension FFIIntegrationTests {
 
     /// One byte below 75% boundary — should fail.
     func test_argon2idGuard_justBelow75PercentBoundary_throwsExceeded() throws {
-        let requiredKib: UInt64 = 524_288
+        let requiredKib = syntheticArgon2idMemoryKib
         let requiredBytes = requiredKib * 1024
         let minPassingAvailable = (requiredBytes * 4 + 2) / 3
 
@@ -187,7 +194,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_queriesMemoryProviderExactlyOnce() throws {
         let s2kInfo = S2kInfo(
             s2kType: .argon2id,
-            memoryKib: 524_288
+            memoryKib: syntheticArgon2idMemoryKib
         )
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 8 * 1024 * 1024 * 1024

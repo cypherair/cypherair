@@ -34,7 +34,7 @@ extension CypherAirError: LocalizedError {
         case .integrityCheckFailed:
             String(localized: "error.integrityCheck", defaultValue: "Message integrity check failed. The content may have been tampered with.")
         case .argon2idMemoryExceeded(let requiredMb):
-            String(localized: "error.argon2idMemory", defaultValue: "This key's passphrase protection needs \(requiredMb) MB of memory, more than this device can provide.")
+            String(localized: "error.argon2idMemory", defaultValue: "Passphrase protection for this key needs \(Self.memorySize(megabytes: requiredMb)) of memory, which isn't available right now. Try again after freeing some up.")
         case .revocationError:
             String(localized: "error.revocation", defaultValue: "Invalid revocation certificate.")
         case .keyGenerationFailed:
@@ -82,6 +82,32 @@ extension CypherAirError: LocalizedError {
         case .contactImportConfirmationAlreadyPending:
             String(localized: "error.contactImportConfirmationAlreadyPending", defaultValue: "Finish or cancel the current contact import before opening another one.")
         }
+    }
+
+    /// What the user can do about it, for the failures where that is a real
+    /// question rather than a restatement. `nil` everywhere else — an empty
+    /// suggestion is worse than none.
+    var recoverySuggestion: String? {
+        switch self {
+        case .argon2idMemoryExceeded:
+            // The memory figure is the limit minus the app's current footprint,
+            // so this refusal is a snapshot: freeing memory really can change
+            // the answer, and saying so is the only useful thing to offer.
+            String(localized: "error.argon2idMemory.recovery", defaultValue: "Close other apps, then try again. If it keeps happening, restart the device.")
+        default:
+            nil
+        }
+    }
+
+    /// Renders an Argon2id memory requirement the way people read memory —
+    /// "2 GB", not "2048 MB" — and degrades sensibly for the arbitrary figures
+    /// a foreign key may declare (1536 MB reads as "1.5 GB").
+    private static func memorySize(megabytes: UInt64) -> String {
+        // A malformed key can declare a requirement that overflows on the way
+        // back to bytes; clamp rather than trap, since this is error copy.
+        let (bytes, overflowed) = megabytes.multipliedReportingOverflow(by: 1024 * 1024)
+        return Int64(clamping: overflowed ? UInt64.max : bytes)
+            .formatted(.byteCount(style: .memory))
     }
 
     /// Per-category copy for key-operation availability failures. Exhaustive on
