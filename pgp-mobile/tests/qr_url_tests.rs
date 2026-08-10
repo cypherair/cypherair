@@ -3,7 +3,7 @@
 use pgp_mobile::keys::{self, KeySuite};
 use pgp_mobile::PgpEngine;
 
-/// v4 public key → base64url encode → cypherair:// URL → decode → byte-identical.
+/// v4 public key → base64url encode → cypherairx:// URL → decode → byte-identical.
 #[test]
 fn test_qr_url_roundtrip_v4() {
     let engine = PgpEngine::new();
@@ -20,7 +20,7 @@ fn test_qr_url_roundtrip_v4() {
         .encode_qr_url(key.public_key_data.clone())
         .expect("URL encoding should succeed");
 
-    assert!(url.starts_with("cypherair://import/v1/"));
+    assert!(url.starts_with("cypherairx://import/v1/"));
 
     let decoded = engine
         .decode_qr_url(url)
@@ -45,7 +45,7 @@ fn test_qr_url_roundtrip_v6() {
         .encode_qr_url(key.public_key_data.clone())
         .expect("URL encoding should succeed");
 
-    assert!(url.starts_with("cypherair://import/v1/"));
+    assert!(url.starts_with("cypherairx://import/v1/"));
 
     let decoded = engine
         .decode_qr_url(url)
@@ -63,11 +63,11 @@ fn test_qr_url_malformed_data() {
     let engine = PgpEngine::new();
 
     // Invalid base64url
-    let result = engine.decode_qr_url("cypherair://import/v1/!!!invalid!!!".to_string());
+    let result = engine.decode_qr_url("cypherairx://import/v1/!!!invalid!!!".to_string());
     assert!(result.is_err(), "Malformed base64url should fail");
 
     // Valid base64url but not a valid key
-    let result = engine.decode_qr_url("cypherair://import/v1/aGVsbG8".to_string());
+    let result = engine.decode_qr_url("cypherairx://import/v1/aGVsbG8".to_string());
     assert!(result.is_err(), "Valid base64url but not a key should fail");
 
     // Wrong URL scheme
@@ -75,7 +75,7 @@ fn test_qr_url_malformed_data() {
     assert!(result.is_err(), "Wrong URL scheme should fail");
 
     // Missing version prefix
-    let result = engine.decode_qr_url("cypherair://import/aGVsbG8".to_string());
+    let result = engine.decode_qr_url("cypherairx://import/aGVsbG8".to_string());
     assert!(result.is_err(), "Missing version prefix should fail");
 }
 
@@ -119,7 +119,7 @@ fn test_qr_url_rejects_secret_key_on_decode() {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;
     let encoded = URL_SAFE_NO_PAD.encode(&key.cert_data);
-    let url = format!("cypherair://import/v1/{encoded}");
+    let url = format!("cypherairx://import/v1/{encoded}");
 
     // decode_qr_url should also reject secret key material
     let result = engine.decode_qr_url(url);
@@ -183,7 +183,7 @@ fn test_qr_url_decode_empty_string() {
 #[test]
 fn test_qr_url_decode_extra_path_segments() {
     let engine = PgpEngine::new();
-    let result = engine.decode_qr_url("cypherair://import/v1/extra/segments/data".to_string());
+    let result = engine.decode_qr_url("cypherairx://import/v1/extra/segments/data".to_string());
     assert!(result.is_err(), "Extra path segments should fail");
 }
 
@@ -212,7 +212,7 @@ fn test_qr_url_decode_query_params() {
 #[test]
 fn test_qr_url_decode_unicode_in_payload() {
     let engine = PgpEngine::new();
-    let result = engine.decode_qr_url("cypherair://import/v1/\u{4f60}\u{597d}".to_string());
+    let result = engine.decode_qr_url("cypherairx://import/v1/\u{4f60}\u{597d}".to_string());
     assert!(result.is_err(), "Unicode in payload should fail");
 }
 
@@ -230,7 +230,7 @@ fn test_qr_url_decode_with_base64_padding() {
     let padded = STANDARD.encode(payload);
     assert!(padded.contains('='), "Test data should produce padding");
 
-    let url = format!("cypherair://import/v1/{padded}");
+    let url = format!("cypherairx://import/v1/{padded}");
     let result = engine.decode_qr_url(url);
     assert!(
         result.is_err(),

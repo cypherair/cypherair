@@ -51,7 +51,7 @@
 			<string>com.cypherair.import</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>cypherair</string>
+				<string>cypherairx</string>
 			</array>
 		</dict>
 	</array>

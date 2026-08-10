@@ -1388,7 +1388,7 @@ impl PgpEngine {
     // ── QR / URL Scheme ─────────────────────────────────────────────
 
     /// Encode a public key for QR code URL scheme.
-    /// Format: cypherair://import/v1/<base64url, no padding>
+    /// Format: cypherairx://import/v1/<base64url, no padding>
     ///
     /// SECURITY: Validates that the input is a valid OpenPGP public key and rejects
     /// secret key material to prevent accidental private key leakage via QR codes.
@@ -1412,7 +1412,7 @@ mod tests {
     fn test_engine_smoke() {
         let engine = PgpEngine::new();
         // Verify engine can perform a basic operation (not just construction)
-        let result = engine.decode_qr_url("cypherair://import/v1/invalid".to_string());
+        let result = engine.decode_qr_url("cypherairx://import/v1/invalid".to_string());
         assert!(result.is_err(), "Invalid QR data should produce an error");
     }
 }

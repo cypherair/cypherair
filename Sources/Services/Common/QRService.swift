@@ -5,7 +5,7 @@ import CoreImage.CIFilterBuiltins
 /// QR code generation and URL scheme parsing.
 ///
 /// SECURITY-CRITICAL: This service parses untrusted external input
-/// (cypherair:// URLs from QR codes).
+/// (cypherairx:// URLs from QR codes).
 @Observable
 final class QRService {
 
@@ -18,7 +18,7 @@ final class QRService {
     // MARK: - QR Generation
 
     /// Generate a QR code image for a public key.
-    /// Format: cypherair://import/v1/<base64url, no padding>
+    /// Format: cypherairx://import/v1/<base64url, no padding>
     ///
     /// - Parameter publicKeyData: Binary public key data.
     /// - Returns: A CIImage of the QR code, or nil if generation fails.
@@ -34,24 +34,24 @@ final class QRService {
 
     // MARK: - URL Parsing
 
-    /// Parse a cypherair:// import URL and extract the public key data.
+    /// Parse a cypherairx:// import URL and extract the public key data.
     ///
     /// SECURITY: This processes untrusted external input. The Rust engine
     /// validates the URL format and parses the OpenPGP key, rejecting
     /// invalid data and secret key material.
     ///
-    /// - Parameter url: The cypherair:// URL.
+    /// - Parameter url: The cypherairx:// URL.
     /// - Returns: Binary public key data.
     func parseImportURL(_ url: URL) throws -> Data {
         let urlString = url.absoluteString
 
         // Validate scheme
-        guard url.scheme == "cypherair" else {
+        guard url.scheme == CypherAirImportURL.scheme else {
             throw CypherAirError.invalidQRCode
         }
 
         // Validate host/path format
-        guard url.host == "import" || urlString.hasPrefix("cypherair://import/") else {
+        guard url.host == "import" || urlString.hasPrefix("\(CypherAirImportURL.scheme)://import/") else {
             throw CypherAirError.invalidQRCode
         }
 

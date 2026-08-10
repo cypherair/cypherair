@@ -31,7 +31,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
     @MainActor
     func test_handleIncomingURL_invalidCypherAirURL_setsImportError() {
         let coordinator = makeCoordinator()
-        let url = URL(string: "cypherair://import/v1/not-a-valid-key")!
+        let url = URL(string: "cypherairx://import/v1/not-a-valid-key")!
 
         coordinator.handleIncomingURL(url, isTutorialPresentationActive: false)
 
@@ -151,7 +151,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let firstRequest = try XCTUnwrap(coordinator.importConfirmationCoordinator.request)
 
         coordinator.handleIncomingURL(
-            URL(string: "cypherair://import/v1/not-a-valid-key")!,
+            URL(string: "cypherairx://import/v1/not-a-valid-key")!,
             isTutorialPresentationActive: false
         )
 
