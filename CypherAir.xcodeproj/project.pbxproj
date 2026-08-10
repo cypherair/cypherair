@@ -138,6 +138,7 @@
 				App/FileIO/OperationController.swift,
 				App/FileIO/OutputHandling.swift,
 				App/FileIO/SecurityScopedFileAccess.swift,
+				App/FileIO/TemporaryArtifactEraser.swift,
 				App/FileIO/TemporaryFileOutput.swift,
 				App/HomeView.swift,
 				App/Keys/BackupKeyScreenModel.swift,

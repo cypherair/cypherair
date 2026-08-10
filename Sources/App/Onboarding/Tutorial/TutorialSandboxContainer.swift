@@ -303,7 +303,7 @@ final class TutorialSandboxContainer {
         guard !didCleanup else { return }
         didCleanup = true
 
-        try? FileManager.default.removeItem(at: contactsDirectory)
+        try? TemporaryArtifactEraser.erase(at: contactsDirectory)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         _ = defaults.synchronize()
         keychain.wipe()

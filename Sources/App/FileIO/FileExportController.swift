@@ -60,7 +60,7 @@ final class FileExportController {
 
     private func cleanupOwnedTemporaryFile() {
         if let ownedTemporaryFile {
-            try? FileManager.default.removeItem(at: ownedTemporaryFile)
+            temporaryArtifactStore.eraseTemporaryArtifact(at: ownedTemporaryFile)
             self.ownedTemporaryFile = nil
         }
     }

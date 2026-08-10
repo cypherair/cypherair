@@ -1,12 +1,20 @@
 import Foundation
 
-final class AppTemporaryArtifactStore {
+/// `@unchecked Sendable`: every stored property is a `let`, and the only state
+/// the store mutates is the filesystem. `FileManager` is not `Sendable`, but its
+/// methods are safe to call concurrently as long as no delegate is attached, and
+/// none is here. The launch sweep runs off the main actor and needs this.
+final class AppTemporaryArtifactStore: @unchecked Sendable {
     struct CleanupResult: Equatable {
         var removedItemCount = 0
         var failures: [String] = []
     }
 
     static let tutorialSandboxDefaultsSuiteName = "com.cypherair.tutorial.sandbox"
+
+    private static let decryptedRootName = "decrypted"
+    private static let streamingRootName = "streaming"
+    private static let operationRootNames = [decryptedRootName, streamingRootName]
 
     private let fileManager: FileManager
     private let temporaryDirectory: URL
@@ -28,12 +36,15 @@ final class AppTemporaryArtifactStore {
 
     func makeStreamingArtifact(for inputURL: URL) throws -> AppTemporaryArtifact {
         let outputFilename = sanitizedFilename(inputURL.lastPathComponent, fallback: "file") + ".gpg"
-        return try makeOperationArtifact(rootName: "streaming", outputFilename: outputFilename)
+        return try makeOperationArtifact(
+            rootName: Self.streamingRootName,
+            outputFilename: outputFilename
+        )
     }
 
     func makeDecryptedArtifact(for inputFilename: String) throws -> AppTemporaryArtifact {
         try makeOperationArtifact(
-            rootName: "decrypted",
+            rootName: Self.decryptedRootName,
             outputFilename: Self.decryptedOutputFilename(for: inputFilename)
         )
     }
@@ -54,7 +65,7 @@ final class AppTemporaryArtifactStore {
         var shouldCleanup = true
         defer {
             if shouldCleanup {
-                try? fileManager.removeItem(at: temporaryURL)
+                eraseTemporaryArtifact(at: temporaryURL)
             }
         }
 
@@ -62,6 +73,12 @@ final class AppTemporaryArtifactStore {
         try applyAndVerifyCompleteProtection(to: temporaryURL)
         shouldCleanup = false
         return temporaryURL
+    }
+
+    /// Erase an artifact this store handed out, for owners that hold the URL
+    /// rather than an `AppTemporaryArtifact`.
+    func eraseTemporaryArtifact(at url: URL) {
+        try? TemporaryArtifactEraser.erase(at: url, fileManager: fileManager)
     }
 
     func applyAndVerifyCompleteProtection(to url: URL) throws {
@@ -82,8 +99,8 @@ final class AppTemporaryArtifactStore {
 
     func cleanupTemporaryArtifacts() -> CleanupResult {
         var result = CleanupResult()
-        for directoryName in ["decrypted", "streaming"] {
-            removeTemporaryItemIfPresent(named: directoryName, isDirectory: true, result: &result)
+        for directoryName in Self.operationRootNames {
+            eraseOperationRootContents(named: directoryName, result: &result)
         }
 
         guard let contents = try? fileManager.contentsOfDirectory(
@@ -94,14 +111,14 @@ final class AppTemporaryArtifactStore {
         }
 
         for url in contents where shouldRemoveTemporaryItem(url) {
-            removeItem(url, result: &result)
+            eraseItem(url, result: &result)
         }
         return result
     }
 
     func remainingTemporaryArtifacts() -> [String] {
         var remaining: [String] = []
-        for directoryName in ["decrypted", "streaming"] {
+        for directoryName in Self.operationRootNames {
             let directory = temporaryDirectory.appendingPathComponent(directoryName, isDirectory: true)
             if fileManager.fileExists(atPath: directory.path) {
                 remaining.append(directoryName)
@@ -166,19 +183,35 @@ final class AppTemporaryArtifactStore {
         try applyAndVerifyCompleteProtection(to: url)
     }
 
-    private func removeTemporaryItemIfPresent(
-        named name: String,
-        isDirectory: Bool,
-        result: inout CleanupResult
-    ) {
-        let url = temporaryDirectory.appendingPathComponent(name, isDirectory: isDirectory)
-        guard fileManager.fileExists(atPath: url.path) else { return }
-        removeItem(url, result: &result)
+    /// Erase the per-operation directories under one root, then the root itself
+    /// once it is empty.
+    ///
+    /// Per-operation rather than wholesale because the sweep runs off the launch
+    /// path, concurrently with the rest of the app: a directory that appears
+    /// after this snapshot belongs to a live operation, and taking the root out
+    /// from under it would fail that operation. Leaving the root behind costs
+    /// nothing — creating one is idempotent.
+    private func eraseOperationRootContents(named name: String, result: inout CleanupResult) {
+        let root = temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil
+        ) else {
+            return
+        }
+
+        for url in contents {
+            eraseItem(url, result: &result)
+        }
+
+        if (try? fileManager.contentsOfDirectory(atPath: root.path))?.isEmpty == true {
+            eraseItem(root, result: &result)
+        }
     }
 
-    private func removeItem(_ url: URL, result: inout CleanupResult) {
+    private func eraseItem(_ url: URL, result: inout CleanupResult) {
         do {
-            try fileManager.removeItem(at: url)
+            try TemporaryArtifactEraser.erase(at: url, fileManager: fileManager)
             result.removedItemCount += 1
         } catch {
             result.failures.append("\(url.lastPathComponent).\(String(describing: type(of: error)))")
@@ -202,7 +235,7 @@ final class AppTemporaryArtifactStore {
 
         let plistURL = tutorialDefaultsPlistURL(for: suiteName)
         if fileManager.fileExists(atPath: plistURL.path) {
-            removeItem(plistURL, result: &result)
+            eraseItem(plistURL, result: &result)
         }
     }
 

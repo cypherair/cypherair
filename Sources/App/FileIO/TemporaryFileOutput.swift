@@ -1,35 +1,31 @@
 import Foundation
 
-/// App-layer wrapper for temporary file outputs owned by a workflow.
+/// App-layer handle for a temporary file output owned by a workflow.
 ///
 /// ScreenModels expose the URL for presentation/export while this value keeps
-/// cleanup ownership out of their public action contracts.
+/// cleanup ownership out of their public action contracts. Cleanup is the
+/// artifact's own — there is no "just the file" variant, because an output that
+/// arrived with an owned directory has to take that directory with it.
 struct TemporaryFileOutput {
-    let fileURL: URL
+    private let artifact: AppTemporaryArtifact
 
-    private let cleanupAction: () -> Void
+    var fileURL: URL { artifact.fileURL }
 
-    init(fileURL: URL, cleanup: @escaping () -> Void) {
-        self.fileURL = fileURL
-        self.cleanupAction = cleanup
+    init(_ artifact: AppTemporaryArtifact) {
+        self.artifact = artifact
     }
 
-    init(fileURL: URL, fileManager: FileManager = .default) {
-        self.fileURL = fileURL
-        self.cleanupAction = {
-            try? fileManager.removeItem(at: fileURL)
-        }
+    init(fileURL: URL) {
+        self.init(AppTemporaryArtifact(fileURL: fileURL))
     }
 
     func cleanup() {
-        cleanupAction()
+        artifact.cleanup()
     }
 }
 
 extension AppTemporaryArtifact {
     var temporaryFileOutput: TemporaryFileOutput {
-        TemporaryFileOutput(fileURL: fileURL) {
-            cleanup()
-        }
+        TemporaryFileOutput(self)
     }
 }

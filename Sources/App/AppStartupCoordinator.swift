@@ -45,7 +45,7 @@ struct AppStartupCoordinator {
             )
         }
 
-        cleanupTemporaryFiles(
+        scheduleTemporaryFileCleanup(
             temporaryArtifactStore: container.temporaryArtifactStore
         )
 
@@ -58,6 +58,19 @@ struct AppStartupCoordinator {
             bootstrapOutcome: bootstrapOutcome,
             protectedDataFrameworkState: protectedDataFrameworkState
         )
+    }
+
+    /// Start the temporary-directory sweep without holding up launch.
+    ///
+    /// The sweep erases what it removes, so its cost is proportional to the bytes
+    /// left behind — and with no termination-time sweep, what it routinely finds
+    /// is a whole decrypted file from the session before. That is not work to run
+    /// inside `App.init()`, where the launch watchdog is counting. Nothing about
+    /// startup depends on the result.
+    private func scheduleTemporaryFileCleanup(temporaryArtifactStore: AppTemporaryArtifactStore) {
+        Task.detached(priority: .utility) {
+            self.cleanupTemporaryFiles(temporaryArtifactStore: temporaryArtifactStore)
+        }
     }
 
     func cleanupTemporaryFiles(
