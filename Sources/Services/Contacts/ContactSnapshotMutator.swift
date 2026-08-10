@@ -18,13 +18,16 @@ struct ContactSnapshotMutator {
     }
 
     private let contactImportAdapter: PGPContactImportAdapter
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let importMatcher: ContactImportMatcher
 
     init(
         contactImportAdapter: PGPContactImportAdapter,
+        certificateAdapter: PGPCertificateOperationAdapter,
         importMatcher: ContactImportMatcher = ContactImportMatcher()
     ) {
         self.contactImportAdapter = contactImportAdapter
+        self.certificateAdapter = certificateAdapter
         self.importMatcher = importMatcher
     }
 
@@ -757,6 +760,163 @@ struct ContactSnapshotMutator {
         snapshot.updatedAt = updatedAt
         try normalizeKeyUsage(in: &snapshot, updatedAt: updatedAt)
         return true
+    }
+
+    /// Retake the engine's verdict on every stored certification.
+    ///
+    /// Whether a certification still vouches for anything is not a property of
+    /// the bytes it was made over. The engine also weighs the signer's
+    /// revocation status, the certification signature's own expiry, and the
+    /// current policy's hash rules — so a stored verdict answers only for the
+    /// moment it was taken, and a signer revoked since then leaves a certified
+    /// badge standing on nothing. This retakes the verdict at unlock, on the
+    /// same cadence as the lifecycle refresh, and lets the fresh answer decide.
+    /// A cached `valid` is never carried forward on the strength of the target
+    /// certificate's bytes being unchanged.
+    ///
+    /// Each certification is checked against the single certificate it names as
+    /// its signer, resolved from the contact key records or from
+    /// `ownSignerCertificates` — the user's own keys, which the contacts domain
+    /// does not hold. That is exactly the claim the badge makes, and it keeps
+    /// the cost proportional to the number of certifications rather than to the
+    /// size of the contact list.
+    ///
+    /// A verdict that cannot be taken at all — the signer is no longer held, the
+    /// User ID it certified is gone from the target, the signature bytes no
+    /// longer parse — demotes to `revalidationNeeded` rather than failing the
+    /// unlock: one unreadable certification must not take the whole domain down
+    /// with it, and "we could not check" is a different statement from "it is
+    /// invalid". Signer fingerprints survive every demotion, so a later unlock
+    /// that can resolve the signer again restores the badge.
+    ///
+    /// Non-throwing by construction; the contract check for the whole reconcile
+    /// sequence belongs to `recomputeCertificationProjections`, which runs next
+    /// and turns these verdicts into the badge the UI reads.
+    @discardableResult
+    func revalidateCertificationArtifacts(
+        in snapshot: inout ContactsDomainSnapshot,
+        ownSignerCertificates: [String: Data],
+        updatedAt: Date = Date()
+    ) async -> Bool {
+        guard !snapshot.certificationArtifacts.isEmpty else {
+            return false
+        }
+
+        let beforeArtifacts = snapshot.certificationArtifacts
+        let targetCertificatesByKeyId = Dictionary(
+            snapshot.keyRecords.map { ($0.keyId, $0.publicKeyData) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let contactCertificatesByFingerprint = Dictionary(
+            snapshot.keyRecords.map { ($0.fingerprint.lowercased(), $0.publicKeyData) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let ownCertificatesByFingerprint = Dictionary(
+            ownSignerCertificates.map { ($0.key.lowercased(), $0.value) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        for index in snapshot.certificationArtifacts.indices {
+            let artifact = snapshot.certificationArtifacts[index]
+            let signerCertificate = artifact.signerPrimaryFingerprint
+                .map { $0.lowercased() }
+                .flatMap {
+                    contactCertificatesByFingerprint[$0] ?? ownCertificatesByFingerprint[$0]
+                }
+
+            switch await certificationVerdict(
+                for: artifact,
+                targetCertificate: targetCertificatesByKeyId[artifact.keyId],
+                signerCertificate: signerCertificate
+            ) {
+            case .valid(let targetCertificateDigest):
+                guard artifact.validationStatus != .valid ||
+                    artifact.targetCertificateDigest != targetCertificateDigest else {
+                    continue
+                }
+                snapshot.certificationArtifacts[index].validationStatus = .valid
+                snapshot.certificationArtifacts[index].targetCertificateDigest = targetCertificateDigest
+                snapshot.certificationArtifacts[index].lastValidatedAt = updatedAt
+            case .invalid:
+                guard artifact.validationStatus != .invalidOrStale else {
+                    continue
+                }
+                snapshot.certificationArtifacts[index].validationStatus = .invalidOrStale
+            case .unavailable:
+                guard artifact.validationStatus != .revalidationNeeded else {
+                    continue
+                }
+                snapshot.certificationArtifacts[index].validationStatus = .revalidationNeeded
+            }
+            snapshot.certificationArtifacts[index].updatedAt = updatedAt
+        }
+
+        guard snapshot.certificationArtifacts != beforeArtifacts else {
+            return false
+        }
+
+        snapshot.updatedAt = updatedAt
+        return true
+    }
+
+    /// The engine's current answer for one stored certification. `valid` carries
+    /// the digest of the exact target bytes the answer was given for, so the
+    /// artifact records what it was checked against rather than what it was
+    /// created against.
+    private enum CertificationVerdict {
+        case valid(targetCertificateDigest: String)
+        case invalid
+        case unavailable
+    }
+
+    private func certificationVerdict(
+        for artifact: ContactCertificationArtifactReference,
+        targetCertificate: Data?,
+        signerCertificate: Data?
+    ) async -> CertificationVerdict {
+        guard let targetCertificate, let signerCertificate else {
+            return .unavailable
+        }
+
+        do {
+            let status: CertificateSignatureVerificationStatus
+            switch artifact.targetSelector.kind {
+            case .directKey:
+                status = try await certificateAdapter.directKeySignatureStatus(
+                    signature: artifact.canonicalSignatureData,
+                    targetCert: targetCertificate,
+                    candidateSigners: [signerCertificate]
+                )
+            case .userId:
+                guard let userIdData = artifact.targetSelector.userIdData,
+                      let occurrenceIndex = artifact.targetSelector.occurrenceIndex,
+                      occurrenceIndex >= 0 else {
+                    return .unavailable
+                }
+                status = try await certificateAdapter.userIdBindingSignatureStatus(
+                    signature: artifact.canonicalSignatureData,
+                    targetCert: targetCertificate,
+                    userIdData: userIdData,
+                    occurrenceIndex: occurrenceIndex,
+                    candidateSigners: [signerCertificate]
+                )
+            }
+
+            switch status {
+            case .valid:
+                return .valid(
+                    targetCertificateDigest: ContactCertificationArtifactReference.sha256Hex(
+                        for: targetCertificate
+                    )
+                )
+            case .invalid:
+                return .invalid
+            case .signerMissing:
+                return .unavailable
+            }
+        } catch {
+            return .unavailable
+        }
     }
 
     private func makeIdentity(

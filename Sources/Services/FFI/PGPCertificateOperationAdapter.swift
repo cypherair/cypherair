@@ -81,6 +81,54 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         }
     }
 
+    /// Crypto-only status for a direct-key certification, without the signer
+    /// identity resolution the interactive verification paths need. A caller
+    /// re-checking a certification it already attributed to a signer wants the
+    /// engine's verdict and nothing else.
+    func directKeySignatureStatus(
+        signature: Data,
+        targetCert: Data,
+        candidateSigners: [Data]
+    ) async throws -> CertificateSignatureVerificationStatus {
+        do {
+            let result = try await Self.performVerifyDirectKeySignature(
+                engine: engine,
+                signature: signature,
+                targetCert: targetCert,
+                candidateSigners: candidateSigners
+            )
+            return CertificateSignatureVerificationStatus(from: result.status)
+        } catch {
+            throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
+        }
+    }
+
+    /// Crypto-only status for a User ID binding certification, selected by the
+    /// User ID bytes and occurrence index a stored certification records.
+    func userIdBindingSignatureStatus(
+        signature: Data,
+        targetCert: Data,
+        userIdData: Data,
+        occurrenceIndex: Int,
+        candidateSigners: [Data]
+    ) async throws -> CertificateSignatureVerificationStatus {
+        do {
+            let result = try await PGPCertificateSelectionAdapter.verifyUserIdBindingSignature(
+                engine: engine,
+                signature: signature,
+                targetCert: targetCert,
+                userIdSelector: UserIdSelectorInput(
+                    userIdData: userIdData,
+                    occurrenceIndex: UInt64(occurrenceIndex)
+                ),
+                candidateSigners: candidateSigners
+            )
+            return CertificateSignatureVerificationStatus(from: result.status)
+        } catch {
+            throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
+        }
+    }
+
     func generateUserIdCertification(
         signerSecretCert: Data,
         targetCert: Data,

@@ -15,9 +15,16 @@ class ContactServiceTestCase: XCTestCase {
     var contactService: ContactService!
     var tempDir: URL!
 
+    /// Own key identities that signed certifications made through
+    /// `makeVerifiedCertificationArtifacts`. Reopening the domain supplies them
+    /// the way the app does, so the unlock re-verification can resolve the
+    /// signer of a certification the user made themselves.
+    private(set) var certificationSignerKeys: [PGPKeyIdentity] = []
+
     override func setUp() async throws {
         try await super.setUp()
         engine = PgpEngine()
+        certificationSignerKeys = []
         let result = await TestHelpers.makeContactService(engine: engine)
         contactService = result.service
         tempDir = result.tempDir
@@ -25,6 +32,7 @@ class ContactServiceTestCase: XCTestCase {
 
     override func tearDown() {
         TestHelpers.cleanupTempDir(tempDir)
+        certificationSignerKeys = []
         contactService = nil
         engine = nil
         tempDir = nil
@@ -74,7 +82,8 @@ class ContactServiceTestCase: XCTestCase {
 
     func reopenProtectedContactService(
         harness: ContactsProtectedHarness,
-        contactsDirectory: URL
+        contactsDirectory: URL,
+        ownSignerKeys: [PGPKeyIdentity]? = nil
     ) async -> (service: ContactService, store: ContactsDomainStore) {
         let store = ContactsDomainStore(
             storageRoot: harness.storageRoot,
@@ -92,7 +101,8 @@ class ContactServiceTestCase: XCTestCase {
         )
         let availability = await service.openContactsAfterPostUnlock(
             gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
+            wrappingRootKey: { harness.wrappingRootKey },
+            ownSignerKeys: ownSignerKeys ?? certificationSignerKeys
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
         return (service, store)
@@ -136,6 +146,7 @@ class ContactServiceTestCase: XCTestCase {
             name: "Certification Signer",
             email: "signer@example.invalid"
         )
+        certificationSignerKeys.append(signer)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let certificateSignatureService = CertificateSignatureService(
             certificateAdapter: certificateAdapter,

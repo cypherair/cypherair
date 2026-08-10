@@ -24,16 +24,28 @@ final class ContactService: @unchecked Sendable {
         contactsDomainStore: ContactsDomainStore? = nil
     ) {
         self.certificateAdapter = certificateAdapter
-        snapshotMutator = ContactSnapshotMutator(contactImportAdapter: contactImportAdapter)
+        snapshotMutator = ContactSnapshotMutator(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter
+        )
         self.contactsDomainStore = contactsDomainStore
     }
 
     // MARK: - Post-Auth Contacts Gate
 
+    /// Open the contacts domain and reconcile everything cached in it against
+    /// the engine before any of it reaches the UI.
+    ///
+    /// - Parameter ownSignerKeys: the user's own key identities. A certification
+    ///   the user made themselves is signed by a key the contacts domain does
+    ///   not hold, so without them every self-made certification would come back
+    ///   unverifiable. Callers read this on the actor that owns key state and
+    ///   pass the values in.
     @discardableResult
     func openContactsAfterPostUnlock(
         gateDecision: ContactsPostAuthGateDecision,
-        wrappingRootKey: () throws -> Data
+        wrappingRootKey: () throws -> Data,
+        ownSignerKeys: [PGPKeyIdentity] = []
     ) async -> ContactsAvailability {
         guard gateDecision.allowsProtectedDomainOpen else {
             clearContactsRuntimeState(availability: gateDecision.availability)
@@ -63,10 +75,21 @@ final class ContactService: @unchecked Sendable {
             let refreshedLifecycleState = try snapshotMutator.refreshCertificateLifecycleState(
                 in: &reconciledSnapshot
             )
+            // After the lifecycle refresh, so certifications are re-checked
+            // against settled key records, and before the projections are
+            // recomputed, so the badges the UI reads are built from this
+            // unlock's verdicts rather than the ones cached last time.
+            let revalidatedCertifications = await snapshotMutator.revalidateCertificationArtifacts(
+                in: &reconciledSnapshot,
+                ownSignerCertificates: Dictionary(
+                    ownSignerKeys.map { ($0.fingerprint, $0.publicKeyData) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+            )
             let recomputedProjections = try snapshotMutator.recomputeCertificationProjections(
                 in: &reconciledSnapshot
             )
-            if refreshedLifecycleState || recomputedProjections {
+            if refreshedLifecycleState || revalidatedCertifications || recomputedProjections {
                 try contactsDomainStore.replaceSnapshot(reconciledSnapshot)
             }
             adoptOpenContactsDomain(reconciledSnapshot)

@@ -266,44 +266,73 @@ final class SelfTestService {
         return verified.verification
     }
 
+    /// Flip one byte inside the encryption container and require the container's
+    /// own authentication to be what rejects it — the AEAD tag of SEIPDv2 for a
+    /// v6 recipient, the MDC of SEIPDv1 for a v4 one. That hard fail is Hard
+    /// Constraint 3, and it is the only thing this test is entitled to claim.
+    ///
+    /// The message is therefore encrypted binary, and the flipped byte is its
+    /// last — always inside the SEIPD packet's authenticated region. An
+    /// ASCII-armored message would put the flip on a base64 character instead,
+    /// where the armor decoder rejects a good share of flips before the
+    /// ciphertext is ever authenticated: a rejection that proves nothing about
+    /// authenticated encryption.
+    ///
+    /// The same ciphertext is decrypted untampered first. That leaves exactly one
+    /// difference between the run that succeeds and the run that fails — one byte
+    /// inside the authenticated region — so the rejection is attributable to the
+    /// container's authentication and not to the key, the format, or the parser.
+    /// It is also what lets `noMatchingKey` count as a pass for a v6 recipient:
+    /// Sequoia authenticates the first chunk while probing a candidate session
+    /// key, and a failed probe is reported as "no key worked" rather than as an
+    /// AEAD failure. With the untampered decryption succeeding on the same key,
+    /// that answer can only have come from the AEAD tag.
     private static func runTamperDetectionTest(
         messageAdapter: PGPMessageOperationAdapter,
         generated: PGPSelfTestGeneratedKey
     ) async throws -> Bool {
+        let tamperVerificationContext = PGPMessageVerificationContext(
+            verificationKeys: [],
+            contactKeys: [],
+            ownKeys: [],
+            contactsAvailability: .availableProtectedDomain
+        )
         let plaintext = Data("Tamper test".utf8)
-        var ciphertext = try await messageAdapter.encrypt(
+        let ciphertext = try await messageAdapter.encrypt(
             plaintext: plaintext,
             recipientKeys: [generated.publicKeyData],
             signingKey: nil,
             selfKey: nil,
-            binary: false
+            binary: true
         )
+        let untamperedDecryption = try await messageAdapter.decryptDetailed(
+            ciphertext: ciphertext,
+            secretKeys: [generated.certData],
+            verificationContext: tamperVerificationContext
+        )
+        guard untamperedDecryption.plaintext == plaintext else {
+            throw CypherAirError.corruptData(reason: "Untampered ciphertext did not round-trip")
+        }
 
-        let midpoint = ciphertext.count / 2
-        ciphertext[midpoint] ^= 0x01
+        var tamperedCiphertext = ciphertext
+        guard let finalByteIndex = tamperedCiphertext.indices.last else {
+            throw CypherAirError.corruptData(reason: "Encryption produced no ciphertext to tamper with")
+        }
+        tamperedCiphertext[finalByteIndex] ^= 0x01
 
-        let decryptSucceeded: Bool
         do {
             _ = try await messageAdapter.decryptDetailed(
-                ciphertext: ciphertext,
+                ciphertext: tamperedCiphertext,
                 secretKeys: [generated.certData],
-                verificationContext: PGPMessageVerificationContext(
-                    verificationKeys: [],
-                    contactKeys: [],
-                    ownKeys: [],
-                    contactsAvailability: .availableProtectedDomain
-                )
+                verificationContext: tamperVerificationContext
             )
-            decryptSucceeded = true
-        } catch {
-            decryptSucceeded = false
+        } catch CypherAirError.aeadAuthenticationFailed,
+                CypherAirError.integrityCheckFailed,
+                CypherAirError.noMatchingKey {
+            return true
         }
 
-        guard !decryptSucceeded else {
-            throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
-        }
-
-        return true
+        throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
     }
 
     private static func verificationContext(for generated: PGPSelfTestGeneratedKey) -> PGPMessageVerificationContext {

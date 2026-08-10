@@ -891,7 +891,11 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     wrappingRootKey: {
                         try protectedDataSessionCoordinator.wrappingRootKeyData()
-                    }
+                    },
+                    // The key-metadata domain opened above, so a certification
+                    // the user signed themselves can be re-checked against the
+                    // key that signed it.
+                    ownSignerKeys: keyManagement.keys
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     availability: Self.protectedOrdinarySettingsAvailability(
@@ -1233,7 +1237,8 @@ final class AppContainer: @unchecked Sendable {
                         postUnlockOutcome: postUnlockOutcome,
                         frameworkState: protectedDataSessionCoordinator.frameworkState
                     ),
-                    wrappingRootKey: { contactsWrappingRootKey }
+                    wrappingRootKey: { contactsWrappingRootKey },
+                    ownSignerKeys: keyManagement.keys
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     availability: Self.protectedOrdinarySettingsAvailability(
@@ -1377,7 +1382,8 @@ final class AppContainer: @unchecked Sendable {
                 postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
                 frameworkState: .sessionAuthorized
             ),
-            wrappingRootKey: { bootstrap.wrappingRootKey }
+            wrappingRootKey: { bootstrap.wrappingRootKey },
+            ownSignerKeys: keyManagement.keys
         )
         var didPreloadContact = bootstrap.didPreloadContact
         if availability == .availableProtectedDomain,
