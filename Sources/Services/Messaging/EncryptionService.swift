@@ -103,13 +103,12 @@ final class EncryptionService {
         guard !recipientKeys.isEmpty else {
             throw CypherAirError.noRecipientsSelected
         }
-        // Get file size for disk space check
         let inputPath = inputURL.path
-        let attrs = try FileManager.default.attributesOfItem(atPath: inputPath)
-        let fileSize = attrs[.size] as? UInt64 ?? 0
 
-        // Validate disk space before starting
-        try diskSpaceChecker.validateForEncryption(inputFileSize: fileSize)
+        // Refuse an encrypt the volume cannot hold before it costs the user
+        // anything: ahead of the output artifact, and ahead of any signing or
+        // encrypt-to-self key step below.
+        try diskSpaceChecker.validateForEncryption(inputPath: inputPath)
 
         let selfKey = try resolvedEncryptToSelfKey(
             encryptToSelf: encryptToSelf,

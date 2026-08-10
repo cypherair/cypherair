@@ -396,6 +396,74 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(mockDisk.callCount, 1, "Disk space should have been checked once")
     }
 
+    /// The encrypt estimate is the input size exactly, and that "exactly" is a
+    /// decision, not an accident: file encryption writes binary output whose overhead
+    /// over the plaintext is a small fraction of a percent, so free space equal to
+    /// the input must be enough. Any safety margin someone adds later — even 1.01x —
+    /// refuses here.
+    func test_encryptFileStreaming_freeSpaceEqualToInputSize_proceeds() async throws {
+        let inputByteCount = 4096
+        let mockDisk = MockDiskSpace()
+        mockDisk.availableBytes = UInt64(inputByteCount)
+        let spyEncryptor = SpyStreamingFileEncryptor()
+        let artifactRoot = try makeIsolatedArtifactRoot()
+        defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+        let recipient = try await generateKeyAndContact(
+            suite: .ed25519LegacyCurve25519Legacy,
+            name: "Exact Fit Encrypt Recipient"
+        )
+        let inputURL = try writeTempFile(Data(repeating: 0x42, count: inputByteCount))
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let encryptedArtifact = try await makeEncryptionService(
+            fileEncryptor: spyEncryptor,
+            diskSpace: mockDisk,
+            artifactRoot: artifactRoot
+        ).encryptFileStreaming(
+            inputURL: inputURL,
+            recipientContactIds: [try contactId(for: recipient)],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { encryptedArtifact.cleanup() }
+
+        XCTAssertEqual(spyEncryptor.callCount, 1, "Free space equal to the input must be enough")
+    }
+
+    /// An input whose size cannot be read is not a reason to refuse: the pre-flight
+    /// only ever fails for missing space, and the real problem with the file surfaces
+    /// from the encrypt pipeline itself. Reported free space is zero here, so a
+    /// pre-flight that ran anyway would refuse and fail this test.
+    func test_encryptFileStreaming_unreadableInputSize_skipsPreflightAndProceeds() async throws {
+        let mockDisk = MockDiskSpace()
+        mockDisk.availableBytes = 0
+        let spyEncryptor = SpyStreamingFileEncryptor()
+        let artifactRoot = try makeIsolatedArtifactRoot()
+        defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+        let recipient = try await generateKeyAndContact(
+            suite: .ed25519LegacyCurve25519Legacy,
+            name: "Unreadable Encrypt Input Recipient"
+        )
+
+        let encryptedArtifact = try await makeEncryptionService(
+            fileEncryptor: spyEncryptor,
+            diskSpace: mockDisk,
+            artifactRoot: artifactRoot
+        ).encryptFileStreaming(
+            inputURL: URL(fileURLWithPath: "/nonexistent/CypherAirDiskPreflightTests/missing.bin"),
+            recipientContactIds: [try contactId(for: recipient)],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { encryptedArtifact.cleanup() }
+
+        XCTAssertEqual(spyEncryptor.callCount, 1, "Encryption should have proceeded to the pipeline")
+    }
+
     /// The decrypt pre-flight has to land before the private-key route, because the
     /// point of it is to spare the user an authentication prompt and a long write
     /// that the volume cannot finish. A refusal raised after the decryptor had run
@@ -602,6 +670,21 @@ final class StreamingServiceTests: XCTestCase {
         )
     }
 
+    private func makeEncryptionService(
+        fileEncryptor: any StreamingFileEncrypting,
+        diskSpace: any DiskSpaceProvidable,
+        artifactRoot: URL
+    ) -> EncryptionService {
+        EncryptionService(
+            keyManagement: stack.keyManagement,
+            contactService: stack.contactService,
+            textEncryptor: stack.textEncryptor,
+            fileEncryptor: fileEncryptor,
+            diskSpaceChecker: DiskSpaceChecker(diskSpace: diskSpace),
+            temporaryArtifactStore: AppTemporaryArtifactStore(temporaryDirectory: artifactRoot)
+        )
+    }
+
     /// A file that opens with the OpenPGP armor header and is padded with base64
     /// characters to an exact size. Only the head has to be real — the spy decryptor
     /// never parses the body.
@@ -788,6 +871,22 @@ final class StreamingServiceTests: XCTestCase {
 ///
 /// `@unchecked Sendable`: the counter is written once inside the awaited call and
 /// read after it returns, never concurrently.
+private final class SpyStreamingFileEncryptor: StreamingFileEncrypting, @unchecked Sendable {
+    private(set) var callCount = 0
+
+    func encryptFile(
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signerFingerprint: String?,
+        selfKey: Data?,
+        progress: FileProgressReporter?
+    ) async throws {
+        callCount += 1
+        try Data().write(to: URL(fileURLWithPath: outputPath))
+    }
+}
+
 private final class SpyStreamingFileDecryptor: StreamingFileDecrypting, @unchecked Sendable {
     private(set) var callCount = 0
 
