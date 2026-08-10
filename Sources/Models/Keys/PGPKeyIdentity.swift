@@ -55,7 +55,7 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Populated from parsed key metadata expiry timestamp (seconds since Unix epoch).
     var expiryDate: Date?
 
-    /// Short Key ID (last 16 hex chars of fingerprint). De-emphasized in UI.
+    /// Short Key ID derived from the fingerprint's key version. De-emphasized in UI.
     var shortKeyId: String {
         IdentityPresentation.shortKeyId(from: fingerprint)
     }

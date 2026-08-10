@@ -95,7 +95,13 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
         let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: second.fingerprint))
         let model = ContactDetailScreenModel(contactId: targetContactId, contactService: service)
 
-        model.markVerified(fingerprint: first.fingerprint)
+        model.setVerification(.verified, fingerprint: first.fingerprint)
+        XCTAssertTrue(try XCTUnwrap(model.contact?.preferredKey).isVerified)
+
+        model.setVerification(.unverified, fingerprint: first.fingerprint)
+        XCTAssertFalse(try XCTUnwrap(model.contact?.preferredKey).isVerified)
+
+        model.setVerification(.verified, fingerprint: first.fingerprint)
         XCTAssertTrue(try XCTUnwrap(model.contact?.preferredKey).isVerified)
 
         model.mergeContact(sourceContactId: sourceContactId)

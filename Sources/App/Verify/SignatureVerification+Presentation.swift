@@ -34,11 +34,6 @@ extension SignatureVerification {
                     localized: "signature.valid.known",
                     defaultValue: "Valid signature from \(signerIdentity.presentationDisplayName)"
                 )
-            } else if let fp = signerFingerprint {
-                String(
-                    localized: "signature.valid.fingerprint",
-                    defaultValue: "Valid signature from \(String(fp.suffix(16)))"
-                )
             } else {
                 String(localized: "signature.valid", defaultValue: "Valid signature")
             }

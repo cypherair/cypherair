@@ -90,9 +90,13 @@ final class ContactDetailScreenModel {
         }
     }
 
-    func markVerified(fingerprint: String) {
+    /// Record or withdraw the user's own confirmation that a key's fingerprint
+    /// matches the one its owner gave them. Withdrawal exists because a
+    /// verification can be made in error, or later doubted, and the app should
+    /// never state a trust claim the user no longer stands behind.
+    func setVerification(_ verificationState: ContactVerificationState, fingerprint: String) {
         do {
-            try contactService.setVerificationState(.verified, for: fingerprint)
+            try contactService.setVerificationState(verificationState, for: fingerprint)
         } catch {
             presentError(error)
         }

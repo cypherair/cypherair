@@ -344,9 +344,20 @@ final class ModelTests: XCTestCase {
 
     // MARK: - PGPKeyIdentity: Computed Properties
 
-    func test_pgpKeyIdentity_shortKeyId_returnsLast16Chars() {
+    func test_pgpKeyIdentity_shortKeyId_v4Fingerprint_readsLowOrderBits() {
         let identity = makeIdentity(fingerprint: "abcdef1234567890abcdef1234567890abcdef12")
         XCTAssertEqual(identity.shortKeyId, "34567890abcdef12")
+    }
+
+    func test_identityPresentation_shortKeyId_v6Fingerprint_readsHighOrderBits() {
+        // A v6 Key ID is the first 64 bits of the fingerprint, not the last —
+        // reading the wrong end yields an ID no other implementation matches.
+        let fingerprint = "0123456789abcdef" + String(repeating: "f", count: 48)
+        XCTAssertEqual(IdentityPresentation.shortKeyId(from: fingerprint), "0123456789abcdef")
+    }
+
+    func test_identityPresentation_shortKeyId_unrecognizedLength_returnsInputUnchanged() {
+        XCTAssertEqual(IdentityPresentation.shortKeyId(from: "abc123"), "abc123")
     }
 
     func test_identityPresentation_fingerprintGroups_groupsInChunksOfFour() {
@@ -692,7 +703,7 @@ final class ModelTests: XCTestCase {
     }
 
     func test_signatureVerification_signerIdentity_unknownFallback_keepsFingerprint() {
-        let fingerprint = "fedcba0987654321fedcba0987654321"
+        let fingerprint = String(repeating: "a", count: 24) + "fedcba0987654321"
 
         let identity = SignatureVerification.SignerIdentity.resolve(
             fingerprint: fingerprint,

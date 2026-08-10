@@ -2785,6 +2785,22 @@
         }
       }
     },
+    "contactdetail.withdrawVerification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Withdraw My Fingerprint Verification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤销我对该指纹的核对"
+          }
+        }
+      }
+    },
     "contactKey.compatible.name" : {
       "localizations" : {
         "en" : {
@@ -14321,22 +14337,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有效签名"
-          }
-        }
-      }
-    },
-    "signature.valid.fingerprint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valid signature from %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "来自 %@ 的有效签名"
           }
         }
       }

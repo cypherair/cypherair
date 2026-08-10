@@ -599,4 +599,79 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertEqual(record.primaryUserId, key.primaryUserId)
         XCTAssertEqual(record.manualVerificationState, .unverified)
     }
+
+    // MARK: - Certificate Lifecycle Reconciliation
+
+    func test_openContacts_refreshesStaleLifecycleFlagsFromStoredCertificate() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactLifecycleRefresh")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let base = try loadFixture("merge_revocation_legacy_base")
+        let update = try loadFixture("merge_revocation_legacy_update")
+
+        _ = try opened.service.importContact(publicKeyData: base)
+        _ = try opened.service.importContact(publicKeyData: update)
+        let truth = try XCTUnwrap(opened.service.testContactKeyRecords.first)
+        XCTAssertTrue(truth.isRevoked)
+
+        // Forge the frozen-at-import cache: the stored certificate is revoked,
+        // but the record still claims the key is a usable recipient.
+        var snapshot = try opened.service.currentContactsDomainSnapshot()
+        let index = try XCTUnwrap(snapshot.keyRecords.indices.first)
+        snapshot.keyRecords[index].hasEncryptionSubkey = true
+        snapshot.keyRecords[index].isRevoked = false
+        snapshot.keyRecords[index].isExpired = false
+        snapshot.keyRecords[index].usageState = .preferred
+        XCTAssertTrue(snapshot.keyRecords[index].canEncryptTo)
+        try opened.harness.store.replaceSnapshot(snapshot)
+
+        try await opened.service.relockProtectedData()
+        let reopened = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+
+        let refreshed = try XCTUnwrap(reopened.service.testContactKeyRecords.first)
+        XCTAssertEqual(refreshed.hasEncryptionSubkey, truth.hasEncryptionSubkey)
+        XCTAssertEqual(refreshed.isRevoked, truth.isRevoked)
+        XCTAssertEqual(refreshed.isExpired, truth.isExpired)
+        XCTAssertFalse(refreshed.canEncryptTo)
+        XCTAssertEqual(refreshed.usageState, .historical)
+    }
+
+    // MARK: - Manual Fingerprint Verification
+
+    func test_setVerificationState_withdrawnVerificationSurvivesReopen() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactVerificationWithdrawal")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let generated = try engine.generateKey(
+            name: "Withdrawn Verification",
+            email: "withdrawn@example.invalid",
+            expirySeconds: nil,
+            suite: .ed25519LegacyCurve25519Legacy
+        )
+        _ = try opened.service.importContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .verified
+        )
+
+        try opened.service.setVerificationState(.unverified, for: generated.fingerprint)
+        XCTAssertEqual(
+            opened.service.testContactKeyRecords.first?.manualVerificationState,
+            .unverified
+        )
+
+        try await opened.service.relockProtectedData()
+        let reopened = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+        XCTAssertEqual(
+            reopened.service.testContactKeyRecords.first?.manualVerificationState,
+            .unverified
+        )
+    }
 }

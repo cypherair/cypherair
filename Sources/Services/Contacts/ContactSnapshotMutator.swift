@@ -696,6 +696,69 @@ struct ContactSnapshotMutator {
             snapshot.certificationArtifacts != beforeCertificationArtifacts
     }
 
+    /// Re-derive the certificate lifecycle flags cached on every key record.
+    ///
+    /// `hasEncryptionSubkey`, `isRevoked` and `isExpired` are written once, at
+    /// import, and then read for the life of the record. Each is an answer about
+    /// a certificate under a policy at a moment in time, so a key whose expiry
+    /// passed afterwards keeps reading as usable and the app keeps offering it as
+    /// a recipient. Key usage is re-normalized after the refresh, so a key that
+    /// can no longer receive messages also stops being presented as a live one.
+    ///
+    /// All three are refreshed rather than the two whose staleness shows first:
+    /// they are the three inputs to one boolean, `canEncryptTo`, and re-deriving
+    /// a subset would leave that boolean an incoherent mixture of fresh and
+    /// import-time answers. `hasEncryptionSubkey` also earns it on its own — it
+    /// depends on a subkey binding signature still being valid at the current
+    /// time, and on `.supported()` under the engine's standard policy, which
+    /// drifts between Sequoia releases.
+    ///
+    /// This does *not* cover an encryption subkey whose own expiry has passed.
+    /// The engine computes `hasEncryptionSubkey` without the aliveness check the
+    /// encrypt path applies, so re-parsing recomputes the same `true`; that gap is
+    /// engine-side and tracked separately (issue #808).
+    ///
+    /// A record whose stored certificate cannot be re-parsed keeps the values it
+    /// has: this runs on the Contacts unlock path, and one unreadable record must
+    /// not take the whole domain down with it.
+    @discardableResult
+    func refreshCertificateLifecycleState(
+        in snapshot: inout ContactsDomainSnapshot,
+        updatedAt: Date = Date()
+    ) throws -> Bool {
+        let beforeKeyRecords = snapshot.keyRecords
+
+        for index in snapshot.keyRecords.indices {
+            guard let metadata = try? contactImportAdapter
+                .validateImportablePublicCertificate(snapshot.keyRecords[index].publicKeyData)
+                .metadata
+            else {
+                continue
+            }
+
+            let record = snapshot.keyRecords[index]
+            guard record.hasEncryptionSubkey != metadata.hasEncryptionSubkey ||
+                record.isRevoked != metadata.isRevoked ||
+                record.isExpired != metadata.isExpired
+            else {
+                continue
+            }
+
+            snapshot.keyRecords[index].hasEncryptionSubkey = metadata.hasEncryptionSubkey
+            snapshot.keyRecords[index].isRevoked = metadata.isRevoked
+            snapshot.keyRecords[index].isExpired = metadata.isExpired
+            snapshot.keyRecords[index].updatedAt = updatedAt
+        }
+
+        guard snapshot.keyRecords != beforeKeyRecords else {
+            return false
+        }
+
+        snapshot.updatedAt = updatedAt
+        try normalizeKeyUsage(in: &snapshot, updatedAt: updatedAt)
+        return true
+    }
+
     private func makeIdentity(
         from validation: PGPValidatedPublicCertificate,
         now: Date

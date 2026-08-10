@@ -4,7 +4,7 @@ struct ContactKeySummaryView: View {
     let key: ContactKeySummary
     let configuration: ContactDetailView.Configuration
     let allowsUsageActions: Bool
-    let markVerified: (String) -> Void
+    let setVerification: (ContactVerificationState, String) -> Void
     let setPreferred: (String) -> Void
     let markHistorical: (String) -> Void
     let markAdditionalActive: (String) -> Void
@@ -89,9 +89,21 @@ struct ContactKeySummaryView: View {
     @ViewBuilder
     private var actionButtons: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !key.isVerified {
+            if key.isVerified {
                 Button {
-                    markVerified(key.fingerprint)
+                    setVerification(.unverified, key.fingerprint)
+                } label: {
+                    Label(
+                        String(
+                            localized: "contactdetail.withdrawVerification",
+                            defaultValue: "Withdraw My Fingerprint Verification"
+                        ),
+                        systemImage: "xmark.shield"
+                    )
+                }
+            } else {
+                Button {
+                    setVerification(.verified, key.fingerprint)
                 } label: {
                     Label(
                         String(localized: "contactdetail.markVerified", defaultValue: "I Verified This Fingerprint"),

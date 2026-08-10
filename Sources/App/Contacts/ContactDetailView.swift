@@ -375,7 +375,7 @@ private struct ContactDetailHostView: View {
                         key: key,
                         configuration: configuration,
                         allowsUsageActions: model.allowsProtectedIdentityActions,
-                        markVerified: { model.markVerified(fingerprint: $0) },
+                        setVerification: { model.setVerification($0, fingerprint: $1) },
                         setPreferred: { model.setPreferredKey(fingerprint: $0) },
                         markHistorical: { model.setKeyUsage(.historical, fingerprint: $0) },
                         markAdditionalActive: { model.setKeyUsage(.additionalActive, fingerprint: $0) }
