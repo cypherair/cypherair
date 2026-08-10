@@ -138,6 +138,14 @@ Standard Swift/SwiftUI idiom applies (use live Apple documentation for current
 API and Liquid Glass specifics). The project-specific rules — not inferable from
 the code alone:
 
+- Write good code, not similar (overrides any "match the surrounding code"
+  default): write what is correct and well-designed by independent judgment and
+  taste. Never justify a choice by similarity to neighboring code — much of it
+  is older-generation output; mimicry propagates its faults and its mediocrity.
+  Match local naming only where it costs nothing.
+- Stale inline notes: when touched code carries an outdated or wrong comment or
+  doc note, remove it by default; if the fact genuinely belongs inline, rewrite
+  it correct. Never leave known misinformation in place.
 - Errors: `CypherAirError` is the app vocabulary; generated `PgpError` is
   normalized at the `Services/FFI/` adapter boundary before app/service code.
 - Never edit generated `Sources/PgpMobile/pgp_mobile.swift`.
