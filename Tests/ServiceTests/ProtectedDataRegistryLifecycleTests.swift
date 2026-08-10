@@ -339,7 +339,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         )
         let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let wrappingRootKey = Data(repeating: 0xB4, count: 32)
-        let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
+        let practiceStore = MockPracticeProtectedDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -353,13 +353,13 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
             pendingMutation: nil
         )
         try registryStore.saveRegistry(registry)
-        try await sentinelStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+        try await practiceStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
 
         let secondDomainCleanupCalled = AsyncBooleanFlag()
         _ = try await registryStore.performDeleteDomainTransaction(
-            domainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID,
+            domainID: MockPracticeProtectedDomainStore.domainID,
             deleteArtifacts: {
-                try sentinelStore.deleteDomainArtifactsForRecovery()
+                try practiceStore.deleteDomainArtifactsForRecovery()
             },
             cleanupSharedResourceIfNeeded: {
                 await secondDomainCleanupCalled.setTrue()
@@ -368,7 +368,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         let afterSecondDomainDelete = try registryStore.loadRegistry()
 
         XCTAssertEqual(afterSecondDomainDelete.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
-        XCTAssertNil(afterSecondDomainDelete.committedMembership[ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID])
+        XCTAssertNil(afterSecondDomainDelete.committedMembership[MockPracticeProtectedDomainStore.domainID])
         XCTAssertEqual(afterSecondDomainDelete.sharedResourceLifecycleState, .ready)
         XCTAssertNil(afterSecondDomainDelete.pendingMutation)
         let didRunSecondDomainCleanup = await secondDomainCleanupCalled.currentValue()

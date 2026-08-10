@@ -262,8 +262,7 @@ struct CypherAirApp: App {
     ) async throws -> ProtectedSettingsHost.RecoveryOutcome {
         var recoveryHandlers: [any ProtectedDomainRecoveryHandler] = [
             container.privateKeyControlStore,
-            container.protectedSettingsStore,
-            container.protectedDataFrameworkSentinelStore
+            container.protectedSettingsStore
         ]
         if let keyMetadataDomainStore = container.keyMetadataDomainStore {
             recoveryHandlers.append(keyMetadataDomainStore)

@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
-    func test_protectedSettingsResetRequiresWrappingKeyBeforeDeletingWhenSentinelRemains() async throws {
+    func test_protectedSettingsResetRequiresWrappingKeyBeforeDeletingWhenAnotherDomainRemains() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsResetPreflight")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
@@ -31,13 +31,13 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
         let wrappingRootKey = try keyManager.deriveWrappingRootKey(from: &rootSecret)
         rootSecret.protectedDataZeroize()
 
-        let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
+        let practiceStore = MockPracticeProtectedDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: keyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
-        try await sentinelStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+        try await practiceStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
         let currentEnvelopeURL = storageRoot.domainEnvelopeURL(
             for: CypherAir.ProtectedSettingsStore.domainID,
             slot: .current
@@ -64,7 +64,7 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
 
         let retainedRegistry = try registryStore.loadRegistry()
         XCTAssertEqual(retainedRegistry.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
-        XCTAssertEqual(retainedRegistry.committedMembership[ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID], .active)
+        XCTAssertEqual(retainedRegistry.committedMembership[MockPracticeProtectedDomainStore.domainID], .active)
         XCTAssertNil(retainedRegistry.pendingMutation)
         XCTAssertTrue(try storageRoot.managedItemExists(at: currentEnvelopeURL))
     }
@@ -283,7 +283,7 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(reloadedCoordinator.snapshot, expectedSnapshot)
     }
 
-    func test_protectedSettingsResetRecreatesWithWrappingKeyWhenSentinelRemains() async throws {
+    func test_protectedSettingsResetRecreatesWithWrappingKeyWhenAnotherDomainRemains() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsResetWithKey")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
@@ -312,13 +312,13 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
         let wrappingRootKey = try keyManager.deriveWrappingRootKey(from: &rootSecret)
         rootSecret.protectedDataZeroize()
 
-        let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
+        let practiceStore = MockPracticeProtectedDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: keyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
-        try await sentinelStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+        try await practiceStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
 
         try await settingsStore.resetDomain(
             persistSharedRight: { _ in
@@ -334,7 +334,7 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
 
         let resetRegistry = try registryStore.loadRegistry()
         XCTAssertEqual(resetRegistry.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
-        XCTAssertEqual(resetRegistry.committedMembership[ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID], .active)
+        XCTAssertEqual(resetRegistry.committedMembership[MockPracticeProtectedDomainStore.domainID], .active)
         XCTAssertNil(resetRegistry.pendingMutation)
         XCTAssertTrue(try storageRoot.managedItemExists(
             at: storageRoot.domainEnvelopeURL(

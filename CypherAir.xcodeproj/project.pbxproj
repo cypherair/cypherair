@@ -331,7 +331,6 @@
 				Security/ProtectedData/DomainStores/KeychainProtectedDataRootSecretStore.swift,
 				Security/ProtectedData/DomainStores/KeyMetadataDomainStore.swift,
 				Security/ProtectedData/DomainStores/PrivateKeyControlStore.swift,
-				Security/ProtectedData/DomainStores/ProtectedDataFrameworkSentinelStore.swift,
 				Security/ProtectedData/DomainStores/ProtectedDomainBootstrapStore.swift,
 				Security/ProtectedData/DomainStores/ProtectedDomainKeyManager.swift,
 				Security/ProtectedData/DomainStores/ProtectedSettingsOrdinarySettingsPersistence.swift,
