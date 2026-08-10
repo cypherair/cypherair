@@ -602,9 +602,7 @@ fn validate_skesk(skesk: &SKESK) -> Result<(), PgpError> {
 /// Runs before `skesk.decrypt`, so the KDF never executes with an OOM parameter.
 fn validate_s2k_memory(s2k: &openpgp::crypto::S2K) -> Result<(), PgpError> {
     if let openpgp::crypto::S2K::Argon2 { m, t, .. } = s2k {
-        // RFC 9580 memory cost is `2^m` KiB; guard the shift so a malformed
-        // `m >= 64` saturates instead of panicking on overflow.
-        let memory_kib = 1u64.checked_shl(*m as u32).unwrap_or(u64::MAX);
+        let memory_kib = crate::keys::argon2_memory_kib(*m);
         if memory_kib > MAX_MESSAGE_ARGON2_MEMORY_KIB {
             return Err(PgpError::Argon2idMemoryExceeded {
                 required_mb: memory_kib / 1024,

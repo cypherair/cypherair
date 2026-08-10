@@ -78,11 +78,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
 
     func importProtectionInfo(armoredData: Data) throws -> PGPKeyImportS2KInfo {
         do {
-            let s2kInfo = try engine.parseS2kParams(armoredData: armoredData)
-            return PGPKeyImportS2KInfo(
-                s2kType: s2kInfo.s2kType,
-                memoryKib: s2kInfo.memoryKib
-            )
+            return PGPKeyImportS2KInfo(try engine.parseS2kParams(armoredData: armoredData))
         } catch {
             throw PGPErrorMapper.map(error) { .invalidKeyData(reason: $0) }
         }
@@ -381,5 +377,24 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
             publicKeyData: result.publicKeyData,
             metadata: PGPKeyMetadataAdapter.metadata(from: result.keyInfo)
         )
+    }
+}
+
+extension PGPKeyImportS2KInfo {
+    /// Normalizes the generated `S2kInfo` into the app's own vocabulary. The
+    /// type switch is exhaustive on purpose — an engine-side S2K case cannot
+    /// ship without an app-side counterpart, which is what keeps the memory
+    /// guard from being silently disabled by a rename.
+    init(_ s2kInfo: S2kInfo) {
+        let s2kType: PGPKeyImportS2KType
+        switch s2kInfo.s2kType {
+        case .argon2id:
+            s2kType = .argon2id
+        case .iteratedSalted:
+            s2kType = .iteratedSalted
+        case .unknown:
+            s2kType = .unknown
+        }
+        self.init(s2kType: s2kType, memoryKib: s2kInfo.memoryKib)
     }
 }

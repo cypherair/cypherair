@@ -76,7 +76,8 @@ fn test_export_import_roundtrip_post_quantum_high_uses_argon2id() {
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
     assert_eq!(
-        s2k.s2k_type, "argon2id",
+        s2k.s2k_type,
+        keys::S2kType::Argon2id,
         "Post-Quantum · High exports must use Argon2id"
     );
 

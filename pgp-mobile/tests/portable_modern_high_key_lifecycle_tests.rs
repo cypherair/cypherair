@@ -38,9 +38,9 @@ fn test_revocation_cert_wrong_key_modern_high() {
     );
 }
 
-/// (extended): Verify that Modern High export uses Argon2id S2K with expected parameters.
-/// PRD requires: 512 MB memory (encoded_m=19), t=3 passes, p=4 parallelism. Memory is asserted
-/// through the FFI probe the app uses; t/p are pinned on the exported packets directly.
+/// Modern High export uses Argon2id S2K with the shipped parameter set
+/// (docs/SECURITY.md §7: t=3, p=4, m=2^19 KiB). Memory is asserted through the
+/// FFI probe the app uses; t/p are pinned on the exported packets directly.
 #[test]
 fn test_export_modern_high_uses_argon2id() {
     use sequoia_openpgp::packet::key::SecretKeyMaterial;
@@ -58,12 +58,13 @@ fn test_export_modern_high_uses_argon2id() {
     let s2k_info = keys::parse_s2k_params(&exported).expect("S2K params should parse");
 
     assert_eq!(
-        s2k_info.s2k_type, "argon2id",
+        s2k_info.s2k_type,
+        keys::S2kType::Argon2id,
         "Modern High export must use Argon2id S2K"
     );
     assert_eq!(
         s2k_info.memory_kib, 524288,
-        "Argon2id memory must be 512 MB (524288 KiB = 2^19 KiB per PRD), got {} KiB",
+        "Argon2id memory must be 512 MiB (524288 KiB = 2^19 KiB), got {} KiB",
         s2k_info.memory_kib
     );
 
@@ -76,8 +77,8 @@ fn test_export_modern_high_uses_argon2id() {
         let sequoia_openpgp::crypto::S2K::Argon2 { t, p, .. } = encrypted.s2k() else {
             panic!("Every exported key packet must use Argon2id S2K");
         };
-        assert_eq!(*t, 3, "Argon2id time passes must be 3 per PRD, got {t}");
-        assert_eq!(*p, 4, "Argon2id parallelism must be 4 per PRD, got {p}");
+        assert_eq!(*t, 3, "Argon2id time passes must be 3, got {t}");
+        assert_eq!(*p, 4, "Argon2id parallelism must be 4, got {p}");
         argon2_keys += 1;
     }
     assert!(argon2_keys >= 2, "Expected primary + subkey packets");
