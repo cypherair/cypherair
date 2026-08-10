@@ -455,6 +455,33 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
         XCTAssertFalse(harness.domainKeyManager.hasUnlockedDomainMasterKeys)
     }
 
+    /// A local data reset must leave no decrypted contact records in memory. The
+    /// payload belongs to the domain store, so a reset that only cleared this
+    /// service's derived state would leave the plaintext resident while the
+    /// reset's own post-conditions reported a clean run.
+    func test_localDataResetLeavesNoDecryptedContactsResident() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsLocalDataReset")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let generated = try engine.generateKey(
+            name: "Reset Residue",
+            email: "reset-residue@example.invalid",
+            expirySeconds: nil,
+            suite: .ed25519LegacyCurve25519Legacy
+        )
+        _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
+        XCTAssertEqual(opened.service.runtimeContactCountForDiagnostics, 1)
+
+        await opened.service.resetInMemoryStateAfterLocalDataReset()
+
+        XCTAssertNil(opened.harness.store.snapshot)
+        XCTAssertEqual(opened.service.runtimeContactCountForDiagnostics, 0)
+        XCTAssertTrue(opened.service.contactsDomainRuntimeStateIsClearedForTests)
+    }
+
     func test_contactsCorruptSQLCipherDatabaseAfterMutationRequiresRecovery() async throws {
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirContactsCorruptSQLCipher-\(UUID().uuidString)", isDirectory: true)

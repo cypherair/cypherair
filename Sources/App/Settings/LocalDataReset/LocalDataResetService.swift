@@ -125,7 +125,7 @@ final class LocalDataResetService {
         selfTestService?.clearLatestReport()
         authManager.clearCachedAuthenticationContextAfterLocalDataReset()
         keyManagement.resetInMemoryStateAfterLocalDataReset()
-        contactService.resetInMemoryStateAfterLocalDataReset()
+        await contactService.resetInMemoryStateAfterLocalDataReset()
         protectedDataSessionCoordinator.resetAfterLocalDataReset()
         // `AppSessionOrchestrator` is `@MainActor`-isolated; hop to the main actor
         // for this single state mutation. The surrounding reset I/O stays off the

@@ -2,6 +2,12 @@ import Foundation
 
 /// Manages contacts (imported public keys).
 /// Production persistence lives in the protected contacts app-data domain after post-auth unlock.
+///
+/// The decrypted contacts payload has one in-memory owner, `ContactsDomainStore`,
+/// which holds exactly what its database contains. This service keeps only state
+/// derived from that snapshot — the search index and the availability the UI
+/// observes — and advances it after a write commits, so a failed mutation cannot
+/// leave a second copy of the payload disagreeing with the database.
 @Observable
 final class ContactService: @unchecked Sendable {
     private let certificateAdapter: PGPCertificateOperationAdapter
@@ -10,7 +16,6 @@ final class ContactService: @unchecked Sendable {
     private let summaryProjector = ContactSummaryProjector()
     private let snapshotMutator: ContactSnapshotMutator
     private(set) var contactsAvailability: ContactsAvailability = .locked
-    private var runtimeSnapshot: ContactsDomainSnapshot?
     private var contactsSearchIndex: ContactsSearchIndex?
 
     init(
@@ -64,7 +69,7 @@ final class ContactService: @unchecked Sendable {
             if refreshedLifecycleState || recomputedProjections {
                 try contactsDomainStore.replaceSnapshot(reconciledSnapshot)
             }
-            try applyProtectedRuntimeSnapshot(reconciledSnapshot)
+            adoptOpenContactsDomain(reconciledSnapshot)
             return contactsAvailability
         } catch {
             clearContactsRuntimeState(availability: .recoveryNeeded)
@@ -72,8 +77,12 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
-    func resetInMemoryStateAfterLocalDataReset() {
+    /// Drop every in-memory trace of the contacts domain after a local data reset.
+    /// The decrypted payload is the store's, so clearing this service's derived
+    /// state alone would leave the plaintext resident behind a locked façade.
+    func resetInMemoryStateAfterLocalDataReset() async {
         clearContactsRuntimeState(availability: .locked)
+        try? await contactsDomainStore?.relockProtectedData()
     }
 
     // MARK: - Import Contact
@@ -92,12 +101,12 @@ final class ContactService: @unchecked Sendable {
         guard contactsAvailability == .availableProtectedDomain else {
             throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
-        return try withProtectedRuntimeRollback {
-            try performProtectedImportContact(
-                publicKeyData: publicKeyData,
-                verificationState: verificationState
-            )
-        }
+        var snapshot = try currentContactsDomainSnapshot()
+        return try applyImportContactMutation(
+            publicKeyData: publicKeyData,
+            verificationState: verificationState,
+            in: &snapshot
+        )
     }
 
     func previewImportCandidateMatch(
@@ -109,7 +118,7 @@ final class ContactService: @unchecked Sendable {
         }
         return try snapshotMutator.importCandidateMatch(
             publicKeyData: publicKeyData,
-            in: mutableRuntimeSnapshot()
+            in: currentContactsDomainSnapshot()
         )
     }
 
@@ -123,35 +132,7 @@ final class ContactService: @unchecked Sendable {
         guard contactsAvailability == .availableProtectedDomain else {
             throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
-        return try withProtectedRuntimeRollback {
-            try performProtectedImportContactAfterConfirmation(
-                publicKeyData: publicKeyData,
-                verificationState: verificationState,
-                displayedCandidateMatch: displayedCandidateMatch
-            )
-        }
-    }
-
-    @discardableResult
-    private func performProtectedImportContact(
-        publicKeyData: Data,
-        verificationState: ContactVerificationState = .verified
-    ) throws -> ContactImportResult {
-        var snapshot = try mutableRuntimeSnapshot()
-        return try applyImportContactMutation(
-            publicKeyData: publicKeyData,
-            verificationState: verificationState,
-            in: &snapshot
-        )
-    }
-
-    @discardableResult
-    private func performProtectedImportContactAfterConfirmation(
-        publicKeyData: Data,
-        verificationState: ContactVerificationState,
-        displayedCandidateMatch: ContactCandidateMatch?
-    ) throws -> ContactImportResult {
-        var snapshot = try mutableRuntimeSnapshot()
+        var snapshot = try currentContactsDomainSnapshot()
         let currentCandidateMatch = try snapshotMutator.importCandidateMatch(
             publicKeyData: publicKeyData,
             in: snapshot
@@ -178,7 +159,7 @@ final class ContactService: @unchecked Sendable {
             in: &snapshot
         )
         if mutation.didMutate {
-            try persistProtectedRuntimeSnapshot(snapshot)
+            try persistContactsSnapshot(snapshot)
         }
 
         switch mutation.output {
@@ -195,15 +176,13 @@ final class ContactService: @unchecked Sendable {
 
     func removeContactIdentity(contactId: String) throws {
         try requireContactsAvailable()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.removeContactIdentity(
-                contactId: contactId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.removeContactIdentity(
+            contactId: contactId,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
     }
 
@@ -212,23 +191,14 @@ final class ContactService: @unchecked Sendable {
         for fingerprint: String
     ) throws {
         try requireContactsAvailable()
-        try withProtectedRuntimeRollback {
-            try performProtectedSetVerificationState(verificationState, for: fingerprint)
-        }
-    }
-
-    private func performProtectedSetVerificationState(
-        _ verificationState: ContactVerificationState,
-        for fingerprint: String
-    ) throws {
-        var snapshot = try mutableRuntimeSnapshot()
+        var snapshot = try currentContactsDomainSnapshot()
         let mutation = try snapshotMutator.setVerificationState(
             verificationState,
             for: fingerprint,
             in: &snapshot
         )
         if mutation.didMutate {
-            try persistProtectedRuntimeSnapshot(snapshot)
+            try persistContactsSnapshot(snapshot)
         }
     }
 
@@ -244,12 +214,12 @@ final class ContactService: @unchecked Sendable {
         matching query: String,
         tagFilterIds: Set<String> = []
     ) -> [ContactIdentitySummary] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot,
+              let contactsSearchIndex else {
             return []
         }
-        let summaries = summaryProjector.identitySummaries(from: runtimeSnapshot)
-        return searchIndex(for: runtimeSnapshot).filterContacts(
+        let summaries = summaryProjector.identitySummaries(from: snapshot)
+        return contactsSearchIndex.filterContacts(
             summaries,
             matching: query,
             tagFilterIds: tagFilterIds,
@@ -262,12 +232,12 @@ final class ContactService: @unchecked Sendable {
         matching query: String,
         tagFilterIds: Set<String> = []
     ) -> [ContactRecipientSummary] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot,
+              let contactsSearchIndex else {
             return []
         }
-        let summaries = summaryProjector.recipientSummaries(from: runtimeSnapshot)
-        return searchIndex(for: runtimeSnapshot).filterContacts(
+        let summaries = summaryProjector.recipientSummaries(from: snapshot)
+        return contactsSearchIndex.filterContacts(
             summaries,
             matching: query,
             tagFilterIds: tagFilterIds,
@@ -277,23 +247,25 @@ final class ContactService: @unchecked Sendable {
     }
 
     func contactTagSummaries() -> [ContactTagSummary] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot else {
             return []
         }
-        return summaryProjector.tagSummaries(from: runtimeSnapshot)
+        return summaryProjector.tagSummaries(from: snapshot)
     }
 
     func tagSuggestions(matching query: String) -> [ContactTagSummary] {
         guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+              let contactsSearchIndex else {
             return []
         }
-        return searchIndex(for: runtimeSnapshot).tagSuggestions(matching: query)
+        return contactsSearchIndex.tagSuggestions(matching: query)
     }
 
+    /// Decrypted contact records still resident in memory, reported regardless of
+    /// availability: the local-data-reset post-conditions use this to detect
+    /// residue, so it reads the owner directly rather than the gated accessor.
     var runtimeContactCountForDiagnostics: Int {
-        runtimeSnapshot?.keyRecords.count ?? 0
+        contactsDomainStore?.snapshot?.keyRecords.count ?? 0
     }
 
     func requireContactsAvailable() throws {
@@ -303,16 +275,15 @@ final class ContactService: @unchecked Sendable {
     }
 
     func currentContactsDomainSnapshot() throws -> ContactsDomainSnapshot {
-        try requireContactsAvailable()
-        if let runtimeSnapshot {
-            try runtimeSnapshot.validateContract()
-            return runtimeSnapshot
+        guard let snapshot = openContactsSnapshot else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
-        throw CypherAirError.contactsUnavailable(contactsAvailability)
+        try snapshot.validateContract()
+        return snapshot
     }
 
     var contactsDomainRuntimeStateIsClearedForTests: Bool {
-        runtimeSnapshot == nil &&
+        contactsDomainStore?.snapshot == nil &&
         contactsSearchIndex == nil &&
         contactsAvailability == .locked
     }
@@ -320,65 +291,46 @@ final class ContactService: @unchecked Sendable {
     // MARK: - Lookup
 
     func availableContactIdentity(forContactID contactId: String) -> ContactIdentitySummary? {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot else {
             return nil
         }
-        return summaryProjector.identitySummary(contactId: contactId, in: runtimeSnapshot)
+        return summaryProjector.identitySummary(contactId: contactId, in: snapshot)
     }
 
     func contactId(forFingerprint fingerprint: String) -> String? {
-        guard contactsAvailability.isAvailable else {
-            return nil
-        }
-        if let keyRecord = runtimeSnapshot?.keyRecords.first(where: { $0.fingerprint == fingerprint }) {
-            return keyRecord.contactId
-        }
-        return nil
+        availableContactKeyRecord(fingerprint: fingerprint)?.contactId
     }
 
     func availableKey(fingerprint: String) -> ContactKeySummary? {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot else {
             return nil
         }
-        return summaryProjector.keySummary(fingerprint: fingerprint, in: runtimeSnapshot)
+        return summaryProjector.keySummary(fingerprint: fingerprint, in: snapshot)
     }
 
     func availableKey(keyId: String) -> ContactKeySummary? {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot,
-              let keyRecord = runtimeSnapshot.keyRecords.first(where: { $0.keyId == keyId }) else {
+        guard let keyRecord = availableContactKeyRecord(keyId: keyId) else {
             return nil
         }
         return summaryProjector.keySummary(from: keyRecord)
     }
 
     func availableContactKeyRecord(fingerprint: String) -> ContactKeyRecord? {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
-            return nil
-        }
-        return runtimeSnapshot.keyRecords.first { $0.fingerprint == fingerprint }
+        openContactsSnapshot?.keyRecords.first { $0.fingerprint == fingerprint }
     }
 
     func availableContactKeyRecord(keyId: String) -> ContactKeyRecord? {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
-            return nil
-        }
-        return runtimeSnapshot.keyRecords.first { $0.keyId == keyId }
+        openContactsSnapshot?.keyRecords.first { $0.keyId == keyId }
     }
 
     func availableContactKeyRecord(
         contactId: String,
         preferredKeyId: String?
     ) -> ContactKeyRecord? {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot else {
             return nil
         }
-        let keyRecords = runtimeSnapshot.keyRecords.filter { $0.contactId == contactId }
+        let keyRecords = snapshot.keyRecords.filter { $0.contactId == contactId }
         if let preferredKeyId,
            let record = keyRecords.first(where: { $0.keyId == preferredKeyId }) {
             return record
@@ -389,11 +341,10 @@ final class ContactService: @unchecked Sendable {
     func certificationArtifacts(
         for keyId: String
     ) -> [ContactCertificationArtifactReference] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot else {
             return []
         }
-        return runtimeSnapshot.certificationArtifacts
+        return snapshot.certificationArtifacts
             .filter { $0.keyId == keyId }
             .sorted { lhs, rhs in
                 if lhs.createdAt != rhs.createdAt {
@@ -412,25 +363,23 @@ final class ContactService: @unchecked Sendable {
             throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
 
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.saveCertificationArtifact(
-                artifact.reference,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return mutation.output
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.saveCertificationArtifact(
+            artifact.reference,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
+        return mutation.output
     }
 
     func exportCertificationArtifact(
         artifactId: String
     ) throws -> (data: Data, filename: String) {
         try requireContactsAvailable()
-        guard let runtimeSnapshot,
-              let artifact = runtimeSnapshot.certificationArtifacts.first(where: { $0.artifactId == artifactId }) else {
+        guard let snapshot = openContactsSnapshot,
+              let artifact = snapshot.certificationArtifacts.first(where: { $0.artifactId == artifactId }) else {
             throw CypherAirError.internalError(
                 reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
             )
@@ -477,39 +426,37 @@ final class ContactService: @unchecked Sendable {
 
     func publicKeysForRecipientContactIDs(_ recipientContactIds: [String]) throws -> [Data] {
         try requireContactsAvailable()
-        guard let runtimeSnapshot else {
+        guard let snapshot = openContactsSnapshot else {
             throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
         return try recipientResolver.publicKeysForRecipientContactIDs(
             recipientContactIds,
-            in: runtimeSnapshot
+            in: snapshot
         )
     }
 
     func contactsVerificationContext() -> ContactsVerificationContext {
         let availability = contactsAvailability
         guard availability.allowsContactsVerification,
-              let runtimeSnapshot else {
+              let snapshot = openContactsSnapshot else {
             return ContactsVerificationContext(contactKeys: [], availability: availability)
         }
         return ContactsVerificationContext(
-            contactKeys: runtimeSnapshot.keyRecords,
+            contactKeys: snapshot.keyRecords,
             availability: availability
         )
     }
 
     func setPreferredKey(fingerprint: String, for contactId: String) throws {
         try requireContactsAvailable()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.setPreferredKey(
-                fingerprint: fingerprint,
-                for: contactId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.setPreferredKey(
+            fingerprint: fingerprint,
+            for: contactId,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
     }
 
@@ -518,30 +465,26 @@ final class ContactService: @unchecked Sendable {
         fingerprint: String
     ) throws {
         try requireContactsAvailable()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.setKeyUsageState(
-                usageState,
-                fingerprint: fingerprint,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.setKeyUsageState(
+            usageState,
+            fingerprint: fingerprint,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
     }
 
     @discardableResult
     func createTag(named name: String) throws -> ContactTagSummary {
         try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.createTag(named: name, in: &snapshot)
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.createTag(named: name, in: &snapshot)
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
+        return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
     }
 
     @discardableResult
@@ -550,28 +493,24 @@ final class ContactService: @unchecked Sendable {
         to name: String
     ) throws -> ContactTagSummary {
         try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.renameTag(
-                tagId: tagId,
-                to: name,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.renameTag(
+            tagId: tagId,
+            to: name,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
+        return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
     }
 
     func deleteTag(tagId: String) throws {
         try requireProtectedContactsAvailableForOrganization()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.deleteTag(tagId: tagId, in: &snapshot)
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.deleteTag(tagId: tagId, in: &snapshot)
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
     }
 
@@ -581,18 +520,16 @@ final class ContactService: @unchecked Sendable {
         toContactId contactId: String
     ) throws -> ContactTagSummary {
         try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.addTag(
-                named: name,
-                toContactId: contactId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.addTag(
+            named: name,
+            toContactId: contactId,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
+        return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
     }
 
     @discardableResult
@@ -601,18 +538,16 @@ final class ContactService: @unchecked Sendable {
         toContactId contactId: String
     ) throws -> ContactTagSummary {
         try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.assignTag(
-                tagId: tagId,
-                toContactId: contactId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.assignTag(
+            tagId: tagId,
+            toContactId: contactId,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
+        return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
     }
 
     func removeTag(
@@ -620,16 +555,14 @@ final class ContactService: @unchecked Sendable {
         fromContactId contactId: String
     ) throws {
         try requireProtectedContactsAvailableForOrganization()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.removeTag(
-                tagId: tagId,
-                fromContactId: contactId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.removeTag(
+            tagId: tagId,
+            fromContactId: contactId,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
     }
 
@@ -638,16 +571,14 @@ final class ContactService: @unchecked Sendable {
         contactIds: Set<String>
     ) throws {
         try requireProtectedContactsAvailableForOrganization()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.replaceTagMembership(
-                tagId: tagId,
-                contactIds: contactIds,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.replaceTagMembership(
+            tagId: tagId,
+            contactIds: contactIds,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
     }
 
@@ -666,26 +597,24 @@ final class ContactService: @unchecked Sendable {
             )
         }
 
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.mergeContact(
-                sourceContactId: sourceContactId,
-                into: targetContactId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            let surviving = try contactSummaryOrThrow(
-                mutation.output.targetContactId,
-                in: snapshot
-            )
-            return ContactMergeResult(
-                survivingContact: surviving,
-                preferredKeyNeedsSelection: surviving.preferredKey == nil
-                    && surviving.keys.contains(where: { $0.usageState == .additionalActive })
-            )
+        var snapshot = try currentContactsDomainSnapshot()
+        let mutation = try snapshotMutator.mergeContact(
+            sourceContactId: sourceContactId,
+            into: targetContactId,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistContactsSnapshot(snapshot)
         }
+        let surviving = try contactSummaryOrThrow(
+            mutation.output.targetContactId,
+            in: snapshot
+        )
+        return ContactMergeResult(
+            survivingContact: surviving,
+            preferredKeyNeedsSelection: surviving.preferredKey == nil
+                && surviving.keys.contains(where: { $0.usageState == .additionalActive })
+        )
     }
 
     // MARK: - Private
@@ -720,15 +649,20 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
-    private func mutableRuntimeSnapshot() throws -> ContactsDomainSnapshot {
-        if let runtimeSnapshot {
-            try runtimeSnapshot.validateContract()
-            return runtimeSnapshot
+    /// The open domain's decrypted snapshot, read from its owner. `nil` whenever
+    /// contacts are not available, so no reader can serve a payload that outlived
+    /// the unlocked session.
+    private var openContactsSnapshot: ContactsDomainSnapshot? {
+        guard contactsAvailability.isAvailable else {
+            return nil
         }
-        throw CypherAirError.contactsUnavailable(contactsAvailability)
+        return contactsDomainStore?.snapshot
     }
 
-    private func persistProtectedRuntimeSnapshot(
+    /// Commit a mutated snapshot, then move this service's derived state onto it.
+    /// The order is the invariant that makes rollback unnecessary: nothing the app
+    /// can observe advances until the database write has succeeded.
+    private func persistContactsSnapshot(
         _ snapshot: ContactsDomainSnapshot
     ) throws {
         guard let contactsDomainStore else {
@@ -736,7 +670,7 @@ final class ContactService: @unchecked Sendable {
         }
         try snapshot.validateContract()
         try contactsDomainStore.replaceSnapshot(snapshot)
-        try applyProtectedRuntimeSnapshot(snapshot)
+        adoptOpenContactsDomain(snapshot)
     }
 
     private func contactSummaryOrThrow(
@@ -784,42 +718,15 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
-    private func searchIndex(for snapshot: ContactsDomainSnapshot) -> ContactsSearchIndex {
-        if let contactsSearchIndex {
-            return contactsSearchIndex
-        }
-        let index = ContactsSearchIndex(snapshot: snapshot)
-        contactsSearchIndex = index
-        return index
-    }
-
-    private func applyProtectedRuntimeSnapshot(_ snapshot: ContactsDomainSnapshot) throws {
-        runtimeSnapshot = snapshot
+    /// Rebuild the derived state for the snapshot the store now holds, and open
+    /// contacts to readers.
+    private func adoptOpenContactsDomain(_ snapshot: ContactsDomainSnapshot) {
         contactsSearchIndex = ContactsSearchIndex(snapshot: snapshot)
         contactsAvailability = .availableProtectedDomain
     }
 
-    private func withProtectedRuntimeRollback<T>(_ operation: () throws -> T) throws -> T {
-        let previousAvailability = contactsAvailability
-        let previousRuntimeSnapshot = runtimeSnapshot
-        let previousSearchIndex = contactsSearchIndex
-
-        do {
-            return try operation()
-        } catch {
-            contactsAvailability = previousAvailability
-            runtimeSnapshot = previousRuntimeSnapshot
-            contactsSearchIndex = previousSearchIndex
-            if let snapshot = contactsDomainStore?.snapshot {
-                try? applyProtectedRuntimeSnapshot(snapshot)
-            }
-            throw error
-        }
-    }
-
     private func clearContactsRuntimeState(availability: ContactsAvailability = .locked) {
         contactsAvailability = availability
-        runtimeSnapshot = nil
         contactsSearchIndex = nil
     }
 }

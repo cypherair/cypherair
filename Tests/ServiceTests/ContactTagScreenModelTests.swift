@@ -4,7 +4,7 @@ import XCTest
 final class ContactTagScreenModelTests: ContactServiceTestCase {
     @MainActor
     func test_tagManagementModelsCanManageTagsOnlyForProtectedContacts() async throws {
-        contactService.resetInMemoryStateAfterLocalDataReset()
+        await contactService.resetInMemoryStateAfterLocalDataReset()
         XCTAssertFalse(ContactsScreenModel(contactService: contactService).canManageTags)
         XCTAssertFalse(TagManagementScreenModel(contactService: contactService).canManageTags)
 
