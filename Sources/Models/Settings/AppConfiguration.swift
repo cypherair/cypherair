@@ -95,12 +95,12 @@ final class AppConfiguration {
     /// Commit a switch whose root-secret re-protection has completed.
     ///
     /// SECURITY-CRITICAL ordering: the committed preference is written *before*
-    /// the journal is cleared. A crash between the two leaves
-    /// `committed == pending`, which reads back as the target on both sides and
-    /// simply replays this method on the next authenticated launch. The reverse
-    /// order would reopen issue #747 — a cleared journal with an uncommitted
-    /// preference is exactly the silent disagreement this journal exists to
-    /// prevent.
+    /// the journal is cleared. A crash between the two leaves an open journal,
+    /// which the next authenticated launch converges by re-protecting and
+    /// committing again. The reverse order would reopen issue #747 — a cleared
+    /// journal with an uncommitted preference is exactly the silent
+    /// disagreement this journal exists to prevent, and once cleared nothing
+    /// remains to detect it.
     func completeAppSessionAuthenticationPolicySwitch(to target: AppSessionAuthenticationPolicy) {
         committedAppSessionAuthenticationPolicy = target
         pendingAppSessionAuthenticationPolicySwitch = nil

@@ -208,6 +208,25 @@ final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
 
     // MARK: - Launch-time convergence (issue #747)
 
+    /// Models the persisted root secret's Keychain access control, so recovery
+    /// tests can assert the *gate* converged rather than only the bookkeeping.
+    /// Re-protecting is idempotent, matching `reprotectRootSecret`: it writes
+    /// the target access control whether or not the item already carries it.
+    private final class RootSecretGate {
+        private(set) var accessControl: AppSessionAuthenticationPolicy
+        private(set) var reprotectTargets: [AppSessionAuthenticationPolicy] = []
+
+        init(accessControl: AppSessionAuthenticationPolicy) {
+            self.accessControl = accessControl
+        }
+
+        func reprotect(to target: AppSessionAuthenticationPolicy) -> Bool {
+            reprotectTargets.append(target)
+            accessControl = target
+            return true
+        }
+    }
+
     private func makeIsolatedConfig() -> AppConfiguration {
         let suiteName = "com.cypherair.tests.appaccesspolicyrecovery.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -262,26 +281,64 @@ final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
         )
     }
 
-    /// Only the journal clear was lost: both stores already name the target, so
-    /// the Keychain gate must not be touched again.
-    func test_recovery_commitGapState_finishesBookkeepingWithoutReprotecting() {
+    /// Even when both stores already name the target, the gate is re-protected
+    /// rather than assumed correct: `committed == pending` says nothing about
+    /// the access control the root secret actually carries. The re-protection is
+    /// an idempotent, round-trip-verified no-op when it already matches.
+    func test_recovery_commitGapState_reprotectsIdempotentlyThenCommits() {
         let config = makeIsolatedConfig()
         config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
         config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
-        var reprotectCalled = false
+        let gate = RootSecretGate(accessControl: .biometricsOnly)
 
         AppAccessPolicySwitchRecovery.recover(
             config: config,
             authenticationContext: LAContext(),
-            reprotectPersistedRootSecretIfPresent: { _, _, _ in
-                reprotectCalled = true
-                return true
-            }
+            reprotectPersistedRootSecretIfPresent: { _, to, _ in gate.reprotect(to: to) }
         )
 
-        XCTAssertFalse(reprotectCalled)
+        XCTAssertEqual(gate.reprotectTargets, [.biometricsOnly])
+        XCTAssertEqual(gate.accessControl, .biometricsOnly)
         XCTAssertNil(config.pendingAppSessionAuthenticationPolicySwitch)
         XCTAssertEqual(config.committedAppSessionAuthenticationPolicy, .biometricsOnly)
+    }
+
+    /// The journal-overwrite path. A failed User Presence -> Biometrics Only
+    /// switch leaves the gate on biometry with the journal open; the natural
+    /// recovery gesture is to re-select User Presence, which overwrites the
+    /// journal with a target equal to the committed policy (the workflow's
+    /// source policy is the *effective* one, so the revert is a real switch). If
+    /// that second attempt dies before its own re-protection, both stores name
+    /// User Presence while the gate still demands biometry — the one state where
+    /// inferring "already converged" from `committed == pending` would strand a
+    /// passcode-satisfiable prompt in front of a biometry gate, permanently and
+    /// silently.
+    func test_recovery_journalOverwrittenToCommittedPolicy_stillConvergesTheGate() {
+        let config = makeIsolatedConfig()
+        // The failed switch: gate moved to biometry, journal still open.
+        let gate = RootSecretGate(accessControl: .biometricsOnly)
+        config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+        // The revert gesture overwrites the journal back to the committed value.
+        config.beginAppSessionAuthenticationPolicySwitch(to: .userPresence)
+        XCTAssertEqual(
+            config.committedAppSessionAuthenticationPolicy,
+            config.pendingAppSessionAuthenticationPolicySwitch
+        )
+
+        AppAccessPolicySwitchRecovery.recover(
+            config: config,
+            authenticationContext: LAContext(),
+            reprotectPersistedRootSecretIfPresent: { _, to, _ in gate.reprotect(to: to) }
+        )
+
+        XCTAssertEqual(
+            gate.accessControl,
+            .userPresence,
+            "The gate must be converged, not assumed correct because the two stores agree."
+        )
+        XCTAssertEqual(gate.reprotectTargets, [.userPresence])
+        XCTAssertNil(config.pendingAppSessionAuthenticationPolicySwitch)
+        XCTAssertEqual(config.committedAppSessionAuthenticationPolicy, .userPresence)
     }
 
     func test_recovery_withoutJournal_isANoOp() {

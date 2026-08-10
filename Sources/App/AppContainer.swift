@@ -906,6 +906,11 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+                // Must stay AFTER the first-domain bootstrap and the post-unlock
+                // domain open: re-protection sets `interactionNotAllowed = true`
+                // on this shared handoff `LAContext`
+                // (`ProtectedDataRootSecretCoordinator`), and that mutation
+                // sticks for every later consumer of the context in this unlock.
                 AppAccessPolicySwitchRecovery.recover(
                     config: config,
                     authenticationContext: authenticationContext,
@@ -1244,6 +1249,11 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+                // Must stay AFTER the first-domain bootstrap and the post-unlock
+                // domain open: re-protection sets `interactionNotAllowed = true`
+                // on this shared handoff `LAContext`
+                // (`ProtectedDataRootSecretCoordinator`), and that mutation
+                // sticks for every later consumer of the context in this unlock.
                 AppAccessPolicySwitchRecovery.recover(
                     config: config,
                     authenticationContext: authenticationContext,

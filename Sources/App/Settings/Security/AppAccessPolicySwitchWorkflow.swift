@@ -138,17 +138,26 @@ final class AppAccessPolicySwitchWorkflow {
 }
 
 /// Launch-time convergence for a policy switch the process died inside of
-/// (issue #747). Runs after an app-session authentication, on the authenticated
-/// context — which was evaluated under the effective (stricter) policy and can
-/// therefore open the root secret whichever access control it currently carries.
+/// (issue #747). Runs after an app-session authentication, on that
+/// authentication's context.
 enum AppAccessPolicySwitchRecovery {
     /// Re-drive an unconfirmed switch to its recorded target and commit it.
     ///
-    /// Idempotent by construction: re-protecting to an access control the item
-    /// already carries is a no-op that still round-trip verifies the secret. On
-    /// failure the journal is left open so the next authenticated launch retries
-    /// — never cleared blind, which would restore the very disagreement it
-    /// records.
+    /// SECURITY-CRITICAL: an open journal always re-protects. Nothing in the
+    /// persisted pair reveals which access control the root secret actually
+    /// carries, so the gate state must never be *inferred* — in particular
+    /// `committed == target` does not mean the gate already matches. A second
+    /// switch attempt overwrites the journal
+    /// (`beginAppSessionAuthenticationPolicySwitch`) and the workflow's source
+    /// policy is the *effective* one, so reverting a failed switch legitimately
+    /// journals a target equal to the committed value while the gate still
+    /// carries the old target. Re-protecting unconditionally is safe because it
+    /// is idempotent: writing an access control the item already carries is a
+    /// no-op that still round-trip verifies the secret.
+    ///
+    /// On failure the journal is left open so the next authenticated launch
+    /// retries — never cleared blind, which would make the disagreement
+    /// permanent and silent.
     static func recover(
         config: AppConfiguration,
         authenticationContext: LAContext?,
@@ -162,21 +171,19 @@ enum AppAccessPolicySwitchRecovery {
             return
         }
 
-        let committed = config.committedAppSessionAuthenticationPolicy
-        guard committed != target else {
-            // The preference commit landed and only the journal clear was lost.
-            // Both stores already name the target; finish the bookkeeping.
-            config.completeAppSessionAuthenticationPolicySwitch(to: target)
-            return
-        }
-
         do {
-            _ = try reprotectPersistedRootSecretIfPresent(committed, target, authenticationContext)
+            _ = try reprotectPersistedRootSecretIfPresent(
+                config.committedAppSessionAuthenticationPolicy,
+                target,
+                authenticationContext
+            )
             config.completeAppSessionAuthenticationPolicySwitch(to: target)
         } catch {
-            // Leave the journal open: the effective policy stays the stricter of
-            // the pair, so protected data remains reachable and the switch is
-            // retried rather than half-applied.
+            // Leave the journal open. The authenticated context may have been
+            // satisfied by a credential the current gate does not accept (the
+            // effective policy is only as strict as the recorded pair, which an
+            // overwritten journal can understate), so a failure here means "not
+            // converged yet", never "nothing to converge".
         }
     }
 }
