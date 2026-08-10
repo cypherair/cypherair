@@ -415,21 +415,15 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
         Ok(all_certs)
     }
 
-    /// Check signature verification results during decryption.
+    /// Collect signature verification results during decryption.
     ///
-    /// DESIGN NOTE: Unlike `VerifyHelper::check()` (in verify.rs) which returns `Err(...)` for
-    /// bad signatures, this implementation returns `Ok(())` even for bad signatures. This is
-    /// intentional — during decryption, a bad signature should not prevent the user from seeing
-    /// the plaintext. Instead, the signature status is reported as a "graded result" (per PRD
-    /// Section 4.5) alongside the decrypted content. The UI shows a warning but still displays
-    /// the message. In contrast, standalone signature verification (`verify_cleartext`,
-    /// `verify_detached`) hard-fails on bad signatures because the content is already visible
-    /// and the sole purpose is to validate the signature.
-    // NOTE: All non-GoodChecksum arms intentionally fall through (no early return).
-    // Only GoodChecksum triggers early return. For MissingKey, BadKey, and catch-all,
-    // the last-set status wins based on iteration order. This is acceptable because
-    // during decryption, signature verification is "graded" — decryption succeeds
-    // regardless of signature status.
+    /// Returning `Ok(())` for every observed result is what makes the signature
+    /// verdict a *graded* result rather than a gate: decryption succeeds and the
+    /// verdict travels beside the plaintext in `DecryptDetailedResult`, for the
+    /// app to present. The decrypt routes fold that verdict with
+    /// `SummaryFoldMode::DecryptLike`, so a later valid signature can still win
+    /// the summary; the verify routes use `VerifyLike` and freeze on the first
+    /// conclusive result. Neither route throws on a bad signature.
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
         self.collector.observe_structure(structure);
         Ok(())

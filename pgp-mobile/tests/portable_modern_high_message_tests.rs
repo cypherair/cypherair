@@ -233,11 +233,8 @@ fn test_tamper_detection_aead_modern_high() {
     let ciphertext = encrypt::encrypt_binary(plaintext, &[key.public_key_data.clone()], None, None)
         .expect("Encryption should succeed");
 
-    // Test tamper detection at multiple positions.
-    // For SEIPDv2 (AEAD), corrupting the PKESK packet yields NoMatchingKey (session key
-    // can't be recovered). To exercise the AEAD integrity check, we must corrupt bytes
-    // in the encrypted data body — typically in the last third of the ciphertext.
-    // We test many positions to maximize the chance of hitting the encrypted data region.
+    // Tamper at many positions so both the PKESK region and the encrypted data
+    // body are hit.
     let len = ciphertext.len();
     let positions: Vec<(&str, usize)> = vec![
         ("early (byte 15)", 15.min(len - 1)),
@@ -251,16 +248,15 @@ fn test_tamper_detection_aead_modern_high() {
         ("second-to-last byte", len.saturating_sub(2).max(1)),
     ];
 
-    // DESIGN NOTE: For SEIPDv2 with v6 PKESK (Modern High), Sequoia uses AEAD-protected
-    // session key transport. Corrupting any byte — even in the SEIP body — causes the
-    // PKESK v6 session key decryption to fail, producing NoMatchingKey rather than
-    // AeadAuthenticationFailed. This is correct and expected: the AEAD protection covers
-    // the entire session key recovery path, so ANY corruption is caught before the
-    // symmetric AEAD decryption stage is even reached.
+    // Why a tampered v6 message can report NoMatchingKey: Sequoia authenticates
+    // the first chunk of the encrypted data *inside* the session-key probe, so a
+    // recovered-but-unusable session key is indistinguishable from a key that
+    // simply did not match. `DecryptHelper` then exhausts the PKESKs and reports
+    // "no key to decrypt message". That is upstream behavior, accepted as such
+    // (issue #828, closed as not planned).
     //
-    // The critical security property is that NO tampered ciphertext ever decrypts
-    // successfully (hard-fail). The specific error variant is less important than the
-    // guarantee that decryption always fails.
+    // The invariant this test guards is the one that matters: NO tampered
+    // ciphertext ever decrypts successfully, whichever error variant reports it.
     for (label, pos) in &positions {
         let mut tampered = ciphertext.clone();
         tampered[*pos] ^= 0x01;
@@ -270,7 +266,7 @@ fn test_tamper_detection_aead_modern_high() {
             Err(pgp_mobile::error::PgpError::AeadAuthenticationFailed) => {}
             Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {}
             Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
-            Err(pgp_mobile::error::PgpError::NoMatchingKey) => {} // PKESK v6 AEAD failure
+            Err(pgp_mobile::error::PgpError::NoMatchingKey) => {} // see the note above
             Err(other) => panic!(
                 "Tamper at {label} (offset {pos}): unexpected error type: {other:?}"
             ),
