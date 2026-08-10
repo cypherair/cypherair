@@ -370,9 +370,10 @@ final class AppLockController {
             return
         }
         guard isGracePeriodExpired else {
-            // The window moved out from under the wake-up — a system clock
-            // adjustment, or an authentication recorded after it was armed.
-            // Wait out what is left instead of relocking early.
+            // The wall clock the window is expressed in moved relative to the
+            // real time waited out (an adjustment or a slew), so the window has
+            // not actually passed. Wait out the remainder rather than relocking
+            // early.
             armAwayRelock(source: source)
             return
         }
@@ -602,6 +603,21 @@ final class AppLockController {
                     return
                 }
                 setLockState(.unlocked, source: "unlock.success:\(source)")
+                // The unlock settled while the app was not foreground-active:
+                // the user left during the post-auth fan-out, or this unlock's
+                // own system sheet has not handed focus back yet. Both
+                // evaluation points would otherwise miss this session — the
+                // `.authenticating` rule swallowed every resign in that span, so
+                // no away event arms the deadline, and the eventual return finds
+                // its epoch already marked (above) and stops before the grace
+                // check. Arm here: a genuine return disarms it, the wake-up
+                // re-checks that the app is still away, and a relock bumps
+                // `awayGeneration` — which is what lets that return
+                // re-authenticate. Same ambiguity, same resolution as the
+                // operation-prompt rule's decision at the prompts' end.
+                if !isForegroundActive {
+                    armAwayRelock(source: "postAuthAway:\(source)")
+                }
             } else {
                 discardHandoffContext("authReturnedFalse")
                 setLockState(.authenticationFailed(.authenticationFailed), source: "unlock.failed:\(source)")
