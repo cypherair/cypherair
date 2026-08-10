@@ -89,8 +89,52 @@ final class AppLockControllerTests: XCTestCase {
         }
     }
 
+    /// Stands in for the wall clock the macOS away relock deadline waits on, so
+    /// the deadline is driven rather than waited out. The controller suspends in
+    /// `wait(_:)`; the test decides when — or whether — it returns.
+    @MainActor
+    final class AwayDeadlineClock {
+        /// One entry per arming, holding the seconds the controller asked for.
+        private(set) var requestedIntervals: [TimeInterval] = []
+        private var pending: CheckedContinuation<Void, Error>?
+
+        var isPending: Bool { pending != nil }
+        var armCount: Int { requestedIntervals.count }
+
+        func wait(_ seconds: TimeInterval) async throws {
+            requestedIntervals.append(seconds)
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    pending = continuation
+                }
+            } onCancel: { [weak self] in
+                Task { @MainActor in
+                    self?.resumePending(throwing: CancellationError())
+                }
+            }
+        }
+
+        /// The deadline arrives.
+        func arrive() {
+            resumePending(throwing: nil)
+        }
+
+        private func resumePending(throwing error: Error?) {
+            guard let continuation = pending else {
+                return
+            }
+            pending = nil
+            if let error {
+                continuation.resume(throwing: error)
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+
     private func makeController(
         spy: Spy,
+        awayDeadline: AwayDeadlineClock = AwayDeadlineClock(),
         operationPromptInProgressProvider: (() -> Bool)? = nil
     ) -> AppLockController {
         AppLockController(
@@ -103,7 +147,8 @@ final class AppLockControllerTests: XCTestCase {
             postAuthenticationHandler: { await spy.postAuth($0, $1) },
             contentClearHandler: { spy.contentClear() },
             shouldBypassAuthentication: { spy.bypass },
-            operationPromptInProgressProvider: operationPromptInProgressProvider
+            operationPromptInProgressProvider: operationPromptInProgressProvider,
+            waitForAwayRelockDeadline: { try await awayDeadline.wait($0) }
         )
     }
 
@@ -487,6 +532,154 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(spy.relockCount, relocksAfterUnlock, "No eager relock for a non-zero interval.")
         XCTAssertTrue(spy.discardReasons.contains { $0.hasPrefix("away:") }, "Handoff context is discarded on away (fail-closed).")
     }
+
+    #if os(macOS)
+
+    // MARK: - Away relock deadline (macOS)
+    //
+    // macOS keeps the process running while the app is away, so the grace
+    // interval is a bound only if something enforces it there. These pin that
+    // the deadline armed at away decides on the same predicate as the foreground
+    // return, and that it stops existing the moment that pair — unlocked and
+    // away — no longer holds.
+
+    /// The past-grace invariant: the session must not survive the grace window
+    /// just because the user has not come back yet.
+    func test_awayDeadline_pastGrace_relocksWhileStillAway() async {
+        let spy = Spy()
+        spy.gracePeriod = 60
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let deadline = AwayDeadlineClock()
+        let controller = makeController(spy: spy, awayDeadline: deadline)
+        spy.lastAuthenticationDate = Date()
+        await controller.handleForegroundActive(source: "unlock")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        let relocksAfterUnlock = spy.relockCount
+        let contentClearsAfterUnlock = spy.contentClearCount
+
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+
+        XCTAssertEqual(controller.lockState, .unlocked, "The session stays open for the rest of the grace window.")
+        XCTAssertEqual(deadline.armCount, 1, "Away arms the relock deadline.")
+        XCTAssertEqual(
+            deadline.requestedIntervals.first ?? -1,
+            60,
+            accuracy: 5,
+            "The deadline is the last authentication plus the grace interval — the same anchor the foreground return uses."
+        )
+
+        // The window ends while the user is still away.
+        spy.lastAuthenticationDate = Date(timeIntervalSinceNow: -600)
+        deadline.arrive()
+        await settle()
+
+        XCTAssertEqual(controller.lockState, .locked, "Past grace the app relocks without waiting for the user.")
+        XCTAssertEqual(
+            spy.relockCount,
+            relocksAfterUnlock + 1,
+            "Protected App-Data relocks (the wrapping root key is zeroized) at the deadline, not on the next return."
+        )
+        XCTAssertEqual(spy.contentClearCount, contentClearsAfterUnlock + 1, "Decrypted content is cleared with it.")
+    }
+
+    /// A return inside the grace window disarms the deadline; a wake-up that
+    /// arrives afterwards must not relock the session the user is using.
+    func test_awayDeadline_foregroundReturnDisarmsIt() async {
+        let spy = Spy()
+        spy.gracePeriod = 300
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let deadline = AwayDeadlineClock()
+        let controller = makeController(spy: spy, awayDeadline: deadline)
+        spy.lastAuthenticationDate = Date()
+        await controller.handleForegroundActive(source: "unlock")
+        let relocksAfterUnlock = spy.relockCount
+
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+        XCTAssertTrue(deadline.isPending)
+
+        controller.noteForegroundActive(true)
+        await controller.handleForegroundActive(source: "macBecomeActive")
+        XCTAssertEqual(controller.lockState, .unlocked, "A return within grace stays unlocked.")
+
+        deadline.arrive()
+        await settle()
+
+        XCTAssertEqual(controller.lockState, .unlocked, "A stale wake-up must not relock a session in use.")
+        XCTAssertEqual(spy.relockCount, relocksAfterUnlock)
+    }
+
+    /// The wake-up is when to look, not what to conclude: if the window has not
+    /// actually passed — a clock adjustment, or an authentication recorded after
+    /// the arming — it waits out the remainder instead of relocking early.
+    func test_awayDeadline_beforeGraceEnds_waitsOutTheRemainder() async {
+        let spy = Spy()
+        spy.gracePeriod = 300
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let deadline = AwayDeadlineClock()
+        let controller = makeController(spy: spy, awayDeadline: deadline)
+        spy.lastAuthenticationDate = Date()
+        await controller.handleForegroundActive(source: "unlock")
+        let relocksAfterUnlock = spy.relockCount
+
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+
+        deadline.arrive()
+        await settle()
+
+        XCTAssertEqual(controller.lockState, .unlocked, "An early wake-up must not relock inside the grace window.")
+        XCTAssertEqual(spy.relockCount, relocksAfterUnlock)
+        XCTAssertEqual(deadline.armCount, 2, "It re-arms for what is left of the window.")
+        XCTAssertTrue(deadline.isPending)
+    }
+
+    /// An explicit lock supersedes the deadline synchronously, so the pending
+    /// wake-up cannot land a second relock cycle after it.
+    func test_awayDeadline_lockNowDisarmsIt_noSecondRelockCycle() async {
+        let spy = Spy()
+        spy.gracePeriod = 300
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let deadline = AwayDeadlineClock()
+        let controller = makeController(spy: spy, awayDeadline: deadline)
+        spy.lastAuthenticationDate = Date()
+        await controller.handleForegroundActive(source: "unlock")
+        let relocksBeforeLock = spy.relockCount
+
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+
+        controller.lockNow(source: "screenLock")
+        deadline.arrive()
+        await settle()
+
+        XCTAssertEqual(controller.lockState, .locked)
+        XCTAssertEqual(spy.relockCount, relocksBeforeLock + 1, "Exactly one relock cycle.")
+    }
+
+    /// UI-test bypass never locks the app, so nothing may be armed to lock it.
+    func test_awayDeadline_bypassMode_neverArms() async {
+        let spy = Spy()
+        spy.gracePeriod = 60
+        spy.bypass = true
+        let deadline = AwayDeadlineClock()
+        let controller = makeController(spy: spy, awayDeadline: deadline)
+        await controller.handleForegroundActive(source: "unlock")
+        XCTAssertEqual(controller.lockState, .unlocked)
+
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+
+        XCTAssertEqual(deadline.armCount, 0)
+        XCTAssertEqual(controller.lockState, .unlocked)
+    }
+    #endif
 
     func test_lockNow_locksImmediatelyRegardlessOfGrace() async {
         let spy = Spy()

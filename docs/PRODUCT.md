@@ -37,6 +37,7 @@ Actions that never proceed without an explicit user step:
 - **Software (portable) keys survive through backups** — export is passphrase-protected, and losing the wrapped copy is recoverable only from such a backup ([SECURITY.md](SECURITY.md) §3).
 - **High Security Mode** removes the passcode fallback: while biometrics are unavailable (sensor damage, lockout), decrypt, sign, and export stay blocked. Device-bound keys always require biometrics regardless of this setting — their enforcement is fixed at creation.
 - **On macOS, screen lock locks the app immediately**, regardless of the grace-period setting. A biometric prompt's own transient deactivation is never treated as leaving the app.
+- **The re-authentication interval bounds the session, not just the next prompt.** Once it passes, the app relocks itself — decrypted content cleared, protected app data re-protected — without waiting for you to come back. On macOS that takes a deadline armed when you leave, because the app keeps running while it is not frontmost; iOS, iPadOS, and visionOS suspend it instead, so nothing runs in between and the check on return is exact.
 - **The privacy cover is not the lock.** When the app is not foreground-active it shows an opaque, app-identified cover — purely visual, with no authentication role; the lock surface is a separate state driven by the app-lock state machine ([SECURITY.md](SECURITY.md) §4–§5).
 
 ## 5. Product rules

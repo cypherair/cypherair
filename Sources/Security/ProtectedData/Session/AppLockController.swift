@@ -9,6 +9,12 @@ import LocalAuthentication
 /// treated as an away event, so there is nothing to disambiguate (the grace=0
 /// "no double-auth" behavior holds structurally; see `handleAwayEvent`).
 ///
+/// The grace window is decided in exactly two places, on one predicate
+/// (`graceDeadline`): the foreground return, and — on macOS, where the process
+/// keeps running while the app is away — the deadline armed at the away event
+/// (`armAwayRelock`), so the interval bounds how long an unlocked session can
+/// survive rather than only when the next prompt appears.
+///
 /// Subsystem boundary:
 /// - This controller owns the lock state, the auto-lock grace decision, the
 ///   per-platform away/foreground bookkeeping, the fail-closed Protected App-Data
@@ -66,6 +72,12 @@ final class AppLockController {
     /// absent, tests that exercise the controller directly fall back to the
     /// main-actor mirror.
     private let operationPromptInProgressProvider: (() -> Bool)?
+    /// Suspends for the given number of seconds — the wake-up the macOS away
+    /// relock deadline is built on. Production sleeps on the continuous clock,
+    /// which keeps counting while the Mac is asleep, so a machine that wakes past
+    /// the deadline relocks at once instead of restarting the wait. Tests inject
+    /// their own so the deadline is driven rather than waited out.
+    private let waitForAwayRelockDeadline: (TimeInterval) async throws -> Void
 
     private(set) var lockState: LockState = .locked
 
@@ -90,6 +102,11 @@ final class AppLockController {
     /// hop interleaving. (A resign racing ahead of the very first began-hop is
     /// processed as a genuine away — fail-closed, the right direction.)
     private var openOperationPromptSessions = 0
+
+    /// The pending away relock wake-up (`armAwayRelock`). It exists only while
+    /// the app is unlocked and away: every transition out of that pair disarms
+    /// it, and the wake-up re-checks both before acting.
+    private var awayRelockTask: Task<Void, Never>?
     #endif
 
     /// Monotonic token bumped on every genuine away event. The unlock flow captures
@@ -148,7 +165,10 @@ final class AppLockController {
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
-        operationPromptInProgressProvider: (() -> Bool)? = nil
+        operationPromptInProgressProvider: (() -> Bool)? = nil,
+        waitForAwayRelockDeadline: @escaping (TimeInterval) async throws -> Void = { seconds in
+            try await Task.sleep(for: .seconds(seconds), tolerance: .seconds(1), clock: .continuous)
+        }
     ) {
         self.gracePeriodProvider = gracePeriodProvider
         self.lastAuthenticationDateProvider = lastAuthenticationDateProvider
@@ -160,6 +180,7 @@ final class AppLockController {
         self.contentClearHandler = contentClearHandler
         self.shouldBypassAuthentication = shouldBypassAuthentication
         self.operationPromptInProgressProvider = operationPromptInProgressProvider
+        self.waitForAwayRelockDeadline = waitForAwayRelockDeadline
     }
 
     // MARK: - Computed projections (read by views)
@@ -212,6 +233,10 @@ final class AppLockController {
         }
         isForegroundActive = active
         if active {
+            // The away window is over — `handleForegroundActive`, which the
+            // observer always schedules right after this call, owns the lock
+            // decision from here.
+            disarmAwayRelock()
             // Keep the cosmetic cover up across the async gap until
             // `handleForegroundActive` resolves the lock decision. Set
             // unconditionally on the transition (not gated on grace/lock
@@ -262,21 +287,97 @@ final class AppLockController {
         awayGeneration &+= 1
         discardHandoffContext("away:\(source)")
 
-        let interval = effectiveGracePeriod()
-
-        // "Immediately" (interval 0) locks on the away event, literally.
-        // For a non-zero interval the relock is evaluated lazily on the next
-        // foreground resume (grace check), matching the shipped behavior; the
-        // cosmetic cover (owned by the app, not this controller) hides content
-        // meanwhile.
-        guard interval == 0 else {
-            return
-        }
         // In UI-test bypass mode the app never locks.
         guard !shouldBypassAuthentication() else {
             return
         }
+
+        // "Immediately" (interval 0) locks on the away event, literally. A
+        // non-zero interval leaves the session open for the rest of the grace
+        // window, which two places then decide on the same predicate: the
+        // foreground return, and — on macOS, where the process keeps running
+        // while away — the armed deadline below if the user has not come back
+        // by then.
+        guard effectiveGracePeriod() == 0 else {
+            armAwayRelock(source: source)
+            return
+        }
         Task { await enterLocked(source: "away:\(source)") }
+    }
+
+    /// Arm the wake-up that relocks the app once the grace window expires while
+    /// it is away.
+    ///
+    /// macOS only, and the reason is the platform's rather than a policy: the
+    /// process keeps running while the app is not frontmost, so with no wake-up
+    /// nothing relocks until the user returns — the unwrapped wrapping root key
+    /// and decrypted content stay resident for however long that is, and the
+    /// grace interval bounds only the next prompt, not the exposure. iOS,
+    /// iPadOS, and visionOS suspend the process while away instead, so
+    /// evaluating on the foreground return is exact there; a wake-up armed on
+    /// those platforms could only fire inside whatever sliver of background
+    /// execution the system happened to grant, which would make the relock
+    /// moment a system-timing artifact rather than the stated interval.
+    private func armAwayRelock(source: String) {
+        #if os(macOS)
+        disarmAwayRelock()
+        // Nothing to relock unless a session is actually open: `.locked` and
+        // `.authenticationFailed` have already relocked, and `.authenticating`
+        // settles an explicit state of its own.
+        guard case .unlocked = lockState else {
+            return
+        }
+        let secondsRemaining = max(graceDeadline.timeIntervalSinceNow, 0)
+        awayRelockTask = Task { [weak self] in
+            guard let wait = self?.waitForAwayRelockDeadline else {
+                return
+            }
+            do {
+                try await wait(secondsRemaining)
+            } catch {
+                // Cancelled: a foreground return or an explicit lock took over.
+                return
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.handleAwayRelockDeadline(source: source)
+        }
+        #endif
+    }
+
+    /// Cancel the pending away relock wake-up. A no-op where none is armed,
+    /// which is every platform but macOS.
+    private func disarmAwayRelock() {
+        #if os(macOS)
+        awayRelockTask?.cancel()
+        awayRelockTask = nil
+        #endif
+    }
+
+    /// The away relock deadline arrived. It applies the same predicate the
+    /// foreground return applies — the deadline is a second place to evaluate
+    /// the grace window, never a second rule for it.
+    private func handleAwayRelockDeadline(source: String) {
+        #if os(macOS)
+        // This wake-up is spent; clearing the handle first keeps the re-arm
+        // below from cancelling the task it is running in.
+        awayRelockTask = nil
+
+        // The user came back, or the session is no longer open: whoever holds
+        // that transition owns the decision.
+        guard !isForegroundActive, case .unlocked = lockState else {
+            return
+        }
+        guard isGracePeriodExpired else {
+            // The window moved out from under the wake-up — a system clock
+            // adjustment, or an authentication recorded after it was armed.
+            // Wait out what is left instead of relocking early.
+            armAwayRelock(source: source)
+            return
+        }
+        Task { await enterLocked(source: "awayGraceExpired:\(source)") }
+        #endif
     }
 
     /// An operation-prompt session began (the coordinator's stack went 0 → 1;
@@ -410,6 +511,9 @@ final class AppLockController {
         // cycle. An explicit lock always supersedes the deferred decision.
         pendingOperationPromptAway = nil
         #endif
+        // Same reasoning for the away deadline: it must not fire into a second
+        // relock cycle while this lock's `enterLocked` is still queued.
+        disarmAwayRelock()
         Task { await enterLocked(source: "lockNow:\(source)") }
     }
 
@@ -428,6 +532,9 @@ final class AppLockController {
         // prompt session decrements normally after this method returns.
         pendingOperationPromptAway = nil
         #endif
+        // The reset settles the lock state directly, so any wake-up armed for
+        // the pre-reset session is moot.
+        disarmAwayRelock()
         discardHandoffContext("localDataReset")
         if preserveAuthentication {
             // Stay unlocked and mark this epoch handled so a post-reset spurious
@@ -521,6 +628,8 @@ final class AppLockController {
         // clearing it avoids a redundant second relock cycle at the prompts' end.
         pendingOperationPromptAway = nil
         #endif
+        // The session is closing; there is no longer a grace window to enforce.
+        disarmAwayRelock()
         awayGeneration &+= 1
         discardHandoffContext("enterLocked:\(source)")
         contentClearHandler()
@@ -539,11 +648,20 @@ final class AppLockController {
         gracePeriodProvider() ?? 0
     }
 
-    private var isGracePeriodExpired: Bool {
+    /// The instant the current grace window ends. A missing authentication date
+    /// fails closed to a window that is already over. Both places that decide
+    /// whether the session may stay open — the foreground return and the macOS
+    /// away deadline — read this one definition, so the two can never drift into
+    /// separate rules.
+    private var graceDeadline: Date {
         guard let lastAuthenticationDate = lastAuthenticationDateProvider() else {
-            return true
+            return .distantPast
         }
-        return Date().timeIntervalSince(lastAuthenticationDate) > TimeInterval(effectiveGracePeriod())
+        return lastAuthenticationDate.addingTimeInterval(TimeInterval(effectiveGracePeriod()))
+    }
+
+    private var isGracePeriodExpired: Bool {
+        Date() > graceDeadline
     }
 
     // MARK: - State helpers
