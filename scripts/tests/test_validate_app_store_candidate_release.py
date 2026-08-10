@@ -633,6 +633,20 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             make_stage1_release_pin(release_tag),
         )
 
+    def test_arm64e_manifest_rejects_missing_openssl_provenance(self) -> None:
+        release_tag = "rust-stage1-arm64e-toolchain-test"
+        payload = valid_arm64e_manifest(release_tag)
+        del payload["dependencyChain"]["openssl"]
+
+        with self.assertRaisesRegex(
+            module.CandidateValidationError,
+            "missing OpenSSL submodule commit",
+        ):
+            module.validate_arm64e_manifest_payload(
+                payload,
+                make_stage1_release_pin(release_tag),
+            )
+
     def test_arm64e_manifest_rejects_missing_rust_stage1_provenance(self) -> None:
         release_tag = "rust-stage1-arm64e-toolchain-test"
         payload = valid_arm64e_manifest(release_tag)

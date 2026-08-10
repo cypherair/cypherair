@@ -175,7 +175,7 @@ class ReportTests(unittest.TestCase):
         (workflows / "a.yml").write_text(WORKFLOW_A, encoding="utf-8")
         return root
 
-    def make_fetchers(self) -> "freshness.Fetchers":
+    def make_fetchers(self, openssl_src_head: str = "f" * 40) -> "freshness.Fetchers":
         checkout_sha = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
         upload_new_sha = "b" * 40
 
@@ -194,7 +194,7 @@ class ReportTests(unittest.TestCase):
                 ("actions/upload-artifact", "v7.1.0"): upload_new_sha,
             }[(repository, tag)],
             branch_head=lambda repository, branch: {
-                "https://github.com/cypherair/openssl-src-rs": "f" * 40,
+                "https://github.com/cypherair/openssl-src-rs": openssl_src_head,
             }[repository],
             cargo_dry_run=lambda repo_root: CARGO_DRY_RUN_OUTPUT,
         )
@@ -221,6 +221,21 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(by_name["actions/checkout (a.yml)"]["status"], "current")
         self.assertEqual(by_name["actions/upload-artifact (a.yml)"]["status"], "update-available")
         self.assertEqual(report["summary"]["unavailable"], 0)
+
+    def test_carry_ref_is_current_when_the_lock_matches_the_branch_head(self) -> None:
+        locked_commit = "1aea076d67ee701d3e9b9ad68177203881542868"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = self.make_repo_root(Path(temp_dir))
+            report = freshness.build_report(
+                repo_root,
+                self.make_fetchers(openssl_src_head=locked_commit),
+            )
+
+        by_name = {entry["name"]: entry for entry in report["entries"]}
+
+        self.assertEqual(
+            by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "current"
+        )
 
     def test_render_text_lists_sections_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

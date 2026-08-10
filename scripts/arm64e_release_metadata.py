@@ -173,6 +173,7 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
     openssl_src["isFresh"] = (
         openssl_src["resolvedCommit"] == openssl_src["remoteBranchHead"]
     )
+
     openssl_submodule_commit = openssl_submodule_pointer(
         openssl_src["repository"],
         openssl_src["resolvedCommit"],
@@ -199,6 +200,7 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
             f"{openssl_submodule_commit} is not the current "
             f"{DEFAULT_OPENSSL_BRANCH} head {openssl_remote_head}"
         )
+
     if stale_messages and freshness_level != "off":
         prefix = "error" if freshness_level == "error" else "warning"
         for message in stale_messages:

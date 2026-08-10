@@ -218,7 +218,7 @@ EOF
         target_libdir="$("$ARM64E_RUSTC" --print target-libdir --target "$target")"
         if ! compgen -G "$target_libdir/libstd-*.rlib" >/dev/null; then
             echo "error: arm64e stage1 toolchain is missing prebuilt std for ${target} at ${target_libdir}" >&2
-            echo "       republish the stable197 Rust fork stage1 with prebuilt std payloads." >&2
+            echo "       republish the Rust fork stage1 with prebuilt std payloads." >&2
             exit 1
         fi
     done

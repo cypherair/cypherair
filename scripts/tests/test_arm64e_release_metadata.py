@@ -87,6 +87,38 @@ source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-a
             "be17d9174a9223a0dfdcbbd9407fe079882214a0",
         )
 
+    def test_parse_openssl_src_lock_rejects_non_owned_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            lock_path = Path(temp_dir_name) / "Cargo.lock"
+            lock_path.write_text(
+                """
+[[package]]
+name = "openssl-src"
+version = "300.6.2+3.6.2"
+source = "git+https://github.com/example/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#be17d9174a9223a0dfdcbbd9407fe079882214a0"
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(module.MetadataError, "required owned fork"):
+                module.parse_openssl_src_lock(lock_path)
+
+    def test_parse_openssl_src_lock_rejects_wrong_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            lock_path = Path(temp_dir_name) / "Cargo.lock"
+            lock_path.write_text(
+                """
+[[package]]
+name = "openssl-src"
+version = "300.6.2+3.6.2"
+source = "git+https://github.com/cypherair/openssl-src-rs?branch=main#be17d9174a9223a0dfdcbbd9407fe079882214a0"
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(module.MetadataError, "required carry branch"):
+                module.parse_openssl_src_lock(lock_path)
+
     def test_collect_dependency_chain_reports_stale_lockfile(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             lock_path = Path(temp_dir_name) / "Cargo.lock"
