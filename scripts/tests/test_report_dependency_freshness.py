@@ -58,12 +58,6 @@ uniffi = { version = "0.32", features = ["build"] }
 
 CARGO_LOCK = """\
 [[package]]
-name = "ctor"
-version = "1.0.9"
-source = "git+https://github.com/cypherair/linktime?branch=carry%2Fapple-ctor-1.0.9#1aa46c01a33b30f3e979e4d5c0a414a2fcc56ecf"
-dependencies = []
-
-[[package]]
 name = "openssl-src"
 version = "300.6.1+3.6.3"
 source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#1aea076d67ee701d3e9b9ad68177203881542868"
@@ -200,8 +194,7 @@ class ReportTests(unittest.TestCase):
                 ("actions/upload-artifact", "v7.1.0"): upload_new_sha,
             }[(repository, tag)],
             branch_head=lambda repository, branch: {
-                "https://github.com/cypherair/openssl-src-rs": "1aea076d67ee701d3e9b9ad68177203881542868",
-                "https://github.com/cypherair/linktime": "f" * 40,
+                "https://github.com/cypherair/openssl-src-rs": "f" * 40,
             }[repository],
             cargo_dry_run=lambda repo_root: CARGO_DRY_RUN_OUTPUT,
         )
@@ -223,9 +216,8 @@ class ReportTests(unittest.TestCase):
         )
         self.assertEqual(by_name["arm64e stage1 toolchain (cypherair/rust)"]["status"], "current")
         self.assertEqual(
-            by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "current"
+            by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "drift"
         )
-        self.assertEqual(by_name["ctor carry (cypherair/linktime)"]["status"], "drift")
         self.assertEqual(by_name["actions/checkout (a.yml)"]["status"], "current")
         self.assertEqual(by_name["actions/upload-artifact (a.yml)"]["status"], "update-available")
         self.assertEqual(report["summary"]["unavailable"], 0)
@@ -242,7 +234,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Owned-fork carry refs (report-only)", text)
         self.assertIn("Pinned GitHub Actions", text)
         self.assertIn("Summary:", text)
-        self.assertIn("[drift] ctor carry (cypherair/linktime)", text)
+        self.assertIn("[drift] openssl-src carry (cypherair/openssl-src-rs)", text)
 
     def test_failing_fetchers_and_missing_files_never_fail_the_run(self) -> None:
         def boom(*args: object, **kwargs: object) -> object:

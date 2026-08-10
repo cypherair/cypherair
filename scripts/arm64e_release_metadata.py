@@ -18,10 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OPENSSL_SRC_BRANCH = "carry/apple-arm64e-openssl-fork"
 DEFAULT_OPENSSL_BRANCH = "carry/apple-arm64e-targets"
-DEFAULT_CTOR_BRANCH = "carry/apple-ctor-1.0.9"
 DEFAULT_OPENSSL_SRC_REPO = "https://github.com/cypherair/openssl-src-rs"
 DEFAULT_OPENSSL_REPO = "https://github.com/cypherair/openssl"
-DEFAULT_CTOR_REPO = "https://github.com/cypherair/linktime"
 
 
 class MetadataError(RuntimeError):
@@ -114,15 +112,6 @@ def parse_openssl_src_lock(cargo_lock_path: Path) -> dict[str, str]:
     )
 
 
-def parse_ctor_lock(cargo_lock_path: Path) -> dict[str, str]:
-    return parse_git_package_lock(
-        cargo_lock_path,
-        "ctor",
-        DEFAULT_CTOR_REPO,
-        DEFAULT_CTOR_BRANCH,
-    )
-
-
 def remote_branch_head(repository: str, branch: str) -> str:
     last_error: subprocess.CalledProcessError | None = None
     output = ""
@@ -157,12 +146,9 @@ def openssl_submodule_pointer(openssl_src_repository: str, openssl_src_commit: s
 
 def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dict[str, object]:
     openssl_src = parse_openssl_src_lock(cargo_lock_path)
-    ctor = parse_ctor_lock(cargo_lock_path)
     if freshness_level == "off":
         openssl_src["remoteBranchHead"] = None
         openssl_src["isFresh"] = None
-        ctor["remoteBranchHead"] = None
-        ctor["isFresh"] = None
         return {
             "opensslSrc": openssl_src,
             "openssl": {
@@ -172,7 +158,6 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
                 "remoteBranchHead": None,
                 "isFresh": None,
             },
-            "ctor": ctor,
             "freshness": {
                 "level": freshness_level,
                 "lookupPerformed": False,
@@ -188,12 +173,6 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
     openssl_src["isFresh"] = (
         openssl_src["resolvedCommit"] == openssl_src["remoteBranchHead"]
     )
-    ctor["remoteBranchHead"] = remote_branch_head(
-        ctor["repository"],
-        ctor["branch"],
-    )
-    ctor["isFresh"] = ctor["resolvedCommit"] == ctor["remoteBranchHead"]
-
     openssl_submodule_commit = openssl_submodule_pointer(
         openssl_src["repository"],
         openssl_src["resolvedCommit"],
@@ -220,13 +199,6 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
             f"{openssl_submodule_commit} is not the current "
             f"{DEFAULT_OPENSSL_BRANCH} head {openssl_remote_head}"
         )
-    if not ctor["isFresh"]:
-        stale_messages.append(
-            "ctor Cargo.lock commit "
-            f"{ctor['resolvedCommit']} is not the current "
-            f"{ctor['branch']} head {ctor['remoteBranchHead']}"
-        )
-
     if stale_messages and freshness_level != "off":
         prefix = "error" if freshness_level == "error" else "warning"
         for message in stale_messages:
@@ -237,7 +209,6 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
     return {
         "opensslSrc": openssl_src,
         "openssl": openssl,
-        "ctor": ctor,
         "freshness": {
             "level": freshness_level,
             "lookupPerformed": True,

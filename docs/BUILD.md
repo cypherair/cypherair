@@ -45,8 +45,6 @@ The SDK/compliance asset set is fixed by WF1 and enumerated in the env block of 
 
 `pgp-mobile/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — that is the entire reason the chain exists. `Cargo.lock`, never prose, is the machine-checked truth for the current heads. The branches stay downstream until equivalent arm64e support lands upstream.
 
-Sequoia pulls in an early OpenSSL constructor through `ctor`. The published crate emits its Apple archive-retention pointer with one-byte section alignment, which ld64 rejects when producing the final arm64e app image, so `pgp-mobile/Cargo.toml` also patches `ctor` to a fork whose owning assembly aligns that pointer to eight bytes. **Keep this carry isolated to `ctor`:** the real constructor record is already correct, so no LLVM, Rust, `link-section`, Sequoia, or downstream linker-suppression change belongs in the workaround. Remove the patch once an equivalent upstream crate release is adopted.
-
 The compiler fork (`cypherair/rust`, plus the LLVM work it depends on) carries its own rules:
 
 - **The ownership test is who decides the behavior**, not whether a thin C API shim happens to live in `llvm-wrapper/`. Rust owns Apple target specifications, the default arm64e feature and ABI model, ABI-mandatory feature diagnostics, and frontend emission of authenticated calls and of function pointers used as data. LLVM owns IR legality for `ptrauth` operand bundles, whether optimization may expose a direct callee while retaining one, and AArch64/Mach-O lowering. Rust's LLVM C API shims express frontend decisions; they never perform optimizer repair or serialized-output rewriting.
