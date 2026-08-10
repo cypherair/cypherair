@@ -26,6 +26,13 @@ final class PrivateKeyModeSwitchAuthenticator {
         )
 
         guard result.isAuthenticated else {
+            // A result that did not authenticate must not leave a live context
+            // behind. `PrivateKeyAuthenticationResult.failed` carries none, but
+            // the memberwise initializer is internal — so revoke whatever this
+            // guard was handed instead of trusting the producer to have passed
+            // nil. `invalidate()` is documented as a no-op when there is nothing
+            // to invalidate.
+            result.context?.invalidate()
             throw AuthenticationError.failed
         }
 

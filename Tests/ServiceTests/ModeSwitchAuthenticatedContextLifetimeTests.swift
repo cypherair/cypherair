@@ -24,6 +24,10 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
     private final class StubModeSwitchAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
         private(set) var evaluateCalls = 0
         let context = TrackingLAContext()
+        /// Hands back a live context alongside `isAuthenticated: false` — a shape
+        /// the production evaluator never produces, but one the memberwise
+        /// initializer allows any conformer to build.
+        var reportsAuthenticated = true
 
         var isBiometricsAvailable: Bool { true }
         func canEvaluate(mode: AuthenticationMode) -> Bool { true }
@@ -33,7 +37,10 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
             reason: String
         ) async throws -> PrivateKeyAuthenticationResult {
             evaluateCalls += 1
-            return .authenticated(context: context)
+            return PrivateKeyAuthenticationResult(
+                isAuthenticated: reportsAuthenticated,
+                context: context
+            )
         }
     }
 
@@ -143,6 +150,36 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
             stub.context.invalidateCount,
             1,
             "A switch that fails part-way must not leave its authentication alive either."
+        )
+    }
+
+    func test_switchMode_notAuthenticatedResult_abortsAndInvalidatesTheContextItWasHanded() async throws {
+        let fixture = try makeFixture(keyCount: 1)
+        defer { UserDefaults().removePersistentDomain(forName: fixture.defaultsSuiteName) }
+        let stub = StubModeSwitchAuthenticator()
+        stub.reportsAuthenticated = false
+
+        do {
+            try await fixture.manager.switchMode(
+                to: .highSecurity,
+                fingerprints: fixture.fingerprints,
+                hasBackup: true,
+                authenticator: stub
+            )
+            XCTFail("Expected a not-authenticated result to abort the switch")
+        } catch AuthenticationError.failed {
+        }
+
+        XCTAssertEqual(fixture.manager.currentMode, .standard)
+        XCTAssertEqual(
+            fixture.secureEnclave.reconstructCallCount,
+            0,
+            "Nothing is re-wrapped without an authenticated result."
+        )
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "The guard revokes whatever context it was handed rather than trusting the producer to have passed nil."
         )
     }
 }

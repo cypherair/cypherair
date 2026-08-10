@@ -384,8 +384,8 @@ final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unc
 }
 
 /// Protocol for authentication evaluation.
-/// Production: LAContext.
-/// Tests substitute a configurable double.
+/// The production conformer is `AuthenticationManager`, which evaluates through
+/// `LAContext`. Tests substitute a configurable double.
 protocol AuthenticationEvaluable {
     /// Check if a given authentication policy can be evaluated.
     /// For High Security mode, this checks if biometrics are available.
