@@ -21,7 +21,7 @@ module = load_script_module(
 
 
 HOST = "aarch64-apple-darwin"
-RELEASE_TAG = "rust-arm64e-stage1-stable197-corrected-test"
+RELEASE_TAG = "rust-stage1-arm64e-toolchain-corrected-test"
 ASSET_BASE = f"{module.EXPECTED_ASSET_PREFIX}-{HOST}"
 TAR_ASSET_NAME = f"{ASSET_BASE}.tar.zst"
 SHA256_ASSET_NAME = f"{ASSET_BASE}.sha256"
@@ -96,12 +96,12 @@ class ValidateArm64eStage1ToolchainTests(unittest.TestCase):
         manifest_path = root / "stage1.json"
 
         published_rustc_verbose = (
-            "rustc 1.97.0-dev\n"
+            f"rustc {module.EXPECTED_STABLE_BASE_RELEASE}-dev\n"
             "binary: rustc\n"
             "commit-hash: unknown\n"
             "commit-date: unknown\n"
             f"host: {HOST}\n"
-            "release: 1.97.0-dev\n"
+            f"release: {module.EXPECTED_STABLE_BASE_RELEASE}-dev\n"
             f"LLVM version: {module.EXPECTED_LLVM_VERSION}"
         )
         actual_rustc_verbose = published_rustc_verbose.replace(
@@ -364,10 +364,10 @@ EOF
             with self.assertRaisesRegex(module.Stage1ValidationError, "schemaVersion"):
                 self.validate(fixture)
 
-    def test_non_stable197_release_tag_fails_closed(self) -> None:
+    def test_foreign_release_tag_prefix_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             fixture = self.make_fixture(Path(temp_dir))
-            unexpected_tag = "rust-arm64e-stage1-nightly-test"
+            unexpected_tag = "rust-stage1-arm64e-nightly-test"
             unexpected_pin = module.Stage1ReleasePin(
                 tag=unexpected_tag,
                 repository=RELEASE_PIN.repository,

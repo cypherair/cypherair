@@ -1,6 +1,6 @@
 ---
 name: repin-arm64e
-description: Rotate the pinned arm64e stage1 Rust toolchain tag everywhere it is pinned. Use when updating ARM64E_STAGE1_RELEASE_TAG to a newly published rust-arm64e-stage1-* release.
+description: Rotate the pinned arm64e stage1 Rust toolchain tag everywhere it is pinned. Use when updating ARM64E_STAGE1_RELEASE_TAG to a newly published rust-stage1-arm64e-toolchain-* release.
 ---
 
 The re-pin rule is docs/BUILD.md Section 3 — read it first; it holds the two

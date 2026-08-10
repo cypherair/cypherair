@@ -37,7 +37,7 @@ CARGO_LOCK = "pgp-mobile/Cargo.lock"
 WORKFLOWS_DIR = ".github/workflows"
 SQLCIPHER_PIN = "third_party/sqlcipher-xcframework.pin.json"
 STAGE1_PIN = "third_party/arm64e-stage1-toolchain.pin.json"
-STAGE1_TAG_PREFIX = "rust-arm64e-stage1-"
+STAGE1_TAG_PREFIX = "rust-stage1-arm64e-toolchain-"
 USER_AGENT = "cypherair-dependency-freshness (https://github.com/cypherair/cypherair)"
 
 STATUS_CURRENT = "current"
@@ -214,7 +214,7 @@ def parse_locked_version(cargo_lock_text: str, package: str) -> str:
 
 
 def latest_stage1_release(releases: list[dict]) -> dict | None:
-    """Pick the newest ``rust-arm64e-stage1-*`` release by publish time."""
+    """Pick the newest ``rust-stage1-arm64e-toolchain-*`` release by publish time."""
 
     stage1 = [
         release

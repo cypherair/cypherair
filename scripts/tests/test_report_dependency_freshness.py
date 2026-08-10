@@ -89,24 +89,24 @@ STAGE1_PIN = {
     "dependencyName": "rust-arm64e-stage1-toolchain",
     "repository": "cypherair/rust",
     "release": {
-        "tag": "rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1",
-        "publishedAt": "2026-07-15T08:07:10Z",
+        "tag": "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
+        "publishedAt": "2026-08-10T10:40:43Z",
     },
 }
 
 STAGE1_RELEASES = [
-    {"tag_name": "some-other-release", "published_at": "2026-07-16T00:00:00Z"},
+    {"tag_name": "some-other-release", "published_at": "2026-08-11T00:00:00Z"},
     {
-        "tag_name": "rust-arm64e-stage1-stable197-20260701T000000Z-aaaaaaa-r1-a1",
+        "tag_name": "rust-stage1-arm64e-toolchain-20260701T000000Z-aaaaaaa-r1-a1",
         "published_at": "2026-07-01T00:00:00Z",
     },
     {
-        "tag_name": "rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1",
-        "published_at": "2026-07-15T08:07:10Z",
+        "tag_name": "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
+        "published_at": "2026-08-10T10:40:43Z",
     },
     {
-        "tag_name": "rust-arm64e-stage1-draft",
-        "published_at": "2026-07-17T00:00:00Z",
+        "tag_name": "rust-stage1-arm64e-toolchain-draft",
+        "published_at": "2026-08-12T00:00:00Z",
         "draft": True,
     },
 ]
@@ -153,7 +153,7 @@ class ParserTests(unittest.TestCase):
         self.assertIsNotNone(latest)
         self.assertEqual(
             latest["tag_name"],
-            "rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1",
+            "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
         )
         self.assertIsNone(freshness.latest_stage1_release([{"tag_name": "unrelated"}]))
 
