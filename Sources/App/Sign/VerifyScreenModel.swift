@@ -85,7 +85,7 @@ final class VerifyScreenModel {
                     )
                 ]
             ) {
-                let signature = try Data(contentsOf: request.signatureFileURL)
+                let signature = try readVerificationInputFile(at: request.signatureFileURL)
                 try Task.checkCancellation()
                 return try await signingService.verifyDetachedStreamingDetailed(
                     fileURL: request.originalFileURL,
@@ -97,14 +97,14 @@ final class VerifyScreenModel {
         self.cleartextFileImportAction = cleartextFileImportAction ?? { url in
             let data = try SecurityScopedFileAccess.withAccess(
                 to: url,
-                failure: .corruptData(
+                failure: .fileIoError(
                     reason: String(
                         localized: "verify.importCleartextReadFailed",
                         defaultValue: "Could not read signed message file"
                     )
                 )
             ) {
-                try Data(contentsOf: url)
+                try readVerificationInputFile(at: url)
             }
 
             guard let text = String(data: data, encoding: .utf8) else {
@@ -338,7 +338,7 @@ final class VerifyScreenModel {
         } catch let error as CypherAirError {
             operation.present(error: error)
         } catch {
-            operation.present(error: mapVerificationError(error))
+            operation.present(error: mapFileImportError(error))
         }
     }
 
@@ -370,7 +370,39 @@ final class VerifyScreenModel {
         detachedDetailedVerification = nil
     }
 
+    /// Normalizes a failure raised while *performing* verification.
+    ///
+    /// Verification reports through two separate channels, and they must not be
+    /// mixed. The verdict — what the check found — travels as
+    /// `DetailedSignatureVerification`, and it alone may say a signature is
+    /// invalid. This error channel says only that the check could not be run to
+    /// completion, so nothing mapped here may borrow the verdict vocabulary:
+    /// `.badSignature` claims a cryptographic rejection the app never reached,
+    /// and a false "this signature is invalid" is the one claim a verification
+    /// tool must never make wrongly. The crypto layer keeps the same separation
+    /// and never throws a verdict either — a real rejection returns as
+    /// `.invalid` in the result.
     private func mapVerificationError(_ error: Error) -> CypherAirError {
-        CypherAirError.from(error) { _ in .badSignature }
+        CypherAirError.from(error) { .internalError(reason: $0) }
+    }
+
+    /// Normalizes a failure raised while loading a file the user picked for
+    /// verification. This runs before any verification is attempted, so the
+    /// failure is about the file, never about a signature.
+    private func mapFileImportError(_ error: Error) -> CypherAirError {
+        CypherAirError.from(error) { .fileIoError(reason: $0) }
+    }
+}
+
+/// Reads a file the user picked as verification input.
+///
+/// A file the app cannot read is an infrastructure failure, not a finding about
+/// the signature the file was supposed to carry, so the read failure surfaces as
+/// the I/O failure it is instead of falling through to a verdict-shaped error.
+private func readVerificationInputFile(at url: URL) throws -> Data {
+    do {
+        return try Data(contentsOf: url)
+    } catch {
+        throw CypherAirError.fileIoError(reason: error.localizedDescription)
     }
 }

@@ -101,6 +101,35 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertNil(model.filePickerTarget)
     }
 
+    /// Importing the signed-message file runs before anything is verified, so a
+    /// file that cannot be read must be reported as a file failure. It must never
+    /// reach the user as a finding about a signature the app never checked.
+    @MainActor
+    func test_importCleartextFile_readFailurePresentsFileErrorWithoutVerdict() throws {
+        let model = makeModel(
+            cleartextFileImportAction: { _ in
+                throw CocoaError(.fileReadNoSuchFile)
+            }
+        )
+
+        model.requestCleartextFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.handleFileImporterResult(
+            .success([URL(fileURLWithPath: "/tmp/missing-signed-message.asc")]),
+            token: token
+        )
+
+        XCTAssertFalse(model.importedCleartext.hasImportedFile)
+        XCTAssertNil(model.cleartextDetailedVerification)
+        // Assert the underlying error case, not its copy: a verdict-shaped case
+        // such as .badSignature would state a rejection that never happened.
+        guard let presented = model.operation.error, case .fileIoError = presented else {
+            return XCTFail(
+                "Expected CypherAirError.fileIoError, got \(String(describing: model.operation.error))"
+            )
+        }
+    }
+
     @MainActor
     func test_detachedSelectionsAndModeSwitchPreservePerModeResults() throws {
         let originalURL = try makeTemporaryFile(
@@ -249,6 +278,37 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertNil(model.detachedDetailedVerification)
         XCTAssertNil(model.operation.progress)
         XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    /// Verification reports through two channels: the verdict, which alone may
+    /// say a signature is invalid, and the error channel, which says only that
+    /// the check could not be run. When verification cannot be performed the
+    /// error stays operational and no verdict is published.
+    @MainActor
+    func test_verifyDetached_infrastructureFailurePresentsOperationalErrorWithoutVerdict() async {
+        let model = makeModel(
+            detachedVerificationAction: { _ in
+                throw CocoaError(.fileReadNoSuchFile)
+            }
+        )
+        model.verifyMode = .detached
+        model.originalFileURL = URL(fileURLWithPath: "/tmp/original.bin")
+        model.signatureFileURL = URL(fileURLWithPath: "/tmp/original.sig")
+
+        model.verifyDetached()
+
+        await waitUntil("failed detached verification to finish") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertNil(model.detachedDetailedVerification)
+        // Assert the underlying error case, not its copy: a verdict-shaped case
+        // such as .badSignature would state a rejection that never happened.
+        guard let presented = model.operation.error, case .internalError = presented else {
+            return XCTFail(
+                "Expected CypherAirError.internalError, got \(String(describing: model.operation.error))"
+            )
+        }
     }
 
     @MainActor
