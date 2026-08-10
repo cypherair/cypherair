@@ -21,51 +21,41 @@ struct Argon2idMemoryGuard {
     /// Validate that the device has sufficient memory to perform Argon2id
     /// key derivation for the given S2K parameters.
     ///
+    /// This guard answers only the platform question — whether *this device* can
+    /// afford the derivation. What the format itself permits is the engine's
+    /// bound (`MAX_IMPORT_ARGON2_MEMORY_KIB` in `pgp-mobile/src/keys/s2k.rs`),
+    /// applied before these parameters ever reach Swift.
+    ///
     /// - Parameter protectionInfo: App-owned S2K protection info parsed at the FFI boundary.
-    /// - Throws: `CypherAirError.argon2idMemoryExceeded` if memory requirement
+    /// - Throws: `CypherAirError.argon2idMemoryExceeded` if the memory requirement
     ///   exceeds 75% of available memory.
-    /// RFC 9580 maximum encoded_m is 31 (2^31 KiB = 2 TB).
-    /// Any value beyond this is malformed or malicious.
-    private static let maxMemoryKib: UInt64 = 1 << 31
-
     func validate(protectionInfo: PGPKeyImportS2KInfo) throws {
-        // Non-Argon2id (Portable Legacy: "iterated-salted") — no memory check needed.
-        guard protectionInfo.s2kType == "argon2id" else { return }
+        // Non-Argon2id (Portable Legacy: iterated-and-salted) — no memory check needed.
+        guard protectionInfo.s2kType == .argon2id else { return }
 
         // memoryKib=0 means no memory requirement (shouldn't happen for argon2id,
         // but be defensive).
         guard protectionInfo.memoryKib > 0 else { return }
 
-        // Defense-in-depth: reject memoryKib values that exceed RFC 9580's
-        // maximum encoded_m=31 (2^31 KiB). This prevents overflow in the
-        // multiplication below and rejects malformed S2K parameters early.
-        guard protectionInfo.memoryKib <= Self.maxMemoryKib else {
-            let requiredMb = protectionInfo.memoryKib / 1024
-            throw CypherAirError.argon2idMemoryExceeded(requiredMb: requiredMb)
-        }
-
-        let requiredBytes = protectionInfo.memoryKib * 1024
-        let availableBytes = memoryInfo.availableMemoryBytes()
-
-        // 75% threshold using integer arithmetic to avoid floating-point rounding.
-        // required <= available * 3/4  ⟺  required * 4 <= available * 3
+        // 75% threshold in integer arithmetic, avoiding floating-point rounding:
+        // requiredBytes <= availableBytes * 3/4  ⟺  memoryKib * 4096 <= availableBytes * 3.
         //
-        // Use overflow-checked multiplication instead of wrapping (&*).
-        // Wrapping multiplication could silently wrap to a small value on overflow,
-        // allowing a malicious S2K parameter to bypass the guard.
-        let (r4, overflowR) = requiredBytes.multipliedReportingOverflow(by: 4)
-        let (a3, overflowA) = availableBytes.multipliedReportingOverflow(by: 3)
+        // Both products are overflow-checked rather than wrapping (&*): a wrap
+        // could produce a small value and let an implausible requirement past.
+        let (requiredTimesFour, requiredOverflowed) =
+            protectionInfo.memoryKib.multipliedReportingOverflow(by: 4096)
+        let (availableTimesThree, availableOverflowed) =
+            memoryInfo.availableMemoryBytes().multipliedReportingOverflow(by: 3)
 
-        // If required*4 overflows, requirement is > 4 EB — always refuse.
-        // If available*3 overflows, available memory > 6 EB — always pass
-        // (impossible on iOS, but logically correct).
+        // An overflowing requirement is beyond any conceivable device — refuse.
+        // Overflowing headroom would mean more than 6 EB free — always pass.
         let exceeds: Bool
-        if overflowR {
+        if requiredOverflowed {
             exceeds = true
-        } else if overflowA {
+        } else if availableOverflowed {
             exceeds = false
         } else {
-            exceeds = r4 > a3
+            exceeds = requiredTimesFour > availableTimesThree
         }
 
         guard !exceeds else {

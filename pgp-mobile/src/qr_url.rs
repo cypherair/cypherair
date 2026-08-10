@@ -5,7 +5,7 @@ use sequoia_openpgp::parse::Parse;
 
 use crate::error::PgpError;
 
-const QR_URL_PREFIX: &str = "cypherair://import/v1/";
+const QR_URL_PREFIX: &str = "cypherairx://import/v1/";
 const QR_MAX_BYTES: usize = 2953;
 
 pub(crate) fn encode_qr_url(public_key_data: Vec<u8>) -> Result<String, PgpError> {
@@ -39,7 +39,7 @@ pub(crate) fn encode_qr_url(public_key_data: Vec<u8>) -> Result<String, PgpError
 pub(crate) fn decode_qr_url(url: &str) -> Result<Vec<u8>, PgpError> {
     if !url.starts_with(QR_URL_PREFIX) {
         return Err(PgpError::CorruptData {
-            reason: "Not a valid CypherAir URL. Expected cypherair://import/v1/...".to_string(),
+            reason: "Not a valid CypherAir X URL. Expected cypherairx://import/v1/...".to_string(),
         });
     }
 

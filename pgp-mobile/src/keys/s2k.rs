@@ -3,26 +3,44 @@ use super::*;
 /// Maximum Argon2 time cost (passes) accepted on the passphrase key-import
 /// path. The import KDF runs before the wrong-passphrase check and is
 /// uninterruptible, so an attacker-supplied key with a very high pass count
-/// could make a single import attempt run arbitrarily long. Memory is bounded
-/// separately by the Swift-side `Argon2idMemoryGuard` via `parse_s2k_params`;
-/// our own export uses 3 passes, so 16 leaves ample headroom while rejecting
-/// the abuse range.
+/// could make a single import attempt run arbitrarily long. Our own export uses
+/// 3 passes, so 16 leaves ample headroom while rejecting the abuse range.
 pub(crate) const MAX_IMPORT_ARGON2_PASSES: u8 = 16;
 
-/// Reject a cert whose encrypted secret key material uses an Argon2 S2K with an
-/// implausible time cost, before any KDF runs during import.
-pub(crate) fn reject_excessive_import_argon2_passes(
+/// Maximum Argon2 memory cost accepted on the passphrase key-import path.
+/// RFC 9580 caps the encoded memory parameter at 31, so 2^31 KiB is the largest
+/// figure a well-formed key can ask for and anything beyond it is malformed or
+/// hostile. This is the format bound and belongs with the pass bound; the much
+/// narrower question of what *this device* can afford is platform knowledge and
+/// stays in the app's memory guard.
+pub(crate) const MAX_IMPORT_ARGON2_MEMORY_KIB: u64 = 1 << 31;
+
+/// RFC 9580 encodes Argon2's memory cost as `2^m` KiB. The shift is guarded so a
+/// malformed `m >= 64` saturates instead of overflowing.
+pub(crate) fn argon2_memory_kib(encoded_m: u8) -> u64 {
+    1u64.checked_shl(u32::from(encoded_m)).unwrap_or(u64::MAX)
+}
+
+/// Reject a cert whose encrypted secret key material uses Argon2 parameters
+/// outside the accepted range, before any KDF runs during import.
+pub(crate) fn reject_excessive_import_argon2_parameters(
     cert: &openpgp::Cert,
 ) -> Result<(), PgpError> {
     let check =
         |secret: Option<&openpgp::packet::key::SecretKeyMaterial>| -> Result<(), PgpError> {
             if let Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) = secret {
-                if let openpgp::crypto::S2K::Argon2 { t, .. } = encrypted.s2k() {
+                if let openpgp::crypto::S2K::Argon2 { m, t, .. } = encrypted.s2k() {
                     if *t > MAX_IMPORT_ARGON2_PASSES {
                         return Err(PgpError::InvalidKeyData {
                             reason: format!(
                                 "Argon2 time cost {t} passes exceeds the maximum of {MAX_IMPORT_ARGON2_PASSES}"
                             ),
+                        });
+                    }
+                    let memory_kib = argon2_memory_kib(*m);
+                    if memory_kib > MAX_IMPORT_ARGON2_MEMORY_KIB {
+                        return Err(PgpError::Argon2idMemoryExceeded {
+                            required_mb: memory_kib / 1024,
                         });
                     }
                 }
@@ -36,13 +54,27 @@ pub(crate) fn reject_excessive_import_argon2_passes(
     Ok(())
 }
 
+/// How a passphrase-protected key derives its unlock key.
+///
+/// A real enum rather than a string: the app reads this to decide whether the
+/// memory guard applies at all, and a rename on either side has to stop
+/// compiling rather than silently disable the guard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum S2kType {
+    /// RFC 9580 Argon2id — memory-hard, and the only kind with a memory cost.
+    Argon2id,
+    /// RFC 4880 iterated-and-salted, as used by Portable Legacy.
+    IteratedSalted,
+    /// Any other S2K a certificate may carry.
+    Unknown,
+}
+
 /// S2K (String-to-Key) parameters extracted from a passphrase-protected key.
-/// Used by Swift side to check memory requirements before importing.
+/// The app reads these to check the device's memory headroom before importing.
 #[derive(Debug, uniffi::Record)]
 pub struct S2kInfo {
-    /// S2K type: "iterated-salted" for Portable Legacy, "argon2id" for Portable Modern · High, or "unknown".
-    pub s2k_type: String,
-    /// For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
+    pub s2k_type: S2kType,
+    /// For Argon2id: memory requirement in KiB (2^encoded_m). 0 otherwise.
     pub memory_kib: u64,
 }
 
@@ -67,18 +99,15 @@ pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
         Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
             let info = match encrypted.s2k() {
                 openpgp::crypto::S2K::Argon2 { m, .. } => S2kInfo {
-                    s2k_type: "argon2id".to_string(),
-                    // RFC 9580 memory cost is `2^m` KiB; guard the shift so a
-                    // malformed `m >= 64` saturates instead of panicking in
-                    // debug/test builds (mirrors password::validate_s2k_memory).
-                    memory_kib: 1u64.checked_shl(*m as u32).unwrap_or(u64::MAX),
+                    s2k_type: S2kType::Argon2id,
+                    memory_kib: argon2_memory_kib(*m),
                 },
                 openpgp::crypto::S2K::Iterated { .. } => S2kInfo {
-                    s2k_type: "iterated-salted".to_string(),
+                    s2k_type: S2kType::IteratedSalted,
                     memory_kib: 0,
                 },
                 _ => S2kInfo {
-                    s2k_type: "unknown".to_string(),
+                    s2k_type: S2kType::Unknown,
                     memory_kib: 0,
                 },
             };
@@ -103,6 +132,13 @@ pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
     }
 
     if let Some(info) = best {
+        // `best` holds the largest memory cost in the certificate, so checking
+        // it here bounds every key in the file.
+        if info.memory_kib > MAX_IMPORT_ARGON2_MEMORY_KIB {
+            return Err(PgpError::Argon2idMemoryExceeded {
+                required_mb: info.memory_kib / 1024,
+            });
+        }
         Ok(info)
     } else if has_unencrypted {
         Err(PgpError::InvalidKeyData {

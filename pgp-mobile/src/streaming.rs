@@ -25,9 +25,7 @@ use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
 use sequoia_openpgp as openpgp;
 use zeroize::Zeroizing;
 
-use crate::decrypt::{
-    classify_decrypt_error, is_expired_error, parse_verification_certs, DecryptHelper,
-};
+use crate::decrypt::{classify_decrypt_error, parse_verification_certs, DecryptHelper};
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::external_composite_signer::{
@@ -38,9 +36,7 @@ use crate::keys::{
     ExternalMlDsa65SigningProvider, ExternalMlDsa87SigningProvider, ExternalP256SigningProvider,
 };
 use crate::sign;
-use crate::signature_details::{
-    FileDecryptDetailedResult, FileVerifyDetailedResult, SignatureVerificationState,
-};
+use crate::signature_details::{FileDecryptDetailedResult, FileVerifyDetailedResult};
 use crate::verify::VerifyHelper;
 
 /// Buffer size for streaming copy operations.
@@ -322,6 +318,34 @@ fn classify_detached_verify_reader_error(error: &openpgp::anyhow::Error) -> Opti
 
     None
 }
+
+/// Classify a failed write.
+///
+/// Running out of space is its own condition, not a generic I/O fault: the app
+/// already has an out-of-space message for the pre-flight refusal, and a message
+/// that legitimately expands past its ciphertext hits the same wall mid-write.
+/// Everything else keeps the caller's category.
+fn classify_write_io_error(
+    error: &std::io::Error,
+    fallback: impl FnOnce(&std::io::Error) -> PgpError,
+) -> PgpError {
+    if error.kind() == std::io::ErrorKind::StorageFull {
+        return PgpError::StorageFull;
+    }
+    fallback(error)
+}
+
+/// Whether a Sequoia writer error was caused by the volume filling up.
+/// Buffered ciphertext reaches the file during `finalize`, so the out-of-space
+/// failure can surface there rather than from the copy loop.
+fn is_storage_full_error(error: &openpgp::anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|io_error| io_error.kind() == std::io::ErrorKind::StorageFull)
+    })
+}
+
 // ── Secure File Deletion ───────────────────────────────────────────────
 
 /// Overwrite file contents with zeros before deleting.
@@ -599,9 +623,11 @@ fn write_streaming_encrypted_file(
             CopyError::Read(io_err) => PgpError::EncryptionFailed {
                 reason: format!("Read failed: {io_err}"),
             },
-            CopyError::Write(io_err) => PgpError::EncryptionFailed {
-                reason: format!("Write failed: {io_err}"),
-            },
+            CopyError::Write(io_err) => {
+                classify_write_io_error(&io_err, |io_err| PgpError::EncryptionFailed {
+                    reason: format!("Write failed: {io_err}"),
+                })
+            }
             CopyError::Cancelled => PgpError::OperationCancelled,
             // Not producible by zeroing_copy on the encrypt path; mapped
             // defensively rather than panicking.
@@ -613,6 +639,9 @@ fn write_streaming_encrypted_file(
 
     literal.finalize().map_err(|error| {
         secure_delete_file(std::path::Path::new(output_path));
+        if is_storage_full_error(&error) {
+            return PgpError::StorageFull;
+        }
         match finalize_mode {
             StreamingFinalizeMode::Software => PgpError::EncryptionFailed {
                 reason: format!("Finalize failed: {error}"),
@@ -765,9 +794,11 @@ where
                 // layers (Strategy 1b) to find the inner openpgp::Error.
                 classify_decrypt_error(openpgp::anyhow::Error::from(io_err))
             }
-            CopyError::Write(io_err) => PgpError::FileIoError {
-                reason: format!("Write failed: {io_err}"),
-            },
+            CopyError::Write(io_err) => {
+                classify_write_io_error(&io_err, |io_err| PgpError::FileIoError {
+                    reason: format!("Write failed: {io_err}"),
+                })
+            }
             CopyError::Cancelled => PgpError::OperationCancelled,
             CopyError::OutputCeilingExceeded => PgpError::CorruptData {
                 reason: "Decrypted output exceeds the maximum expansion for this input \
@@ -778,11 +809,11 @@ where
     }
 
     // Flush temp file
-    temp_file.sync_all().map_err(|e| {
+    temp_file.sync_all().map_err(|error| {
         secure_delete_file(temp_path_ref);
-        PgpError::FileIoError {
-            reason: format!("Sync failed: {e}"),
-        }
+        classify_write_io_error(&error, |error| PgpError::FileIoError {
+            reason: format!("Sync failed: {error}"),
+        })
     })?;
     drop(temp_file);
 
@@ -974,23 +1005,12 @@ pub fn verify_detached_file_detailed(
         })?
         .with_policy(&policy, None, helper);
 
-    // Match the current early-setup grading: no observed per-signature results means
-    // an empty detailed array and an Expired/Invalid summary.
-    let mut verifier = match verifier_result {
-        Ok(v) => v,
-        Err(e) => {
-            let summary_state = if is_expired_error(&e) {
-                SignatureVerificationState::Expired
-            } else {
-                SignatureVerificationState::Invalid
-            };
-            return Ok(FileVerifyDetailedResult {
-                summary_state,
-                summary_entry_index: None,
-                signatures: Vec::new(),
-            });
-        }
-    };
+    // A verifier that cannot be constructed has checked nothing, so it has no
+    // verdict to report. This is the error channel's business, not the
+    // graded-result channel's.
+    let mut verifier = verifier_result.map_err(|error| PgpError::VerificationSetupFailed {
+        reason: format!("Could not start verifying the detached signature: {error}"),
+    })?;
 
     let data_file = File::open(data_path).map_err(|e| PgpError::FileIoError {
         reason: format!("Cannot open data file '{}': {e}", data_path),
@@ -1238,5 +1258,35 @@ mod tests {
         // output_len > reported_total.
         assert_eq!(reporter.last_processed.load(Ordering::SeqCst), reported_total);
         assert_eq!(reporter.last_total.load(Ordering::SeqCst), reported_total);
+    }
+
+    /// The disk-full mapping rests on ENOSPC classifying as `StorageFull`.
+    /// If the platform mapping ever changed, out-of-space would silently fall
+    /// back to a raw OS error string in the UI.
+    #[test]
+    fn enospc_classifies_as_storage_full() {
+        const ENOSPC: i32 = 28;
+        let error = std::io::Error::from_raw_os_error(ENOSPC);
+        assert_eq!(error.kind(), std::io::ErrorKind::StorageFull);
+
+        let mapped = classify_write_io_error(&error, |error| PgpError::FileIoError {
+            reason: format!("Write failed: {error}"),
+        });
+        assert!(matches!(mapped, PgpError::StorageFull));
+        assert!(is_storage_full_error(&openpgp::anyhow::Error::from(
+            std::io::Error::from_raw_os_error(ENOSPC)
+        )));
+    }
+
+    #[test]
+    fn other_write_errors_keep_their_caller_category() {
+        let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped = classify_write_io_error(&error, |error| PgpError::EncryptionFailed {
+            reason: format!("Write failed: {error}"),
+        });
+        assert!(matches!(mapped, PgpError::EncryptionFailed { .. }));
+        assert!(!is_storage_full_error(&openpgp::anyhow::Error::from(
+            std::io::Error::from(std::io::ErrorKind::PermissionDenied)
+        )));
     }
 }

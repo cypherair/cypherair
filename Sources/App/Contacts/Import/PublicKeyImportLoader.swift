@@ -47,7 +47,7 @@ struct PublicKeyImportLoader {
 
         let qrStrings = try await qrService.decodeQRCodes(from: ciImage)
 
-        guard let urlString = qrStrings.first(where: { $0.hasPrefix("cypherair://") }),
+        guard let urlString = qrStrings.first(where: { $0.hasPrefix(CypherAirImportURL.schemePrefix) }),
               let url = URL(string: urlString) else {
             throw CypherAirError.invalidQRCode
         }

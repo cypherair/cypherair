@@ -194,8 +194,9 @@ fn test_export_legacy_uses_iterated_salted() {
     let s2k_info = keys::parse_s2k_params(&exported).expect("S2K params should parse");
 
     assert_eq!(
-        s2k_info.s2k_type, "iterated-salted",
-        "Legacy export must use Iterated+Salted S2K, not {}",
+        s2k_info.s2k_type,
+        keys::S2kType::IteratedSalted,
+        "Legacy export must use Iterated+Salted S2K, not {:?}",
         s2k_info.s2k_type
     );
     assert_eq!(

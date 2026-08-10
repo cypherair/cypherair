@@ -4,8 +4,10 @@ use crate::keys::{
 };
 
 /// PGP error types exposed across the FFI boundary.
-/// Each variant maps 1:1 to a Swift `CypherAirError` enum case (via UniFFI-generated `PgpError`).
-/// See PRD Section 4.7 for user-facing error messages.
+///
+/// Each variant is normalized into a Swift `CypherAirError` case at the
+/// `Services/FFI` adapter boundary; the user-facing copy for that case is owned
+/// by the String Catalog, not by these messages.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum PgpError {
     /// Key generation failed.
@@ -17,12 +19,11 @@ pub enum PgpError {
     InvalidKeyData { reason: String },
 
     /// No matching secret key found for decryption.
-    /// PRD: "Not addressed to your identities."
     #[error("No matching key found for decryption")]
     NoMatchingKey,
 
     /// AEAD authentication failed — message may have been tampered with.
-    /// PRD: "May have been tampered with." HARD-FAIL: never show partial plaintext.
+    /// HARD-FAIL: never show partial plaintext.
     #[error("AEAD authentication failed — message may have been tampered with")]
     AeadAuthenticationFailed,
 
@@ -31,33 +32,34 @@ pub enum PgpError {
     #[error("Message integrity check failed — message may have been tampered with")]
     IntegrityCheckFailed,
 
-    /// Signature verification failed.
-    /// PRD: "Content may have been modified."
+    /// Signature verification failed — a cryptographic verdict.
     #[error("Signature verification failed")]
     BadSignature,
 
+    /// The verification machinery could not be started, so no signature was
+    /// ever checked. Distinct from `BadSignature` on purpose: a failure to
+    /// *perform* a check must never be presented as a statement about the
+    /// signature.
+    #[error("Signature verification could not be performed: {reason}")]
+    VerificationSetupFailed { reason: String },
+
     /// Signer's key is not in contacts.
-    /// PRD: "Signer not in Contacts."
     #[error("Unknown signer")]
     UnknownSigner,
 
     /// The key has expired.
-    /// PRD: "Ask sender to update."
     #[error("Key has expired")]
     KeyExpired,
 
     /// Unsupported algorithm or message format.
-    /// PRD: "Method not supported."
     #[error("Unsupported algorithm: {algo}")]
     UnsupportedAlgorithm { algo: String },
 
     /// Corrupt or unparseable data.
-    /// PRD: "Damaged. Ask sender to resend."
     #[error("Corrupt data: {reason}")]
     CorruptData { reason: String },
 
     /// Wrong passphrase for key import/unlock.
-    /// PRD: "Re-enter backup passphrase."
     #[error("Wrong passphrase")]
     WrongPassphrase,
 
@@ -102,7 +104,6 @@ pub enum PgpError {
     S2kError { reason: String },
 
     /// Argon2id memory requirement exceeds device capacity.
-    /// PRD: "This key uses memory-intensive protection that exceeds this device's capacity."
     #[error("Argon2id memory requirement ({required_mb} MB) exceeds device capacity")]
     Argon2idMemoryExceeded { required_mb: u64 },
 
@@ -118,9 +119,15 @@ pub enum PgpError {
     #[error("Operation cancelled")]
     OperationCancelled,
 
-    /// File I/O error (path not found, permission denied, disk full, etc.).
+    /// File I/O error (path not found, permission denied, etc.).
     #[error("File I/O error: {reason}")]
     FileIoError { reason: String },
+
+    /// A write ran out of space on the destination volume. Its own variant so
+    /// the app can present the out-of-space message it already shows when the
+    /// pre-flight check refuses, instead of a raw OS error string.
+    #[error("Not enough free space to write the output file")]
+    StorageFull,
 
     /// Public key data is too large to encode as a QR code.
     /// The QR code standard has a maximum capacity; keys with many accumulated

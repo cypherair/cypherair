@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 /// Tests for QRService — SECURITY-CRITICAL: validates parsing of untrusted external input.
-/// QRService.parseImportURL() processes cypherair:// URLs from QR codes.
+/// QRService.parseImportURL() processes cypherairx:// URLs from QR codes.
 /// These tests verify rejection of malformed, malicious, and invalid input.
 final class QRServiceTests: XCTestCase {
 
@@ -146,7 +146,7 @@ final class QRServiceTests: XCTestCase {
     // MARK: - Negative: Wrong Host/Path
 
     func test_parseImportURL_wrongHost_throwsInvalidQRCode() {
-        let url = URL(string: "cypherair://export/v1/AAAA")!
+        let url = URL(string: "cypherairx://export/v1/AAAA")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
             guard let cypherError = error as? CypherAirError else {
@@ -163,7 +163,7 @@ final class QRServiceTests: XCTestCase {
     // MARK: - Negative: Unsupported Version
 
     func test_parseImportURL_unsupportedVersion_v2_throwsUnsupportedQRVersion() {
-        let url = URL(string: "cypherair://import/v2/AAAA")!
+        let url = URL(string: "cypherairx://import/v2/AAAA")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
             guard let cypherError = error as? CypherAirError else {
@@ -183,7 +183,7 @@ final class QRServiceTests: XCTestCase {
         // URL with valid scheme/host/version but no base64 payload.
         // Empty base64 decodes to empty bytes → Cert::from_bytes fails →
         // QRService wraps as CypherAirError.invalidQRCode.
-        let url = URL(string: "cypherair://import/v1/")!
+        let url = URL(string: "cypherairx://import/v1/")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
             guard let cypherError = error as? CypherAirError else {
@@ -198,7 +198,7 @@ final class QRServiceTests: XCTestCase {
     func test_parseImportURL_invalidBase64_throwsInvalidQRCode() {
         // Invalid base64url characters (contains !, @, #).
         // Rust base64 decode fails → QRService wraps as CypherAirError.invalidQRCode.
-        let url = URL(string: "cypherair://import/v1/!!!@@@###")!
+        let url = URL(string: "cypherairx://import/v1/!!!@@@###")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
             guard let cypherError = error as? CypherAirError else {
@@ -214,7 +214,7 @@ final class QRServiceTests: XCTestCase {
         // Valid base64url encoding of "Hello, World!" — not a PGP key.
         // Base64 decode succeeds but Cert::from_bytes fails →
         // QRService wraps as CypherAirError.invalidQRCode.
-        let url = URL(string: "cypherair://import/v1/SGVsbG8sIFdvcmxkIQ")!
+        let url = URL(string: "cypherairx://import/v1/SGVsbG8sIFdvcmxkIQ")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
             guard let cypherError = error as? CypherAirError else {
@@ -265,7 +265,7 @@ final class QRServiceTests: XCTestCase {
 
     func test_parseImportURL_exceedsMaxLength_throwsInvalidQRCode() {
         // Construct a URL that exceeds the 4096-character limit
-        let prefix = "cypherair://import/v1/"
+        let prefix = "cypherairx://import/v1/"
         let padding = String(repeating: "A", count: 4097 - prefix.count)
         let url = URL(string: prefix + padding)!
 
@@ -284,7 +284,7 @@ final class QRServiceTests: XCTestCase {
     func test_parseImportURL_atMaxLength_doesNotThrowLengthError() {
         // Construct a URL at exactly 4096 characters — should NOT be rejected by length guard.
         // The error should come from Rust parsing (not the Swift-side length guard).
-        let prefix = "cypherair://import/v1/"
+        let prefix = "cypherairx://import/v1/"
         let padding = String(repeating: "A", count: 4096 - prefix.count)
         let url = URL(string: prefix + padding)!
 

@@ -8,6 +8,7 @@ extension SignatureVerification {
         case .invalid: "xmark.seal.fill"
         case .signerCertificateUnavailable: "person.crop.circle.badge.questionmark"
         case .contactsContextUnavailable: "lock.badge.clock"
+        case .unverifiable: "questionmark.circle"
         case .notSigned: "minus.circle"
         case .expired: "clock.badge.exclamationmark"
         }
@@ -20,6 +21,7 @@ extension SignatureVerification {
         case .invalid: .red
         case .signerCertificateUnavailable: .orange
         case .contactsContextUnavailable: .orange
+        case .unverifiable: .orange
         case .notSigned: .secondary
         case .expired: .orange
         }
@@ -50,6 +52,11 @@ extension SignatureVerification {
             String(
                 localized: "signature.contactsContextUnavailable",
                 defaultValue: "Contacts verification context is unavailable — signer cannot be verified yet"
+            )
+        case .unverifiable:
+            String(
+                localized: "signature.unverifiable",
+                defaultValue: "This signature could not be checked — it is damaged or uses a format this app does not support"
             )
         case .notSigned:
             String(localized: "signature.none", defaultValue: "This message was not signed")

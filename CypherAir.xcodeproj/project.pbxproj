@@ -372,6 +372,7 @@
 				Security/SecureEnclaveManageable.swift,
 				Security/SecureEnclaveManager.swift,
 				Security/SystemSecureEnclaveCustodyKeyStore.swift,
+				Services/Common/CypherAirImportURL.swift,
 				Services/Common/DiskSpaceChecker.swift,
 				Services/Common/FileProgressReporter.swift,
 				Services/Common/ImportablePublicCertificateInspection.swift,

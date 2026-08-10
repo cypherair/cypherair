@@ -4,22 +4,10 @@ use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
 use crate::decrypt::{
-    is_expired_error, parse_verification_certs, read_capped_zeroizing,
-    MAX_IN_MEMORY_PLAINTEXT_BYTES,
+    parse_verification_certs, read_capped_zeroizing, MAX_IN_MEMORY_PLAINTEXT_BYTES,
 };
 use crate::error::PgpError;
-use crate::signature_details::{
-    SignatureCollector, SignatureVerificationState, SummaryFoldMode, VerifyDetailedResult,
-};
-
-fn empty_detailed_result(summary_state: SignatureVerificationState) -> VerifyDetailedResult {
-    VerifyDetailedResult {
-        summary_state,
-        summary_entry_index: None,
-        signatures: Vec::new(),
-        content: None,
-    }
-}
+use crate::signature_details::{SignatureCollector, SummaryFoldMode, VerifyDetailedResult};
 
 /// Verify a cleartext-signed message and preserve detailed per-signature results.
 pub fn verify_cleartext_detailed(
@@ -36,19 +24,12 @@ pub fn verify_cleartext_detailed(
         })?
         .with_policy(&policy, None, helper);
 
-    // Match the current early-setup grading: no observed per-signature results means
-    // an empty detailed array and an Expired/Invalid summary with no content.
-    let mut verifier = match verifier_result {
-        Ok(v) => v,
-        Err(e) => {
-            let summary_state = if is_expired_error(&e) {
-                SignatureVerificationState::Expired
-            } else {
-                SignatureVerificationState::Invalid
-            };
-            return Ok(empty_detailed_result(summary_state));
-        }
-    };
+    // A verifier that cannot be constructed has checked nothing, so it has no
+    // verdict to report. This is the error channel's business, not the
+    // graded-result channel's.
+    let mut verifier = verifier_result.map_err(|error| PgpError::VerificationSetupFailed {
+        reason: format!("Could not start verifying the signed message: {error}"),
+    })?;
 
     // Sequoia transparently decompresses an embedded CompressedData packet
     // while streaming, so a few-KB signed message can expand without bound.

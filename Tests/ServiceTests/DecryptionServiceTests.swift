@@ -1275,6 +1275,8 @@ final class DecryptionServiceTests: XCTestCase {
             return .invalid
         case .expired:
             return .expired
+        case .unverifiable:
+            return .unverifiable
         }
     }
 

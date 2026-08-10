@@ -5493,6 +5493,22 @@
         }
       }
     },
+    "error.storageFull" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough disk space. The device ran out of space while writing the file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "磁盘空间不足。写入文件时设备已无可用空间。"
+          }
+        }
+      }
+    },
     "error.title" : {
       "localizations" : {
         "en" : {
@@ -5553,6 +5569,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此二维码需要更新版本的 App。请更新。"
+          }
+        }
+      }
+    },
+    "error.verificationUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This signature could not be checked. The signature data is damaged or uses a format this app does not support."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法校验此签名。签名数据已损坏，或使用了本应用不支持的格式。"
           }
         }
       }
@@ -14321,6 +14353,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "签名者证书不可用——无法验证签名"
+          }
+        }
+      }
+    },
+    "signature.unverifiable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This signature could not be checked — it is damaged or uses a format this app does not support"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法校验此签名——签名已损坏或使用了本应用不支持的格式"
           }
         }
       }

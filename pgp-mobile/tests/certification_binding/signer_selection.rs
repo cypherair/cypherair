@@ -41,6 +41,35 @@ fn test_verify_direct_key_signature_issuer_guided_rejects_signing_only_subkey() 
     assert_eq!(without_issuer_result.signing_key_fingerprint, None);
 }
 
+/// A revoked key must not produce a new vouch, whichever custody path holds its
+/// secret. The device-bound path has always refused; the software path used to
+/// take the primary key with secret parts and sign with it.
+#[test]
+fn test_generate_user_id_certification_with_revoked_signer_is_refused() {
+    let signer = revoked_signer_secret_cert(
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        "RevokedCertifier",
+    );
+    let target = generated_key(KeySuite::Ed25519LegacyCurve25519Legacy, "RevokedCertifierTarget");
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
+
+    let result = cert_signature::generate_user_id_certification_by_selector(
+        &signer,
+        &target.public_key_data,
+        &selector,
+        CertificationKind::Positive,
+    );
+
+    match result {
+        Err(PgpError::SigningFailed { reason }) => assert!(
+            reason.contains("revoked"),
+            "refusal must name revocation, got: {reason}"
+        ),
+        other => panic!("certifying with a revoked key must fail, got: {other:?}"),
+    }
+}
+
 #[test]
 fn test_generate_user_id_certification_prefers_primary_over_certification_subkey() {
     let (signer_cert, _) = CertBuilder::new()

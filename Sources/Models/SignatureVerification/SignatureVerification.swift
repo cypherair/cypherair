@@ -2,6 +2,9 @@ import Foundation
 
 /// App-level signature verification result for display in the UI.
 struct SignatureVerification {
+    /// Only `verified`, `invalid`, and `expired` are verdicts — statements about
+    /// a signature that was actually checked. The rest say the check did not
+    /// happen, and must never be presented as claims about the content.
     enum VerificationState: Equatable {
         case notSigned
         case verified
@@ -9,6 +12,9 @@ struct SignatureVerification {
         case expired
         case signerCertificateUnavailable
         case contactsContextUnavailable
+        /// The signature packet itself could not be read: malformed, of an
+        /// unknown type, or rejected without a verdict.
+        case unverifiable
     }
 
     enum SignerSource: Equatable {
@@ -104,7 +110,7 @@ struct SignatureVerification {
     var isWarning: Bool {
         switch verificationState {
         case .invalid, .expired, .signerCertificateUnavailable,
-             .contactsContextUnavailable:
+             .contactsContextUnavailable, .unverifiable:
             true
         case .verified, .notSigned:
             false

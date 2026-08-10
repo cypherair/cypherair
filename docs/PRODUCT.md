@@ -76,4 +76,4 @@ Decided but not shipped; nothing here describes current behavior:
 
 - **Unified screen lifecycle rule:** hide keeps everything and operations continue; destroy cancels and cleans; relock clears everything on every screen.
 - **Contacts redesign:** person/certificate membership model, reversible merge with undo, detachable keys, withdrawable manual verification, and lifecycle-refresh (which is what would make expiry states re-evaluated and representable).
-- **Open With handler** with explicit consent (§3) and the `cypherairx://` scheme rename.
+- **Open With handler** with explicit consent (§3).

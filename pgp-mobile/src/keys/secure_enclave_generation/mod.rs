@@ -79,6 +79,21 @@ pub fn generate_secure_enclave_public_certificate(
             .set_key_validity_period(validity)
             .map_err(|error| PgpError::KeyGenerationFailed {
                 reason: format!("Failed to set key validity period: {error}"),
+            })?
+            // Correspondents choose what to send us from these subpackets. Without
+            // them a sender falls back to the RFC defaults (TripleDES, SHA-1), so
+            // device-bound certificates advertise the same preferences the portable
+            // and composite-custody paths do.
+            .set_preferred_symmetric_algorithms(vec![
+                SymmetricAlgorithm::AES256,
+                SymmetricAlgorithm::AES128,
+            ])
+            .map_err(|error| PgpError::KeyGenerationFailed {
+                reason: format!("Failed to set symmetric preferences: {error}"),
+            })?
+            .set_preferred_hash_algorithms(vec![HashAlgorithm::SHA512, HashAlgorithm::SHA256])
+            .map_err(|error| PgpError::KeyGenerationFailed {
+                reason: format!("Failed to set hash preferences: {error}"),
             })?;
     user_id_builder = match input.version {
         SecureEnclaveCertificateVersion::V4 => user_id_builder

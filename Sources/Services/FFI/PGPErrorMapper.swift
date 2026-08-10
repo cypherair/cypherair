@@ -90,6 +90,8 @@ enum PGPErrorMapper {
             return .keyExpired
         case .BadSignature:
             return .badSignature
+        case .VerificationSetupFailed(let reason):
+            return .verificationUnavailable(reason: reason)
         case .UnknownSigner:
             return .unknownSigner
         case .CorruptData(let reason):
@@ -130,6 +132,8 @@ enum PGPErrorMapper {
             return .operationCancelled
         case .FileIoError(let reason):
             return .fileIoError(reason: reason)
+        case .StorageFull:
+            return .storageFull
         case .KeyTooLargeForQr:
             return .keyTooLargeForQr
         }

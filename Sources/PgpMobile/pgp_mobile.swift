@@ -2016,7 +2016,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
 
     /**
      * Encode a public key for QR code URL scheme.
-     * Format: cypherair://import/v1/<base64url, no padding>
+     * Format: cypherairx://import/v1/<base64url, no padding>
      *
      * SECURITY: Validates that the input is a valid OpenPGP public key and rejects
      * secret key material to prevent accidental private key leakage via QR codes.
@@ -2755,7 +2755,7 @@ open func discoverCertificateSelectors(certData: Data)throws  -> DiscoveredCerti
 
     /**
      * Encode a public key for QR code URL scheme.
-     * Format: cypherair://import/v1/<base64url, no padding>
+     * Format: cypherairx://import/v1/<base64url, no padding>
      *
      * SECURITY: Validates that the input is a valid OpenPGP public key and rejects
      * secret key material to prevent accidental private key leakage via QR codes.
@@ -5990,26 +5990,20 @@ public func FfiConverterTypePublicCertificateValidationResult_lower(_ value: Pub
 
 /**
  * S2K (String-to-Key) parameters extracted from a passphrase-protected key.
- * Used by Swift side to check memory requirements before importing.
+ * The app reads these to check the device's memory headroom before importing.
  */
 public struct S2kInfo: Equatable, Hashable {
+    public var s2kType: S2kType
     /**
-     * S2K type: "iterated-salted" for Portable Legacy, "argon2id" for Portable Modern · High, or "unknown".
-     */
-    public var s2kType: String
-    /**
-     * For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
+     * For Argon2id: memory requirement in KiB (2^encoded_m). 0 otherwise.
      */
     public var memoryKib: UInt64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(
+    public init(s2kType: S2kType,
         /**
-         * S2K type: "iterated-salted" for Portable Legacy, "argon2id" for Portable Modern · High, or "unknown".
-         */s2kType: String,
-        /**
-         * For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
+         * For Argon2id: memory requirement in KiB (2^encoded_m). 0 otherwise.
          */memoryKib: UInt64) {
         self.s2kType = s2kType
         self.memoryKib = memoryKib
@@ -6031,13 +6025,13 @@ public struct FfiConverterTypeS2kInfo: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> S2kInfo {
         return
             try S2kInfo(
-                s2kType: FfiConverterString.read(from: &buf),
+                s2kType: FfiConverterTypeS2kType.read(from: &buf),
                 memoryKib: FfiConverterUInt64.read(from: &buf)
         )
     }
 
     public static func write(_ value: S2kInfo, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.s2kType, into: &buf)
+        FfiConverterTypeS2kType.write(value.s2kType, into: &buf)
         FfiConverterUInt64.write(value.memoryKib, into: &buf)
     }
 }
@@ -7467,6 +7461,10 @@ public enum DetailedSignatureStatus: Equatable, Hashable {
     case unknownSigner
     case bad
     case expired
+    /**
+     * See `SignatureVerificationState::Unverifiable`.
+     */
+    case unverifiable
 
 
 
@@ -7496,6 +7494,8 @@ public struct FfiConverterTypeDetailedSignatureStatus: FfiConverterRustBuffer {
 
         case 4: return .expired
 
+        case 5: return .unverifiable
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -7518,6 +7518,10 @@ public struct FfiConverterTypeDetailedSignatureStatus: FfiConverterRustBuffer {
 
         case .expired:
             writeInt(&buf, Int32(4))
+
+
+        case .unverifiable:
+            writeInt(&buf, Int32(5))
 
         }
     }
@@ -8843,8 +8847,10 @@ public func FfiConverterTypePasswordMessageFormat_lower(_ value: PasswordMessage
 
 /**
  * PGP error types exposed across the FFI boundary.
- * Each variant maps 1:1 to a Swift `CypherAirError` enum case (via UniFFI-generated `PgpError`).
- * See PRD Section 4.7 for user-facing error messages.
+ *
+ * Each variant is normalized into a Swift `CypherAirError` case at the
+ * `Services/FFI` adapter boundary; the user-facing copy for that case is owned
+ * by the String Catalog, not by these messages.
  */
 public
 enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
@@ -8863,12 +8869,11 @@ enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
     )
     /**
      * No matching secret key found for decryption.
-     * PRD: "Not addressed to your identities."
      */
     case NoMatchingKey
     /**
      * AEAD authentication failed — message may have been tampered with.
-     * PRD: "May have been tampered with." HARD-FAIL: never show partial plaintext.
+     * HARD-FAIL: never show partial plaintext.
      */
     case AeadAuthenticationFailed
     /**
@@ -8877,35 +8882,37 @@ enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
      */
     case IntegrityCheckFailed
     /**
-     * Signature verification failed.
-     * PRD: "Content may have been modified."
+     * Signature verification failed — a cryptographic verdict.
      */
     case BadSignature
     /**
+     * The verification machinery could not be started, so no signature was
+     * ever checked. Distinct from `BadSignature` on purpose: a failure to
+     * *perform* a check must never be presented as a statement about the
+     * signature.
+     */
+    case VerificationSetupFailed(reason: String
+    )
+    /**
      * Signer's key is not in contacts.
-     * PRD: "Signer not in Contacts."
      */
     case UnknownSigner
     /**
      * The key has expired.
-     * PRD: "Ask sender to update."
      */
     case KeyExpired
     /**
      * Unsupported algorithm or message format.
-     * PRD: "Method not supported."
      */
     case UnsupportedAlgorithm(algo: String
     )
     /**
      * Corrupt or unparseable data.
-     * PRD: "Damaged. Ask sender to resend."
      */
     case CorruptData(reason: String
     )
     /**
      * Wrong passphrase for key import/unlock.
-     * PRD: "Re-enter backup passphrase."
      */
     case WrongPassphrase
     /**
@@ -8950,7 +8957,6 @@ enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
     )
     /**
      * Argon2id memory requirement exceeds device capacity.
-     * PRD: "This key uses memory-intensive protection that exceeds this device's capacity."
      */
     case Argon2idMemoryExceeded(requiredMb: UInt64
     )
@@ -8969,10 +8975,16 @@ enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
      */
     case OperationCancelled
     /**
-     * File I/O error (path not found, permission denied, disk full, etc.).
+     * File I/O error (path not found, permission denied, etc.).
      */
     case FileIoError(reason: String
     )
+    /**
+     * A write ran out of space on the destination volume. Its own variant so
+     * the app can present the out-of-space message it already shows when the
+     * pre-flight check refuses, instead of a raw OS error string.
+     */
+    case StorageFull
     /**
      * Public key data is too large to encode as a QR code.
      * The QR code standard has a maximum capacity; keys with many accumulated
@@ -9019,53 +9031,57 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
         case 4: return .AeadAuthenticationFailed
         case 5: return .IntegrityCheckFailed
         case 6: return .BadSignature
-        case 7: return .UnknownSigner
-        case 8: return .KeyExpired
-        case 9: return .UnsupportedAlgorithm(
+        case 7: return .VerificationSetupFailed(
+            reason: try FfiConverterString.read(from: &buf)
+            )
+        case 8: return .UnknownSigner
+        case 9: return .KeyExpired
+        case 10: return .UnsupportedAlgorithm(
             algo: try FfiConverterString.read(from: &buf)
             )
-        case 10: return .CorruptData(
+        case 11: return .CorruptData(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 11: return .WrongPassphrase
-        case 12: return .EncryptionFailed(
+        case 12: return .WrongPassphrase
+        case 13: return .EncryptionFailed(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 13: return .SigningFailed(
+        case 14: return .SigningFailed(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .ExternalP256SigningFailed(
+        case 15: return .ExternalP256SigningFailed(
             category: try FfiConverterTypeExternalP256SigningFailureCategory.read(from: &buf)
             )
-        case 15: return .ExternalP256KeyAgreementFailed(
+        case 16: return .ExternalP256KeyAgreementFailed(
             category: try FfiConverterTypeExternalP256KeyAgreementFailureCategory.read(from: &buf)
             )
-        case 16: return .ExternalCompositeSigningFailed(
+        case 17: return .ExternalCompositeSigningFailed(
             category: try FfiConverterTypeExternalCompositeSigningFailureCategory.read(from: &buf)
             )
-        case 17: return .ExternalCompositeKeyAgreementFailed(
+        case 18: return .ExternalCompositeKeyAgreementFailed(
             category: try FfiConverterTypeExternalCompositeKeyAgreementFailureCategory.read(from: &buf)
             )
-        case 18: return .ArmorError(
+        case 19: return .ArmorError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .S2kError(
+        case 20: return .S2kError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .Argon2idMemoryExceeded(
+        case 21: return .Argon2idMemoryExceeded(
             requiredMb: try FfiConverterUInt64.read(from: &buf)
             )
-        case 21: return .RevocationError(
+        case 22: return .RevocationError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 22: return .InternalError(
+        case 23: return .InternalError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 23: return .OperationCancelled
-        case 24: return .FileIoError(
+        case 24: return .OperationCancelled
+        case 25: return .FileIoError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 25: return .KeyTooLargeForQr(
+        case 26: return .StorageFull
+        case 27: return .KeyTooLargeForQr(
             sizeBytes: try FfiConverterUInt64.read(from: &buf),
             maxBytes: try FfiConverterUInt64.read(from: &buf)
             )
@@ -9107,94 +9123,103 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(6))
 
 
-        case .UnknownSigner:
+        case let .VerificationSetupFailed(reason):
             writeInt(&buf, Int32(7))
+            FfiConverterString.write(reason, into: &buf)
 
 
-        case .KeyExpired:
+        case .UnknownSigner:
             writeInt(&buf, Int32(8))
 
 
-        case let .UnsupportedAlgorithm(algo):
+        case .KeyExpired:
             writeInt(&buf, Int32(9))
+
+
+        case let .UnsupportedAlgorithm(algo):
+            writeInt(&buf, Int32(10))
             FfiConverterString.write(algo, into: &buf)
 
 
         case let .CorruptData(reason):
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(11))
             FfiConverterString.write(reason, into: &buf)
 
 
         case .WrongPassphrase:
-            writeInt(&buf, Int32(11))
+            writeInt(&buf, Int32(12))
 
 
         case let .EncryptionFailed(reason):
-            writeInt(&buf, Int32(12))
-            FfiConverterString.write(reason, into: &buf)
-
-
-        case let .SigningFailed(reason):
             writeInt(&buf, Int32(13))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case let .ExternalP256SigningFailed(category):
+        case let .SigningFailed(reason):
             writeInt(&buf, Int32(14))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case let .ExternalP256SigningFailed(category):
+            writeInt(&buf, Int32(15))
             FfiConverterTypeExternalP256SigningFailureCategory.write(category, into: &buf)
 
 
         case let .ExternalP256KeyAgreementFailed(category):
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(16))
             FfiConverterTypeExternalP256KeyAgreementFailureCategory.write(category, into: &buf)
 
 
         case let .ExternalCompositeSigningFailed(category):
-            writeInt(&buf, Int32(16))
+            writeInt(&buf, Int32(17))
             FfiConverterTypeExternalCompositeSigningFailureCategory.write(category, into: &buf)
 
 
         case let .ExternalCompositeKeyAgreementFailed(category):
-            writeInt(&buf, Int32(17))
+            writeInt(&buf, Int32(18))
             FfiConverterTypeExternalCompositeKeyAgreementFailureCategory.write(category, into: &buf)
 
 
         case let .ArmorError(reason):
-            writeInt(&buf, Int32(18))
-            FfiConverterString.write(reason, into: &buf)
-
-
-        case let .S2kError(reason):
             writeInt(&buf, Int32(19))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case let .Argon2idMemoryExceeded(requiredMb):
+        case let .S2kError(reason):
             writeInt(&buf, Int32(20))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case let .Argon2idMemoryExceeded(requiredMb):
+            writeInt(&buf, Int32(21))
             FfiConverterUInt64.write(requiredMb, into: &buf)
 
 
         case let .RevocationError(reason):
-            writeInt(&buf, Int32(21))
-            FfiConverterString.write(reason, into: &buf)
-
-
-        case let .InternalError(reason):
             writeInt(&buf, Int32(22))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case .OperationCancelled:
+        case let .InternalError(reason):
             writeInt(&buf, Int32(23))
-
-
-        case let .FileIoError(reason):
-            writeInt(&buf, Int32(24))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case let .KeyTooLargeForQr(sizeBytes,maxBytes):
+        case .OperationCancelled:
+            writeInt(&buf, Int32(24))
+
+
+        case let .FileIoError(reason):
             writeInt(&buf, Int32(25))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case .StorageFull:
+            writeInt(&buf, Int32(26))
+
+
+        case let .KeyTooLargeForQr(sizeBytes,maxBytes):
+            writeInt(&buf, Int32(27))
             FfiConverterUInt64.write(sizeBytes, into: &buf)
             FfiConverterUInt64.write(maxBytes, into: &buf)
 
@@ -9216,6 +9241,95 @@ public func FfiConverterTypePgpError_lift(_ buf: RustBuffer) throws -> PgpError 
 public func FfiConverterTypePgpError_lower(_ value: PgpError) -> RustBuffer {
     return FfiConverterTypePgpError.lower(value)
 }
+
+
+/**
+ * How a passphrase-protected key derives its unlock key.
+ *
+ * A real enum rather than a string: the app reads this to decide whether the
+ * memory guard applies at all, and a rename on either side has to stop
+ * compiling rather than silently disable the guard.
+ */
+
+public enum S2kType: Equatable, Hashable {
+
+    /**
+     * RFC 9580 Argon2id — memory-hard, and the only kind with a memory cost.
+     */
+    case argon2id
+    /**
+     * RFC 4880 iterated-and-salted, as used by Portable Legacy.
+     */
+    case iteratedSalted
+    /**
+     * Any other S2K a certificate may carry.
+     */
+    case unknown
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension S2kType: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeS2kType: FfiConverterRustBuffer {
+    typealias SwiftType = S2kType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> S2kType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .argon2id
+
+        case 2: return .iteratedSalted
+
+        case 3: return .unknown
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: S2kType, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .argon2id:
+            writeInt(&buf, Int32(1))
+
+
+        case .iteratedSalted:
+            writeInt(&buf, Int32(2))
+
+
+        case .unknown:
+            writeInt(&buf, Int32(3))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeS2kType_lift(_ buf: RustBuffer) throws -> S2kType {
+    return try FfiConverterTypeS2kType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeS2kType_lower(_ value: S2kType) -> RustBuffer {
+    return FfiConverterTypeS2kType.lower(value)
+}
+
 
 
 /**
@@ -9295,6 +9409,10 @@ public func FfiConverterTypeSecureEnclaveCertificateVersion_lower(_ value: Secur
 
 /**
  * Certificate-backed verification state for a signature entry or summary.
+ *
+ * Only `Verified`, `Invalid`, and `Expired` are verdicts — statements about a
+ * signature the engine actually checked. The remaining states say the check
+ * did not happen, and must never be presented as claims about the content.
  */
 
 public enum SignatureVerificationState: Equatable, Hashable {
@@ -9304,6 +9422,12 @@ public enum SignatureVerificationState: Equatable, Hashable {
     case invalid
     case expired
     case signerCertificateUnavailable
+    /**
+     * A signature the engine could not check at all: its packet is malformed,
+     * its type is unknown, or verification reported a failure that carries no
+     * verdict.
+     */
+    case unverifiable
 
 
 
@@ -9335,6 +9459,8 @@ public struct FfiConverterTypeSignatureVerificationState: FfiConverterRustBuffer
 
         case 5: return .signerCertificateUnavailable
 
+        case 6: return .unverifiable
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -9361,6 +9487,10 @@ public struct FfiConverterTypeSignatureVerificationState: FfiConverterRustBuffer
 
         case .signerCertificateUnavailable:
             writeInt(&buf, Int32(5))
+
+
+        case .unverifiable:
+            writeInt(&buf, Int32(6))
 
         }
     }
@@ -9687,7 +9817,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_discover_certificate_selectors() != 34843) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 1608) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 51888) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 14997) {

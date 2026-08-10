@@ -15,6 +15,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.keyExpired", defaultValue: "This key has expired. Ask the sender to update their key.")
         case .badSignature:
             String(localized: "error.badSignature", defaultValue: "Signature verification failed. The content may have been modified.")
+        case .verificationUnavailable:
+            String(localized: "error.verificationUnavailable", defaultValue: "This signature could not be checked. The signature data is damaged or uses a format this app does not support.")
         case .unknownSigner:
             String(localized: "error.unknownSigner", defaultValue: "The signer is not in your contacts.")
         case .corruptData:
@@ -45,6 +47,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.operationCancelled", defaultValue: "Operation was cancelled.")
         case .fileIoError(let reason):
             String(localized: "error.fileIoError", defaultValue: "File operation failed: \(reason)")
+        case .storageFull:
+            String(localized: "error.storageFull", defaultValue: "Not enough disk space. The device ran out of space while writing the file.")
         case .keyOperationUnavailable(let category):
             Self.keyOperationUnavailableDescription(for: category)
         case .authenticationFailed:

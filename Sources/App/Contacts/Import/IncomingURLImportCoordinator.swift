@@ -29,7 +29,7 @@ final class IncomingURLImportCoordinator {
         _ url: URL,
         isTutorialPresentationActive: Bool
     ) {
-        guard url.scheme == "cypherair" else { return }
+        guard url.scheme == CypherAirImportURL.scheme else { return }
 
         guard !isTutorialPresentationActive else {
             isTutorialImportBlocked = true

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Displays the user's public key as a QR code for sharing.
-/// Format: cypherair://import/v1/<base64url binary key, no padding>
+/// Format: cypherairx://import/v1/<base64url binary key, no padding>
 struct QRDisplayView: View {
     @Environment(QRService.self) private var qrService
     let publicKeyData: Data
