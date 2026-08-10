@@ -284,13 +284,15 @@ final class TutorialSandboxContainer {
         try Task.checkCancellation()
         let contactService = self.contactService
         let wrappingRootKey = contactsWrappingRootKeyBox.key
+        let ownSignerKeys = keyManagement.keys
         let availability = await Task.detached {
             await contactService.openContactsAfterPostUnlock(
                 gateDecision: ContactsPostAuthGateDecision(
                     postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
                     frameworkState: .sessionAuthorized
                 ),
-                wrappingRootKey: { wrappingRootKey }
+                wrappingRootKey: { wrappingRootKey },
+                ownSignerKeys: ownSignerKeys
             )
         }.value
         try Task.checkCancellation()

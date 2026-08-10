@@ -380,4 +380,96 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [artifact.artifactId])
     }
+
+    /// The badge must say what the engine says about the signer *now*, not what
+    /// it said when the certification was saved.
+    func test_openContacts_certificationBadgeFollowsCurrentSignerVerdict() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsCertificationRevalidation")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Revalidated Contact",
+            email: "revalidated@example.invalid",
+            expirySeconds: nil,
+            suite: .ed25519LegacyCurve25519Legacy
+        )
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let keyRecord = try XCTUnwrap(
+            service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
+        )
+        _ = try service.saveCertificationArtifact(
+            try await makeVerifiedCertificationArtifact(
+                service: service,
+                keyRecord: keyRecord,
+                exportFilename: "artifact-revalidation.asc"
+            )
+        )
+        let signer = try XCTUnwrap(certificationSignerKeys.last)
+        XCTAssertEqual(
+            service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            .certified
+        )
+
+        // The signer is no longer among the keys this device holds. The vouch
+        // cannot be checked, so the badge must stop asserting it — without
+        // claiming the certification is invalid.
+        try await service.relockProtectedData()
+        let withoutSigner = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory,
+            ownSignerKeys: []
+        )
+        XCTAssertEqual(
+            withoutSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            .revalidationNeeded
+        )
+
+        // The signer is available again and still sound: the verdict is retaken
+        // and the badge returns rather than staying stuck at its worst answer.
+        try await withoutSigner.service.relockProtectedData()
+        let withSigner = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory,
+            ownSignerKeys: [signer]
+        )
+        XCTAssertEqual(
+            withSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            .certified
+        )
+
+        // The signer has been revoked since the certification was cached. The
+        // target certificate is byte-for-byte what it always was, so nothing
+        // keyed on the target digest can notice; only re-asking the engine does.
+        var revokedSigner = signer
+        revokedSigner.publicKeyData = signer.publicKeyData + signer.revocationCert
+        XCTAssertTrue(
+            try PGPContactImportAdapter(engine: engine)
+                .validateImportablePublicCertificate(revokedSigner.publicKeyData)
+                .metadata.isRevoked,
+            "The revoked-signer fixture must actually read as revoked"
+        )
+
+        try await withSigner.service.relockProtectedData()
+        let afterRevocation = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory,
+            ownSignerKeys: [revokedSigner]
+        )
+        XCTAssertEqual(
+            afterRevocation.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            .invalidOrStale
+        )
+        let revalidatedArtifact = try XCTUnwrap(
+            afterRevocation.service.certificationArtifacts(for: keyRecord.keyId).first
+        )
+        XCTAssertEqual(revalidatedArtifact.validationStatus, .invalidOrStale)
+        XCTAssertEqual(
+            revalidatedArtifact.signerPrimaryFingerprint,
+            signer.fingerprint,
+            "A demotion must keep the signer attribution the next unlock needs to re-resolve it"
+        )
+    }
 }

@@ -78,6 +78,9 @@ final class SelfTestServiceTests: XCTestCase {
             expectedCount,
             "Should have \(expectedCount) total test results"
         )
+        for result in results where !result.passed {
+            XCTFail("\(result.suite.map(String.init(describing:)) ?? "General") — \(result.name): \(result.message)")
+        }
 
         let report = try XCTUnwrap(selfTestService.latestReport)
         XCTAssertTrue(

@@ -57,7 +57,6 @@ enum PGPCertificateSelectionAdapter {
         )
     }
 
-    @concurrent
     static func verifyUserIdBindingSignature(
         engine: PgpEngine,
         signature: Data,
@@ -65,10 +64,31 @@ enum PGPCertificateSelectionAdapter {
         selectedUserId: UserIdSelectionOption,
         candidateSigners: [Data]
     ) async throws -> CertificateSignatureResult {
-        try engine.verifyUserIdBindingSignatureBySelector(
+        try await verifyUserIdBindingSignature(
+            engine: engine,
             signature: signature,
             targetCert: targetCert,
             userIdSelector: userIdSelectorInput(for: selectedUserId),
+            candidateSigners: candidateSigners
+        )
+    }
+
+    /// By-selector verification for callers that hold the selector's two
+    /// cryptographic fields on their own — a stored certification records the
+    /// User ID bytes and occurrence it was made against, and has no display
+    /// metadata to carry.
+    @concurrent
+    static func verifyUserIdBindingSignature(
+        engine: PgpEngine,
+        signature: Data,
+        targetCert: Data,
+        userIdSelector: UserIdSelectorInput,
+        candidateSigners: [Data]
+    ) async throws -> CertificateSignatureResult {
+        try engine.verifyUserIdBindingSignatureBySelector(
+            signature: signature,
+            targetCert: targetCert,
+            userIdSelector: userIdSelector,
             candidateSigners: candidateSigners
         )
     }

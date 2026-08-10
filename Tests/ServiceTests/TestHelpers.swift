@@ -693,6 +693,7 @@ extension ContactSnapshotMutator {
     ) {
         self.init(
             contactImportAdapter: PGPContactImportAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             importMatcher: importMatcher
         )
     }
