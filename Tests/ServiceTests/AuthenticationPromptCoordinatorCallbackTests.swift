@@ -4,7 +4,7 @@ import XCTest
 
 /// The `onOperationPromptsEnded` hook fires exactly when the
 /// operation-prompt stack becomes empty — the moment the `.authenticating` rule's
-/// deferred away decision is made — and never for privacy prompts.
+/// deferred away decision is made.
 final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
     func test_onOperationPromptsEnded_firesOnlyWhenStackEmpties() {
         let coordinator = AuthenticationPromptCoordinator()
@@ -40,16 +40,5 @@ final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
 
         _ = coordinator.beginOperationPrompt()
         XCTAssertEqual(beganCount, 2, "Each new session fires the began hook once.")
-    }
-
-    func test_onOperationPromptsEnded_ignoresPrivacyPrompts() {
-        let coordinator = AuthenticationPromptCoordinator()
-        nonisolated(unsafe) var firedCount = 0
-        coordinator.onOperationPromptsEnded = { firedCount += 1 }
-
-        let privacy = coordinator.beginPrivacyPrompt()
-        coordinator.endPrivacyPrompt(privacy)
-
-        XCTAssertEqual(firedCount, 0, "Privacy prompts never fire the operation hook.")
     }
 }

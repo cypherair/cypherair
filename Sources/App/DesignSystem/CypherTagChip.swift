@@ -8,14 +8,12 @@ import SwiftUI
 struct CypherTagChip: View {
     let title: String
     let isSelected: Bool
-    var selectedSystemImage: String = "checkmark.circle.fill"
-    var unselectedSystemImage: String = "tag"
     let toggle: () -> Void
 
     var body: some View {
         if isSelected {
             Button(action: toggle) {
-                Label(title, systemImage: selectedSystemImage)
+                Label(title, systemImage: "checkmark.circle.fill")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
@@ -23,7 +21,7 @@ struct CypherTagChip: View {
             .accessibilityAddTraits(.isSelected)
         } else {
             Button(action: toggle) {
-                Label(title, systemImage: unselectedSystemImage)
+                Label(title, systemImage: "tag")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)

@@ -38,7 +38,6 @@ final class AppLoadWarningCoordinator {
     }
 
     func presentPendingIfPossible(
-        source: String,
         presentationState: LoadWarningPresentationState,
         isRestartRequiredAfterLocalDataReset: Bool
     ) {

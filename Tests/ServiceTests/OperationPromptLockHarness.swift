@@ -48,11 +48,11 @@ final class OperationPromptLockHarness {
         let controller = AppLockController(
             gracePeriodProvider: { state.gracePeriod },
             lastAuthenticationDateProvider: { nil },
-            evaluateAppSessionAuthentication: { _, _ in .authenticated(context: nil) },
+            evaluateAppSessionAuthentication: { _ in .authenticated(context: nil) },
             recordSuccessfulAuthentication: { _ in },
-            discardHandoffContext: { _ in },
+            discardHandoffContext: {},
             relockProtectedData: { state.relock() },
-            postAuthenticationHandler: { _, _ in },
+            postAuthenticationHandler: { _ in },
             contentClearHandler: { state.contentClear() },
             shouldBypassAuthentication: { false },
             operationPromptInProgressProvider: { [weak coordinator] in
@@ -88,14 +88,14 @@ final class OperationPromptLockHarness {
 
     /// Drive the controller to `.unlocked` (auto-success auth stub).
     func unlockForTest() async {
-        await controller.handleForegroundActive(source: "harness.boot")
+        await controller.handleForegroundActive()
         await settle()
     }
 
     /// A macOS resign-active delivered while (presumably) a session is open.
-    func deliverResign(source: String = "macResignActive") {
+    func deliverResign() {
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: source)
+        controller.handleAwayEvent()
     }
 
     /// The user comes back before the session ends: only the foreground-active

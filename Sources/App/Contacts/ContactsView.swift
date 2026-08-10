@@ -37,7 +37,6 @@ private struct ContactsScreenHostView: View {
         .navigationTitle(String(localized: "contacts.title", defaultValue: "Contacts"))
         .cypherSearchable(
             text: $model.searchText,
-            placement: .automatic,
             prompt: String(
                 localized: "contacts.search.prompt",
                 defaultValue: "Names, email, tags, fingerprints"

@@ -147,14 +147,6 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         #endif
     }
 
-    func deleteKey(_ handle: any SEKeyHandle) throws {
-        if let error = nextError {
-            nextError = nil
-            throw error
-        }
-        keys.removeValue(forKey: handle.dataRepresentation)
-    }
-
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         if let error = nextError {
             nextError = nil

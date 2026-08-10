@@ -176,9 +176,7 @@ final class KeyManagementService: @unchecked Sendable {
         metadataLoadState = .recoveryNeeded
     }
 
-    func completeKeyMetadataLoad(
-        source: String
-    ) throws {
+    func completeKeyMetadataLoad() throws {
         try loadKeys()
     }
 
@@ -355,30 +353,22 @@ final class KeyManagementService: @unchecked Sendable {
     /// Export a secret key protected with a passphrase for backup.
     /// Requires device authentication to access the SE-wrapped key.
     ///
+    /// The key is not marked backed up here: only `confirmKeyBackupExported` —
+    /// called once the exported bytes have actually reached the user — records that.
+    ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key to export.
     ///   - passphrase: User-provided passphrase for S2K protection.
     /// - Returns: ASCII-armored passphrase-protected secret key data.
-    func exportKey(fingerprint: String, passphrase: String) async throws -> Data {
-        let exported = try await exportService.exportKey(
-            fingerprint: fingerprint,
-            passphrase: passphrase,
-            markBackedUp: true
-        )
-        syncKeysAndSecureEnclaveRecoveryReport()
-        return exported
-    }
-
     func exportKeyBackupData(fingerprint: String, passphrase: String) async throws -> Data {
         try await exportService.exportKey(
             fingerprint: fingerprint,
-            passphrase: passphrase,
-            markBackedUp: false
+            passphrase: passphrase
         )
     }
 
-    func confirmKeyBackupExported(fingerprint: String) {
-        catalogStore.markBackedUp(fingerprint: fingerprint)
+    func confirmKeyBackupExported(fingerprint: String) throws {
+        try catalogStore.markBackedUp(fingerprint: fingerprint)
         syncKeysAndSecureEnclaveRecoveryReport()
     }
 
@@ -407,7 +397,7 @@ final class KeyManagementService: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key whose subkey is being revoked.
-    ///   - subkeySelection: Selector-bearing option obtained from `selectionCatalog(fingerprint:)`.
+    ///   - subkeySelection: Selector-bearing option obtained from `loadSelectionCatalog(fingerprint:)`.
     /// - Returns: ASCII-armored subkey revocation signature bytes.
     func exportSubkeyRevocationCertificate(
         fingerprint: String,
@@ -431,7 +421,7 @@ final class KeyManagementService: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key whose User ID is being revoked.
-    ///   - userIdSelection: Selector-bearing option obtained from `selectionCatalog(fingerprint:)`.
+    ///   - userIdSelection: Selector-bearing option obtained from `loadSelectionCatalog(fingerprint:)`.
     /// - Returns: ASCII-armored User ID revocation signature bytes.
     func exportUserIdRevocationCertificate(
         fingerprint: String,
@@ -524,21 +514,6 @@ final class KeyManagementService: @unchecked Sendable {
         try exportService.exportPublicKey(fingerprint: fingerprint)
     }
 
-    /// Discover selector-bearing subkey and User ID metadata for an existing key.
-    /// This is a read-only operation that uses stored public key bytes only.
-    func selectionCatalog(fingerprint: String) throws -> CertificateSelectionCatalog {
-        guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.keyMetadataUnavailable
-        }
-
-        let catalog = try certificateAdapter.validatedCatalog(
-            certData: identity.publicKeyData,
-            expectedFingerprint: identity.fingerprint
-        )
-
-        return catalog
-    }
-
     /// Discover selector-bearing subkey and User ID metadata off the main actor.
     /// This is a read-only operation that uses stored public key bytes only.
     func loadSelectionCatalog(fingerprint: String) async throws -> CertificateSelectionCatalog {
@@ -546,13 +521,11 @@ final class KeyManagementService: @unchecked Sendable {
             throw CypherAirError.keyMetadataUnavailable
         }
 
-        let catalog = try await Self.discoverSelectionCatalogOffMainActor(
+        return try await Self.discoverSelectionCatalogOffMainActor(
             certificateAdapter: certificateAdapter,
             certData: identity.publicKeyData,
             expectedFingerprint: identity.fingerprint
         )
-
-        return catalog
     }
 
     // MARK: - Crash Recovery

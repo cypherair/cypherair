@@ -359,7 +359,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         )
         XCTAssertTrue(store.isCompleted(.decryptAndVerify))
 
-        let backup = try await container.keyManagement.exportKey(
+        let backup = try await container.keyManagement.exportKeyBackupData(
             fingerprint: alice.fingerprint,
             passphrase: "demo-backup-passphrase"
         )

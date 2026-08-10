@@ -29,14 +29,14 @@ struct AppLifecycleObserverModifier: ViewModifier {
                 switch newPhase {
                 case .active:
                     appLockController.noteForegroundActive(true)
-                    Task { await appLockController.handleForegroundActive(source: "scenePhase.active") }
+                    Task { await appLockController.handleForegroundActive() }
                 case .inactive:
                     // Cover only — a biometric prompt produces `.inactive`, which is
                     // never an away event.
                     appLockController.noteForegroundActive(false)
                 case .background:
                     appLockController.noteForegroundActive(false)
-                    appLockController.handleAwayEvent(source: "scenePhase.background")
+                    appLockController.handleAwayEvent()
                 @unknown default:
                     break
                 }
@@ -44,17 +44,17 @@ struct AppLifecycleObserverModifier: ViewModifier {
         #elseif os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
                 appLockController.noteForegroundActive(false)
-                appLockController.handleAwayEvent(source: "macResignActive")
+                appLockController.handleAwayEvent()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 appLockController.noteForegroundActive(true)
-                Task { await appLockController.handleForegroundActive(source: "macBecomeActive") }
+                Task { await appLockController.handleForegroundActive() }
             }
             .onReceive(
                 DistributedNotificationCenter.default().publisher(for: Notification.Name("com.apple.screenIsLocked"))
             ) { _ in
                 appLockController.noteForegroundActive(false)
-                appLockController.lockNow(source: "screenLock")
+                appLockController.lockNow()
             }
         #endif
     }

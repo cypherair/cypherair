@@ -370,8 +370,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let outcome = await coordinator.openRegisteredDomains(
             authenticationContext: handoffContext,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
+            localizedReason: "Open protected domains"
         )
 
         XCTAssertEqual(outcome, .opened([CypherAir.ProtectedSettingsStore.domainID]))
@@ -409,8 +408,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let outcome = await coordinator.openRegisteredDomains(
             authenticationContext: nil,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
+            localizedReason: "Open protected domains"
         )
 
         XCTAssertEqual(outcome, .noAuthenticatedContext)
@@ -455,8 +453,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let outcome = await coordinator.openRegisteredDomains(
             authenticationContext: handoffContext,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
+            localizedReason: "Open protected domains"
         )
 
         XCTAssertEqual(outcome, .pendingMutationRecoveryRequired)
@@ -507,8 +504,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let outcome = await coordinator.openRegisteredDomains(
             authenticationContext: handoffContext,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
+            localizedReason: "Open protected domains"
         )
 
         XCTAssertEqual(outcome, .authorizationDenied)
@@ -597,8 +593,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let outcome = await coordinator.openRegisteredDomains(
             authenticationContext: handoffContext,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
+            localizedReason: "Open protected domains"
         )
         let registry = try registryStore.loadRegistry()
 

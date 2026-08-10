@@ -128,13 +128,6 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         return plaintext
     }
 
-    func deleteKey(_ handle: any SEKeyHandle) throws {
-        // SE keys are deleted by removing them from Keychain.
-        // The actual SE key is tied to its dataRepresentation stored in Keychain.
-        // Once the Keychain item is removed, the SE key becomes inaccessible.
-        // The caller (AuthenticationManager) is responsible for Keychain deletion.
-    }
-
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         // Reconstructing from dataRepresentation triggers device authentication
         // (Face ID / Touch ID) when the key has biometric access control flags.

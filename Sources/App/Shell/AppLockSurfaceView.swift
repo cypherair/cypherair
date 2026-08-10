@@ -32,7 +32,7 @@ struct AppLockSurfaceView: View {
             }
         }
         .task {
-            await appLockController.handleForegroundActive(source: "lockSurface.appear")
+            await appLockController.handleForegroundActive()
         }
         .accessibilityIdentifier("appLock.surface")
         // The surface is hosted in the shield window
@@ -128,7 +128,7 @@ struct AppLockSurfaceView: View {
 
     private func retryAuthenticationButton(title: String, accessibilityLabel: String) -> some View {
         Button {
-            Task { await appLockController.retryUnlock(source: "retryButton") }
+            Task { await appLockController.retryUnlock() }
         } label: {
             Label(title, systemImage: biometricIconName)
                 .font(.headline)

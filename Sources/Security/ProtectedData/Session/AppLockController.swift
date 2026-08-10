@@ -50,20 +50,19 @@ final class AppLockController {
 
     private let gracePeriodProvider: () -> Int?
     private let lastAuthenticationDateProvider: () -> Date?
-    private let evaluateAppSessionAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
+    private let evaluateAppSessionAuthentication: (String) async throws -> AppSessionAuthenticationResult
     /// Store the authenticated context + record the authentication on the
     /// orchestrator (the handoff-context custodian).
     private let recordSuccessfulAuthentication: (LAContext?) -> Void
     /// Discard the orchestrator's pending handoff context (fail-closed) on
     /// away/relock/failure.
-    private let discardHandoffContext: (String) -> Void
+    private let discardHandoffContext: () -> Void
     /// Fail-closed Protected App-Data relock (fans out to all relock participants
     /// and zeroizes the wrapping root key). The trigger owner moves here; the
     /// fan-out itself stays in `ProtectedDataSessionCoordinator`.
     private let relockProtectedData: () async -> Void
-    /// Post-unlock domain-open fan-out. Receives the authenticated context and the
-    /// source.
-    private let postAuthenticationHandler: (LAContext?, String) async -> Void
+    /// Post-unlock domain-open fan-out. Receives the authenticated context.
+    private let postAuthenticationHandler: (LAContext?) async -> Void
     /// Ordinary-settings relock side effect.
     private let contentClearHandler: () -> Void
     /// UI-test bypass.
@@ -86,9 +85,8 @@ final class AppLockController {
     /// flight (the `.authenticating` rule). The away decision is
     /// deferred to the prompts' end: `handleOperationPromptsEnded()` processes it
     /// if the app is still not foreground-active, and discards it if the user
-    /// returned. Holds the original away source so the deferred dispatch carries
-    /// the provenance that began the deferral.
-    private var pendingOperationPromptAway: String?
+    /// returned.
+    private var hasPendingOperationPromptAway = false
 
     /// Main-actor mirror of "an operation-prompt session is open", maintained by
     /// `handleOperationPromptSessionBegan()` / `handleOperationPromptsEnded()`
@@ -158,11 +156,11 @@ final class AppLockController {
     init(
         gracePeriodProvider: @escaping () -> Int?,
         lastAuthenticationDateProvider: @escaping () -> Date?,
-        evaluateAppSessionAuthentication: @escaping (String, String) async throws -> AppSessionAuthenticationResult,
+        evaluateAppSessionAuthentication: @escaping (String) async throws -> AppSessionAuthenticationResult,
         recordSuccessfulAuthentication: @escaping (LAContext?) -> Void,
-        discardHandoffContext: @escaping (String) -> Void,
+        discardHandoffContext: @escaping () -> Void,
         relockProtectedData: @escaping () async -> Void,
-        postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
+        postAuthenticationHandler: @escaping (LAContext?) async -> Void = { _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
         operationPromptInProgressProvider: (() -> Bool)? = nil,
@@ -250,7 +248,7 @@ final class AppLockController {
     /// A genuine away event for this platform: iOS/iPadOS/visionOS
     /// `ScenePhase.background`; macOS app-resign ∪ screen-lock ∪ "Lock Now".
     /// (A biometric prompt's `.inactive` is NOT routed here — see the observer.)
-    func handleAwayEvent(source: String = "awayEvent") {
+    func handleAwayEvent() {
         #if os(macOS)
         // The `.authenticating` rule: an app-resign during an
         // app-driven authentication is explicit state, never an away event.
@@ -272,20 +270,17 @@ final class AppLockController {
         //     app is still not foreground-active then, and discards it if the user
         //     returned.
         if isOperationPromptInProgressForAwayRule {
-            // First resign wins: later resigns during the same prompt session carry
-            // no additional information (the decision at the prompts' end depends
-            // only on `isForegroundActive`), and keeping the earliest source carries
-            // the away provenance that began the deferral into the eventual dispatch.
-            if pendingOperationPromptAway == nil {
-                pendingOperationPromptAway = source
-            }
+            // Later resigns during the same prompt session carry no additional
+            // information: the decision at the prompts' end depends only on
+            // `isForegroundActive`.
+            hasPendingOperationPromptAway = true
             return
         }
         #endif
 
         // Any genuine away invalidates an in-flight unlock attempt.
         awayGeneration &+= 1
-        discardHandoffContext("away:\(source)")
+        discardHandoffContext()
 
         // In UI-test bypass mode the app never locks.
         guard !shouldBypassAuthentication() else {
@@ -299,10 +294,10 @@ final class AppLockController {
         // while away — the armed deadline below if the user has not come back
         // by then.
         guard effectiveGracePeriod() == 0 else {
-            armAwayRelock(source: source)
+            armAwayRelock()
             return
         }
-        Task { await enterLocked(source: "away:\(source)") }
+        Task { await enterLocked() }
     }
 
     /// Arm the wake-up that relocks the app once the grace window expires while
@@ -318,7 +313,7 @@ final class AppLockController {
     /// those platforms could only fire inside whatever sliver of background
     /// execution the system happened to grant, which would make the relock
     /// moment a system-timing artifact rather than the stated interval.
-    private func armAwayRelock(source: String) {
+    private func armAwayRelock() {
         #if os(macOS)
         disarmAwayRelock()
         // Nothing to relock unless a session is actually open: `.locked` and
@@ -341,7 +336,7 @@ final class AppLockController {
             guard !Task.isCancelled else {
                 return
             }
-            self?.handleAwayRelockDeadline(source: source)
+            self?.handleAwayRelockDeadline()
         }
         #endif
     }
@@ -358,7 +353,7 @@ final class AppLockController {
     /// The away relock deadline arrived. It applies the same predicate the
     /// foreground return applies — the deadline is a second place to evaluate
     /// the grace window, never a second rule for it.
-    private func handleAwayRelockDeadline(source: String) {
+    private func handleAwayRelockDeadline() {
         #if os(macOS)
         // This wake-up is spent; clearing the handle first keeps the re-arm
         // below from cancelling the task it is running in.
@@ -374,10 +369,10 @@ final class AppLockController {
             // real time waited out (an adjustment or a slew), so the window has
             // not actually passed. Wait out the remainder rather than relocking
             // early.
-            armAwayRelock(source: source)
+            armAwayRelock()
             return
         }
-        Task { await enterLocked(source: "awayGraceExpired:\(source)") }
+        Task { await enterLocked() }
         #endif
     }
 
@@ -402,10 +397,10 @@ final class AppLockController {
         if openOperationPromptSessions > 0 {
             openOperationPromptSessions -= 1
         }
-        guard let source = pendingOperationPromptAway else {
+        guard hasPendingOperationPromptAway else {
             return
         }
-        pendingOperationPromptAway = nil
+        hasPendingOperationPromptAway = false
         guard !isLockedState else {
             // An explicit lock (lockNow / screen-lock) or a processed away
             // already locked the app; the deferred decision is moot.
@@ -414,7 +409,7 @@ final class AppLockController {
         guard !isForegroundActive else {
             return
         }
-        handleAwayEvent(source: "deferredOperationAway:\(source)")
+        handleAwayEvent()
         #endif
     }
 
@@ -430,7 +425,7 @@ final class AppLockController {
     /// The app returned to the foreground. Idempotent: safe to call from both the
     /// lifecycle observer (`.active` / `didBecomeActive`) and the lock surface's
     /// auto-invoke.
-    func handleForegroundActive(source: String = "foregroundActive") async {
+    func handleForegroundActive() async {
         // Release the resume-time cover hold once the lock decision has resolved,
         // on EVERY exit path (bypass, not-foreground-active, in-flight, spurious,
         // within-grace, or the full unlock flow). On the unlock path this fires in
@@ -443,7 +438,7 @@ final class AppLockController {
 
         if shouldBypassAuthentication() {
             if isLocked {
-                setLockState(.unlocked, source: "bypass:\(source)")
+                setLockState(.unlocked)
             }
             return
         }
@@ -481,41 +476,41 @@ final class AppLockController {
             // Within the grace window a foreground round-trip stays unlocked (no
             // re-auth, content preserved) — "cover ≠ lock". Past it, re-authenticate.
             if isGracePeriodExpired {
-                await runUnlockFlow(source: "graceExpired:\(source)")
+                await runUnlockFlow()
             } else {
                 // Genuine away, but within grace → stay unlocked and mark this epoch
                 // handled so a later spurious `.active` is a no-op.
                 handledAwayGeneration = awayGeneration
             }
         case .locked, .authenticationFailed:
-            await runUnlockFlow(source: source)
+            await runUnlockFlow()
         case .authenticating:
             break
         }
     }
 
     /// Re-invoke the unlock flow from the lock surface's retry affordance.
-    func retryUnlock(source: String = "retry") async {
+    func retryUnlock() async {
         guard !isAuthenticating else {
             return
         }
-        await runUnlockFlow(source: "retry:\(source)")
+        await runUnlockFlow()
     }
 
     /// Lock immediately regardless of the grace interval (macOS "Lock Now" / screen
     /// lock; also the seam for any future explicit-lock affordance).
-    func lockNow(source: String = "lockNow") {
+    func lockNow() {
         #if os(macOS)
         // Clear the deferred away SYNCHRONOUSLY: the queued `enterLocked` also
         // clears it, but a prompts-ended hop could run between this call and that
         // task, and must not process the now-moot deferral into a second relock
         // cycle. An explicit lock always supersedes the deferred decision.
-        pendingOperationPromptAway = nil
+        hasPendingOperationPromptAway = false
         #endif
         // Same reasoning for the away deadline: it must not fire into a second
         // relock cycle while this lock's `enterLocked` is still queued.
         disarmAwayRelock()
-        Task { await enterLocked(source: "lockNow:\(source)") }
+        Task { await enterLocked() }
     }
 
     /// Local Data Reset hook for the lock-state portion of the reset. The
@@ -531,25 +526,25 @@ final class AppLockController {
         // `openOperationPromptSessions` is deliberately NOT reset: the hooks are
         // the counter's sole mutators, and any in-flight reset authentication
         // prompt session decrements normally after this method returns.
-        pendingOperationPromptAway = nil
+        hasPendingOperationPromptAway = false
         #endif
         // The reset settles the lock state directly, so any wake-up armed for
         // the pre-reset session is moot.
         disarmAwayRelock()
-        discardHandoffContext("localDataReset")
+        discardHandoffContext()
         if preserveAuthentication {
             // Stay unlocked and mark this epoch handled so a post-reset spurious
             // `.active` is a no-op.
             handledAwayGeneration = awayGeneration
-            setLockState(.unlocked, source: "localDataReset")
+            setLockState(.unlocked)
         } else {
-            setLockState(.locked, source: "localDataReset")
+            setLockState(.locked)
         }
     }
 
     // MARK: - Unlock flow
 
-    private func runUnlockFlow(source: String) async {
+    private func runUnlockFlow() async {
         // Mark the attempt in flight synchronously, BEFORE the first `await`, so a
         // second resume observes `.authenticating` at the `handleForegroundActive`
         // guard and cannot start a duplicate prompt. `.authenticating` is also what
@@ -562,15 +557,14 @@ final class AppLockController {
         // invalidated by a genuine away leaves `handledAwayGeneration != awayGeneration`,
         // so the next foreground correctly re-authenticates.
         handledAwayGeneration = attemptAwayGeneration
-        setLockState(.authenticating, source: "unlock.begin:\(source)")
+        setLockState(.authenticating)
 
         // Fail-closed: clear content and relock Protected App-Data before prompting.
         contentClearHandler()
-        await enterRelock(source: "unlock:\(source)")
+        await relockProtectedData()
 
-        let reason = Self.localizedResumeReason
         do {
-            let result = try await evaluateAppSessionAuthentication(reason, source)
+            let result = try await evaluateAppSessionAuthentication(Self.localizedResumeReason)
 
             // The app genuinely left the foreground during authentication: discard
             // the result and stay locked ("real background wins"). On macOS the
@@ -583,26 +577,26 @@ final class AppLockController {
                 // it here. Nothing reopened Protected App-Data before this point (the
                 // top-of-flow relock still holds), so a state-only `.locked` is fail-closed.
                 result.context?.invalidate()
-                discardHandoffContext("staleUnlock")
+                discardHandoffContext()
                 if !isLockedState {
-                    setLockState(.locked, source: "unlock.stale:\(source)")
+                    setLockState(.locked)
                 }
                 return
             }
 
             if result.isAuthenticated {
                 recordSuccessfulAuthentication(result.context)
-                await postAuthenticationHandler(result.context, source)
+                await postAuthenticationHandler(result.context)
                 // A genuine away during the post-auth fan-out: postAuthenticationHandler
                 // has already REOPENED Protected App-Data, so fail closed for real —
                 // relock, not just a UI state flip ("real background wins"). enterLocked
                 // discards the handoff, clears content, awaits the real relock, and
                 // settles `.locked`.
                 guard attemptAwayGeneration == awayGeneration else {
-                    await enterLocked(source: "stalePostAuth:\(source)")
+                    await enterLocked()
                     return
                 }
-                setLockState(.unlocked, source: "unlock.success:\(source)")
+                setLockState(.unlocked)
                 // The unlock settled while the app was not foreground-active:
                 // the user left during the post-auth fan-out, or this unlock's
                 // own system sheet has not handed focus back yet. Both
@@ -616,45 +610,38 @@ final class AppLockController {
                 // re-authenticate. Same ambiguity, same resolution as the
                 // operation-prompt rule's decision at the prompts' end.
                 if !isForegroundActive {
-                    armAwayRelock(source: "postAuthAway:\(source)")
+                    armAwayRelock()
                 }
             } else {
-                discardHandoffContext("authReturnedFalse")
-                setLockState(.authenticationFailed(.authenticationFailed), source: "unlock.failed:\(source)")
+                discardHandoffContext()
+                setLockState(.authenticationFailed(.authenticationFailed))
             }
         } catch {
-            discardHandoffContext("authThrew")
+            discardHandoffContext()
             guard attemptAwayGeneration == awayGeneration else {
                 if !isLockedState {
-                    setLockState(.locked, source: "unlock.staleThrow:\(source)")
+                    setLockState(.locked)
                 }
                 return
             }
-            setLockState(
-                .authenticationFailed(Self.failureReason(for: error)),
-                source: "unlock.threw:\(source)"
-            )
+            setLockState(.authenticationFailed(Self.failureReason(for: error)))
         }
     }
 
-    private func enterLocked(source: String) async {
+    private func enterLocked() async {
         #if os(macOS)
         // An explicit lock supersedes a pending deferred away (the `.authenticating`
         // rule): the app is locking right now, so the prompts'-end decision is moot —
         // clearing it avoids a redundant second relock cycle at the prompts' end.
-        pendingOperationPromptAway = nil
+        hasPendingOperationPromptAway = false
         #endif
         // The session is closing; there is no longer a grace window to enforce.
         disarmAwayRelock()
         awayGeneration &+= 1
-        discardHandoffContext("enterLocked:\(source)")
+        discardHandoffContext()
         contentClearHandler()
-        await enterRelock(source: source)
-        setLockState(.locked, source: "enterLocked:\(source)")
-    }
-
-    private func enterRelock(source: String) async {
         await relockProtectedData()
+        setLockState(.locked)
     }
 
     // MARK: - Grace
@@ -689,7 +676,7 @@ final class AppLockController {
         return false
     }
 
-    private func setLockState(_ newState: LockState, source: String) {
+    private func setLockState(_ newState: LockState) {
         guard newState != lockState else {
             return
         }

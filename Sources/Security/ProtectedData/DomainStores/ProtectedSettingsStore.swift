@@ -221,7 +221,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                     let cleanupOutcome = try await firstDomainSharedRightCleaner
                         .cleanupJournaledFirstDomainSharedRightIfSafe(
                             expectedDomainID: Self.domainID,
-                            source: Self.domainID.rawValue,
                             loadCurrentRegistry: { try registryStore.loadRegistry() }
                         )
                     if cleanupOutcome == .blockedByArtifacts {

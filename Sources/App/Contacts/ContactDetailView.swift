@@ -121,8 +121,7 @@ private struct ContactDetailHostView: View {
                     NavigationLink(
                         value: AppRoute.contactCertification(
                             contactId: contact.contactId,
-                            keyId: contact.preferredKey?.keyId,
-                            intent: .certify
+                            keyId: contact.preferredKey?.keyId
                         )
                     ) {
                         Label(
@@ -325,8 +324,7 @@ private struct ContactDetailHostView: View {
                 NavigationLink(
                     value: AppRoute.contactCertification(
                         contactId: contact.contactId,
-                        keyId: contact.preferredKey?.keyId,
-                        intent: .certify
+                        keyId: contact.preferredKey?.keyId
                     )
                 ) {
                     Label(

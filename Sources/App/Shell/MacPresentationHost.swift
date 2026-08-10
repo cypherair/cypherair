@@ -22,26 +22,6 @@ private struct MacPresentationHostModifier: ViewModifier {
         }
         .sheet(item: modalPresentationBinding) { presentation in
             switch presentation {
-            case .importConfirmation(let request):
-                let onImportUnverified: (() -> Void)? = request.allowsUnverifiedImport ? {
-                    activePresentation = nil
-                    request.onImportUnverified()
-                } : nil
-
-                ImportConfirmView(
-                    metadata: request.metadata,
-                    candidateMatch: request.candidateMatch,
-                    onImportVerified: {
-                        activePresentation = nil
-                        request.onImportVerified()
-                    },
-                    onImportUnverified: onImportUnverified,
-                    onCancel: {
-                        activePresentation = nil
-                        request.onCancel()
-                    }
-                )
-                .presentationSizing(.form)
             case .authModeConfirmation(let request):
                 NavigationStack {
                     SettingsAuthModeConfirmationSheetView(request: request)
@@ -63,7 +43,7 @@ private struct MacPresentationHostModifier: ViewModifier {
         switch activePresentation {
         case .onboarding, .tutorial:
             return activePresentation
-        case .importConfirmation, .authModeConfirmation, .modifyExpiry:
+        case .authModeConfirmation, .modifyExpiry:
             return nil
         }
     }
@@ -73,7 +53,7 @@ private struct MacPresentationHostModifier: ViewModifier {
             get: {
                 guard let activePresentation else { return nil }
                 switch activePresentation {
-                case .importConfirmation, .authModeConfirmation, .modifyExpiry:
+                case .authModeConfirmation, .modifyExpiry:
                     return activePresentation
                 case .onboarding, .tutorial:
                     return nil
@@ -109,7 +89,7 @@ private struct MacPresentationHostModifier: ViewModifier {
             .environment(protectedOrdinarySettings)
             .environment(tutorialStore)
             .environment(\.macPresentationController, macPresentationControllerValue)
-        case .importConfirmation, .authModeConfirmation, .modifyExpiry:
+        case .authModeConfirmation, .modifyExpiry:
             EmptyView()
         }
     }

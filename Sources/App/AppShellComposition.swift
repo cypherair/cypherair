@@ -21,7 +21,7 @@ struct AppRouteDestinationView: View {
             ImportKeyView()
         case .contactDetail(let contactId):
             ContactDetailView(contactId: contactId)
-        case .contactCertification(let contactId, let keyId, _):
+        case .contactCertification(let contactId, let keyId):
             ContactCertificationDetailsView(
                 contactId: contactId,
                 keyId: keyId
@@ -130,63 +130,58 @@ enum AppShellComposition {
 
     static func content(
         for tab: AppShellTab,
-        resolver: AppRouteDestinationResolver,
-        rootDecorator: (AppShellTab, AnyView) -> AnyView = { _, root in root }
+        resolver: AppRouteDestinationResolver
     ) -> AnyView {
-        let root: AnyView
-
         switch tab {
         case .home:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     HomeView()
                 }
             )
         case .keys:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     MyKeysView()
                 }
             )
         case .contacts:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     ContactsView()
                 }
             )
         case .settings:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     MainWindowSettingsRootView()
                 }
             )
         case .encrypt:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     EncryptView()
                 }
             )
         case .decrypt:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     DecryptView()
                 }
             )
         case .sign:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     SignView()
                 }
             )
         case .verify:
-            root = AnyView(
+            AnyView(
                 AppRouteHost(resolver: resolver) {
                     VerifyView()
                 }
             )
         }
-
-        return rootDecorator(tab, root)
     }
 
     static func normalizedSelection(
@@ -204,13 +199,12 @@ enum AppShellComposition {
     }
 
     static func definitions(
-        resolver: AppRouteDestinationResolver,
-        rootDecorator: (AppShellTab, AnyView) -> AnyView = { _, root in root }
+        resolver: AppRouteDestinationResolver
     ) -> [AppShellTabDefinition] {
         AppShellTab.allCases.map { tab in
             definition(
                 for: tab,
-                content: content(for: tab, resolver: resolver, rootDecorator: rootDecorator)
+                content: content(for: tab, resolver: resolver)
             )
         }
     }

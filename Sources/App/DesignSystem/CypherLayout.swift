@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Shared spacing scale for screen layouts.
 ///
-/// The design system is deliberately small: spacing, radii, and one surface
-/// modifier (`cypherSurface(_:)`). Standard SwiftUI components (Form, List,
-/// section headers, ContentUnavailableView) already carry the platform design
-/// language; do not add new primitives here without a repeated cross-screen need.
+/// Standard SwiftUI components (Form, List, section headers,
+/// ContentUnavailableView) already carry the platform design language, so this
+/// directory holds only what several screens repeat: do not add a primitive
+/// here until a second screen needs it.
 enum CypherSpacing {
     /// Tight intra-row spacing (icon-to-text pairs, dot indicators).
     static let compact: CGFloat = 8

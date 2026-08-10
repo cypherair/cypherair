@@ -149,8 +149,7 @@ struct ContactKeySummaryView: View {
                 NavigationLink(
                     value: AppRoute.contactCertification(
                         contactId: key.contactId,
-                        keyId: key.keyId,
-                        intent: .details
+                        keyId: key.keyId
                     )
                 ) {
                     Label(

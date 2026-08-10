@@ -76,9 +76,6 @@ protocol SecureEnclaveManageable: Sendable {
         payloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> Data
 
-    /// Delete an SE wrapping key from the Secure Enclave.
-    func deleteKey(_ handle: any SEKeyHandle) throws
-
     /// Reconstruct an SE key handle from its data representation.
     /// This triggers device authentication on real hardware unless a
     /// pre-authenticated `LAContext` is provided.

@@ -77,10 +77,6 @@ struct EphemeralKeyWrappingCustody: SecureEnclaveManageable {
         )
     }
 
-    func deleteKey(_ handle: any SEKeyHandle) throws {
-        try hardware.deleteKey(handle)
-    }
-
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         guard Self.isAvailable else {
             throw EphemeralKeyWrappingCustodyError.secureEnclaveUnavailable

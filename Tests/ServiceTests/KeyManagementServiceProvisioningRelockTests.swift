@@ -228,7 +228,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Import Before Auth Mode Source"
         )
         let passphrase = "import-before-auth-mode-passphrase"
-        var exportedData = try await service.exportKey(
+        var exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -281,7 +281,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Import Duplicate Race Source"
         )
         let passphrase = "import-duplicate-race-passphrase"
-        var exportedData = try await service.exportKey(
+        var exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -350,7 +350,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Existing Metadata"
         )
         let passphrase = "existing-metadata-passphrase"
-        var exportedData = try await service.exportKey(
+        var exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -385,7 +385,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Existing Bundle"
         )
         let passphrase = "existing-bundle-passphrase"
-        var exportedData = try await service.exportKey(
+        var exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -672,7 +672,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Import Source"
         )
         let passphrase = "import-reset-passphrase"
-        let exportedData = try await service.exportKey(
+        let exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -718,7 +718,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Import Post Source"
         )
         let passphrase = "import-post-race-passphrase"
-        var exportedData = try await service.exportKey(
+        var exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -768,7 +768,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             name: "Import Cancel Source"
         )
         let passphrase = "import-cancel-after-commit-passphrase"
-        var exportedData = try await service.exportKey(
+        var exportedData = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )

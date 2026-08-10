@@ -54,7 +54,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         let unwrapCountBefore = mockSE.unwrapCallCount
         let saveCountBefore = mockKC.saveCallCount
 
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
 
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Selector discovery must not unwrap private key material")
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Selector discovery must not rewrite metadata")
@@ -69,12 +69,13 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
     func test_selectionCatalog_missingFingerprint_throwsKeyMetadataUnavailable() async throws {
         _ = try await TestHelpers.generateLegacyKey(service: service, name: "Selector Missing")
 
-        XCTAssertThrowsError(
-            try service.selectionCatalog(fingerprint: "missing-fingerprint")
-        ) { error in
-            guard case .keyMetadataUnavailable = error as? CypherAirError else {
-                return XCTFail("Expected keyMetadataUnavailable, got \(error)")
-            }
+        do {
+            _ = try await service.loadSelectionCatalog(fingerprint: "missing-fingerprint")
+            XCTFail("Expected keyMetadataUnavailable")
+        } catch CypherAirError.keyMetadataUnavailable {
+            // Expected.
+        } catch {
+            XCTFail("Expected keyMetadataUnavailable, got \(error)")
         }
     }
 
@@ -92,19 +93,20 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         let unwrapCountBefore = mockSE.unwrapCallCount
         let saveCountBefore = mockKC.saveCallCount
 
-        XCTAssertThrowsError(
-            try freshService.selectionCatalog(fingerprint: identity.fingerprint)
-        ) { error in
-            guard case .invalidKeyData = error as? CypherAirError else {
-                return XCTFail("Expected invalidKeyData, got \(error)")
-            }
+        do {
+            _ = try await freshService.loadSelectionCatalog(fingerprint: identity.fingerprint)
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
         }
 
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Fingerprint mismatch must not unwrap private keys")
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Fingerprint mismatch must not rewrite metadata")
     }
 
-    func test_selectionCatalog_duplicateSameBytesFixture_preservesPerOccurrenceState() throws {
+    func test_selectionCatalog_duplicateSameBytesFixture_preservesPerOccurrenceState() async throws {
         let fixture = try FixtureLoader.loadData(
             "selector_duplicate_userid_second_revoked_secret",
             ext: "gpg"
@@ -134,7 +136,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         let unwrapCountBefore = mockSE.unwrapCallCount
         let saveCountBefore = mockKC.saveCallCount
 
-        let catalog = try freshService.selectionCatalog(fingerprint: info.fingerprint)
+        let catalog = try await freshService.loadSelectionCatalog(fingerprint: info.fingerprint)
 
         XCTAssertEqual(catalog.userIds.count, 2)
         XCTAssertEqual(catalog.userIds[0].userIdData, catalog.userIds[1].userIdData)
@@ -144,19 +146,6 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         XCTAssertTrue(catalog.userIds[1].isCurrentlyRevoked)
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Duplicate selector discovery must not unwrap private key material")
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Duplicate selector discovery must not rewrite metadata")
-    }
-
-    func test_loadSelectionCatalog_existingStoredKey_matchesSynchronousSelectorsWithoutUnwrapOrMetadataRewrite() async throws {
-        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Async Selector Catalog")
-        let unwrapCountBefore = mockSE.unwrapCallCount
-        let saveCountBefore = mockKC.saveCallCount
-
-        let synchronousCatalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
-        let asyncCatalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
-
-        XCTAssertEqual(asyncCatalog, synchronousCatalog)
-        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Async selector discovery must not unwrap private key material")
-        XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Async selector discovery must not rewrite metadata")
     }
 
     func test_loadSelectionCatalog_missingFingerprint_throwsKeyMetadataUnavailable() async throws {
@@ -215,7 +204,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
     func test_exportRevocationCertificate_existingImportedKey_doesNotUnwrapOrRewriteMetadata() async throws {
         let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Imported Revocation Source")
         let passphrase = "imported-revocation-pass"
-        let exportedBackup = try await service.exportKey(
+        let exportedBackup = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: passphrase
         )
@@ -267,7 +256,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportSubkeyRevocationCertificate_legacy_returnsArmoredSignatureAndUnwrapsOnce() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Subkey Rev A")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first,
                                    "Legacy key should expose at least one subkey selector")
 
@@ -287,7 +276,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportSubkeyRevocationCertificate_modernHigh_returnsArmoredSignatureAndUnwrapsOnce() async throws {
         let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Subkey Rev B")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first,
                                    "Modern High key should expose at least one subkey selector")
 
@@ -306,7 +295,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportSubkeyRevocationCertificate_unknownFingerprint_throwsKeyMetadataUnavailableBeforeUnwrap() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Subkey Rev Missing")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
 
         let unwrapBefore = mockSE.unwrapCallCount
@@ -359,7 +348,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
     func test_exportSubkeyRevocationCertificate_metadataFingerprintMismatch_throwsInvalidKeyDataBeforeUnwrap() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Subkey Rev Metadata A")
         let otherIdentity = try await TestHelpers.generateModernHighKey(service: service, name: "Subkey Rev Metadata B")
-        let otherCatalog = try service.selectionCatalog(fingerprint: otherIdentity.fingerprint)
+        let otherCatalog = try await service.loadSelectionCatalog(fingerprint: otherIdentity.fingerprint)
         let otherSubkey = try XCTUnwrap(otherCatalog.subkeys.first)
 
         var corruptedIdentity = try loadStoredIdentity(fingerprint: identity.fingerprint)
@@ -391,7 +380,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportUserIdRevocationCertificate_legacy_returnsArmoredSignatureAndUnwrapsOnce() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "UserId Rev A")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let userIdOption = try XCTUnwrap(catalog.userIds.first,
                                          "Legacy key should expose its User ID selector")
 
@@ -410,7 +399,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportUserIdRevocationCertificate_modernHigh_returnsArmoredSignatureAndUnwrapsOnce() async throws {
         let identity = try await TestHelpers.generateModernHighKey(service: service, name: "UserId Rev B")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let userIdOption = try XCTUnwrap(catalog.userIds.first)
 
         let unwrapBefore = mockSE.unwrapCallCount
@@ -428,7 +417,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportUserIdRevocationCertificate_outOfRangeOccurrenceIndex_throwsInvalidKeyDataBeforeUnwrap() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "UserId Rev OOB")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let baseOption = try XCTUnwrap(catalog.userIds.first)
 
         let outOfRange = UserIdSelectionOption(
@@ -460,7 +449,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
 
     func test_exportUserIdRevocationCertificate_userIdDataBytesMismatch_throwsInvalidKeyDataBeforeUnwrap() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service, name: "UserId Rev Bytes")
-        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
         let baseOption = try XCTUnwrap(catalog.userIds.first)
 
         let tamperedBytes = Data("Mallory <mallory@example.com>".utf8)
@@ -502,10 +491,10 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
             email: "foreign@example.com"
         )
 
-        let foreignCatalog = try service.selectionCatalog(fingerprint: foreignIdentity.fingerprint)
+        let foreignCatalog = try await service.loadSelectionCatalog(fingerprint: foreignIdentity.fingerprint)
         let foreignOption = try XCTUnwrap(foreignCatalog.userIds.first)
 
-        let victimCatalog = try service.selectionCatalog(fingerprint: victimIdentity.fingerprint)
+        let victimCatalog = try await service.loadSelectionCatalog(fingerprint: victimIdentity.fingerprint)
         let victimOption = try XCTUnwrap(victimCatalog.userIds.first)
         XCTAssertNotEqual(foreignOption.userIdData, victimOption.userIdData)
 
@@ -534,7 +523,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
             name: "UserId Rev Metadata B",
             email: "metadata-b@example.com"
         )
-        let otherCatalog = try service.selectionCatalog(fingerprint: otherIdentity.fingerprint)
+        let otherCatalog = try await service.loadSelectionCatalog(fingerprint: otherIdentity.fingerprint)
         let otherUserId = try XCTUnwrap(otherCatalog.userIds.first)
 
         var corruptedIdentity = try loadStoredIdentity(fingerprint: identity.fingerprint)
@@ -580,7 +569,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         let freshService = makeFreshService()
         try freshService.loadKeys()
 
-        let catalog = try freshService.selectionCatalog(fingerprint: identity.fingerprint)
+        let catalog = try await freshService.loadSelectionCatalog(fingerprint: identity.fingerprint)
         XCTAssertEqual(catalog.userIds.count, 2, "Fixture is expected to expose two User ID occurrences")
         let secondOccurrence = catalog.userIds[1]
         XCTAssertEqual(secondOccurrence.occurrenceIndex, 1)

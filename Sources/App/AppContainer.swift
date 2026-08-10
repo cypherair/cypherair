@@ -820,9 +820,7 @@ final class AppContainer: @unchecked Sendable {
                             _ = try await keyMetadataDomainStore.openDomainIfNeeded(
                                 wrappingRootKey: wrappingRootKey
                             )
-                            try keyManagement.completeKeyMetadataLoad(
-                                source: "postUnlock"
-                            )
+                            try keyManagement.completeKeyMetadataLoad()
                         } catch {
                             keyManagement.markKeyMetadataRecoveryNeeded()
                             throw error
@@ -850,7 +848,7 @@ final class AppContainer: @unchecked Sendable {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
             lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason, _ in
+            evaluateAppSessionAuthentication: { reason in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
                     reason: reason
@@ -859,13 +857,13 @@ final class AppContainer: @unchecked Sendable {
             recordSuccessfulAuthentication: { context in
                 appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
             },
-            discardHandoffContext: { reason in
-                appSessionOrchestrator.discardAuthorizationHandoffContext(reason: reason)
+            discardHandoffContext: {
+                appSessionOrchestrator.discardAuthorizationHandoffContext()
             },
             relockProtectedData: {
                 await protectedDataSessionCoordinator.relockCurrentSession()
             },
-            postAuthenticationHandler: { authenticationContext, source in
+            postAuthenticationHandler: { authenticationContext in
                 do {
                     _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
                         authenticationContext: authenticationContext,
@@ -882,8 +880,7 @@ final class AppContainer: @unchecked Sendable {
                     localizedReason: String(
                         localized: "protectedData.postUnlock.reason",
                         defaultValue: "Authenticate to unlock protected app data."
-                    ),
-                    source: source
+                    )
                 )
                 _ = await contactService.openContactsAfterPostUnlock(
                     gateDecision: ContactsPostAuthGateDecision(
@@ -1198,7 +1195,7 @@ final class AppContainer: @unchecked Sendable {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
             lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason, _ in
+            evaluateAppSessionAuthentication: { reason in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
                     reason: reason
@@ -1207,13 +1204,13 @@ final class AppContainer: @unchecked Sendable {
             recordSuccessfulAuthentication: { context in
                 appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
             },
-            discardHandoffContext: { reason in
-                appSessionOrchestrator.discardAuthorizationHandoffContext(reason: reason)
+            discardHandoffContext: {
+                appSessionOrchestrator.discardAuthorizationHandoffContext()
             },
             relockProtectedData: {
                 await protectedDataSessionCoordinator.relockCurrentSession()
             },
-            postAuthenticationHandler: { authenticationContext, source in
+            postAuthenticationHandler: { authenticationContext in
                 do {
                     _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
                         authenticationContext: authenticationContext,
@@ -1230,8 +1227,7 @@ final class AppContainer: @unchecked Sendable {
                     localizedReason: String(
                         localized: "protectedData.postUnlock.reason",
                         defaultValue: "Authenticate to unlock protected app data."
-                    ),
-                    source: source
+                    )
                 )
                 _ = await contactService.openContactsAfterPostUnlock(
                     gateDecision: ContactsPostAuthGateDecision(

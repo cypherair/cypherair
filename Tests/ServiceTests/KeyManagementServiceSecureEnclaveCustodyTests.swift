@@ -332,7 +332,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             .unavailable(.privateHandleMissing)
         )
 
-        targetService.confirmKeyBackupExported(fingerprint: hiddenIdentity.fingerprint)
+        try targetService.confirmKeyBackupExported(fingerprint: hiddenIdentity.fingerprint)
 
         XCTAssertEqual(
             recoveryClassifier.requestedIdentitySnapshots.last?.first?.isBackedUp,
@@ -392,7 +392,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         }
 
         do {
-            _ = try await service.exportKey(
+            _ = try await service.exportKeyBackupData(
                 fingerprint: fixture.identity.fingerprint,
                 passphrase: "backup-pass"
             )
@@ -492,7 +492,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         )
         try storeIdentity(fixture.identity)
         try service.loadKeys()
-        let catalog = try service.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let catalog = try await service.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
         let unwrapCountBefore = mockSE.unwrapCallCount
 

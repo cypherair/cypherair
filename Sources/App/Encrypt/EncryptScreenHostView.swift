@@ -65,7 +65,6 @@ struct EncryptScreenHostView: View {
         }
         .cypherSearchable(
             text: $model.recipientSearchText,
-            placement: .automatic,
             prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")
         )
         .encryptScreenPresentations(model: model)
