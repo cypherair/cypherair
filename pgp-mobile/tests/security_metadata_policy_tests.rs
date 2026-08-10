@@ -127,3 +127,45 @@ fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
         "Expired key should still have an expiry_timestamp (L2 fix)"
     );
 }
+
+/// A live primary key whose only encryption subkey has expired must read as
+/// not-encryptable. The contacts predicate and `encrypt::collect_recipients`
+/// have to agree, or the app offers a recipient it then hard-fails on.
+#[test]
+fn test_parse_key_info_reports_expired_encryption_subkey_as_unusable() {
+    use sequoia_openpgp as openpgp;
+    use openpgp::cert::prelude::CertBuilder;
+    use openpgp::serialize::Serialize;
+    use openpgp::types::KeyFlags;
+
+    let (cert, _) = CertBuilder::new()
+        .add_userid("Expiring Subkey <expiring-subkey@example.com>")
+        .add_subkey(
+            KeyFlags::empty().set_transport_encryption(),
+            Some(std::time::Duration::from_secs(1)),
+            None,
+        )
+        .generate()
+        .expect("cert with a short-lived encryption subkey should generate");
+
+    let mut public_key_data = Vec::new();
+    cert.serialize(&mut public_key_data)
+        .expect("public cert should serialize");
+
+    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    let info = keys::parse_key_info(&public_key_data).expect("parse_key_info should succeed");
+
+    assert!(
+        !info.is_expired,
+        "the primary key itself has not expired in this fixture"
+    );
+    assert!(
+        !info.has_encryption_subkey,
+        "an expired encryption subkey must not read as encryptable"
+    );
+    assert!(
+        encrypt::encrypt_binary(b"unsendable", &[public_key_data], None, None).is_err(),
+        "the encrypt path must refuse the same certificate"
+    );
+}
