@@ -15,6 +15,7 @@ final class DecryptionService {
     private let contactService: ContactService
     private let messageDecryptor: any RecipientMessageDecrypting
     private let fileDecryptor: any StreamingFileDecrypting
+    private let diskSpaceChecker: DiskSpaceChecker
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
@@ -23,6 +24,7 @@ final class DecryptionService {
         contactService: ContactService,
         messageDecryptor: any RecipientMessageDecrypting,
         fileDecryptor: any StreamingFileDecrypting,
+        diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.messageAdapter = messageAdapter
@@ -30,6 +32,7 @@ final class DecryptionService {
         self.contactService = contactService
         self.messageDecryptor = messageDecryptor
         self.fileDecryptor = fileDecryptor
+        self.diskSpaceChecker = diskSpaceChecker
         self.temporaryArtifactStore = temporaryArtifactStore
     }
 
@@ -146,6 +149,15 @@ final class DecryptionService {
             throw CypherAirError.noMatchingKey
         }
 
+        // Refuse a decrypt the volume cannot hold before it costs the user anything:
+        // ahead of the output artifact, and ahead of the private-key route below,
+        // which prompts for authentication. A size that cannot be read is not a
+        // reason to refuse — this pre-flight fails only for missing space, and an
+        // unreadable input reports itself through the pipeline's own file error.
+        if let encryptedInputSize = Self.fileSize(atPath: phase1.inputPath) {
+            try diskSpaceChecker.validateForDecryption(encryptedInputSize: encryptedInputSize)
+        }
+
         // Custody-specific private-key access is owned by the router-backed streaming
         // file decryptor: software custody unwraps and zeroizes a secret certificate;
         // Secure Enclave custody uses the external P-256 key-agreement route. This
@@ -183,6 +195,13 @@ final class DecryptionService {
     }
 
     // MARK: - Private
+
+    private static func fileSize(atPath path: String) -> UInt64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return nil
+        }
+        return attributes[.size] as? UInt64
+    }
 
     private func verificationContext() -> PGPMessageVerificationContext {
         let contactsContext = contactService.contactsVerificationContext()

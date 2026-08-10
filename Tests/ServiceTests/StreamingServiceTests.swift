@@ -396,6 +396,137 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(mockDisk.callCount, 1, "Disk space should have been checked once")
     }
 
+    /// The decrypt pre-flight has to land before the private-key route, because the
+    /// point of it is to spare the user an authentication prompt and a long write
+    /// that the volume cannot finish. A refusal raised after the decryptor had run
+    /// would still throw `insufficientDiskSpace`, so the spy — not the error — is
+    /// what pins the ordering.
+    func test_decryptFileStreaming_insufficientDiskSpace_refusesBeforeDecryptorRuns() async throws {
+        let mockDisk = MockDiskSpace()
+        mockDisk.availableBytes = 1024
+        let spyDecryptor = SpyStreamingFileDecryptor()
+        let artifactRoot = try makeIsolatedArtifactRoot()
+        defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+        let recipient = try await generateKeyAndContact(
+            suite: .ed25519LegacyCurve25519Legacy,
+            name: "Disk Preflight Recipient"
+        )
+        let encryptedURL = try writeTempFile(Data(repeating: 0x42, count: 4 * 1024 * 1024))
+        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+
+        let decService = makeDecryptionService(
+            fileDecryptor: spyDecryptor,
+            diskSpace: mockDisk,
+            artifactRoot: artifactRoot
+        )
+
+        do {
+            let result = try await decService.decryptFileStreamingDetailed(
+                phase1: FileDecryptionPhase1Result(
+                    matchedKey: recipient,
+                    inputPath: encryptedURL.path
+                ),
+                progress: nil
+            )
+            result.artifact.cleanup()
+            XCTFail("Expected insufficientDiskSpace error")
+        } catch let error as CypherAirError {
+            if case .insufficientDiskSpace = error {
+                // Expected
+            } else {
+                XCTFail("Expected insufficientDiskSpace, got: \(error)")
+            }
+        }
+
+        XCTAssertEqual(mockDisk.callCount, 1, "Disk space should have been checked once")
+        XCTAssertEqual(
+            spyDecryptor.callCount,
+            0,
+            "The pre-flight must refuse before the private-key route authenticates"
+        )
+        XCTAssertEqual(
+            try decryptedOperationArtifacts(in: artifactRoot),
+            [],
+            "A refused decrypt must not leave an output artifact behind"
+        )
+    }
+
+    /// An input whose size cannot be read is not a reason to refuse: the pre-flight
+    /// only ever fails for missing space, and the real problem with the file surfaces
+    /// from the decrypt pipeline itself. Reported free space is zero here, so a
+    /// pre-flight that ran anyway would refuse and fail this test.
+    func test_decryptFileStreaming_unreadableInputSize_skipsPreflightAndProceeds() async throws {
+        let mockDisk = MockDiskSpace()
+        mockDisk.availableBytes = 0
+        let spyDecryptor = SpyStreamingFileDecryptor()
+        let artifactRoot = try makeIsolatedArtifactRoot()
+        defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+        let recipient = try await generateKeyAndContact(
+            suite: .ed25519LegacyCurve25519Legacy,
+            name: "Unreadable Input Recipient"
+        )
+
+        let decService = makeDecryptionService(
+            fileDecryptor: spyDecryptor,
+            diskSpace: mockDisk,
+            artifactRoot: artifactRoot
+        )
+
+        let result = try await decService.decryptFileStreamingDetailed(
+            phase1: FileDecryptionPhase1Result(
+                matchedKey: recipient,
+                inputPath: "/nonexistent/CypherAirDiskPreflightTests/missing.gpg"
+            ),
+            progress: nil
+        )
+        defer { result.artifact.cleanup() }
+
+        XCTAssertEqual(spyDecryptor.callCount, 1, "Decryption should have proceeded to the pipeline")
+    }
+
+    private func makeDecryptionService(
+        fileDecryptor: any StreamingFileDecrypting,
+        diskSpace: any DiskSpaceProvidable,
+        artifactRoot: URL
+    ) -> DecryptionService {
+        let messageAdapter = PGPMessageOperationAdapter(engine: stack.engine)
+        return DecryptionService(
+            messageAdapter: messageAdapter,
+            keyManagement: stack.keyManagement,
+            contactService: stack.contactService,
+            messageDecryptor: TestHelpers.makeMessageDecryptor(
+                engine: stack.engine,
+                keyManagement: stack.keyManagement,
+                messageAdapter: messageAdapter
+            ),
+            fileDecryptor: fileDecryptor,
+            diskSpaceChecker: DiskSpaceChecker(diskSpace: diskSpace),
+            temporaryArtifactStore: AppTemporaryArtifactStore(temporaryDirectory: artifactRoot)
+        )
+    }
+
+    /// A per-test artifact root, so the assertions cannot be perturbed by another
+    /// process sharing the app's temporary directory.
+    private func makeIsolatedArtifactRoot() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirDiskPreflightTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func decryptedOperationArtifacts(in artifactRoot: URL) throws -> [URL] {
+        let decryptedDirectory = artifactRoot.appendingPathComponent("decrypted", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: decryptedDirectory.path) else {
+            return []
+        }
+        return try FileManager.default.contentsOfDirectory(
+            at: decryptedDirectory,
+            includingPropertiesForKeys: nil
+        )
+    }
+
     // MARK: - Tamper Detection
 
     func test_decryptFileStreaming_tamperedFile_throwsError() async throws {
@@ -541,5 +672,28 @@ final class StreamingServiceTests: XCTestCase {
             file: file,
             line: line
         )
+    }
+}
+
+/// Records whether the streaming file decryptor was reached, which is what lets a
+/// pre-flight test distinguish "refused up front" from "refused after the work".
+/// Creates the output file on the way out because `DecryptionService` applies file
+/// protection to it before returning.
+///
+/// `@unchecked Sendable`: the counter is written once inside the awaited call and
+/// read after it returns, never concurrently.
+private final class SpyStreamingFileDecryptor: StreamingFileDecrypting, @unchecked Sendable {
+    private(set) var callCount = 0
+
+    func decryptFile(
+        inputPath: String,
+        outputPath: String,
+        recipientFingerprint: String,
+        verificationContext: PGPMessageVerificationContext,
+        progress: FileProgressReporter?
+    ) async throws -> DetailedSignatureVerification {
+        callCount += 1
+        try Data().write(to: URL(fileURLWithPath: outputPath))
+        return DetailedSignatureVerification(summaryState: .notSigned, signatures: [])
     }
 }
