@@ -118,7 +118,7 @@ final class ContactServiceTagTests: ContactServiceTestCase {
     }
 
     func test_tagManagementOperationsRequireProtectedContacts() async throws {
-        contactService.resetInMemoryStateAfterLocalDataReset()
+        await contactService.resetInMemoryStateAfterLocalDataReset()
 
         XCTAssertThrowsError(try contactService.createTag(named: "Locked Tag")) { error in
             guard case .contactsUnavailable(.locked) = error as? CypherAirError else {
