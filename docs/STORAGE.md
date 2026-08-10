@@ -34,7 +34,7 @@ Everything app-owned sits under the `com.cypherair.v5.` service prefix. Reset de
 
 The exceptions, each with the reason that keeps it outside a protected domain:
 
-- **`appSessionAuthenticationPolicy`** (plain `UserDefaults`) — must be readable *before* ProtectedData opens, because it configures the unlock prompt itself. It is the **sole** ordinary-settings boot-authentication exception; protected-after-unlock settings must never grow pre-unlock shadow copies.
+- **`appSessionAuthenticationPolicy`** (plain `UserDefaults`) — must be readable *before* ProtectedData opens, because it configures the unlock prompt itself. Its pending-switch journal (**`pendingAppSessionAuthenticationPolicySwitch`**, plain `UserDefaults`) shares the exception: it records an in-flight protection-switch intent so launch converges on the stricter policy after an interruption. These two are the **only** ordinary-settings boot-authentication exceptions; protected-after-unlock settings must never grow pre-unlock shadow copies.
 - **`uiTestBypassAuthentication`** (test-only `UserDefaults` key) — a deliberate authentication bypass in shipping code, gated to the DEBUG UI-test container. It is listed here precisely because an auth bypass must stay visible.
 - **Self-test reports** — in-memory, export-only, never persisted.
 - **Files exported to user-selected locations** — the custody boundary: past export, the data is outside the app-owned container and CypherAir makes no protection claim.
