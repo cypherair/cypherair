@@ -282,7 +282,6 @@
 				Models/Keys/PGPPrivateOperationRole.swift,
 				Models/Keys/SubkeySelectionOption.swift,
 				Models/Keys/UserIdSelectionOption.swift,
-				Models/Messaging/OutgoingMessageFormat.swift,
 				Models/Settings/AppConfiguration.swift,
 				Models/Settings/InMemoryOrdinarySettingsStore.swift,
 				Models/Settings/ProtectedOrdinarySettingsAvailability.swift,

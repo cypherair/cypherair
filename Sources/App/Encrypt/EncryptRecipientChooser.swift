@@ -24,7 +24,6 @@ struct EncryptRecipientChooser: View {
         let selectedTagIds = model.selectedRecipientTagFilterIds
         let selectedCount = model.effectiveRecipientContactIds.count
         let hiddenSelectedCount = model.hiddenSelectedRecipientCount
-        let formatPreview = model.outgoingMessageFormatPreview
         let addableCount = recipients.reduce(into: 0) { count, contact in
             count += selectedIds.contains(contact.contactId) ? 0 : 1
         }
@@ -63,7 +62,7 @@ struct EncryptRecipientChooser: View {
                     RecipientToggleRow(
                         contact: contact,
                         isSelected: isSelected,
-                        formatPreview: formatPreview,
+                        defaultKeyVersion: model.defaultKeyVersion,
                         toggle: {
                             withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
                                 model.toggleRecipient(contact.contactId, isOn: !isSelected)
@@ -71,10 +70,6 @@ struct EncryptRecipientChooser: View {
                         }
                     )
                 }
-            }
-
-            if formatPreview.downgradesAeadCapableRecipients {
-                formatDowngradeLabel
             }
 
             if !model.selectedUnverifiedContacts.isEmpty {
@@ -195,23 +190,6 @@ struct EncryptRecipientChooser: View {
         }
     }
 
-    /// The message-level half of the format story. A per-row glyph can only ever
-    /// point at a row, and the certificate that forces the fallback may be the
-    /// Encrypt to Self copy, which has no row — so the outcome is also stated
-    /// once, for the whole message.
-    @ViewBuilder
-    private var formatDowngradeLabel: some View {
-        Label(
-            String(
-                localized: "encrypt.compat.messageDowngraded",
-                defaultValue: "Encrypted to at least one v4 key, so this message will use SEIPDv1 — recipients whose keys support AEAD will not get it."
-            ),
-            systemImage: "exclamationmark.triangle.fill"
-        )
-        .font(.footnote)
-        .foregroundStyle(.orange)
-    }
-
     @ViewBuilder
     private var unverifiedWarningLabel: some View {
         Label(
@@ -252,22 +230,31 @@ struct EncryptRecipientChooser: View {
     }
 }
 
-/// A composed VoiceOver label for a recipient row: name, suite, plus the format
-/// warning and the unverified status when they apply. Keeps the format and
-/// verification cues audible (following the comma-separated idiom used elsewhere
-/// in the app); the row separately announces its selected state.
+/// Single source of truth for the SEIPDv1-downgrade rule: a v6 sender default key
+/// encrypting to a v4 recipient falls back to SEIPDv1 (no AEAD).
+enum RecipientCompatibility {
+    static func isSeipdV1Downgrade(senderDefaultKeyVersion: UInt8?, recipientKeyVersion: UInt8) -> Bool {
+        senderDefaultKeyVersion == 6 && recipientKeyVersion == 4
+    }
+}
+
+/// A composed VoiceOver label for a recipient row: name, suite, plus the SEIPDv1
+/// downgrade warning and the unverified status when they apply. Keeps the
+/// downgrade/verification cues audible (following the comma-separated idiom used
+/// elsewhere in the app); the row separately announces its selected state.
 private func recipientAccessibilityLabel(
     _ contact: ContactRecipientSummary,
-    formatPreview: OutgoingMessageFormatPreview
+    defaultKeyVersion: UInt8?
 ) -> String {
     var parts = [
         IdentityDisplayPresentation.displayName(contact.displayName),
         contact.preferredKey.suite.contactKeyKindDisplayName
     ]
-    if formatPreview.limitsFormat(recipientKeyVersion: contact.preferredKey.keyVersion) {
-        parts.append(
-            String(localized: "encrypt.compat.limitsMessageFormat", defaultValue: "Limits this message to SEIPDv1")
-        )
+    if RecipientCompatibility.isSeipdV1Downgrade(
+        senderDefaultKeyVersion: defaultKeyVersion,
+        recipientKeyVersion: contact.preferredKey.keyVersion
+    ) {
+        parts.append(String(localized: "encrypt.compat.downgrade", defaultValue: "Format downgrade to SEIPDv1"))
     }
     if !contact.isPreferredKeyVerified {
         parts.append(String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"))
@@ -275,28 +262,21 @@ private func recipientAccessibilityLabel(
     return parts.joined(separator: ", ")
 }
 
-/// The per-recipient compatibility glyph: an orange warning when this recipient's
-/// key is what holds the message at SEIPDv1 — its v4 certificate alongside at
-/// least one AEAD-capable one — otherwise a green "compatible" check. A message
-/// addressed only to v4 keys gives nothing up and stays green.
-///
-/// The predicate reads the whole message's format decision, so a row that is not
-/// selected yet answers the same question honestly: adding it is what would cost
-/// the message its AEAD. Status is conveyed by symbol + label.
+/// The per-recipient compatibility glyph: orange downgrade warning when the
+/// sender's default key is v6 but this recipient is v4 (SEIPDv1 fallback),
+/// otherwise a green "compatible" check. Status is conveyed by symbol + label.
 private struct RecipientCompatibilityIcon: View {
     let contact: ContactRecipientSummary
-    let formatPreview: OutgoingMessageFormatPreview
+    let defaultKeyVersion: UInt8?
 
     var body: some View {
-        if formatPreview.limitsFormat(recipientKeyVersion: contact.preferredKey.keyVersion) {
+        if RecipientCompatibility.isSeipdV1Downgrade(
+            senderDefaultKeyVersion: defaultKeyVersion,
+            recipientKeyVersion: contact.preferredKey.keyVersion
+        ) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
-                .accessibilityLabel(
-                    String(
-                        localized: "encrypt.compat.limitsMessageFormat",
-                        defaultValue: "Limits this message to SEIPDv1"
-                    )
-                )
+                .accessibilityLabel(String(localized: "encrypt.compat.downgrade", defaultValue: "Format downgrade to SEIPDv1"))
         } else {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
@@ -310,11 +290,11 @@ private struct RecipientCompatibilityIcon: View {
 /// suite, and an Unverified badge when applicable.
 private struct RecipientRowContent: View {
     let contact: ContactRecipientSummary
-    let formatPreview: OutgoingMessageFormatPreview
+    let defaultKeyVersion: UInt8?
 
     var body: some View {
         HStack {
-            RecipientCompatibilityIcon(contact: contact, formatPreview: formatPreview)
+            RecipientCompatibilityIcon(contact: contact, defaultKeyVersion: defaultKeyVersion)
             VStack(alignment: .leading, spacing: 2) {
                 Text(IdentityDisplayPresentation.displayName(contact.displayName))
                     .fixedSize(horizontal: false, vertical: true)
@@ -342,13 +322,13 @@ private struct RecipientToggleRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let contact: ContactRecipientSummary
     let isSelected: Bool
-    let formatPreview: OutgoingMessageFormatPreview
+    let defaultKeyVersion: UInt8?
     let toggle: () -> Void
 
     var body: some View {
         Button(action: toggle) {
             HStack {
-                RecipientRowContent(contact: contact, formatPreview: formatPreview)
+                RecipientRowContent(contact: contact, defaultKeyVersion: defaultKeyVersion)
                 Spacer()
                 ZStack {
                     Image(systemName: "circle")
@@ -365,7 +345,7 @@ private struct RecipientToggleRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(recipientAccessibilityLabel(contact, formatPreview: formatPreview))
+        .accessibilityLabel(recipientAccessibilityLabel(contact, defaultKeyVersion: defaultKeyVersion))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("encrypt.recipient.row")
     }
