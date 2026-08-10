@@ -157,6 +157,8 @@ private extension SignatureVerification.VerificationState {
             } else {
                 self = .contactsContextUnavailable
             }
+        case .unverifiable:
+            self = .unverifiable
         }
     }
 
@@ -177,6 +179,8 @@ private extension SignatureVerification.VerificationState {
             } else {
                 self = .contactsContextUnavailable
             }
+        case .unverifiable:
+            self = .unverifiable
         }
     }
 }

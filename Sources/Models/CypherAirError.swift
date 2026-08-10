@@ -8,6 +8,9 @@ enum CypherAirError: Error {
     case unsupportedAlgorithm(algo: String)
     case keyExpired
     case badSignature
+    /// The engine could not start verifying, so nothing was checked. Kept apart
+    /// from `badSignature`: only a completed check may state a verdict.
+    case verificationUnavailable(reason: String)
     case unknownSigner
     case corruptData(reason: String)
     case wrongPassphrase
@@ -23,6 +26,9 @@ enum CypherAirError: Error {
     case internalError(reason: String)
     case operationCancelled
     case fileIoError(reason: String)
+    /// A write ran out of space on the destination volume. The pre-flight
+    /// counterpart is `insufficientDiskSpace`, which knows the figures.
+    case storageFull
     case keyOperationUnavailable(category: PGPKeyOperationFailureCategory)
 
     // Security-layer errors

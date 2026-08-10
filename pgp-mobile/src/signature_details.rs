@@ -6,6 +6,10 @@ use sequoia_openpgp as openpgp;
 use crate::decrypt::is_expired_error;
 
 /// Certificate-backed verification state for a signature entry or summary.
+///
+/// Only `Verified`, `Invalid`, and `Expired` are verdicts — statements about a
+/// signature the engine actually checked. The remaining states say the check
+/// did not happen, and must never be presented as claims about the content.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum SignatureVerificationState {
     NotSigned,
@@ -13,6 +17,10 @@ pub enum SignatureVerificationState {
     Invalid,
     Expired,
     SignerCertificateUnavailable,
+    /// A signature the engine could not check at all: its packet is malformed,
+    /// its type is unknown, or verification reported a failure that carries no
+    /// verdict.
+    Unverifiable,
 }
 
 /// Per-signature status preserved by the detailed APIs.
@@ -22,6 +30,8 @@ pub enum DetailedSignatureStatus {
     UnknownSigner,
     Bad,
     Expired,
+    /// See `SignatureVerificationState::Unverifiable`.
+    Unverifiable,
 }
 
 impl DetailedSignatureStatus {
@@ -34,6 +44,7 @@ impl DetailedSignatureStatus {
             }
             DetailedSignatureStatus::Bad => SignatureVerificationState::Invalid,
             DetailedSignatureStatus::Expired => SignatureVerificationState::Expired,
+            DetailedSignatureStatus::Unverifiable => SignatureVerificationState::Unverifiable,
         }
     }
 }
@@ -178,7 +189,9 @@ impl SignatureCollector {
             DetailedSignatureStatus::Valid => {
                 self.summary_stopped = true;
             }
-            DetailedSignatureStatus::UnknownSigner => {}
+            // Neither reached a verdict, so neither may freeze the summary: a
+            // later signature that *was* checked still gets to decide it.
+            DetailedSignatureStatus::UnknownSigner | DetailedSignatureStatus::Unverifiable => {}
             DetailedSignatureStatus::Bad | DetailedSignatureStatus::Expired => {
                 if matches!(self.mode, SummaryFoldMode::VerifyLike) {
                     self.summary_stopped = true;
@@ -214,10 +227,13 @@ fn entry_from_result(result: &VerificationResult) -> DetailedSignatureEntry {
             status: DetailedSignatureStatus::Bad,
             signer_primary_fingerprint: Some(cert.fingerprint().to_hex().to_lowercase()),
         },
+        // A signature packet that is malformed, of an unknown type, or rejected
+        // by a variant this build does not know: the engine never got as far as
+        // checking it, so this is not a verdict on the content.
         Err(VerificationError::MalformedSignature { .. })
         | Err(VerificationError::UnknownSignature { .. })
         | Err(_) => DetailedSignatureEntry {
-            status: DetailedSignatureStatus::Bad,
+            status: DetailedSignatureStatus::Unverifiable,
             signer_primary_fingerprint: None,
         },
     }

@@ -135,7 +135,11 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
     }
 
-    func test_verifyDetachedStreamingDetailed_fixtureExpiredBad_preservesDetailedFold()
+    /// The second signature in `ffi_detailed_mixedfold_expired_bad.sig` carries no
+    /// signature-creation-time subpacket, so the engine rejects it as malformed
+    /// before checking anything. It reads as `.unverifiable` — not `.invalid`,
+    /// which would tell the user the content may have been modified.
+    func test_verifyDetachedStreamingDetailed_fixtureExpiredMalformed_preservesDetailedFold()
         async throws
     {
         let expiredSigner = try loadFixture("ffi_detailed_mixedfold_expired_signer")
@@ -157,7 +161,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[0].verificationState, .expired)
         XCTAssertEqual(detailed.signatures[0].signerPrimaryFingerprint, expiredInfo.fingerprint)
         XCTAssertEqual(detailed.signatures[0].signerIdentity?.source, .contact)
-        XCTAssertEqual(detailed.signatures[1].verificationState, .invalid)
+        XCTAssertEqual(detailed.signatures[1].verificationState, .unverifiable)
         XCTAssertNil(detailed.signatures[1].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[1].signerIdentity)
     }

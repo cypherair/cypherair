@@ -273,6 +273,8 @@ final class ModelTests: XCTestCase {
             .noRecipientsSelected,
             .biometricsUnavailable,
             .fileIoError(reason: "test io error"),
+            .storageFull,
+            .verificationUnavailable(reason: "test setup failure"),
             .operationCancelled,
             .keyOperationUnavailable(category: .operationUnsupportedForCustody),
             .insufficientDiskSpace(requiredMB: 100, availableMB: 30),
