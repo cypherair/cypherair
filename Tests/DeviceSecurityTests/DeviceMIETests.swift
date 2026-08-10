@@ -266,7 +266,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
     }
 
     /// Key export/import round-trip under MIE.
-    /// Legacy: Iterated+Salted S2K. Modern High: Argon2id S2K (512 MB).
+    /// Legacy: Iterated+Salted S2K. Modern High: Argon2id S2K (2 GiB).
     func test_mie_keyExportImport_bothProfiles_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
@@ -407,7 +407,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         // 7. AES-256-OCB AEAD via SEIPDv2 (Modern High, covered above in step 6).
 
         // 8. Argon2id via Modern High key export.
-        //    OpenSSL path: Argon2id KDF (512 MB memory, 4 lanes).
+        //    OpenSSL path: Argon2id KDF (2 GiB memory, 4 lanes).
         let exported = try engine.exportSecretKey(
             certData: keyB.certData, passphrase: "openssltest"
         )

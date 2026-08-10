@@ -1,10 +1,23 @@
 use super::*;
 
+/// The Argon2id parameters every v6 export derives under: RFC 9106 §4's first
+/// recommended option — 2 GiB of memory, one pass, four lanes. Staying exactly
+/// on the RFC keeps the external-standard anchor, and the high memory cost is
+/// what makes a stolen backup expensive to attack offline.
+///
+/// RFC 9580 encodes the memory cost as `2^m` KiB, so 2 GiB is `m = 21`.
+/// `export_s2k_params` publishes the resulting requirement to the app's memory
+/// guard and `export_argon2_s2k` builds the specifier the packets carry, so the
+/// number the guard checks and the number the KDF runs under are the same one.
+const EXPORT_ARGON2_MEMORY_ENCODED_M: u8 = 21;
+const EXPORT_ARGON2_PASSES: u8 = 1;
+const EXPORT_ARGON2_LANES: u8 = 4;
+
 /// Maximum Argon2 time cost (passes) accepted on the passphrase key-import
 /// path. The import KDF runs before the wrong-passphrase check and is
 /// uninterruptible, so an attacker-supplied key with a very high pass count
 /// could make a single import attempt run arbitrarily long. Our own export uses
-/// 3 passes, so 16 leaves ample headroom while rejecting the abuse range.
+/// one pass, so 16 leaves ample headroom while rejecting the abuse range.
 pub(crate) const MAX_IMPORT_ARGON2_PASSES: u8 = 16;
 
 /// Maximum Argon2 memory cost accepted on the passphrase key-import path.
@@ -19,6 +32,24 @@ pub(crate) const MAX_IMPORT_ARGON2_MEMORY_KIB: u64 = 1 << 31;
 /// malformed `m >= 64` saturates instead of overflowing.
 pub(crate) fn argon2_memory_kib(encoded_m: u8) -> u64 {
     1u64.checked_shl(u32::from(encoded_m)).unwrap_or(u64::MAX)
+}
+
+/// Whether exporting `suite` protects the secret material with Argon2id.
+///
+/// Portable Legacy is the GnuPG-compatibility family, so its export keeps
+/// RFC 4880 Iterated+Salted S2K; every v6 suite uses Argon2id.
+pub(crate) fn export_uses_argon2id(suite: KeySuite) -> bool {
+    suite != KeySuite::Ed25519LegacyCurve25519Legacy
+}
+
+/// The Argon2id specifier an export writes into its secret-key packets.
+pub(crate) fn export_argon2_s2k(salt: [u8; 16]) -> openpgp::crypto::S2K {
+    openpgp::crypto::S2K::Argon2 {
+        salt,
+        t: EXPORT_ARGON2_PASSES,
+        p: EXPORT_ARGON2_LANES,
+        m: EXPORT_ARGON2_MEMORY_ENCODED_M,
+    }
 }
 
 /// Reject a cert whose encrypted secret key material uses Argon2 parameters
@@ -69,8 +100,10 @@ pub enum S2kType {
     Unknown,
 }
 
-/// S2K (String-to-Key) parameters extracted from a passphrase-protected key.
-/// The app reads these to check the device's memory headroom before importing.
+/// S2K (String-to-Key) parameters of a passphrase-protected key. The app reads
+/// these to check the device's memory headroom before running the derivation —
+/// as declared by an incoming key file (`parse_s2k_params`) or as an outgoing
+/// export will use them (`export_s2k_params`).
 #[derive(Debug, uniffi::Record)]
 pub struct S2kInfo {
     pub s2k_type: S2kType,
@@ -78,9 +111,29 @@ pub struct S2kInfo {
     pub memory_kib: u64,
 }
 
+/// The S2K an export of `suite` will derive under, without exporting anything.
+///
+/// Export is as memory-hard as import and carries the same risk of being
+/// terminated mid-derivation, so the app checks this before it unwraps any
+/// secret material. Answering from the suite alone keeps the check ahead of
+/// both the authentication prompt and the private key leaving the enclave.
+pub fn export_s2k_params(suite: KeySuite) -> S2kInfo {
+    if export_uses_argon2id(suite) {
+        S2kInfo {
+            s2k_type: S2kType::Argon2id,
+            memory_kib: argon2_memory_kib(EXPORT_ARGON2_MEMORY_ENCODED_M),
+        }
+    } else {
+        S2kInfo {
+            s2k_type: S2kType::IteratedSalted,
+            memory_kib: 0,
+        }
+    }
+}
+
 /// Parse S2K parameters from a passphrase-protected key file.
-/// This allows the Swift side to check memory requirements (e.g., Argon2id 512 MB)
-/// before calling `import_secret_key`, preventing iOS Jetsam kills.
+/// This allows the Swift side to check the memory requirement an incoming key
+/// declares before calling `import_secret_key`, preventing iOS Jetsam kills.
 ///
 /// Inspects the primary key and all subkeys, returning the S2K info with the
 /// highest memory requirement. This handles keys where the primary key and

@@ -11,15 +11,7 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     let mut salt = [0u8; 16];
     openpgp::crypto::random(&mut salt)?;
 
-    // Project-chosen parameters (docs/SECURITY.md §7 records this set and the
-    // decided RFC 9106 high-memory target): t=3 passes, p=4 lanes,
-    // m=2^19 KiB = 512 MiB.
-    let s2k = openpgp::crypto::S2K::Argon2 {
-        salt,
-        t: 3,
-        p: 4,
-        m: 19,
-    };
+    let s2k = super::s2k::export_argon2_s2k(salt);
 
     let (key_pub, mut secret) = key.take_secret();
 
@@ -43,7 +35,7 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
 ///
 /// The S2K mode is derived from the certificate's classified suite:
 /// - `Ed25519LegacyCurve25519Legacy`: Iterated+Salted S2K (mode 3) — GnuPG compatible.
-/// - Every v6 suite: Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
+/// - Every v6 suite: Argon2id S2K under the `s2k` module's export parameters.
 ///
 /// Returns ASCII-armored key data with passphrase-encrypted secret key material.
 pub fn export_secret_key(cert_data: &[u8], passphrase: &str) -> Result<Vec<u8>, PgpError> {
@@ -55,7 +47,7 @@ pub fn export_secret_key(cert_data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
     // RFC 9980 composite cert is a post-quantum suite, not the high classical
     // one, so a bare version check would not be sufficient.
     let suite = super::suite::classify_suite(&cert);
-    let uses_argon2id = suite != KeySuite::Ed25519LegacyCurve25519Legacy;
+    let uses_argon2id = super::s2k::export_uses_argon2id(suite);
 
     let password = openpgp::crypto::Password::from(passphrase);
 

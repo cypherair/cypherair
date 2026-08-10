@@ -112,7 +112,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         mockMemory.availableBytes = 500_000_000
         let (lowMemService, _, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
 
-        // Modern High uses Argon2id with 512 MB; 512 MB > 75% of 500 MB (375 MB) → rejected
+        // Modern High uses Argon2id with 2 GiB; that exceeds 75% of 500 MB → rejected
         do {
             _ = try await lowMemService.importKey(
                 armoredData: exported,
@@ -126,6 +126,53 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
                 XCTFail("Expected .argon2idMemoryExceeded, got \(error)")
             }
         }
+    }
+
+    func test_exportKey_modernHigh_lowMemory_refusesBeforeUnwrappingTheKey() async throws {
+        // The low-memory service generates the key as well: generation runs no
+        // Argon2id, so only the export is affected by the memory figure — and
+        // the refusal has to land before the private key leaves the enclave.
+        let mockMemory = MockMemoryInfo()
+        mockMemory.availableBytes = 500_000_000
+        let (lowMemService, mockSE, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
+        let identity = try await TestHelpers.generateModernHighKey(service: lowMemService)
+        let unwrapsBeforeExport = mockSE.unwrapCallCount
+
+        do {
+            _ = try await lowMemService.exportKeyBackupData(
+                fingerprint: identity.fingerprint,
+                passphrase: "test-pass"
+            )
+            XCTFail("Expected argon2idMemoryExceeded for low-memory export")
+        } catch let error as CypherAirError {
+            if case .argon2idMemoryExceeded = error {
+                // Expected
+            } else {
+                XCTFail("Expected .argon2idMemoryExceeded, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(
+            mockSE.unwrapCallCount,
+            unwrapsBeforeExport,
+            "Export must refuse before unwrapping the private key"
+        )
+    }
+
+    func test_exportKey_legacy_lowMemory_succeeds() async throws {
+        // Portable Legacy exports under Iterated+Salted S2K, so the Argon2id
+        // parameters never reach the GnuPG-compatible family and the guard has
+        // nothing to refuse.
+        let mockMemory = MockMemoryInfo()
+        mockMemory.availableBytes = 500_000_000
+        let (lowMemService, _, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
+        let identity = try await TestHelpers.generateLegacyKey(service: lowMemService)
+
+        let exported = try await lowMemService.exportKeyBackupData(
+            fingerprint: identity.fingerprint,
+            passphrase: "test-pass"
+        )
+        XCTAssertFalse(exported.isEmpty)
     }
 
     func test_importKey_legacy_lowMemory_succeeds() async throws {

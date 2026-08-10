@@ -8,7 +8,7 @@ CypherAir X is a fully offline OpenPGP encryption tool for people who want to co
 
 The product name is **CypherAir X** (bundle display name, Face ID prompt, About screen); copyright lines keep "CypherAir".
 
-**Minimum device: 8 GB RAM.** Nothing in code enforces this — it is a support promise, and it becomes load-bearing under the decided Argon2id 2 GiB move ([SECURITY.md](SECURITY.md) §7).
+**Minimum device: 8 GB RAM.** Nothing in code enforces the floor as a device check — it is a support promise, and it is load-bearing now that key backups derive under Argon2id's 2 GiB parameters ([SECURITY.md](SECURITY.md) §7). What the code does enforce is the consequence: a device without the memory to run that derivation is refused the backup — in both directions — rather than given a weaker one.
 
 ## 2. Deliberate non-features
 

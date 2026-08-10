@@ -23,9 +23,10 @@ final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
             "Available memory must not exceed physical memory")
     }
 
-    /// Real 512 MB Argon2id import with guard on device.
-    /// Validates the full pipeline: parseS2kParams → guard → importSecretKey.
-    func test_argon2idGuard_realDevice_512MB_import_succeeds() throws {
+    /// Real 2 GiB Argon2id import with the guard on device — the one place the
+    /// granted memory limit is the real one rather than a mock. Validates the
+    /// full pipeline: parseS2kParams → guard → importSecretKey.
+    func test_argon2idGuard_realDevice_import_succeeds() throws {
         let engine = PgpEngine()
 
         // Generate and export a Modern High key.
@@ -41,8 +42,8 @@ final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
         let s2kInfo = try engine.parseS2kParams(armoredData: exported)
         let memoryGuard = Argon2idMemoryGuard() // Uses SystemMemoryInfo (real)
 
-        // On an 8 GB+ device, 512 MB should be well within limits.
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        // On an 8 GB+ device with the memory entitlements granted, 2 GiB fits.
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
 
         // If the guard passes, proceed with actual import.
         let imported = try engine.importSecretKey(

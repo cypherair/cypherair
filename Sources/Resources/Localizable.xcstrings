@@ -4330,13 +4330,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key uses memory-intensive protection (%lld MB) that exceeds this device's capacity."
+            "value" : "Passphrase protection for this key needs %@ of memory, which isn't available right now. Try again after freeing some up."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥使用的内存密集型保护（%lld MB）超出了此设备的容量。"
+            "value" : "此密钥的密码短语保护需要 %@ 内存，目前无法提供。请释放部分内存后重试。"
+          }
+        }
+      }
+    },
+    "error.argon2idMemory.recovery" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close other apps, then try again. If it keeps happening, restart the device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请关闭其他应用后重试。如果问题持续出现，请重新启动设备。"
           }
         }
       }

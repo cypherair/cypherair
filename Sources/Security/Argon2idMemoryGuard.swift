@@ -1,13 +1,14 @@
 import Foundation
 
-/// Guards against Jetsam termination when importing passphrase-protected keys
-/// that use Argon2id S2K with high memory parameters.
+/// Guards against Jetsam termination when a passphrase-protected key runs its
+/// Argon2id S2K derivation — on export as well as on import. Both directions
+/// derive under the same high-memory parameters and carry the same risk of the
+/// process being killed part-way through.
 ///
-/// This guard applies ONLY to key import (passphrase-protected key files).
-/// It does NOT apply to routine message decryption or signing (those use
-/// the SE-unwrapped private key directly).
-///
-/// Portable Legacy keys use Iterated+Salted S2K (memoryKib=0) — the guard is a no-op.
+/// It does NOT apply to routine message decryption or signing, which use the
+/// SE-unwrapped private key directly and run no S2K at all. Portable Legacy
+/// keys use Iterated+Salted S2K (memoryKib=0) in both directions, so the guard
+/// is a no-op for them.
 ///
 /// See docs/SECURITY.md Section 7.
 struct Argon2idMemoryGuard {
@@ -22,14 +23,22 @@ struct Argon2idMemoryGuard {
     /// key derivation for the given S2K parameters.
     ///
     /// This guard answers only the platform question — whether *this device* can
-    /// afford the derivation. What the format itself permits is the engine's
-    /// bound (`MAX_IMPORT_ARGON2_MEMORY_KIB` in `pgp-mobile/src/keys/s2k.rs`),
-    /// applied before these parameters ever reach Swift.
+    /// afford the derivation, under the memory limit it has actually been
+    /// granted. What the format itself permits is the engine's bound
+    /// (`MAX_IMPORT_ARGON2_MEMORY_KIB` in `pgp-mobile/src/keys/s2k.rs`), applied
+    /// before these parameters ever reach Swift.
     ///
-    /// - Parameter protectionInfo: App-owned S2K protection info parsed at the FFI boundary.
+    /// Failing is the only outcome when the memory is not there: the export
+    /// parameters are fixed by the engine and are never weakened to fit a
+    /// device, so a backup this device cannot afford to produce is one it must
+    /// refuse to produce.
+    ///
+    /// - Parameter protectionInfo: App-owned S2K protection info, either parsed
+    ///   from an incoming key at the FFI boundary or declared by the engine for
+    ///   an outgoing export.
     /// - Throws: `CypherAirError.argon2idMemoryExceeded` if the memory requirement
     ///   exceeds 75% of available memory.
-    func validate(protectionInfo: PGPKeyImportS2KInfo) throws {
+    func validate(protectionInfo: PGPKeyS2KInfo) throws {
         // Non-Argon2id (Portable Legacy: iterated-and-salted) — no memory check needed.
         guard protectionInfo.s2kType == .argon2id else { return }
 
@@ -66,13 +75,12 @@ struct Argon2idMemoryGuard {
 }
 
 /// Production implementation of MemoryInfoProvidable.
-/// iOS: calls os_proc_available_memory() to check Jetsam headroom.
-/// macOS: returns total physical memory (no Jetsam on macOS).
 struct SystemMemoryInfo: MemoryInfoProvidable {
     func availableMemoryBytes() -> UInt64 {
         #if os(macOS)
-        // macOS has no Jetsam — use total physical memory.
-        // The guard still rejects malformed S2K parameters that exceed physical RAM.
+        // macOS applies no per-process dirty-memory limit and has no Jetsam, so
+        // there is no granted limit to read — physical memory is the ceiling
+        // that matters, and the guard still refuses requirements beyond it.
         return ProcessInfo.processInfo.physicalMemory
         #else
         return UInt64(_os_proc_available_memory())
@@ -80,10 +88,17 @@ struct SystemMemoryInfo: MemoryInfoProvidable {
     }
 }
 
-// os_proc_available_memory() is a C function from <os/proc.h>.
-// It returns the number of bytes available to the process before Jetsam
-// would terminate it. Available since iOS 13.0.
-// API_UNAVAILABLE(macos) — not applicable on macOS (no Jetsam).
+// os_proc_available_memory() is a C function from <os/proc.h>, available on
+// iOS/iPadOS/visionOS and declared API_UNAVAILABLE(macos).
+//
+// It reports the bytes remaining before the process hits its *current* dirty
+// memory limit — the limit the system has actually granted this process, which
+// is what makes it the right probe here: `increased-memory-limit` raises that
+// limit only on device models that support it, so reading the granted figure is
+// the only honest way to learn whether the 2 GiB derivation fits. Apple
+// documents the value as advisory and invalidated by any allocating work, so it
+// is read per operation and never cached. It returns 0 for a process that is
+// not an app or has already exceeded its limit, which fails the check closed.
 //
 // We use @_silgen_name because the function is not exposed in the
 // Darwin Swift module map, and adding a bridging header for a single

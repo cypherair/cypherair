@@ -547,15 +547,16 @@ fn collect_message_context(ciphertext: &[u8]) -> Result<PasswordMessageContext, 
 /// memory and Jetsam-kills the app on a decrypt attempt, before any authentication
 /// runs. Our own traffic is unaffected: message encryption uses Sequoia's default
 /// Iterated+Salted S2K (no Argon2), and the highest Argon2 cost we ever emit is the
-/// 512 MiB key export. Mirrors the Swift-side `Argon2idMemoryGuard`, which guards
-/// the passphrase-protected key-import path. 2 GiB accepts RFC 9106's high-security
-/// setting while rejecting the OOM-DoS range on the 8 GB minimum device.
+/// 2 GiB key export. Mirrors the Swift-side `Argon2idMemoryGuard`, which guards the
+/// passphrase-protected key import and export paths. 2 GiB is RFC 9106's primary
+/// recommendation — the ceiling admits it exactly and rejects the OOM-DoS range
+/// above it on the 8 GB minimum device.
 const MAX_MESSAGE_ARGON2_MEMORY_KIB: u64 = 2 * 1024 * 1024; // 2 GiB
 
 /// Reject an Argon2 S2K whose time cost (passes) is implausibly high. Total KDF
 /// work scales with memory × passes; memory is bounded above, so bounding passes
 /// closes the remaining knob an attacker could turn to make a single decrypt
-/// attempt run arbitrarily long. Our own export uses 3 passes; 16 leaves ample
+/// attempt run arbitrarily long. Our own export uses one pass; 16 leaves ample
 /// headroom over RFC 9106's recommendations while rejecting the abuse range.
 const MAX_MESSAGE_ARGON2_PASSES: u8 = 16;
 
@@ -707,15 +708,16 @@ mod tests {
     }
 
     #[test]
-    fn validate_s2k_memory_accepts_reasonable_argon2() {
-        // m = 19 -> 2^19 KiB = 512 MiB, the cost of our own high-security export.
-        let s2k = S2K::Argon2 {
-            salt: [0u8; 16],
-            t: 3,
-            p: 4,
-            m: 19,
-        };
-        assert!(validate_s2k_memory(&s2k).is_ok());
+    fn message_ceiling_admits_our_own_export_cost() {
+        // Our key export emits RFC 9106's primary recommendation, which lands
+        // exactly on this ceiling. Raising the export cost past it would leave
+        // us refusing a memory cost we ourselves consider legitimate.
+        let export = crate::keys::export_s2k_params(crate::keys::KeySuite::Ed448X448);
+        assert!(
+            export.memory_kib <= MAX_MESSAGE_ARGON2_MEMORY_KIB,
+            "export costs {} KiB but messages are capped at {MAX_MESSAGE_ARGON2_MEMORY_KIB} KiB",
+            export.memory_kib
+        );
     }
 
     #[test]

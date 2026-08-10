@@ -1,12 +1,20 @@
 import XCTest
 @testable import CypherAir
 
+/// An arbitrary Argon2id memory figure used to exercise the guard's threshold
+/// arithmetic. Deliberately **not** a product parameter and not a value the app
+/// ever emits — what CypherAir actually exports is asserted against a real
+/// artifact in `test_argon2idGuard_modernHighBackup_onDeviceWithHeadroom_passes`
+/// and pinned on the Rust side. Read nothing about the shipped set from it.
+private let syntheticArgon2idMemoryKib: UInt64 = 524_288
+
 extension FFIIntegrationTests {
     // MARK: - Argon2id Memory Guard Tests
 
-    /// Import Modern High key with 512 MB Argon2id → success on device with enough memory.
-    /// Uses real Modern High key export/parseS2kParams, but mocks memory to ensure success.
-    func test_argon2idGuard_modernHigh_512MB_8GBDevice_passes() throws {
+    /// A real Modern High backup declares the shipped 2 GiB Argon2id cost, and
+    /// a device with room for it passes the guard. Real export/parseS2kParams;
+    /// only the memory figure is mocked.
+    func test_argon2idGuard_modernHighBackup_onDeviceWithHeadroom_passes() throws {
         let key = try engine.generateKey(
             name: "Argon2id Test", email: nil, expirySeconds: nil, suite: .ed448X448
         )
@@ -17,15 +25,15 @@ extension FFIIntegrationTests {
 
         let s2kInfo = try engine.parseS2kParams(armoredData: exported)
         XCTAssertEqual(s2kInfo.s2kType, .argon2id)
-        XCTAssertEqual(s2kInfo.memoryKib, 524_288, "Modern High export should use 512 MB (2^19 KiB)")
+        XCTAssertEqual(s2kInfo.memoryKib, 2_097_152, "Modern High export should use 2 GiB (2^21 KiB)")
 
         // Mock: 8 GB device with 6 GB available.
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 6 * 1024 * 1024 * 1024
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
-        // Should pass: 512 MB < 75% of 6 GB (4.5 GB).
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        // Should pass: 2 GiB < 75% of 6 GB (4.5 GB).
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// 1 GB Argon2id params → graceful error with limited memory.
@@ -41,7 +49,7 @@ extension FFIIntegrationTests {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should fail: 1 GB > 75% of 1 GB (768 MB).
-        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo))) { error in
+        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo))) { error in
             guard let cypherError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
@@ -67,7 +75,7 @@ extension FFIIntegrationTests {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should pass: 1 GB < 75% of 6 GB (4.5 GB).
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// 2 GB Argon2id → graceful refusal even on device with moderate available memory.
@@ -83,7 +91,7 @@ extension FFIIntegrationTests {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should fail: 2 GB > 75% of 2.5 GB (1.875 GB).
-        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo))) { error in
+        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo))) { error in
             guard let cypherError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
@@ -100,7 +108,7 @@ extension FFIIntegrationTests {
     /// Guard checks: required * 4 <= available * 3.
     /// Smallest passing available = ceil(required * 4 / 3).
     func test_argon2idGuard_exact75PercentBoundary_passes() throws {
-        let requiredKib: UInt64 = 524_288 // 512 MB
+        let requiredKib = syntheticArgon2idMemoryKib
         let requiredBytes = requiredKib * 1024
 
         // Smallest available where required * 4 <= available * 3 (ceiling division).
@@ -116,12 +124,12 @@ extension FFIIntegrationTests {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // At exact threshold (<=): should pass.
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// One byte below 75% boundary — should fail.
     func test_argon2idGuard_justBelow75PercentBoundary_throwsExceeded() throws {
-        let requiredKib: UInt64 = 524_288
+        let requiredKib = syntheticArgon2idMemoryKib
         let requiredBytes = requiredKib * 1024
         let minPassingAvailable = (requiredBytes * 4 + 2) / 3
 
@@ -134,7 +142,7 @@ extension FFIIntegrationTests {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = minPassingAvailable - 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// Legacy (Iterated+Salted) — guard is a no-op even with minimal memory.
@@ -155,7 +163,7 @@ extension FFIIntegrationTests {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// Defensive: argon2id type with memoryKib=0 — guard should not throw.
@@ -167,7 +175,7 @@ extension FFIIntegrationTests {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// Defensive: unknown S2K type — guard should be a no-op.
@@ -179,19 +187,19 @@ extension FFIIntegrationTests {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo)))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo)))
     }
 
     /// Verify that the guard queries the memory provider exactly once.
     func test_argon2idGuard_queriesMemoryProviderExactlyOnce() throws {
         let s2kInfo = S2kInfo(
             s2kType: .argon2id,
-            memoryKib: 524_288
+            memoryKib: syntheticArgon2idMemoryKib
         )
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 8 * 1024 * 1024 * 1024
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        _ = try? memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kInfo))
+        _ = try? memoryGuard.validate(protectionInfo: PGPKeyS2KInfo(s2kInfo))
         XCTAssertEqual(mockMemory.callCount, 1,
                        "Guard should query memory provider exactly once")
     }
