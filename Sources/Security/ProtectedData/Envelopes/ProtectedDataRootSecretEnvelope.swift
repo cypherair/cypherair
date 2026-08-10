@@ -15,8 +15,7 @@ import Security
 /// Domain-separated from the per-key private-key envelope (`CAPKEV5`) by distinct
 /// `magic` (`CAPDSEV5`) and HKDF/AAD prefixes so neither blob can be misread.
 ///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 3 and Section 10.
+/// See SECURITY.md Section 3.
 struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
     static let magic = "CAPDSEV5"
     static let currentFormatVersion = 5

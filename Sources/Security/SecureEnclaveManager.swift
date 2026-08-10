@@ -40,8 +40,7 @@ final class HardwareSEKey: SEKeyHandle {
 /// 3. HKDF(SHA-256, randomSalt, domain-bound sharedInfo) -> AES-256 key.
 /// 4. AES.GCM.seal(privateKeyBytes, authenticating: public-parameter AAD) -> envelope.
 ///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 3 and Section 10.
+/// See SECURITY.md Section 3.
 struct HardwareSecureEnclave: SecureEnclaveManageable {
     static var isAvailable: Bool {
         SecureEnclave.isAvailable

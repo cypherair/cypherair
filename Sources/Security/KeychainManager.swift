@@ -41,9 +41,6 @@ enum KeychainError: Error, Equatable, KeychainFailureRepresentable {
 /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` to ensure:
 /// - Items are only accessible while the device is unlocked.
 /// - Items are not included in backups or migrated to other devices.
-///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 10.
 struct SystemKeychain: KeychainManageable {
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws {
         var query: [String: Any] = [

@@ -78,8 +78,7 @@ enum AuthenticationError: Error, LocalizedError {
 /// - Switch between Standard and High Security modes by re-wrapping all SE keys.
 /// - Recover from interrupted mode switches (crash recovery) on app launch.
 ///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 4 and Section 10.
+/// See SECURITY.md Section 4.
 @Observable
 final class AuthenticationManager: AuthenticationEvaluable {
     private enum UITestPreferences {

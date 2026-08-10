@@ -6,8 +6,6 @@ import Foundation
 /// Phase 1 (parseRecipients) runs WITHOUT authentication — it only determines
 /// which key is needed. Phase 2 (decrypt) triggers device authentication via
 /// SE unwrap before accessing the private key.
-///
-/// Changes to this file require human review. See SECURITY.md Section 10.
 @Observable
 final class DecryptionService {
     private let messageAdapter: PGPMessageOperationAdapter

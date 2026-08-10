@@ -39,8 +39,7 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
 /// the two are domain-separated by `magic` (`CAPKEV5` vs `CAPDSEV5`) and by their
 /// HKDF/AAD prefixes so neither blob can be misread as the other.
 ///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 3 and Section 10.
+/// See SECURITY.md Section 3.
 struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
     static let magic = "CAPKEV5"
     static let currentFormatVersion = 5

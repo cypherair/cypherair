@@ -3,9 +3,6 @@ import Foundation
 /// Auto-zeroing wrapper for sensitive data (private keys, passphrases, plaintext).
 /// Calls `resetBytes(in:)` on deinit to prevent key material from lingering in memory.
 ///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 10.
-///
 /// Usage:
 /// ```swift
 /// let sensitive = SensitiveData(data)

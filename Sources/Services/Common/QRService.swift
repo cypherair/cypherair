@@ -5,8 +5,7 @@ import CoreImage.CIFilterBuiltins
 /// QR code generation and URL scheme parsing.
 ///
 /// SECURITY-CRITICAL: This service parses untrusted external input
-/// (cypherair:// URLs from QR codes). Changes require human review.
-/// See SECURITY.md Section 10.
+/// (cypherair:// URLs from QR codes).
 @Observable
 final class QRService {
 

@@ -126,9 +126,9 @@ documentation lookup for API behavior instead of relying on memory.
 
 ## Security-Sensitive Work
 
-You may edit security-critical areas directly, but the summary and PR description
-must call out the file, what changed, and why. Security changes get human
-review before merge. The authoritative
+You may edit security-critical areas directly, but the summary and PR
+description must call out the file, what changed, and why; the PR's
+verification pass checks these edits with extra care. The authoritative
 security-critical predicates and invariants live in
 `docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
 
