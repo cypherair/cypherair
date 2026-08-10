@@ -82,14 +82,31 @@ enum KeychainConstants {
     /// generation of the persisted format family, nothing more.
     static let prefix = "com.cypherair.v5"
 
-    /// Single self-contained private-key envelope row (`PrivateKeyEnvelope`).
+    /// Prefix for the single self-contained software private-key envelope rows.
+    static let privateKeyEnvelopeServicePrefix = "\(prefix).privkey-envelope."
+
+    /// Prefix for the mode-switch / modify-expiry rewrap crash-window rows.
+    static let pendingPrivateKeyEnvelopeServicePrefix = "\(prefix).pending-privkey-envelope."
+
+    /// Prefix for the Device-Bound Post-Quantum split-custody classical-component rows.
+    static let splitCustodyClassicalComponentServicePrefix = "\(prefix).split-custody-classical."
+
+    /// Single self-contained software private-key envelope row (`PrivateKeyEnvelope`).
     static func privateKeyEnvelopeService(fingerprint: String) -> String {
-        "\(prefix).privkey-envelope.\(fingerprint)"
+        "\(privateKeyEnvelopeServicePrefix)\(fingerprint)"
     }
 
     /// Temporary private-key envelope row during mode-switch / modify-expiry rewrap.
     static func pendingPrivateKeyEnvelopeService(fingerprint: String) -> String {
-        "\(prefix).pending-privkey-envelope.\(fingerprint)"
+        "\(pendingPrivateKeyEnvelopeServicePrefix)\(fingerprint)"
+    }
+
+    /// Sealed classical component of a Device-Bound Post-Quantum split-custody
+    /// identity. Its own namespace: this payload is never software-custody
+    /// material and must never be reachable through the software envelope rows
+    /// (CUSTODY.md §7).
+    static func splitCustodyClassicalComponentService(fingerprint: String) -> String {
+        "\(splitCustodyClassicalComponentServicePrefix)\(fingerprint)"
     }
 
     /// Stable ProtectedData CAPDSEV5 device-binding label; not a persisted Keychain item.

@@ -27,7 +27,12 @@ Two product rules ride on the flag choice: `biometryAny` keeps the key usable wh
 
 **Invariant:** a Standard ↔ High Security mode switch never re-wraps device-bound custody state.
 
-**Mechanism (corrected):** the exemption is enforced **entirely by caller-side custody-kind filtering** — `PGPKeyIdentity.softwareCustodyFingerprints` selects `.softwareSecretCertificate` identities, and both the mode-switch caller and interrupted-rewrap recovery enumerate only that set. The fixed access policy (§3) does *not* enforce it: the split-custody classical envelope (§7) lives in the same Keychain namespace as software envelopes, so `PrivateKeyRewrapWorkflow` **would load and re-wrap it under a mode-dependent policy if the filter were removed** — a silent custody downgrade with no error. For the pure-enclave families the filter matters differently: they have no envelope at all, and a bundleless fingerprint classifies as unrecoverable and poisons the whole mode-switch recovery. The filter is therefore a [SECURITY.md](SECURITY.md) §10 predicate, not a redundant safety net.
+**Mechanism:** two layers, and the outer one is not the enforcement.
+
+1. **Caller-side custody-kind filtering** decides what is enumerated: `PGPKeyIdentity.softwareCustodyFingerprints` selects `.softwareSecretCertificate` identities, and both the mode-switch caller and interrupted-rewrap recovery walk only that set. This keeps device-bound identities out of the workflow entirely — which matters because a fingerprint with no software envelope classifies as unrecoverable and poisons the whole mode-switch recovery.
+2. **The envelope's payload kind is what makes a mis-enumeration fail closed.** `PrivateKeyRewrapWorkflow` pins every envelope it opens and re-seals to `software-secret-certificate`. The split-custody classical component (§7) is sealed as a different kind in a namespace the workflow never reads, so it is rejected by contract validation before any Secure Enclave call, and would fail the AEAD even if that check were bypassed. There is no input to this workflow that produces a silent custody downgrade.
+
+The fixed access policy (§3) enforces neither: it constrains how the wrapping key may be used, not which envelopes a re-wrap may open. The filter remains a [SECURITY.md](SECURITY.md) §10 predicate — it is the difference between a clean switch and a poisoned recovery — but it is no longer the only thing standing between a mode switch and device-bound custody state.
 
 ## 5. Operation routing
 
@@ -51,9 +56,14 @@ Structural red lines:
 
 ## 7. Classical-component storage
 
-**Today:** the classical component secrets (Ed25519+X25519, or Ed448+X448 for · High) are concatenated and sealed as one `CAPKEV5` envelope under a fixed-access Secure Enclave wrapping key, stored per fingerprint **in the same Keychain namespace as software-custody envelopes** (`SecureEnclaveCompositeClassicalComponentStore` writes through `KeyBundleStore`). This shared tenancy is exactly why the §4 filter is load-bearing.
+The classical component secrets (Ed25519+X25519, or Ed448+X448 for · High) are concatenated and sealed as one `CAPKEV6` envelope under a fixed-access Secure Enclave wrapping key, stored per fingerprint in the **`split-custody-classical.<fingerprint>`** row family — its own Keychain namespace, distinct from every software-custody row ([STORAGE.md](STORAGE.md) §3).
 
-**Roadmap:** the decided relocation moves the classical component to its own Keychain namespace with a **payload-kind in the authenticated binding** (`CAPKEV6` — version map: [STORAGE.md](STORAGE.md) §5) and a custody-health existence check. The §6 red lines survive the move unchanged; the location does not.
+Two properties hold the boundary, and they are independent:
+
+- **Location.** `SecureEnclaveCompositeClassicalComponentStore` is the only writer and only reader of that namespace. No software-custody path resolves a service name that reaches it.
+- **Payload kind.** The envelope binding names what it seals (`split-custody-classical-component`), authenticated by both the HKDF `sharedInfo` and the AES-GCM AAD (version map: [STORAGE.md](STORAGE.md) §5). Moving a row does not change what it is: a component handed to a software-certificate consumer is rejected before any Secure Enclave call, and fails the AEAD even if that check is bypassed.
+
+The custody health check reports the component's presence as its own availability value: split custody needs both halves, and an intact enclave handle pair says nothing about the sealed component (§5 routing depends on both).
 
 ## 8. Interop position
 

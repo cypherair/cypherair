@@ -85,6 +85,93 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(report.assessments[0].handleAvailability, .available)
     }
 
+    // Split custody is only usable while BOTH halves survive. The enclave
+    // handle pair being intact says nothing about the sealed classical
+    // component, so the health check reports the component on its own.
+    func test_recoveryReportReportsSplitCustodyClassicalComponentPresence() throws {
+        let keyStore = InMemoryCompositeKeyStore()
+        try keyStore.seed(handleSetIdentifier: "abcdef01")
+        let identity = Self.identity(
+            fingerprint: "device-bound-pq",
+            keyVersion: 6,
+            family: .deviceBoundMlDsa65Ed25519MlKem768X25519,
+            publicKeyData: Data("device-bound-pq-cert".utf8),
+            revocationCert: Data("device-bound-pq-revocation".utf8)
+        )
+        let keychain = MockKeychain()
+        let service = SecureEnclaveCustodyGenerationRecoveryService(
+            publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
+                error: CypherAirError.invalidKeyData(reason: "p256 inspector must not be called")
+            ),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256),
+            compositeBindingInspector: MockSecureEnclaveCompositeBindingInspector(
+                inspection: Self.compositeInspection(identity: identity)
+            ),
+            compositeHandleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantum),
+            compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore(
+                secureEnclave: MockSecureEnclave(),
+                keychain: keychain
+            )
+        )
+
+        // Handles intact, component gone: everything else still grades healthy,
+        // so the component is the only thing that can surface the loss.
+        let withoutComponent = service.classify(identities: [identity])
+        XCTAssertEqual(withoutComponent.assessments[0].handleAvailability, .available)
+        XCTAssertEqual(
+            withoutComponent.assessments[0].classicalComponentAvailability,
+            .unavailable(.classicalComponentFailed)
+        )
+
+        try keychain.save(
+            Data([0x01]),
+            service: KeychainConstants.splitCustodyClassicalComponentService(
+                fingerprint: identity.fingerprint
+            ),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+
+        let withComponent = service.classify(identities: [identity])
+        XCTAssertEqual(withComponent.assessments[0].classicalComponentAvailability, .available)
+    }
+
+    func test_recoveryReportOmitsClassicalComponentForNonSplitCustodyTiers() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let handleStore = makeHandleStore(keyStore: keyStore, handleSetIdentifier: "a1a11ab1e0")
+        let pairLoaded = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
+        let identity = Self.identity(
+            fingerprint: "device-bound-p256",
+            publicKeyData: Data("device-bound-p256-cert".utf8),
+            revocationCert: Data("device-bound-p256-revocation".utf8)
+        )
+        let service = SecureEnclaveCustodyGenerationRecoveryService(
+            publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
+                inspection: Self.inspection(
+                    identity: identity,
+                    signingPublicKeyX963: pair.signing.publicKeyRaw,
+                    keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyRaw
+                )
+            ),
+            handleStore: handleStore,
+            compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore(
+                secureEnclave: MockSecureEnclave(),
+                keychain: MockKeychain()
+            )
+        )
+
+        let report = service.classify(identities: [identity])
+
+        // A P-256 device-bound key has no classical component row; absence must
+        // read as "not applicable", never as a missing secret.
+        XCTAssertEqual(report.assessments[0].handleAvailability, .available)
+        XCTAssertNil(report.assessments[0].classicalComponentAvailability)
+    }
+
     func test_recoveryReportClassifiesDeviceBoundPostQuantumWithMissingHandlesAsMissing() throws {
         let identity = Self.identity(
             fingerprint: "device-bound-pq-orphan",

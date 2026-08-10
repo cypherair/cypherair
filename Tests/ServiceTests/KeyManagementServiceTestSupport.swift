@@ -43,17 +43,29 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
     func wrap(
         privateKey: Data,
         using handle: any SEKeyHandle,
-        fingerprint: String
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> WrappedKeyBundle {
-        return try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        return try base.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: payloadKind
+        )
     }
 
     func unwrap(
         bundle: WrappedKeyBundle,
         using handle: any SEKeyHandle,
-        fingerprint: String
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> Data {
-        try base.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        try base.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: payloadKind
+        )
     }
 
     func deleteKey(_ handle: any SEKeyHandle) throws {
@@ -116,17 +128,29 @@ final class BlockingReconstructSecureEnclave: SecureEnclaveManageable, @unchecke
     func wrap(
         privateKey: Data,
         using handle: any SEKeyHandle,
-        fingerprint: String
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> WrappedKeyBundle {
-        try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        try base.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: payloadKind
+        )
     }
 
     func unwrap(
         bundle: WrappedKeyBundle,
         using handle: any SEKeyHandle,
-        fingerprint: String
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> Data {
-        try base.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        try base.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: payloadKind
+        )
     }
 
     func deleteKey(_ handle: any SEKeyHandle) throws {
@@ -985,7 +1009,8 @@ class KeyManagementServiceTestCase: XCTestCase {
         let bundle = try mockSE.wrap(
             privateKey: secretCertData,
             using: handle,
-            fingerprint: info.fingerprint
+            fingerprint: info.fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
         let bundleStore = KeyBundleStore(keychain: mockKC)
         try bundleStore.saveBundle(bundle, fingerprint: info.fingerprint)

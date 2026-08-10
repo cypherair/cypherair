@@ -428,6 +428,45 @@ final class KeyDetailScreenModelTests: XCTestCase {
         ))
     }
 
+    func test_deviceBoundDegradedMapping_flagsMissingSplitCustodyClassicalComponent() {
+        let secureEnclaveKey = makeCustodyMappingIdentity(
+            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+        )
+
+        // Everything else healthy: only the sealed classical component is gone,
+        // and the key is unusable without it.
+        let missingComponentReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [
+                SecureEnclaveCustodyGenerationRecoveryAssessment(
+                    identityOrdinal: 0,
+                    publicMaterialAvailability: .available,
+                    revocationArtifactAvailability: .available,
+                    handleAvailability: .available,
+                    classicalComponentAvailability: .unavailable(.classicalComponentFailed)
+                ),
+            ],
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+        XCTAssertTrue(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb",
+            keys: [secureEnclaveKey],
+            report: missingComponentReport
+        ))
+
+        // A tier with no classical component reports nil, which is not degraded.
+        let notApplicableReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [makeAssessment(ordinal: 0, handleAvailability: .available)],
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+        XCTAssertFalse(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb",
+            keys: [secureEnclaveKey],
+            report: notApplicableReport
+        ))
+    }
+
     private func makeCustodyMappingIdentity(
         fingerprint: String,
         custody: PGPPrivateKeyCustodyKind

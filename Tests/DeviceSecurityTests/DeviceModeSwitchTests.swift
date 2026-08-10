@@ -59,7 +59,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         // 1. Initial wrap under Standard mode (no access control for test simplicity).
         // This keeps the test non-interactive and focused on re-wrap mechanics only.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         // Store in Keychain as permanent items.
         try keychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
@@ -86,10 +86,10 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         // 5. Verify: can still unwrap the key with new items.
         let newEnvelope = try keychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
 
-        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint)
+        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
         let newHandle = try secureEnclave.reconstructKey(from: newSEKeyData, authenticationContext: nil)
         let newBundle = WrappedKeyBundle(envelope: newEnvelope)
-        let unwrapped = try secureEnclave.unwrap(bundle: newBundle, using: newHandle, fingerprint: fingerprint)
+        let unwrapped = try secureEnclave.unwrap(bundle: newBundle, using: newHandle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after mode switch")
 
@@ -150,7 +150,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account
         )
-        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint)
+        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
         let newHandle = try secureEnclave.reconstructKey(
             from: newSEKeyData,
             authenticationContext: authentication.context
@@ -159,7 +159,8 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let unwrapped = try secureEnclave.unwrap(
             bundle: newBundle,
             using: newHandle,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
 
         XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after manual Standard→High Security switch")
@@ -187,11 +188,11 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         // Wrap and store keys for both fingerprints.
         let handle1 = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle1 = try mockSE.wrap(privateKey: fakeKey1, using: handle1, fingerprint: fp1)
+        let bundle1 = try mockSE.wrap(privateKey: fakeKey1, using: handle1, fingerprint: fp1, payloadKind: .softwareSecretCertificate)
         try mockKeychain.save(bundle1.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp1), account: account, accessControl: nil)
 
         let handle2 = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle2 = try mockSE.wrap(privateKey: fakeKey2, using: handle2, fingerprint: fp2)
+        let bundle2 = try mockSE.wrap(privateKey: fakeKey2, using: handle2, fingerprint: fp2, payloadKind: .softwareSecretCertificate)
         try mockKeychain.save(bundle2.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp2), account: account, accessControl: nil)
 
         // 2 permanent saves so far (one envelope row per key). Pending saves follow during switchMode.
@@ -255,7 +256,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         // Set up a key so we have a valid fingerprint.
         let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try mockSE.wrap(privateKey: Data(repeating: 0xCC, count: 32), using: handle, fingerprint: fp)
+        let bundle = try mockSE.wrap(privateKey: Data(repeating: 0xCC, count: 32), using: handle, fingerprint: fp, payloadKind: .softwareSecretCertificate)
         try mockKeychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account, accessControl: nil)
 
         let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
@@ -304,7 +305,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         // 1. Initial wrap under High Security mode.
         // No initial ACL so this test stays focused on re-wrap mechanics.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         try keychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
@@ -330,10 +331,10 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         // 5. Verify: can still unwrap the key.
         let newEnvelope = try keychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
 
-        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint)
+        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
         let newHandle = try secureEnclave.reconstructKey(from: newSEKeyData, authenticationContext: nil)
         let newBundle = WrappedKeyBundle(envelope: newEnvelope)
-        let unwrapped = try secureEnclave.unwrap(bundle: newBundle, using: newHandle, fingerprint: fingerprint)
+        let unwrapped = try secureEnclave.unwrap(bundle: newBundle, using: newHandle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after HS→Standard switch")
 
@@ -392,7 +393,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account
         )
-        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint)
+        let newSEKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: newEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
         let newHandle = try secureEnclave.reconstructKey(
             from: newSEKeyData,
             authenticationContext: authentication.context
@@ -401,7 +402,8 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let unwrapped = try secureEnclave.unwrap(
             bundle: newBundle,
             using: newHandle,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
 
         XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after manual High Security→Standard switch")
@@ -431,7 +433,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             originalKeys[fp] = fakeKey
 
             let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-            let bundle = try mockSE.wrap(privateKey: fakeKey, using: handle, fingerprint: fp)
+            let bundle = try mockSE.wrap(privateKey: fakeKey, using: handle, fingerprint: fp, payloadKind: .softwareSecretCertificate)
             try mockKeychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account, accessControl: nil)
         }
 
@@ -453,10 +455,10 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         for fp in fingerprints {
             let envelope = try mockKeychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account)
 
-            let seData = try PrivateKeyEnvelopeCodec.seKeyData(from: envelope, expectedFingerprint: fp)
+            let seData = try PrivateKeyEnvelopeCodec.seKeyData(from: envelope, expectedFingerprint: fp, expectedPayloadKind: .softwareSecretCertificate)
             let handle = try mockSE.reconstructKey(from: seData, authenticationContext: nil)
             let bundle = WrappedKeyBundle(envelope: envelope)
-            let unwrapped = try mockSE.unwrap(bundle: bundle, using: handle, fingerprint: fp)
+            let unwrapped = try mockSE.unwrap(bundle: bundle, using: handle, fingerprint: fp, payloadKind: .softwareSecretCertificate)
             XCTAssertEqual(unwrapped, originalKeys[fp], "Key for \(fp) must match after 12-key mode switch")
 
             // No pending items
@@ -484,7 +486,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             let fakeKey = Data(repeating: UInt8(i + 0x20), count: keySize)
 
             let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-            let bundle = try mockSE.wrap(privateKey: fakeKey, using: handle, fingerprint: fp)
+            let bundle = try mockSE.wrap(privateKey: fakeKey, using: handle, fingerprint: fp, payloadKind: .softwareSecretCertificate)
             try mockKeychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account, accessControl: nil)
             originalBundles[fp] = bundle
         }

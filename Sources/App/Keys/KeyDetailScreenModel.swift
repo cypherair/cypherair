@@ -138,6 +138,10 @@ final class KeyDetailScreenModel {
         guard let assessment = report.assessments.first(where: { $0.identityOrdinal == ordinal }) else {
             return true
         }
+        if let classicalComponentAvailability = assessment.classicalComponentAvailability,
+           classicalComponentAvailability != .available {
+            return true
+        }
         return assessment.publicMaterialAvailability != .available
             || assessment.revocationArtifactAvailability != .available
             || assessment.handleAvailability != .available

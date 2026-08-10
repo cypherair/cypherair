@@ -69,7 +69,12 @@ final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTes
         defer { secret.zeroize() }
 
         let handle = try custody.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try custody.wrap(privateKey: secret, using: handle, fingerprint: fingerprint)
+        let bundle = try custody.wrap(
+            privateKey: secret,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
 
         // Production-shaped open path: reconstruct the enclave key from the
         // representation the envelope row carries, then unwrap promptlessly.
@@ -77,7 +82,12 @@ final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTes
             from: handle.dataRepresentation,
             authenticationContext: nil
         )
-        var unwrapped = try custody.unwrap(bundle: bundle, using: reconstructed, fingerprint: fingerprint)
+        var unwrapped = try custody.unwrap(
+            bundle: bundle,
+            using: reconstructed,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
         defer { unwrapped.zeroize() }
         XCTAssertEqual(unwrapped, secret)
 
@@ -86,7 +96,8 @@ final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTes
             try custody.unwrap(
                 bundle: bundle,
                 using: reconstructed,
-                fingerprint: "feedfacefeedfacefeedfacefeedfacefeedface"
+                fingerprint: "feedfacefeedfacefeedfacefeedfacefeedface",
+                payloadKind: .softwareSecretCertificate
             )
         )
     }

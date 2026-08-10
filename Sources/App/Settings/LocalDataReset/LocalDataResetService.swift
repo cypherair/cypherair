@@ -362,11 +362,14 @@ final class LocalDataResetService {
             }
             return "protectedDataDomainKey"
         }
-        if service.hasPrefix("\(KeychainConstants.prefix).pending-privkey-envelope.") {
+        if service.hasPrefix(KeychainConstants.pendingPrivateKeyEnvelopeServicePrefix) {
             return "pendingPrivateKeyEnvelope"
         }
-        if service.hasPrefix("\(KeychainConstants.prefix).privkey-envelope.") {
+        if service.hasPrefix(KeychainConstants.privateKeyEnvelopeServicePrefix) {
             return "privateKeyEnvelope"
+        }
+        if service.hasPrefix(KeychainConstants.splitCustodyClassicalComponentServicePrefix) {
+            return "splitCustodyClassicalComponent"
         }
         if service == ProtectedDataRightIdentifiers.productionSharedRightIdentifier {
             return "protectedDataRootSecret"

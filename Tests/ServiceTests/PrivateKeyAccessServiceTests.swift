@@ -74,7 +74,8 @@ final class PrivateKeyAccessServiceTests: XCTestCase {
         let bundle = try secureEnclave.wrap(
             privateKey: privateKey,
             using: handle,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
         try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
         return (fingerprint, privateKey)

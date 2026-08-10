@@ -267,7 +267,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
 
         let handlePair = authorizedPair.loadedPair
         var storedFingerprint: String?
-        var classicalReceipt: KeyBundleWriteReceipt?
+        var storedClassicalComponentFingerprint: String?
         var didRollbackGeneratedState = false
         do {
             try Task.checkCancellation()
@@ -299,12 +299,13 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             // Seal the classical component before the durable identity commit
             // so a committed identity never exists without its component;
             // `store` zeroizes the secret buffers.
-            classicalReceipt = try compositeClassicalComponentStore.store(
+            try compositeClassicalComponentStore.store(
                 fingerprint: generated.metadata.fingerprint,
                 eddsaSecret: &generated.classicalEddsaSecret,
                 ecdhSecret: &generated.classicalEcdhSecret,
                 tier: tier
             )
+            storedClassicalComponentFingerprint = generated.metadata.fingerprint
 
             return try await commitCoordinator.performCommit {
                 do {
@@ -345,7 +346,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                             compositeHandleStore: compositeHandleStore,
                             compositeClassicalComponentStore: compositeClassicalComponentStore,
                             loadedPair: handlePair,
-                            classicalReceipt: classicalReceipt,
+                            storedClassicalComponentFingerprint: storedClassicalComponentFingerprint,
                             storedFingerprint: storedFingerprint
                         )
                     } catch {
@@ -361,7 +362,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                         compositeHandleStore: compositeHandleStore,
                         compositeClassicalComponentStore: compositeClassicalComponentStore,
                         loadedPair: handlePair,
-                        classicalReceipt: classicalReceipt,
+                        storedClassicalComponentFingerprint: storedClassicalComponentFingerprint,
                         storedFingerprint: storedFingerprint
                     )
                 } catch {
@@ -426,14 +427,16 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         compositeHandleStore: SecureEnclaveCustodyHandleStore,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore,
         loadedPair: SecureEnclaveCustodyLoadedHandlePair,
-        classicalReceipt: KeyBundleWriteReceipt?,
+        storedClassicalComponentFingerprint: String?,
         storedFingerprint: String?
     ) throws {
         if let storedFingerprint {
             try catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
         }
-        if let classicalReceipt {
-            compositeClassicalComponentStore.rollback(classicalReceipt)
+        if let storedClassicalComponentFingerprint {
+            compositeClassicalComponentStore.discardStoredComponent(
+                fingerprint: storedClassicalComponentFingerprint
+            )
         }
         let pair = try SecureEnclaveCustodyHandlePair(
             signing: loadedPair.signing.binding,

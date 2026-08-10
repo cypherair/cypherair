@@ -12,19 +12,22 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
     private let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
     private let compositeHandleStore: SecureEnclaveCustodyHandleStore?
     private let compositeHighHandleStore: SecureEnclaveCustodyHandleStore?
+    private let compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore?
 
     init(
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
         handleStore: SecureEnclaveCustodyHandleStore,
         compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
         compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil,
-        compositeHighHandleStore: SecureEnclaveCustodyHandleStore? = nil
+        compositeHighHandleStore: SecureEnclaveCustodyHandleStore? = nil,
+        compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore? = nil
     ) {
         self.publicBindingInspector = publicBindingInspector
         self.handleStore = handleStore
         self.compositeBindingInspector = compositeBindingInspector
         self.compositeHandleStore = compositeHandleStore
         self.compositeHighHandleStore = compositeHighHandleStore
+        self.compositeClassicalComponentStore = compositeClassicalComponentStore
     }
 
     func classify(
@@ -160,13 +163,21 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
         tier: SecureEnclaveCustodyTier,
         revocationAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability
     ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
+        // Split custody needs both halves: an enclave-resident PQ handle pair
+        // AND the sealed classical component. Losing either one makes the
+        // identity unusable, so the component's presence is checked on every
+        // path — independently of, and before, the public-material inspection.
+        // Presence only: nothing is decoded, so this never prompts.
+        let classicalComponentAvailability = classicalComponentAvailability(for: identity)
+
         guard !identity.publicKeyData.isEmpty else {
             return assessment(
                 identity: identity,
                 ordinal: ordinal,
                 publicMaterialAvailability: .unavailable(.publicMaterialUnavailable),
                 revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.publicMaterialUnavailable)
+                handleAvailability: .unavailable(.publicMaterialUnavailable),
+                classicalComponentAvailability: classicalComponentAvailability
             )
         }
 
@@ -189,7 +200,8 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
                 ordinal: ordinal,
                 publicMaterialAvailability: .unavailable(.operationUnavailableByPolicy),
                 revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.operationUnavailableByPolicy)
+                handleAvailability: .unavailable(.operationUnavailableByPolicy),
+                classicalComponentAvailability: classicalComponentAvailability
             )
         }
 
@@ -206,7 +218,8 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
                 ordinal: ordinal,
                 publicMaterialAvailability: .unavailable(category),
                 revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(category)
+                handleAvailability: .unavailable(category),
+                classicalComponentAvailability: classicalComponentAvailability
             )
         }
 
@@ -217,7 +230,8 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
                 ordinal: ordinal,
                 publicMaterialAvailability: .unavailable(.metadataAssociationMismatch),
                 revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.metadataAssociationMismatch)
+                handleAvailability: .unavailable(.metadataAssociationMismatch),
+                classicalComponentAvailability: classicalComponentAvailability
             )
         }
 
@@ -226,8 +240,20 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             ordinal: ordinal,
             publicMaterialAvailability: .available,
             revocationArtifactAvailability: revocationAvailability,
-            handleAvailability: locateCompositeHandlePair(inspection, store: tierHandleStore)
+            handleAvailability: locateCompositeHandlePair(inspection, store: tierHandleStore),
+            classicalComponentAvailability: classicalComponentAvailability
         )
+    }
+
+    private func classicalComponentAvailability(
+        for identity: PGPKeyIdentity
+    ) -> SecureEnclaveCustodyRecoveryMaterialAvailability {
+        guard let compositeClassicalComponentStore else {
+            return .unavailable(.operationUnavailableByPolicy)
+        }
+        return compositeClassicalComponentStore.componentExists(fingerprint: identity.fingerprint)
+            ? .available
+            : .unavailable(.classicalComponentFailed)
     }
 
     private func locateCompositeHandlePair(
@@ -268,13 +294,15 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
         ordinal: Int,
         publicMaterialAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability,
         revocationArtifactAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability,
-        handleAvailability: SecureEnclaveCustodyHandleAvailability
+        handleAvailability: SecureEnclaveCustodyHandleAvailability,
+        classicalComponentAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability? = nil
     ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
         SecureEnclaveCustodyGenerationRecoveryAssessment(
             identityOrdinal: ordinal,
             publicMaterialAvailability: publicMaterialAvailability,
             revocationArtifactAvailability: revocationArtifactAvailability,
-            handleAvailability: handleAvailability
+            handleAvailability: handleAvailability,
+            classicalComponentAvailability: classicalComponentAvailability
         )
     }
 }

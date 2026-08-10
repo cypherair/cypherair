@@ -25,8 +25,8 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         XCTAssertEqual(status, errSecSuccess)
 
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint)
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         XCTAssertEqual(unwrapped, keyData, "MIE smoke: wrap/unwrap must succeed without tag mismatch")
     }
@@ -45,8 +45,8 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             XCTAssertEqual(status, errSecSuccess, "Iteration \(i): SecRandom failed")
 
             let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-            let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint)
-            let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+            let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
             XCTAssertEqual(unwrapped, keyData, "Iteration \(i): wrap/unwrap mismatch")
         }

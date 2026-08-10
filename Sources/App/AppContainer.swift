@@ -706,7 +706,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let secureEnclaveCompositeClassicalComponentStore = SecureEnclaveCompositeClassicalComponentStore(
             secureEnclave: secureEnclave,
-            bundleStore: KeyBundleStore(keychain: keychain)
+            keychain: keychain
         )
         let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()
         let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
@@ -714,7 +714,8 @@ final class AppContainer: @unchecked Sendable {
             handleStore: secureEnclaveCustodyHandleStore,
             compositeBindingInspector: secureEnclaveCompositeBindingInspector,
             compositeHandleStore: secureEnclaveCompositeHandleStore,
-            compositeHighHandleStore: secureEnclaveCompositeHighHandleStore
+            compositeHighHandleStore: secureEnclaveCompositeHighHandleStore,
+            compositeClassicalComponentStore: secureEnclaveCompositeClassicalComponentStore
         )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)

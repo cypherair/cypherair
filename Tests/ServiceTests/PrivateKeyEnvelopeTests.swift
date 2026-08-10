@@ -28,9 +28,18 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
     func test_envelope_roundTripsThroughSecureEnclave() throws {
         let privateKey = Data(repeating: 0xAB, count: 57) // Ed448-size secret material
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
 
-        let decoded = try PrivateKeyEnvelopeCodec.decode(bundle.envelope, expectedFingerprint: fingerprint)
+        let decoded = try PrivateKeyEnvelopeCodec.decode(
+            bundle.envelope,
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: .softwareSecretCertificate
+        )
         XCTAssertEqual(decoded.magic, PrivateKeyEnvelope.magic)
         XCTAssertEqual(decoded.formatVersion, PrivateKeyEnvelope.currentFormatVersion)
         XCTAssertEqual(decoded.aadVersion, PrivateKeyEnvelope.currentAADVersion)
@@ -44,7 +53,12 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded.ephemeralPublicKeyX963.count, PrivateKeyEnvelope.expectedP256X963Length)
         XCTAssertEqual(decoded.ciphertext.count, privateKey.count)
 
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        let unwrapped = try secureEnclave.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
         XCTAssertEqual(unwrapped, privateKey)
     }
 
@@ -52,14 +66,8 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let privateKey = Data(repeating: 0x11, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
 
-        let first = try PrivateKeyEnvelopeCodec.decode(
-            try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint).envelope,
-            expectedFingerprint: fingerprint
-        )
-        let second = try PrivateKeyEnvelopeCodec.decode(
-            try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint).envelope,
-            expectedFingerprint: fingerprint
-        )
+        let first = try decodedSoftwareEnvelope(sealing: privateKey, using: handle)
+        let second = try decodedSoftwareEnvelope(sealing: privateKey, using: handle)
 
         XCTAssertNotEqual(first.ephemeralPublicKeyX963, second.ephemeralPublicKeyX963)
         XCTAssertNotEqual(first.hkdfSalt, second.hkdfSalt)
@@ -74,12 +82,26 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         // exact length authenticated in the AAD.
         let largePrivateKey = Data((0..<(64 * 1024)).map { UInt8(truncatingIfNeeded: $0) })
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: largePrivateKey, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(
+            privateKey: largePrivateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
 
-        let decoded = try PrivateKeyEnvelopeCodec.decode(bundle.envelope, expectedFingerprint: fingerprint)
+        let decoded = try PrivateKeyEnvelopeCodec.decode(
+            bundle.envelope,
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: .softwareSecretCertificate
+        )
         XCTAssertEqual(decoded.ciphertext.count, largePrivateKey.count)
 
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        let unwrapped = try secureEnclave.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
         XCTAssertEqual(unwrapped, largePrivateKey)
     }
 
@@ -88,10 +110,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
     func test_envelope_rejectsTamperedAuthenticatedFields() throws {
         let privateKey = Data(repeating: 0x24, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let envelope = try PrivateKeyEnvelopeCodec.decode(
-            try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint).envelope,
-            expectedFingerprint: fingerprint
-        )
+        let envelope = try decodedSoftwareEnvelope(sealing: privateKey, using: handle)
 
         let substitutePublicKey = P256.KeyAgreement.PrivateKey().publicKey.x963Representation
         let tampered: [PrivateKeyEnvelope] = [
@@ -108,7 +127,8 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
                 try secureEnclave.unwrap(
                     bundle: WrappedKeyBundle(envelope: encoded),
                     using: handle,
-                    fingerprint: fingerprint
+                    fingerprint: fingerprint,
+                    payloadKind: .softwareSecretCertificate
                 ),
                 "Tampered authenticated field must fail closed"
             )
@@ -118,10 +138,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
     func test_envelope_wrongBoundPublicKey_failsClosedBeforeKeyAgreement() throws {
         let privateKey = Data(repeating: 0x42, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let envelope = try PrivateKeyEnvelopeCodec.decode(
-            try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint).envelope,
-            expectedFingerprint: fingerprint
-        )
+        let envelope = try decodedSoftwareEnvelope(sealing: privateKey, using: handle)
 
         // Re-bind the envelope to a different (valid) SE public key, then unwrap with the
         // original handle → the bound-key guard fires before any ECDH.
@@ -130,7 +147,8 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
             try secureEnclave.unwrap(
                 bundle: WrappedKeyBundle(envelope: try PrivateKeyEnvelopeCodec.encode(rebound)),
                 using: handle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
         ) { error in
             XCTAssertEqual(error as? PrivateKeyEnvelopeError, .deviceBindingMismatch)
@@ -141,24 +159,48 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let privateKey = Data(repeating: 0x53, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let otherHandle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
 
         XCTAssertThrowsError(
-            try secureEnclave.unwrap(bundle: bundle, using: otherHandle, fingerprint: fingerprint)
+            try secureEnclave.unwrap(
+                bundle: bundle,
+                using: otherHandle,
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
+            )
         )
     }
 
     func test_envelope_wrongFingerprint_failsClosed() throws {
         let privateKey = Data(repeating: 0x64, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        let bundle = try secureEnclave.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
 
         let otherFingerprint = "fedcba9876543210fedcba9876543210fedcba98"
         XCTAssertThrowsError(
-            try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: otherFingerprint)
+            try secureEnclave.unwrap(
+                bundle: bundle,
+                using: handle,
+                fingerprint: otherFingerprint,
+                payloadKind: .softwareSecretCertificate
+            )
         )
         XCTAssertThrowsError(
-            try PrivateKeyEnvelopeCodec.decode(bundle.envelope, expectedFingerprint: otherFingerprint)
+            try PrivateKeyEnvelopeCodec.decode(
+                bundle.envelope,
+                expectedFingerprint: otherFingerprint,
+                expectedPayloadKind: .softwareSecretCertificate
+            )
         )
     }
 
@@ -167,12 +209,9 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
     func test_envelope_rejectsMalformedContractAndUnsupportedFields() throws {
         let privateKey = Data(repeating: 0x35, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let envelope = try PrivateKeyEnvelopeCodec.decode(
-            try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint).envelope,
-            expectedFingerprint: fingerprint
-        )
+        let envelope = try decodedSoftwareEnvelope(sealing: privateKey, using: handle)
 
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, magic: "CAPKEX5")))
+        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, magic: "CAPKEX6")))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, formatVersion: 0)))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, aadVersion: 2)))
@@ -185,7 +224,8 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         XCTAssertThrowsError(
             try PrivateKeyEnvelopeCodec.decode(
                 try encodedEnvelopeWithUnsupportedField(from: envelope),
-                expectedFingerprint: fingerprint
+                expectedFingerprint: fingerprint,
+                expectedPayloadKind: .softwareSecretCertificate
             )
         )
     }
@@ -194,11 +234,119 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let garbage = WrappedKeyBundle(envelope: Data("not-a-private-key-envelope".utf8))
 
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.decode(garbage.envelope, expectedFingerprint: fingerprint))
-        XCTAssertThrowsError(try secureEnclave.unwrap(bundle: garbage, using: handle, fingerprint: fingerprint))
+        XCTAssertThrowsError(
+            try PrivateKeyEnvelopeCodec.decode(
+                garbage.envelope,
+                expectedFingerprint: fingerprint,
+                expectedPayloadKind: .softwareSecretCertificate
+            )
+        )
+        XCTAssertThrowsError(
+            try secureEnclave.unwrap(
+                bundle: garbage,
+                using: handle,
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
+            )
+        )
+    }
+
+    // MARK: - Payload-kind separation
+
+    func test_envelope_sealedAsOneKind_cannotBeOpenedAsTheOther() throws {
+        let component = Data(repeating: 0x71, count: 64)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: component,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .splitCustodyClassicalComponent
+        )
+
+        XCTAssertThrowsError(
+            try secureEnclave.unwrap(
+                bundle: bundle,
+                using: handle,
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
+            ),
+            "A classical component must not open as a software secret certificate"
+        ) { error in
+            XCTAssertEqual(error as? PrivateKeyEnvelopeError, .payloadKindMismatch)
+        }
+        XCTAssertThrowsError(
+            try PrivateKeyEnvelopeCodec.seKeyData(
+                from: bundle.envelope,
+                expectedFingerprint: fingerprint,
+                expectedPayloadKind: .softwareSecretCertificate
+            ),
+            "The kind must be rejected before any Secure Enclave reconstruct"
+        ) { error in
+            XCTAssertEqual(error as? PrivateKeyEnvelopeError, .payloadKindMismatch)
+        }
+
+        var opened = try secureEnclave.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .splitCustodyClassicalComponent
+        )
+        defer { opened.zeroize() }
+        XCTAssertEqual(opened, component)
+    }
+
+    func test_envelope_relabelledPayloadKind_failsTheAEAD() throws {
+        // The contract check is not the only thing standing between the two
+        // payload kinds: rewrite the stored field so contract validation passes,
+        // and the AES-GCM AAD — which binds the kind — must still reject it.
+        let component = Data(repeating: 0x72, count: 64)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
+        let sealed = try PrivateKeyEnvelopeCodec.decode(
+            try secureEnclave.wrap(
+                privateKey: component,
+                using: handle,
+                fingerprint: fingerprint,
+                payloadKind: .splitCustodyClassicalComponent
+            ).envelope,
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: .splitCustodyClassicalComponent
+        )
+
+        let relabelled = replacing(sealed, payloadKind: .softwareSecretCertificate)
+        let encoded = try PrivateKeyEnvelopeCodec.encode(relabelled)
+
+        XCTAssertThrowsError(
+            try secureEnclave.unwrap(
+                bundle: WrappedKeyBundle(envelope: encoded),
+                using: handle,
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
+            )
+        ) { error in
+            XCTAssertTrue(
+                error is CryptoKitError,
+                "Expected an AEAD failure, got \(error)"
+            )
+        }
     }
 
     // MARK: - Helpers
+
+    private func decodedSoftwareEnvelope(
+        sealing privateKey: Data,
+        using handle: any SEKeyHandle
+    ) throws -> PrivateKeyEnvelope {
+        try PrivateKeyEnvelopeCodec.decode(
+            try secureEnclave.wrap(
+                privateKey: privateKey,
+                using: handle,
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
+            ).envelope,
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: .softwareSecretCertificate
+        )
+    }
 
     private func flippedFirstByte(_ data: Data) -> Data {
         var copy = data
@@ -220,12 +368,16 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         return try PropertyListSerialization.data(fromPropertyList: dictionary, format: .binary, options: 0)
     }
 
+    // Each field is resolved into an explicitly typed local first: as one
+    // expression, the fourteen chained `??` operators blow past the
+    // type-checker's budget.
     private func replacing(
         _ envelope: PrivateKeyEnvelope,
         magic: String? = nil,
         formatVersion: Int? = nil,
         algorithmID: String? = nil,
         aadVersion: Int? = nil,
+        payloadKind: PrivateKeyEnvelopePayloadKind? = nil,
         fingerprint: String? = nil,
         seKeyData: Data? = nil,
         seKeyPublicKeyX963: Data? = nil,
@@ -235,19 +387,34 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         ciphertext: Data? = nil,
         tag: Data? = nil
     ) -> PrivateKeyEnvelope {
-        PrivateKeyEnvelope(
-            magic: magic ?? envelope.magic,
-            formatVersion: formatVersion ?? envelope.formatVersion,
-            algorithmID: algorithmID ?? envelope.algorithmID,
-            aadVersion: aadVersion ?? envelope.aadVersion,
-            fingerprint: fingerprint ?? envelope.fingerprint,
-            seKeyData: seKeyData ?? envelope.seKeyData,
-            seKeyPublicKeyX963: seKeyPublicKeyX963 ?? envelope.seKeyPublicKeyX963,
-            ephemeralPublicKeyX963: ephemeralPublicKeyX963 ?? envelope.ephemeralPublicKeyX963,
-            hkdfSalt: hkdfSalt ?? envelope.hkdfSalt,
-            nonce: nonce ?? envelope.nonce,
-            ciphertext: ciphertext ?? envelope.ciphertext,
-            tag: tag ?? envelope.tag
+        let resolvedMagic: String = magic ?? envelope.magic
+        let resolvedFormatVersion: Int = formatVersion ?? envelope.formatVersion
+        let resolvedAlgorithmID: String = algorithmID ?? envelope.algorithmID
+        let resolvedAADVersion: Int = aadVersion ?? envelope.aadVersion
+        let resolvedPayloadKind: PrivateKeyEnvelopePayloadKind = payloadKind ?? envelope.payloadKind
+        let resolvedFingerprint: String = fingerprint ?? envelope.fingerprint
+        let resolvedSEKeyData: Data = seKeyData ?? envelope.seKeyData
+        let resolvedSEKeyPublicKey: Data = seKeyPublicKeyX963 ?? envelope.seKeyPublicKeyX963
+        let resolvedEphemeralPublicKey: Data = ephemeralPublicKeyX963 ?? envelope.ephemeralPublicKeyX963
+        let resolvedSalt: Data = hkdfSalt ?? envelope.hkdfSalt
+        let resolvedNonce: Data = nonce ?? envelope.nonce
+        let resolvedCiphertext: Data = ciphertext ?? envelope.ciphertext
+        let resolvedTag: Data = tag ?? envelope.tag
+
+        return PrivateKeyEnvelope(
+            magic: resolvedMagic,
+            formatVersion: resolvedFormatVersion,
+            algorithmID: resolvedAlgorithmID,
+            aadVersion: resolvedAADVersion,
+            payloadKind: resolvedPayloadKind,
+            fingerprint: resolvedFingerprint,
+            seKeyData: resolvedSEKeyData,
+            seKeyPublicKeyX963: resolvedSEKeyPublicKey,
+            ephemeralPublicKeyX963: resolvedEphemeralPublicKey,
+            hkdfSalt: resolvedSalt,
+            nonce: resolvedNonce,
+            ciphertext: resolvedCiphertext,
+            tag: resolvedTag
         )
     }
 }

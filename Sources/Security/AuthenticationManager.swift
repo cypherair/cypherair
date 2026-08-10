@@ -331,13 +331,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// - Parameters:
     ///   - newMode: The target authentication mode.
     ///   - fingerprints: Software-custody identity fingerprints (lowercase hex)
-    ///     that have SE-wrapped private-key bundles. Device-bound fingerprints
-    ///     must not be passed — the caller-side custody-kind filter
-    ///     (`PGPKeyIdentity.softwareCustodyFingerprints`) is the enforcement of
-    ///     the device-bound mode-switch exemption (docs/CUSTODY.md §4); this
-    ///     workflow itself would re-wrap a split-custody classical envelope if
-    ///     given one. A device-bound-only population yields an empty list and
-    ///     the switch fails closed with `noIdentities`.
+    ///     that have SE-wrapped private-key bundles, selected by
+    ///     `PGPKeyIdentity.softwareCustodyFingerprints` (docs/CUSTODY.md §4).
+    ///     A device-bound fingerprint has no bundle the re-wrap can open, so
+    ///     passing one aborts the switch rather than downgrading its custody.
+    ///     A device-bound-only population yields an empty list and the switch
+    ///     fails closed with `noIdentities`.
     ///   - hasBackup: Whether at least one private key has been backed up.
     ///     If false and switching to High Security, the caller must show a stronger warning.
     ///   - authenticator: The authentication evaluator to use for verifying user identity.

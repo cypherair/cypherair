@@ -39,6 +39,29 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             account: KeychainConstants.defaultAccount))
     }
 
+    /// Key deletion enumerates every private row family, not just the software
+    /// envelope ones — a split-custody classical component left behind would be
+    /// a sealed secret with no owning identity. The row is planted directly
+    /// because composite generation needs Secure Enclave hardware; what is under
+    /// test is the deletion enumeration, which is keyed by fingerprint alone.
+    func test_deleteKey_removesSplitCustodyClassicalComponentRow() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
+        let fp = identity.fingerprint
+        let componentService = KeychainConstants.splitCustodyClassicalComponentService(fingerprint: fp)
+        try mockKC.save(
+            Data([0x11, 0x22]),
+            service: componentService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+
+        try service.deleteKey(fingerprint: fp)
+
+        XCTAssertFalse(mockKC.exists(
+            service: componentService,
+            account: KeychainConstants.defaultAccount))
+    }
+
     func test_deleteKey_reassignsDefaultIfNeeded() async throws {
         let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
         let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")

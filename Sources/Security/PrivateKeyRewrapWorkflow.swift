@@ -90,6 +90,13 @@ final class PrivateKeyRewrapWorkflow {
         }
     }
 
+    /// SECURITY-CRITICAL: every envelope this workflow opens and re-seals is
+    /// pinned to `.softwareSecretCertificate`. Device-bound custody state is
+    /// exempt from mode switching (docs/CUSTODY.md §4) and the exemption does
+    /// not rest on the caller's fingerprint filter alone: a split-custody
+    /// classical component is sealed as a different payload kind, so it is
+    /// rejected by contract validation here — before any Secure Enclave call —
+    /// and would fail the AEAD even if that check were bypassed.
     private func rewrapBundleForModeSwitch(
         existingBundle: WrappedKeyBundle,
         fingerprint: String,
@@ -99,7 +106,8 @@ final class PrivateKeyRewrapWorkflow {
         try await authenticationPromptCoordinator.withOperationPrompt {
             let existingSeKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
                 from: existingBundle.envelope,
-                expectedFingerprint: fingerprint
+                expectedFingerprint: fingerprint,
+                expectedPayloadKind: .softwareSecretCertificate
             )
             let existingHandle = try secureEnclave.reconstructKey(
                 from: existingSeKeyData,
@@ -109,7 +117,8 @@ final class PrivateKeyRewrapWorkflow {
             var rawKeyBytes = try secureEnclave.unwrap(
                 bundle: existingBundle,
                 using: existingHandle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
 
             defer {
@@ -123,7 +132,8 @@ final class PrivateKeyRewrapWorkflow {
             return try secureEnclave.wrap(
                 privateKey: rawKeyBytes,
                 using: newHandle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
         }
     }

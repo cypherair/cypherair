@@ -2,7 +2,7 @@ import Foundation
 import LocalAuthentication
 import Security
 
-/// Result of wrapping a private key with the Secure Enclave.
+/// Result of wrapping a private payload with the Secure Enclave.
 /// Holds the single self-contained `PrivateKeyEnvelope` row (binary plist): it folds
 /// in the SE key `dataRepresentation`, the persistent SE public key, the per-seal
 /// software ephemeral public key, the HKDF salt, and the AES-GCM seal.
@@ -42,25 +42,39 @@ protocol SecureEnclaveManageable: Sendable {
     /// - Returns: A handle to the SE key.
     func generateWrappingKey(accessControl: SecAccessControl?, authenticationContext: LAContext?) throws -> any SEKeyHandle
 
-    /// Wrap a private key into a single `PrivateKeyEnvelope`:
+    /// Wrap a private payload into a single `PrivateKeyEnvelope`:
     /// software-ephemeral × persistent SE-public ECDH → HKDF(SHA-256, salt, domain-bound
     /// info) → AES-GCM seal with public-parameter AAD.
     ///
     /// - Parameters:
-    ///   - privateKey: The raw private key bytes to wrap.
+    ///   - privateKey: The raw private bytes to wrap.
     ///   - handle: The SE wrapping key handle (its public key is the persistent ECDH party).
     ///   - fingerprint: The key's hex fingerprint (lowercase, no spaces); bound into the envelope.
+    ///   - payloadKind: What the payload is; bound into the envelope so it can only
+    ///     be reopened as the same kind.
     /// - Returns: A WrappedKeyBundle holding the single encoded envelope row.
-    func wrap(privateKey: Data, using handle: any SEKeyHandle, fingerprint: String) throws -> WrappedKeyBundle
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> WrappedKeyBundle
 
-    /// Unwrap a private key. Triggers device authentication (Face ID / Touch ID).
+    /// Unwrap a private payload. Triggers device authentication (Face ID / Touch ID).
     ///
     /// - Parameters:
     ///   - bundle: The WrappedKeyBundle retrieved from Keychain.
     ///   - handle: The SE wrapping key handle (reconstructed from `seKeyData`).
     ///   - fingerprint: The key's hex fingerprint; verified against the envelope binding.
-    /// - Returns: The raw private key bytes. MUST be zeroized after use.
-    func unwrap(bundle: WrappedKeyBundle, using handle: any SEKeyHandle, fingerprint: String) throws -> Data
+    ///   - payloadKind: The kind the caller intends to consume. An envelope sealed
+    ///     as a different kind fails closed rather than being reinterpreted.
+    /// - Returns: The raw private bytes. MUST be zeroized after use.
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> Data
 
     /// Delete an SE wrapping key from the Secure Enclave.
     func deleteKey(_ handle: any SEKeyHandle) throws
