@@ -67,19 +67,18 @@ struct AppStartupCoordinator {
     /// is a whole decrypted file from the session before. That is not work to run
     /// inside `App.init()`, where the launch watchdog is counting. Nothing about
     /// startup depends on the result.
-    private func scheduleTemporaryFileCleanup(temporaryArtifactStore: AppTemporaryArtifactStore) {
+    func scheduleTemporaryFileCleanup(temporaryArtifactStore: AppTemporaryArtifactStore) {
         Task.detached(priority: .utility) {
             self.cleanupTemporaryFiles(temporaryArtifactStore: temporaryArtifactStore)
         }
     }
 
-    func cleanupTemporaryFiles(
-        fileManager: FileManager = .default,
-        temporaryArtifactStore: AppTemporaryArtifactStore? = nil
-    ) {
-        let artifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
-        _ = artifactStore.cleanupTemporaryArtifacts()
-        _ = artifactStore.cleanupTutorialSandboxDefaultsSuite()
+    /// Takes the session's own store rather than building one: sparing live
+    /// artifacts means asking the store that handed them out, and a fresh store
+    /// knows of none.
+    func cleanupTemporaryFiles(temporaryArtifactStore: AppTemporaryArtifactStore) {
+        _ = temporaryArtifactStore.sweepAbandonedArtifacts()
+        _ = temporaryArtifactStore.cleanupTutorialSandboxDefaultsSuite()
     }
 
     func mergedStartupMessages(

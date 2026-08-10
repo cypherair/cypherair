@@ -1,9 +1,11 @@
 import Foundation
 
-/// `@unchecked Sendable`: every stored property is a `let`, and the only state
-/// the store mutates is the filesystem. `FileManager` is not `Sendable`, but its
-/// methods are safe to call concurrently as long as no delegate is attached, and
-/// none is here. The launch sweep runs off the main actor and needs this.
+/// `@unchecked Sendable`, which the sweep needs because it runs off the main
+/// actor alongside the session. The mutable state is the live-artifact set,
+/// guarded by `liveArtifactLock`; everything else is a `let`. `FileManager` is
+/// not `Sendable` and Apple documents concurrent use only for `FileManager
+/// .default` — which is what the app passes everywhere. The parameter is a test
+/// seam, and a test that supplies its own instance owns its confinement.
 final class AppTemporaryArtifactStore: @unchecked Sendable {
     struct CleanupResult: Equatable {
         var removedItemCount = 0
@@ -19,6 +21,16 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     private let fileManager: FileManager
     private let temporaryDirectory: URL
     private let preferencesDirectory: URL
+
+    /// Paths this process handed out. The sweep no longer finishes before the
+    /// session starts, so "present in `tmp/`" stopped meaning "abandoned" and
+    /// something has to carry the difference.
+    ///
+    /// Insert-only by design: artifact names are per-operation UUIDs and are
+    /// never reused, so an entry left behind after its artifact is erased can
+    /// only ever match a path that no longer exists.
+    private let liveArtifactLock = NSLock()
+    private var liveArtifactPaths: Set<String> = []
 
     init(
         fileManager: FileManager = .default,
@@ -55,6 +67,7 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             isDirectory: true
         )
         try createProtectedDirectory(at: directory)
+        markLive(directory)
         return directory
     }
 
@@ -71,6 +84,7 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
 
         try data.write(to: temporaryURL, options: [.atomic, .completeFileProtection])
         try applyAndVerifyCompleteProtection(to: temporaryURL)
+        markLive(temporaryURL)
         shouldCleanup = false
         return temporaryURL
     }
@@ -97,10 +111,32 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         }
     }
 
-    func cleanupTemporaryArtifacts() -> CleanupResult {
+    /// Erase what a previous session left behind, sparing everything this one is
+    /// still using.
+    ///
+    /// This is the launch sweep, and it no longer completes before the app
+    /// starts working — so it has to be able to tell an abandoned artifact from
+    /// a live one. `liveArtifactPaths` is that answer: without it the sweep
+    /// would zero an export while the share sheet was offering it, or take the
+    /// tutorial's store out from under the running tutorial.
+    func sweepAbandonedArtifacts() -> CleanupResult {
+        sweep(sparingLiveArtifacts: true)
+    }
+
+    /// Erase every temporary artifact, live ones included — the session they
+    /// belong to is being destroyed along with them.
+    func removeAllTemporaryArtifacts() -> CleanupResult {
+        sweep(sparingLiveArtifacts: false)
+    }
+
+    private func sweep(sparingLiveArtifacts: Bool) -> CleanupResult {
         var result = CleanupResult()
         for directoryName in Self.operationRootNames {
-            eraseOperationRootContents(named: directoryName, result: &result)
+            eraseOperationRootContents(
+                named: directoryName,
+                sparingLiveArtifacts: sparingLiveArtifacts,
+                result: &result
+            )
         }
 
         guard let contents = try? fileManager.contentsOfDirectory(
@@ -111,6 +147,7 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         }
 
         for url in contents where shouldRemoveTemporaryItem(url) {
+            guard !(sparingLiveArtifacts && isLive(url)) else { continue }
             eraseItem(url, result: &result)
         }
         return result
@@ -170,6 +207,7 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         let ownerDirectory = rootDirectory.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true)
         try createProtectedDirectory(at: rootDirectory)
         try createProtectedDirectory(at: ownerDirectory)
+        markLive(ownerDirectory)
         return AppTemporaryArtifact(
             fileURL: ownerDirectory.appendingPathComponent(
                 sanitizedFilename(outputFilename, fallback: "file")
@@ -184,14 +222,18 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     }
 
     /// Erase the per-operation directories under one root, then the root itself
-    /// once it is empty.
+    /// if that emptied it.
     ///
-    /// Per-operation rather than wholesale because the sweep runs off the launch
-    /// path, concurrently with the rest of the app: a directory that appears
-    /// after this snapshot belongs to a live operation, and taking the root out
-    /// from under it would fail that operation. Leaving the root behind costs
-    /// nothing — creating one is idempotent.
-    private func eraseOperationRootContents(named name: String, result: inout CleanupResult) {
+    /// Per-operation rather than wholesale: a live operation's directory has to
+    /// survive, and so does the root above it. Leaving a root behind costs
+    /// nothing — creating one is idempotent — and once a root is genuinely
+    /// empty it goes, which is what keeps `remainingTemporaryArtifacts()` and
+    /// the local-data-reset post-condition meaning what they did.
+    private func eraseOperationRootContents(
+        named name: String,
+        sparingLiveArtifacts: Bool,
+        result: inout CleanupResult
+    ) {
         let root = temporaryDirectory.appendingPathComponent(name, isDirectory: true)
         guard let contents = try? fileManager.contentsOfDirectory(
             at: root,
@@ -201,12 +243,27 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         }
 
         for url in contents {
+            guard !(sparingLiveArtifacts && isLive(url)) else { continue }
             eraseItem(url, result: &result)
         }
 
         if (try? fileManager.contentsOfDirectory(atPath: root.path))?.isEmpty == true {
             eraseItem(root, result: &result)
         }
+    }
+
+    private func markLive(_ url: URL) {
+        let path = url.standardizedFileURL.path
+        liveArtifactLock.lock()
+        liveArtifactPaths.insert(path)
+        liveArtifactLock.unlock()
+    }
+
+    private func isLive(_ url: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        liveArtifactLock.lock()
+        defer { liveArtifactLock.unlock() }
+        return liveArtifactPaths.contains(path)
     }
 
     private func eraseItem(_ url: URL, result: inout CleanupResult) {

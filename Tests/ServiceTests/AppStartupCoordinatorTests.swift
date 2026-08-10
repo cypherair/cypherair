@@ -36,6 +36,34 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedPlist.path))
     }
 
+    /// Launch schedules the sweep rather than running it, so the wiring that
+    /// makes it happen at all is worth its own case: nothing on the launch path
+    /// blocks on it, and it still finishes.
+    func test_appStartupCoordinator_scheduledCleanupSweepsWithoutBlockingTheCaller() async throws {
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirScheduledSweep-\(UUID().uuidString)", isDirectory: true)
+        let preferencesDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirScheduledPrefs-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: baseDirectory)
+            try? FileManager.default.removeItem(at: preferencesDirectory)
+        }
+        try makeSweepableTemporaryArtifacts(in: baseDirectory)
+        try FileManager.default.createDirectory(at: preferencesDirectory, withIntermediateDirectories: true)
+
+        let store = CypherAir.AppTemporaryArtifactStore(
+            temporaryDirectory: baseDirectory,
+            preferencesDirectory: preferencesDirectory
+        )
+        AppStartupCoordinator().scheduleTemporaryFileCleanup(temporaryArtifactStore: store)
+
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline, !store.remainingTemporaryArtifacts().isEmpty {
+            await Task.yield()
+        }
+        XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
+    }
+
     func test_appStartupCoordinator_mergedStartupMessages_joinsAndDeduplicatesRecoveryDiagnostics() {
         let coordinator = AppStartupCoordinator()
         let merged = coordinator.mergedStartupMessages(
