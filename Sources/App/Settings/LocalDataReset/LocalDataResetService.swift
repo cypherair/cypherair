@@ -317,7 +317,7 @@ final class LocalDataResetService {
         _ removedDirectoryCount: inout Int,
         failures: inout [String]
     ) {
-        let temporaryCleanup = temporaryArtifactStore.cleanupTemporaryArtifacts()
+        let temporaryCleanup = temporaryArtifactStore.removeAllTemporaryArtifacts()
         removedDirectoryCount += temporaryCleanup.removedItemCount
         failures.append(contentsOf: temporaryCleanup.failures.map { "temporary.\($0)" })
 

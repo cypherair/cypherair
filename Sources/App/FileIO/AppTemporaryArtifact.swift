@@ -9,11 +9,12 @@ struct AppTemporaryArtifact: Equatable {
         self.ownerDirectoryURL = ownerDirectoryURL
     }
 
+    /// Erase the artifact, taking the whole owned directory when it has one so
+    /// that anything the operation wrote beside the output goes with it.
     func cleanup(fileManager: FileManager = .default) {
-        if let ownerDirectoryURL {
-            try? fileManager.removeItem(at: ownerDirectoryURL)
-        } else {
-            try? fileManager.removeItem(at: fileURL)
-        }
+        try? TemporaryArtifactEraser.erase(
+            at: ownerDirectoryURL ?? fileURL,
+            fileManager: fileManager
+        )
     }
 }
