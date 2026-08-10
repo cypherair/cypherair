@@ -5,6 +5,13 @@ import LocalAuthentication
 /// authentication and immediate root-secret re-protection window is enrolled in
 /// an operation-prompt session; the rest of the policy switch remains a normal
 /// action so genuine macOS away events still lock immediately at grace period 0.
+///
+/// The switch is a two-store transaction — the persisted root secret's Keychain
+/// access control and the App Access Protection preference — and this workflow
+/// is its single owner. It journals the target before the Keychain gate moves
+/// and commits the preference once the gate is confirmed, so a process death
+/// anywhere in between is recoverable rather than a silent disagreement
+/// (issue #747; the recovery half is `AppAccessPolicySwitchRecovery`).
 @MainActor
 final class AppAccessPolicySwitchWorkflow {
     private let currentPolicy: () -> AppSessionAuthenticationPolicy
@@ -14,11 +21,13 @@ final class AppAccessPolicySwitchWorkflow {
         AppSessionAuthenticationPolicy,
         String
     ) async throws -> AppSessionAuthenticationResult
+    private let beginPolicySwitchJournal: (AppSessionAuthenticationPolicy) -> Void
     private let reprotectPersistedRootSecret: (
         AppSessionAuthenticationPolicy,
         AppSessionAuthenticationPolicy,
         LAContext?
     ) throws -> Void
+    private let commitPolicySwitch: (AppSessionAuthenticationPolicy) -> Void
     private let discardHandoffContextForPolicyChange: () -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
 
@@ -30,11 +39,13 @@ final class AppAccessPolicySwitchWorkflow {
             AppSessionAuthenticationPolicy,
             String
         ) async throws -> AppSessionAuthenticationResult,
+        beginPolicySwitchJournal: @escaping (AppSessionAuthenticationPolicy) -> Void,
         reprotectPersistedRootSecret: @escaping (
             AppSessionAuthenticationPolicy,
             AppSessionAuthenticationPolicy,
             LAContext?
         ) throws -> Void,
+        commitPolicySwitch: @escaping (AppSessionAuthenticationPolicy) -> Void,
         discardHandoffContextForPolicyChange: @escaping () -> Void,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator
     ) {
@@ -42,7 +53,9 @@ final class AppAccessPolicySwitchWorkflow {
         self.hasPersistedRootSecret = hasPersistedRootSecret
         self.canEvaluate = canEvaluate
         self.evaluateAppSession = evaluateAppSession
+        self.beginPolicySwitchJournal = beginPolicySwitchJournal
         self.reprotectPersistedRootSecret = reprotectPersistedRootSecret
+        self.commitPolicySwitch = commitPolicySwitch
         self.discardHandoffContextForPolicyChange = discardHandoffContextForPolicyChange
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
     }
@@ -80,6 +93,9 @@ final class AppAccessPolicySwitchWorkflow {
             guard canEvaluate(newPolicy) else {
                 throw AuthenticationError.appAccessBiometricsUnavailable
             }
+            // No persisted root secret means no Keychain gate to disagree with,
+            // so the preference is the whole state and needs no journal.
+            commitPolicySwitch(newPolicy)
             discardHandoffContextForPolicyChange()
         }
     }
@@ -100,13 +116,67 @@ final class AppAccessPolicySwitchWorkflow {
             guard result.isAuthenticated else {
                 throw AuthenticationError.failed
             }
+            // SECURITY-CRITICAL: the journal opens here — after authentication
+            // (which mutates nothing, so a cancelled prompt must not leave an
+            // intent behind) and before the Keychain access control moves.
+            beginPolicySwitchJournal(newPolicy)
             do {
                 try reprotectPersistedRootSecret(currentPolicy, newPolicy, result.context)
             } catch {
+                // The journal deliberately stays open. A re-protection failure
+                // cannot say whether the access-control update landed before it
+                // threw, so the pair is treated as possibly-disagreeing: the
+                // effective policy stays the stricter of the two and the next
+                // authenticated launch converges them.
                 result.context?.invalidate()
                 throw error
             }
+            commitPolicySwitch(newPolicy)
             return result
+        }
+    }
+}
+
+/// Launch-time convergence for a policy switch the process died inside of
+/// (issue #747). Runs after an app-session authentication, on the authenticated
+/// context — which was evaluated under the effective (stricter) policy and can
+/// therefore open the root secret whichever access control it currently carries.
+enum AppAccessPolicySwitchRecovery {
+    /// Re-drive an unconfirmed switch to its recorded target and commit it.
+    ///
+    /// Idempotent by construction: re-protecting to an access control the item
+    /// already carries is a no-op that still round-trip verifies the secret. On
+    /// failure the journal is left open so the next authenticated launch retries
+    /// — never cleared blind, which would restore the very disagreement it
+    /// records.
+    static func recover(
+        config: AppConfiguration,
+        authenticationContext: LAContext?,
+        reprotectPersistedRootSecretIfPresent: (
+            AppSessionAuthenticationPolicy,
+            AppSessionAuthenticationPolicy,
+            LAContext?
+        ) throws -> Bool
+    ) {
+        guard let target = config.pendingAppSessionAuthenticationPolicySwitch else {
+            return
+        }
+
+        let committed = config.committedAppSessionAuthenticationPolicy
+        guard committed != target else {
+            // The preference commit landed and only the journal clear was lost.
+            // Both stores already name the target; finish the bookkeeping.
+            config.completeAppSessionAuthenticationPolicySwitch(to: target)
+            return
+        }
+
+        do {
+            _ = try reprotectPersistedRootSecretIfPresent(committed, target, authenticationContext)
+            config.completeAppSessionAuthenticationPolicySwitch(to: target)
+        } catch {
+            // Leave the journal open: the effective policy stays the stricter of
+            // the pair, so protected data remains reachable and the switch is
+            // retried rather than half-applied.
         }
     }
 }

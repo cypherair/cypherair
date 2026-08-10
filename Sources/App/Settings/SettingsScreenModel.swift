@@ -83,10 +83,16 @@ final class SettingsScreenModel {
                 authenticator: authManager
             )
         }
+        // The switch action owns the whole two-store transaction, preference
+        // commit included (issue #747) — only the object that moves the root
+        // secret's Keychain gate can order the two writes. This fallback runs
+        // where no protected-data graph is wired (previews, tutorial sandbox),
+        // so there is no gate to move and the preference is the whole state.
         self.appAccessPolicySwitchAction = appAccessPolicySwitchAction ?? { newPolicy in
             guard authManager.canEvaluate(appSessionPolicy: newPolicy) else {
                 throw AuthenticationError.appAccessBiometricsUnavailable
             }
+            config.completeAppSessionAuthenticationPolicySwitch(to: newPolicy)
         }
         self.localDataResetAuthenticationAction = localDataResetAuthenticationAction ?? { policy, reason in
             try await authManager.evaluateAppSession(
@@ -297,8 +303,10 @@ final class SettingsScreenModel {
         isSwitchingAppAccessPolicy = true
         Task {
             do {
+                // The action commits the preference itself; this screen must not
+                // write it. A commit from here would be a second, unjournaled
+                // store and would reintroduce issue #747's crash window.
                 try await appAccessPolicySwitchAction(newPolicy)
-                appConfiguration.appSessionAuthenticationPolicy = newPolicy
             } catch {
                 switchError = error.localizedDescription
                 showSwitchError = true

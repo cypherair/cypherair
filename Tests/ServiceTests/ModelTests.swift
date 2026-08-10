@@ -824,10 +824,101 @@ final class ModelTests: XCTestCase {
     func test_appConfiguration_appSessionPolicy_persistsBiometricsOnly() {
         let defaults = makeIsolatedDefaults()
         let config = AppConfiguration(defaults: defaults)
-        config.appSessionAuthenticationPolicy = .biometricsOnly
+        config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
 
         let reloaded = AppConfiguration(defaults: defaults)
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
+        XCTAssertNil(reloaded.pendingAppSessionAuthenticationPolicySwitch)
+    }
+
+    /// An App Access Protection switch interrupted between the root-secret
+    /// re-protection and the preference commit must not leave the prompt weaker
+    /// than the Keychain gate (issue #747). The unconfirmed target survives the
+    /// relaunch and pulls the effective policy up to the stricter of the pair.
+    func test_appConfiguration_interruptedPolicySwitch_survivesRelaunchAsStricterPolicy() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+        config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
+        XCTAssertEqual(config.committedAppSessionAuthenticationPolicy, .userPresence)
+
+        let reloaded = AppConfiguration(defaults: defaults)
+        XCTAssertEqual(reloaded.pendingAppSessionAuthenticationPolicySwitch, .biometricsOnly)
+        XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
+        XCTAssertEqual(reloaded.committedAppSessionAuthenticationPolicy, .userPresence)
+    }
+
+    /// The relaxing direction is the benign one, and it must stay benign: until
+    /// the switch is confirmed, the prompt keeps demanding biometry even though
+    /// the gate may already accept a passcode.
+    func test_appConfiguration_interruptedRelaxingSwitch_keepsStricterPolicyUntilCommitted() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+        config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+        config.beginAppSessionAuthenticationPolicySwitch(to: .userPresence)
+
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
+
+        config.completeAppSessionAuthenticationPolicySwitch(to: .userPresence)
+
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+        XCTAssertNil(config.pendingAppSessionAuthenticationPolicySwitch)
+    }
+
+    /// The commit writes the preference before clearing the journal, so the only
+    /// state a crash can expose in that gap is `committed == pending`. That state
+    /// must read back as the target on both sides — never as the reverse gap
+    /// (cleared journal over an uncommitted preference), which is issue #747.
+    func test_appConfiguration_commitGapState_readsBackAsTheTargetPolicy() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set(
+            AppSessionAuthenticationPolicy.biometricsOnly.rawValue,
+            forKey: AppConfiguration.appSessionAuthenticationPolicyKey
+        )
+        defaults.set(
+            AppSessionAuthenticationPolicy.biometricsOnly.rawValue,
+            forKey: AppConfiguration.pendingAppSessionAuthenticationPolicySwitchKey
+        )
+
+        let config = AppConfiguration(defaults: defaults)
+
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
+        XCTAssertEqual(config.committedAppSessionAuthenticationPolicy, .biometricsOnly)
+        XCTAssertEqual(config.pendingAppSessionAuthenticationPolicySwitch, .biometricsOnly)
+    }
+
+    /// The journal is cleared only by a commit, and the commit persists both
+    /// halves — a reload must show no leftover intent.
+    func test_appConfiguration_completedSwitch_clearsPersistedJournal() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+        config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+        config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+
+        XCTAssertNil(
+            defaults.string(forKey: AppConfiguration.pendingAppSessionAuthenticationPolicySwitchKey)
+        )
+        XCTAssertEqual(
+            defaults.string(forKey: AppConfiguration.appSessionAuthenticationPolicyKey),
+            AppSessionAuthenticationPolicy.biometricsOnly.rawValue
+        )
+    }
+
+    func test_appConfiguration_resetToFirstRunDefaults_clearsPolicyAndJournal() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+        config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+        config.beginAppSessionAuthenticationPolicySwitch(to: .userPresence)
+
+        config.resetToFirstRunDefaults()
+
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+        XCTAssertNil(config.pendingAppSessionAuthenticationPolicySwitch)
+
+        let reloaded = AppConfiguration(defaults: defaults)
+        XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .userPresence)
+        XCTAssertNil(reloaded.pendingAppSessionAuthenticationPolicySwitch)
     }
 
     func test_protectedOrdinarySettings_guidedTutorial_defaultsToNotCompleted() {

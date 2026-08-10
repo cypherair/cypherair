@@ -179,12 +179,18 @@ final class AppContainer: @unchecked Sendable {
                     reason: reason
                 )
             },
+            beginPolicySwitchJournal: { target in
+                config.beginAppSessionAuthenticationPolicySwitch(to: target)
+            },
             reprotectPersistedRootSecret: { from, to, context in
                 try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
                     from: from,
                     to: to,
                     authenticationContext: context
                 )
+            },
+            commitPolicySwitch: { target in
+                config.completeAppSessionAuthenticationPolicySwitch(to: target)
             },
             discardHandoffContextForPolicyChange: {
                 appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
@@ -900,6 +906,17 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+                AppAccessPolicySwitchRecovery.recover(
+                    config: config,
+                    authenticationContext: authenticationContext,
+                    reprotectPersistedRootSecretIfPresent: { from, to, context in
+                        try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                            from: from,
+                            to: to,
+                            authenticationContext: context
+                        )
+                    }
+                )
                 appSessionOrchestrator.recordPostAuthenticationCompletion()
             },
             contentClearHandler: {
@@ -1226,6 +1243,17 @@ final class AppContainer: @unchecked Sendable {
                     keyManagement: keyManagement,
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
+                )
+                AppAccessPolicySwitchRecovery.recover(
+                    config: config,
+                    authenticationContext: authenticationContext,
+                    reprotectPersistedRootSecretIfPresent: { from, to, context in
+                        try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                            from: from,
+                            to: to,
+                            authenticationContext: context
+                        )
+                    }
                 )
                 appSessionOrchestrator.recordPostAuthenticationCompletion()
             },

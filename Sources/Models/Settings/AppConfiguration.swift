@@ -35,16 +35,82 @@ final class AppConfiguration {
         postUnlockRecoveryLoadWarning = nil
     }
 
-    /// App launch/resume and App Data root-secret authentication policy.
+    // MARK: - App Access Protection
+
+    /// App launch/resume and App Data root-secret authentication policy — the
+    /// **effective** policy, and the only one any authentication or gating call
+    /// site should read.
+    ///
+    /// SECURITY-CRITICAL: while a policy switch is journaled but unconfirmed,
+    /// the persisted root secret's Keychain access control may already carry
+    /// either the committed policy's flags or the target's, and nothing can tell
+    /// the two apart without an authenticated read. Answering with the stricter
+    /// of the pair yields an `LAContext` that satisfies both access controls, so
+    /// an interrupted switch can never leave the root secret unreachable
+    /// (issue #747). It is also the "fail toward the stronger protection"
+    /// direction: a passcode-satisfiable prompt is never offered for a gate that
+    /// may already demand biometry.
     var appSessionAuthenticationPolicy: AppSessionAuthenticationPolicy {
-        didSet {
-            defaults.set(appSessionAuthenticationPolicy.rawValue, forKey: Self.appSessionAuthenticationPolicyKey)
+        guard let pending = pendingAppSessionAuthenticationPolicySwitch else {
+            return committedAppSessionAuthenticationPolicy
         }
+        return .strictestPolicyForRootSecretReprotection(
+            from: committedAppSessionAuthenticationPolicy,
+            to: pending
+        )
+    }
+
+    /// The last App Access Protection preference whose root-secret
+    /// re-protection is known to have completed.
+    private(set) var committedAppSessionAuthenticationPolicy: AppSessionAuthenticationPolicy {
+        didSet {
+            defaults.set(
+                committedAppSessionAuthenticationPolicy.rawValue,
+                forKey: Self.appSessionAuthenticationPolicyKey
+            )
+        }
+    }
+
+    /// Target of a switch that has reached the root-secret re-protection step
+    /// and has not been confirmed complete. Surviving a launch means the process
+    /// died inside that window, so the committed preference and the Keychain
+    /// gate may disagree; `AppAccessPolicySwitchRecovery` converges them.
+    private(set) var pendingAppSessionAuthenticationPolicySwitch: AppSessionAuthenticationPolicy? {
+        didSet {
+            guard let pending = pendingAppSessionAuthenticationPolicySwitch else {
+                defaults.removeObject(forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
+                return
+            }
+            defaults.set(pending.rawValue, forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
+        }
+    }
+
+    /// Record the intent to move App Access Protection to `target`. Must be
+    /// called before the persisted root secret's access control is rewritten —
+    /// the journal is what makes the rewrite recoverable.
+    func beginAppSessionAuthenticationPolicySwitch(to target: AppSessionAuthenticationPolicy) {
+        pendingAppSessionAuthenticationPolicySwitch = target
+    }
+
+    /// Commit a switch whose root-secret re-protection has completed.
+    ///
+    /// SECURITY-CRITICAL ordering: the committed preference is written *before*
+    /// the journal is cleared. A crash between the two leaves
+    /// `committed == pending`, which reads back as the target on both sides and
+    /// simply replays this method on the next authenticated launch. The reverse
+    /// order would reopen issue #747 — a cleared journal with an uncommitted
+    /// preference is exactly the silent disagreement this journal exists to
+    /// prevent.
+    func completeAppSessionAuthenticationPolicySwitch(to target: AppSessionAuthenticationPolicy) {
+        committedAppSessionAuthenticationPolicy = target
+        pendingAppSessionAuthenticationPolicySwitch = nil
     }
 
     // MARK: - UserDefaults Keys
 
     static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
+    static let pendingAppSessionAuthenticationPolicySwitchKey =
+        "com.cypherair.preference.pendingAppSessionAuthenticationPolicySwitch"
 
     // MARK: - Initialization
 
@@ -53,13 +119,16 @@ final class AppConfiguration {
 
         let appSessionPolicyString = defaults.string(forKey: Self.appSessionAuthenticationPolicyKey)
             ?? AppSessionAuthenticationPolicy.userPresence.rawValue
-        self.appSessionAuthenticationPolicy = AppSessionAuthenticationPolicy(rawValue: appSessionPolicyString)
+        self.committedAppSessionAuthenticationPolicy = AppSessionAuthenticationPolicy(rawValue: appSessionPolicyString)
             ?? .userPresence
+        self.pendingAppSessionAuthenticationPolicySwitch = defaults
+            .string(forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
+            .flatMap(AppSessionAuthenticationPolicy.init(rawValue:))
     }
 
     func resetToFirstRunDefaults() {
         privateKeyControlState = .locked
-        appSessionAuthenticationPolicy = .userPresence
+        completeAppSessionAuthenticationPolicySwitch(to: .userPresence)
 
         for key in Self.resetPersistentKeys {
             defaults.removeObject(forKey: key)
@@ -72,6 +141,7 @@ final class AppConfiguration {
     private static var resetPersistentKeys: [String] {
         [
             appSessionAuthenticationPolicyKey,
+            pendingAppSessionAuthenticationPolicySwitchKey,
             "com.cypherair.preference.uiTestBypassAuthentication"
         ]
     }
