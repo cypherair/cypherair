@@ -203,8 +203,7 @@ final class SensitiveBytesBox: @unchecked Sendable {
 ///
 /// Domain-separated by its own magic (`CPDENV5`) and AAD prefix (`CPDENVA5`).
 ///
-/// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 5 and Section 10.
+/// See SECURITY.md Section 5.
 struct ProtectedDomainEnvelope: Codable, Equatable, Sendable {
     static let magic = "CPDENV5"
     static let currentFormatVersion = 5

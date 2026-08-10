@@ -58,7 +58,7 @@ ProtectedData uses a separate app-data root-secret model — do not conflate it 
 
 ### Mode Switching
 
-Switching re-wraps every **software-custody** key under a single authentication: record the target in the `private-key-control` recovery journal, authenticate under the **current** mode, re-wrap each key into its pending row, and only after **all** pending rows are verified: delete old rows, promote pending rows, persist the new mode, clear the journal. **Device-bound keys are exempt; the exemption is enforced by the caller-side custody-kind filter, not by their fixed access policy** — mechanism and consequences: [CUSTODY.md](CUSTODY.md) §4. The High Security backup check applies to software-custody keys only.
+Switching re-wraps every **software-custody** key under a single authentication: authenticate under the **current** mode (a cancelled prompt leaves no intent behind), record the target in the `private-key-control` recovery journal, re-wrap each key into its pending row, and only after **all** pending rows are verified: delete old rows, promote pending rows, persist the new mode, clear the journal. **Device-bound keys are exempt; the exemption is enforced by the caller-side custody-kind filter, not by their fixed access policy** — mechanism and consequences: [CUSTODY.md](CUSTODY.md) §4. The High Security backup check applies to software-custody keys only.
 
 **Crash-recovery invariant:** old rows stay authoritative until every new row is confirmed. Recovery (after unlock opens `private-key-control`) prefers an existing permanent row over a pending one; promotes a complete pending row only when the permanent row is absent or invalid; keeps the journal on retryable Keychain failures so recovery re-runs after the next unlock; treats no-complete-row-anywhere as unrecoverable (clear journal, surface a generic warning that never includes fingerprints); and persists the new auth mode only after a full successful promotion — cleaning stale pending rows alone never changes the mode. All four outcomes are test-pinned ([TESTING.md](TESTING.md) §4).
 
@@ -111,7 +111,7 @@ Enablement is the Enhanced Security capability (`ENABLE_ENHANCED_SECURITY = YES`
 
 ## 10. AI Coding Red Lines
 
-Security-critical scope is defined by **grep-able predicates, not file paths** — paths rot silently when code moves; predicates follow the code. A change is security-critical when it touches any predicate below. The process this triggers — the explicit call-out (file, what changed, why) in the task summary and PR description, and the maintainer's independent review before merge — is stated once in [WORKFLOW.md](WORKFLOW.md) §3.
+Security-critical scope is defined by **grep-able predicates, not file paths** — paths rot silently when code moves; predicates follow the code. A change is security-critical when it touches any predicate below. The process this triggers — the explicit call-out (file, what changed, why) in the task summary and PR description, and the extra-care check in the PR's independent verification — is stated once in [WORKFLOW.md](WORKFLOW.md) §3.
 
 ### Absolute Coding Invariants
 

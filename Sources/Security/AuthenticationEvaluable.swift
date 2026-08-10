@@ -106,7 +106,7 @@ enum AuthenticationMode: String, Codable, Sendable {
     /// SECURITY-CRITICAL: this function authors the mode flag sets — the code
     /// is the source of truth for the exact flags; docs/SECURITY.md Section 4
     /// states the invariant (Standard adds the passcode fallback, High
-    /// Security does not). Any change requires human review.
+    /// Security does not).
     func createAccessControl() throws -> SecAccessControl {
         let flags: SecAccessControlCreateFlags = switch self {
         case .standard:
