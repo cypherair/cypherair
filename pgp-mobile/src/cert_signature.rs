@@ -149,10 +149,12 @@ pub fn generate_user_id_certification_by_selector(
         });
     }
 
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
     let target_cert_data = target_cert;
     let target_cert = parse_cert(target_cert_data, "Invalid target certificate")?;
     let user_id = find_user_id_by_selector(target_cert_data, user_id_selector)?;
-    let mut signer = select_certification_signer(&signer_cert)?;
+    let mut signer = select_certification_signer(&signer_cert, &policy, reference_time)?;
     let certification = user_id
         .certify(
             &mut signer,
@@ -179,7 +181,7 @@ pub fn generate_user_id_certification_by_selector_with_external_p256_signer(
     let policy = StandardPolicy::new();
     let reference_time = SystemTime::now();
     let signer_cert = parse_public_cert_for_external_certification(public_cert)?;
-    ensure_external_certification_certificate_not_revoked(&signer_cert, &policy, reference_time)?;
+    certification_signer_certificate(&signer_cert, &policy, reference_time)?;
     let signing_public_key = select_external_certification_primary_signing_key(
         &signer_cert,
         signing_key_fingerprint,
@@ -224,7 +226,7 @@ pub fn generate_user_id_certification_by_selector_with_external_composite_signer
     let policy = StandardPolicy::new();
     let reference_time = SystemTime::now();
     let signer_cert = parse_public_cert_for_external_certification(public_cert)?;
-    ensure_external_certification_certificate_not_revoked(&signer_cert, &policy, reference_time)?;
+    certification_signer_certificate(&signer_cert, &policy, reference_time)?;
     let signing_public_key = select_external_certification_primary_signing_key(
         &signer_cert,
         signing_key_fingerprint,
@@ -272,7 +274,7 @@ pub fn generate_user_id_certification_by_selector_with_external_composite_high_s
     let policy = StandardPolicy::new();
     let reference_time = SystemTime::now();
     let signer_cert = parse_public_cert_for_external_certification(public_cert)?;
-    ensure_external_certification_certificate_not_revoked(&signer_cert, &policy, reference_time)?;
+    certification_signer_certificate(&signer_cert, &policy, reference_time)?;
     let signing_public_key = select_external_certification_primary_signing_key(
         &signer_cert,
         signing_key_fingerprint,
@@ -382,25 +384,32 @@ fn parse_public_cert_for_external_certification(
     Ok(cert)
 }
 
-fn ensure_external_certification_certificate_not_revoked(
-    cert: &openpgp::Cert,
-    policy: &StandardPolicy,
+/// The signer's certificate under policy, refusing any signer whose certificate
+/// is not policy-valid or whose revocation status is anything other than "not
+/// revoked as far as we know".
+///
+/// Shared by both custody paths — a revoked key must never produce a new vouch,
+/// whichever way its secret is held. Expiration is deliberately *not* gated
+/// here; see `eligible_verification_keys` for why the two sides agree on that.
+fn certification_signer_certificate<'a>(
+    cert: &'a openpgp::Cert,
+    policy: &'a StandardPolicy,
     reference_time: SystemTime,
-) -> Result<(), PgpError> {
+) -> Result<openpgp::cert::ValidCert<'a>, PgpError> {
     let valid_cert = cert
         .with_policy(policy, Some(reference_time))
         .map_err(|error| PgpError::SigningFailed {
-            reason: format!("External certification certificate is not policy-valid: {error}"),
+            reason: format!("Certification signer certificate is not policy-valid: {error}"),
         })?;
     match valid_cert.revocation_status() {
-        RevocationStatus::NotAsFarAsWeKnow => Ok(()),
+        RevocationStatus::NotAsFarAsWeKnow => Ok(valid_cert),
         RevocationStatus::Revoked(_) => Err(PgpError::SigningFailed {
-            reason: "Cannot generate certification for a revoked certificate".to_string(),
+            reason: "Cannot generate a certification with a revoked key".to_string(),
         }),
         RevocationStatus::CouldBe(_) => Err(PgpError::SigningFailed {
-            reason:
-                "Cannot generate certification for a certificate with unresolved revocation status"
-                    .to_string(),
+            reason: "Cannot generate a certification with a key whose revocation status is \
+                     unresolved"
+                .to_string(),
         }),
     }
 }
@@ -506,33 +515,27 @@ fn certification_signature_acceptable(
 
 /// Candidate signer keys that may have produced a certification, restricted to
 /// keys trustworthy enough to record a `Valid` vouch: the signer certificate
-/// must be policy-valid and unrevoked, and each returned key must be unrevoked,
-/// certification-capable, and use a supported algorithm.
+/// must clear `certification_signer_certificate`, and each returned key must be
+/// unrevoked, certification-capable, and use a supported algorithm.
 ///
-/// This mirrors the generation-side revocation/policy gate
-/// (`ensure_external_certification_certificate_not_revoked` +
-/// `select_external_certification_primary_signing_key`), which likewise rejects
-/// revoked signers but **allows expired ones**: expiration only means "make no
-/// new signatures with this key", so a certification made while the key was live
-/// stays a valid historical vouch. Revocation (e.g. key compromise) is what
-/// invalidates prior vouches, so we gate on that — not aliveness. (The
-/// certification signature's own expiry is still enforced, in
+/// Verification and generation therefore read the same gate — a key this
+/// function would refuse to credit is a key `select_certification_signer` and
+/// `select_external_certification_primary_signing_key` refuse to sign with. That
+/// gate rejects revoked signers but **allows expired ones**: expiration only
+/// means "make no new signatures with this key", so a certification made while
+/// the key was live stays a valid historical vouch. Revocation (e.g. key
+/// compromise) is what invalidates prior vouches, so we gate on that — not
+/// aliveness. (The certification signature's own expiry is still enforced, in
 /// `certification_signature_acceptable`.)
 fn eligible_verification_keys<'a>(
     cert: &'a openpgp::Cert,
-    policy: &StandardPolicy,
+    policy: &'a StandardPolicy,
     reference_time: SystemTime,
 ) -> Vec<EligibleVerificationKey<'a>> {
-    let valid_cert = match cert.with_policy(policy, Some(reference_time)) {
+    let valid_cert = match certification_signer_certificate(cert, policy, reference_time) {
         Ok(valid_cert) => valid_cert,
         Err(_) => return Vec::new(),
     };
-    if !matches!(
-        valid_cert.revocation_status(),
-        RevocationStatus::NotAsFarAsWeKnow
-    ) {
-        return Vec::new();
-    }
 
     let primary_fingerprint = cert.fingerprint();
     valid_cert
@@ -732,23 +735,30 @@ fn signer_missing_result(
     }
 }
 
-fn select_certification_signer(cert: &openpgp::Cert) -> Result<openpgp::crypto::KeyPair, PgpError> {
-    if let Ok(primary) = cert
-        .primary_key()
-        .key()
-        .clone()
-        .parts_into_secret()
-        .and_then(|key| key.into_keypair())
+/// Pick a software-custody key to sign a certification with.
+///
+/// The eligibility gate is the one the device-bound path already applies
+/// (`certification_signer_certificate` +
+/// `select_external_certification_primary_signing_key`) and the one the
+/// verification side reads back (`eligible_verification_keys`): the certificate
+/// must be policy-valid and unrevoked, and the key itself unrevoked,
+/// certification-capable under its binding signature, and of a supported
+/// algorithm. Candidates come in Sequoia's order, primary first, so a
+/// certification-capable primary key still wins over a certification subkey.
+fn select_certification_signer(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
+) -> Result<openpgp::crypto::KeyPair, PgpError> {
+    let valid_cert = certification_signer_certificate(cert, policy, reference_time)?;
+
+    for candidate in valid_cert
+        .keys()
+        .supported()
+        .revoked(false)
+        .for_certification()
     {
-        return Ok(primary);
-    }
-
-    for subkey in cert.keys().subkeys() {
-        if !is_explicit_certification_capable(&subkey) {
-            continue;
-        }
-
-        if let Ok(signer) = subkey
+        if let Ok(signer) = candidate
             .key()
             .clone()
             .parts_into_secret()
@@ -760,21 +770,5 @@ fn select_certification_signer(cert: &openpgp::Cert) -> Result<openpgp::crypto::
 
     Err(PgpError::SigningFailed {
         reason: "No usable certification-capable secret key found".to_string(),
-    })
-}
-
-fn is_explicit_certification_capable<P, R, R2>(
-    key: &openpgp::cert::prelude::KeyAmalgamation<'_, P, R, R2>,
-) -> bool
-where
-    P: openpgp::packet::key::KeyParts,
-    R: openpgp::packet::key::KeyRole,
-    R2: Copy + std::fmt::Debug,
-{
-    key.self_signatures().any(|signature| {
-        signature
-            .key_flags()
-            .map(|flags| flags.for_certification())
-            .unwrap_or(false)
     })
 }

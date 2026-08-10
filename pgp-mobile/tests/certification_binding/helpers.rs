@@ -171,6 +171,35 @@ pub(super) fn signing_only_subkey_signer() -> (openpgp::Cert, Vec<u8>) {
     (cert, public_bytes)
 }
 
+/// A secret certificate carrying its own key revocation, for asserting that a
+/// revoked key cannot produce new vouches.
+pub(super) fn revoked_signer_secret_cert(profile: KeySuite, name: &str) -> Vec<u8> {
+    let generated = generated_key(profile, name);
+    let revocation = keys::generate_key_revocation(&generated.cert_data)
+        .expect("key revocation should generate");
+    let revocation_packet =
+        openpgp::Packet::from_bytes(&revocation).expect("revocation packet should parse");
+    let (revoked_cert, _) = parse_cert(&generated.cert_data)
+        .insert_packets(vec![revocation_packet])
+        .expect("revocation packet should insert");
+
+    let policy = StandardPolicy::new();
+    assert!(
+        matches!(
+            revoked_cert.revocation_status(&policy, None),
+            openpgp::types::RevocationStatus::Revoked(_)
+        ),
+        "the fixture certificate must actually be revoked"
+    );
+
+    let mut secret_bytes = Vec::new();
+    revoked_cert
+        .as_tsk()
+        .serialize(&mut secret_bytes)
+        .expect("revoked secret cert should serialize");
+    secret_bytes
+}
+
 pub(super) fn unusable_certification_signer() -> Vec<u8> {
     let (cert, _) = CertBuilder::new()
         .set_primary_key_flags(KeyFlags::empty())
