@@ -337,6 +337,41 @@ fn test_secure_enclave_public_certificate_generation_v4_v6() {
     }
 }
 
+/// Without these subpackets a correspondent falls back to the RFC defaults
+/// (TripleDES, SHA-1) when sending to a device-bound certificate.
+#[test]
+fn test_secure_enclave_public_certificate_advertises_algorithm_preferences() {
+    for version in [
+        SecureEnclaveCertificateVersion::V4,
+        SecureEnclaveCertificateVersion::V6,
+    ] {
+        let material = public_material(version).expect("material should generate");
+        let result =
+            generate_secure_enclave_public_certificate(input_for(version, &material), provider_for(material))
+                .expect("certificate should generate");
+
+        let cert = openpgp::Cert::from_bytes(&result.public_key_data)
+            .expect("public certificate should parse");
+        let policy = StandardPolicy::new();
+        let binding = cert
+            .with_policy(&policy, None)
+            .expect("certificate should validate")
+            .primary_userid()
+            .expect("certificate should have a primary User ID");
+
+        assert_eq!(
+            binding.preferred_symmetric_algorithms(),
+            Some(&[SymmetricAlgorithm::AES256, SymmetricAlgorithm::AES128][..]),
+            "{version:?} certificate must advertise symmetric preferences"
+        );
+        assert_eq!(
+            binding.preferred_hash_algorithms(),
+            Some(&[HashAlgorithm::SHA512, HashAlgorithm::SHA256][..]),
+            "{version:?} certificate must advertise hash preferences"
+        );
+    }
+}
+
 #[test]
 fn test_secure_enclave_public_certificate_rejects_invalid_or_duplicate_public_keys() {
     let material =
