@@ -232,7 +232,8 @@ final class KeyProvisioningService {
             return try secureEnclave.wrap(
                 privateKey: privateKey,
                 using: seHandle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
         }
     }

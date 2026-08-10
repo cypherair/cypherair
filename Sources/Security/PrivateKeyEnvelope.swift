@@ -20,12 +20,27 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
     case invalidCiphertextLength(Int)
     /// The envelope's bound Secure Enclave public key did not match the handle.
     case deviceBindingMismatch
+    /// The sealed payload is of a different kind than the caller asked to open.
+    case payloadKindMismatch
     /// Internal encoding/random failure.
     case internalFailure(String)
 }
 
-/// Authenticated envelope that seals a single OpenPGP software secret certificate
-/// under a per-key Secure Enclave P-256 key.
+/// What a `PrivateKeyEnvelope` seals. The kind is part of the authenticated
+/// binding, so an envelope can only ever be opened as the kind it was sealed
+/// as — the two payloads are not interchangeable, and neither the row's
+/// location nor a caller's assumption decides which one a blob is.
+enum PrivateKeyEnvelopePayloadKind: String, Codable, Equatable, Sendable, CaseIterable {
+    /// A whole exportable OpenPGP secret certificate under software custody.
+    case softwareSecretCertificate = "software-secret-certificate"
+    /// The concatenated classical component scalars of a Device-Bound
+    /// Post-Quantum split-custody identity (CUSTODY.md §6).
+    case splitCustodyClassicalComponent = "split-custody-classical-component"
+}
+
+/// Authenticated envelope that seals one private payload — a software secret
+/// certificate or a split-custody classical component — under a per-payload
+/// Secure Enclave P-256 key.
 ///
 /// Construction mirrors `ProtectedDataRootSecretEnvelope` (ephemeral-static ECDH):
 /// a fresh software ephemeral P-256 key agrees with the **persistent** Secure
@@ -35,16 +50,22 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
 /// (`seKeyData`) is folded into the envelope so a single Keychain row reconstructs
 /// the handle and reopens the material.
 ///
+/// `payloadKind` rides in both the HKDF `sharedInfo` and the AES-GCM AAD, so the
+/// two payload kinds are cryptographically separated: a classical-component
+/// envelope handed to a software-certificate consumer fails contract validation
+/// before any Secure Enclave operation, and would fail the AEAD even if that
+/// check were bypassed.
+///
 /// This deliberately does **not** reuse the ProtectedData root-secret envelope:
-/// the two are domain-separated by `magic` (`CAPKEV5` vs `CAPDSEV5`) and by their
+/// the two are domain-separated by `magic` (`CAPKEV6` vs `CAPDSEV5`) and by their
 /// HKDF/AAD prefixes so neither blob can be misread as the other.
 ///
 /// See SECURITY.md Section 3.
 struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CAPKEV5"
-    static let currentFormatVersion = 5
-    static let currentAADVersion = 5
-    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v5"
+    static let magic = "CAPKEV6"
+    static let currentFormatVersion = 6
+    static let currentAADVersion = 6
+    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v6"
     static let expectedSaltLength = 32
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
@@ -54,6 +75,8 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
     let formatVersion: Int
     let algorithmID: String
     let aadVersion: Int
+    /// What the ciphertext holds. Authenticated, never inferred.
+    let payloadKind: PrivateKeyEnvelopePayloadKind
     /// Lowercase hex fingerprint of the wrapped key (bound identity).
     let fingerprint: String
     /// Secure Enclave key `dataRepresentation` — folded in so one row reconstructs the handle.
@@ -67,7 +90,10 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
     let ciphertext: Data
     let tag: Data
 
-    func validateContract(expectedFingerprint: String? = nil) throws {
+    func validateContract(
+        expectedFingerprint: String? = nil,
+        expectedPayloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws {
         guard magic == Self.magic else {
             throw PrivateKeyEnvelopeError.invalidEnvelope("Unsupported private-key envelope magic.")
         }
@@ -79,6 +105,9 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
         }
         guard aadVersion == Self.currentAADVersion else {
             throw PrivateKeyEnvelopeError.invalidEnvelope("Unsupported private-key envelope AAD version \(aadVersion).")
+        }
+        guard payloadKind == expectedPayloadKind else {
+            throw PrivateKeyEnvelopeError.payloadKindMismatch
         }
         try SEConstants.validateFingerprint(fingerprint)
         guard fingerprint == fingerprint.lowercased() else {
@@ -126,6 +155,7 @@ enum PrivateKeyEnvelopeCodec {
         "formatVersion",
         "algorithmID",
         "aadVersion",
+        "payloadKind",
         "fingerprint",
         "seKeyData",
         "seKeyPublicKeyX963",
@@ -137,28 +167,49 @@ enum PrivateKeyEnvelopeCodec {
     ]
 
     static func encode(_ envelope: PrivateKeyEnvelope) throws -> Data {
-        try envelope.validateContract(expectedFingerprint: envelope.fingerprint)
+        try envelope.validateContract(
+            expectedFingerprint: envelope.fingerprint,
+            expectedPayloadKind: envelope.payloadKind
+        )
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
         return try encoder.encode(envelope)
     }
 
-    static func decode(_ data: Data, expectedFingerprint: String? = nil) throws -> PrivateKeyEnvelope {
+    static func decode(
+        _ data: Data,
+        expectedFingerprint: String? = nil,
+        expectedPayloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> PrivateKeyEnvelope {
         try validateNoUnsupportedKeys(in: data)
         let envelope = try PropertyListDecoder().decode(PrivateKeyEnvelope.self, from: data)
-        try envelope.validateContract(expectedFingerprint: expectedFingerprint)
+        try envelope.validateContract(
+            expectedFingerprint: expectedFingerprint,
+            expectedPayloadKind: expectedPayloadKind
+        )
         return envelope
     }
 
     /// Decode + validate an envelope and return only the Secure Enclave key
     /// `dataRepresentation`, used by the reconstruct seam before biometric unwrap.
-    static func seKeyData(from data: Data, expectedFingerprint: String) throws -> Data {
-        try decode(data, expectedFingerprint: expectedFingerprint).seKeyData
+    /// A payload-kind mismatch is rejected here — before any Secure Enclave call,
+    /// so a wrong-kind row never reaches a biometric prompt.
+    static func seKeyData(
+        from data: Data,
+        expectedFingerprint: String,
+        expectedPayloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> Data {
+        try decode(
+            data,
+            expectedFingerprint: expectedFingerprint,
+            expectedPayloadKind: expectedPayloadKind
+        ).seKeyData
     }
 
     static func seal(
         privateKey: Data,
         fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind,
         seKeyData: Data,
         seKeyPublicKeyX963: Data,
         ephemeralPrivateKey: P256.KeyAgreement.PrivateKey? = nil
@@ -181,6 +232,7 @@ enum PrivateKeyEnvelopeCodec {
         let symmetricKey = try wrappingKey(
             sharedSecret: sharedSecret,
             salt: salt,
+            payloadKind: payloadKind,
             fingerprint: normalizedFingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,
@@ -188,6 +240,7 @@ enum PrivateKeyEnvelopeCodec {
             plaintextLength: privateKey.count
         )
         let aad = try envelopeAAD(
+            payloadKind: payloadKind,
             fingerprint: normalizedFingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,
@@ -206,6 +259,7 @@ enum PrivateKeyEnvelopeCodec {
             formatVersion: PrivateKeyEnvelope.currentFormatVersion,
             algorithmID: PrivateKeyEnvelope.algorithmID,
             aadVersion: PrivateKeyEnvelope.currentAADVersion,
+            payloadKind: payloadKind,
             fingerprint: normalizedFingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,
@@ -215,19 +269,27 @@ enum PrivateKeyEnvelopeCodec {
             ciphertext: sealedBox.ciphertext,
             tag: sealedBox.tag
         )
-        try envelope.validateContract(expectedFingerprint: normalizedFingerprint)
+        try envelope.validateContract(
+            expectedFingerprint: normalizedFingerprint,
+            expectedPayloadKind: payloadKind
+        )
         return envelope
     }
 
     static func open(
         envelope: PrivateKeyEnvelope,
         sharedSecret: SharedSecret,
-        expectedFingerprint: String
+        expectedFingerprint: String,
+        expectedPayloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> Data {
-        try envelope.validateContract(expectedFingerprint: expectedFingerprint)
+        try envelope.validateContract(
+            expectedFingerprint: expectedFingerprint,
+            expectedPayloadKind: expectedPayloadKind
+        )
         let symmetricKey = try wrappingKey(
             sharedSecret: sharedSecret,
             salt: envelope.hkdfSalt,
+            payloadKind: envelope.payloadKind,
             fingerprint: envelope.fingerprint,
             seKeyData: envelope.seKeyData,
             seKeyPublicKeyX963: envelope.seKeyPublicKeyX963,
@@ -235,6 +297,7 @@ enum PrivateKeyEnvelopeCodec {
             plaintextLength: envelope.ciphertext.count
         )
         let aad = try envelopeAAD(
+            payloadKind: envelope.payloadKind,
             fingerprint: envelope.fingerprint,
             seKeyData: envelope.seKeyData,
             seKeyPublicKeyX963: envelope.seKeyPublicKeyX963,
@@ -252,6 +315,7 @@ enum PrivateKeyEnvelopeCodec {
     private static func wrappingKey(
         sharedSecret: SharedSecret,
         salt: Data,
+        payloadKind: PrivateKeyEnvelopePayloadKind,
         fingerprint: String,
         seKeyData: Data,
         seKeyPublicKeyX963: Data,
@@ -259,7 +323,8 @@ enum PrivateKeyEnvelopeCodec {
         plaintextLength: Int
     ) throws -> SymmetricKey {
         let sharedInfo = try bindingData(
-            prefix: "CAPKKI5",
+            prefix: "CAPKKI6",
+            payloadKind: payloadKind,
             fingerprint: fingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,
@@ -275,6 +340,7 @@ enum PrivateKeyEnvelopeCodec {
     }
 
     private static func envelopeAAD(
+        payloadKind: PrivateKeyEnvelopePayloadKind,
         fingerprint: String,
         seKeyData: Data,
         seKeyPublicKeyX963: Data,
@@ -282,7 +348,8 @@ enum PrivateKeyEnvelopeCodec {
         plaintextLength: Int
     ) throws -> Data {
         try bindingData(
-            prefix: "CAPKAD5",
+            prefix: "CAPKAD6",
+            payloadKind: payloadKind,
             fingerprint: fingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,
@@ -293,6 +360,7 @@ enum PrivateKeyEnvelopeCodec {
 
     private static func bindingData(
         prefix: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind,
         fingerprint: String,
         seKeyData: Data,
         seKeyPublicKeyX963: Data,
@@ -302,6 +370,7 @@ enum PrivateKeyEnvelopeCodec {
         guard let prefixData = prefix.data(using: .utf8),
               let magicData = PrivateKeyEnvelope.magic.data(using: .utf8),
               let algorithmData = PrivateKeyEnvelope.algorithmID.data(using: .utf8),
+              let payloadKindData = payloadKind.rawValue.data(using: .utf8),
               let fingerprintData = fingerprint.data(using: .utf8) else {
             throw PrivateKeyEnvelopeError.internalFailure("Private-key envelope binding data could not be encoded.")
         }
@@ -314,6 +383,8 @@ enum PrivateKeyEnvelopeCodec {
         data.append(magicData)
         data.append(UInt16(algorithmData.count).bigEndianData)
         data.append(algorithmData)
+        data.append(UInt16(payloadKindData.count).bigEndianData)
+        data.append(payloadKindData)
         data.append(UInt16(fingerprintData.count).bigEndianData)
         data.append(fingerprintData)
         data.append(Data(SHA256.hash(data: seKeyData)))

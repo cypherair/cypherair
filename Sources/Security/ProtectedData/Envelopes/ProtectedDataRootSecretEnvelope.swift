@@ -12,7 +12,7 @@ import Security
 /// SE-encrypted key that is useless off-device, and its hash is bound into both the
 /// HKDF `sharedInfo` and the AES-GCM AAD.
 ///
-/// Domain-separated from the per-key private-key envelope (`CAPKEV5`) by distinct
+/// Domain-separated from the per-key private-key envelope (`CAPKEV6`) by distinct
 /// `magic` (`CAPDSEV5`) and HKDF/AAD prefixes so neither blob can be misread.
 ///
 /// See SECURITY.md Section 3.

@@ -73,7 +73,8 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         let bundle = try secureEnclave.wrap(
             privateKey: Data(repeating: 0x42, count: 32),
             using: handle,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
         try KeyBundleStore(keychain: keychain).saveBundle(bundle, fingerprint: fingerprint)
         return (manager, fingerprint, suiteName)

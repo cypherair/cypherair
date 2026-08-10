@@ -213,7 +213,8 @@ enum TestHelpers {
         let bundle = try mockSE.wrap(
             privateKey: secretCertData,
             using: handle,
-            fingerprint: metadata.fingerprint
+            fingerprint: metadata.fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
 
         let bundleStore = KeyBundleStore(keychain: mockKC)

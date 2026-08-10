@@ -39,7 +39,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         )
-        let loadedSEKey = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
+        let loadedSEKey = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
         let handle = try secureEnclave.reconstructKey(
             from: loadedSEKey,
             authenticationContext: authentication.context
@@ -48,7 +48,8 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let unwrapped = try secureEnclave.unwrap(
             bundle: storedBundle,
             using: handle,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
         )
 
         XCTAssertEqual(unwrapped, privateKey, "Stored key must unwrap after production authentication")

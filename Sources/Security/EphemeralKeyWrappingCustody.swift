@@ -43,18 +43,38 @@ struct EphemeralKeyWrappingCustody: SecureEnclaveManageable {
         return try hardware.generateWrappingKey(accessControl: nil, authenticationContext: nil)
     }
 
-    func wrap(privateKey: Data, using handle: any SEKeyHandle, fingerprint: String) throws -> WrappedKeyBundle {
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> WrappedKeyBundle {
         guard Self.isAvailable else {
             throw EphemeralKeyWrappingCustodyError.secureEnclaveUnavailable
         }
-        return try hardware.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        return try hardware.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: payloadKind
+        )
     }
 
-    func unwrap(bundle: WrappedKeyBundle, using handle: any SEKeyHandle, fingerprint: String) throws -> Data {
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> Data {
         guard Self.isAvailable else {
             throw EphemeralKeyWrappingCustodyError.secureEnclaveUnavailable
         }
-        return try hardware.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        return try hardware.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: payloadKind
+        )
     }
 
     func deleteKey(_ handle: any SEKeyHandle) throws {

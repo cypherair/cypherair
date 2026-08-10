@@ -30,6 +30,15 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
+        let classicalComponentService = KeychainConstants.splitCustodyClassicalComponentService(
+            fingerprint: "0123456789abcdef0123456789abcdef01234567"
+        )
+        try container.keychain.save(
+            Data([0x09]),
+            service: classicalComponentService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
         let committedDomainKeyService = KeychainConstants.protectedDataDomainKeyService(domainID: "contacts")
         let stagedDomainKeyService = KeychainConstants.stagedProtectedDataDomainKeyService(domainID: "contacts")
         try container.keychain.save(
@@ -62,6 +71,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertFalse(container.keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(container.keychain.exists(
+            service: classicalComponentService,
             account: KeychainConstants.defaultAccount
         ))
         XCTAssertFalse(container.keychain.exists(

@@ -336,7 +336,8 @@ final class KeyMutationService {
             return try secureEnclave.wrap(
                 privateKey: certData,
                 using: seHandle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
         }
     }
@@ -570,10 +571,15 @@ final class KeyMutationService {
         return deletionErrors
     }
 
+    /// Every Keychain row that can hold private material for one identity,
+    /// across all custody kinds. A row that does not exist for this identity's
+    /// custody kind simply is not found; deleting the whole set is what keeps
+    /// key deletion from leaving a sealed remnant behind.
     private func allPrivateKeychainServices(for fingerprint: String) -> [String] {
         [
             KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
-            KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint)
+            KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
+            KeychainConstants.splitCustodyClassicalComponentService(fingerprint: fingerprint)
         ]
     }
 

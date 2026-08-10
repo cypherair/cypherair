@@ -93,14 +93,20 @@ final class PrivateKeyAccessService {
     ) async throws -> Data {
         let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
             from: bundle.envelope,
-            expectedFingerprint: fingerprint
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: .softwareSecretCertificate
         )
         let handle = try secureEnclave.reconstructKey(
             from: seKeyData,
             authenticationContext: authenticationContext.context
         )
 
-        var unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        var unwrapped = try secureEnclave.unwrap(
+            bundle: bundle,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: .softwareSecretCertificate
+        )
 
         // Custody-integrity gate: the envelope's AES-GCM tag and device binding
         // prove the wrapped bytes were sealed by this device, but NOT that they

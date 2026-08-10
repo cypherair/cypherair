@@ -161,10 +161,12 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
         measure(metrics: [XCTClockMetric()], options: options) {
             let handle = try! secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
             let bundle = try! secureEnclave.wrap(
-                privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint
+                privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
             let unwrapped = try! secureEnclave.unwrap(
-                bundle: bundle, using: handle, fingerprint: fingerprint
+                bundle: bundle, using: handle, fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
             assert(unwrapped == fakePrivateKey)
         }

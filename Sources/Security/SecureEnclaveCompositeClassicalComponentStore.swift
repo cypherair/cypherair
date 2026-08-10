@@ -10,31 +10,33 @@ import Security
 /// operation additionally requires the enclave-resident ML-DSA/ML-KEM component
 /// (docs/CUSTODY.md §6).
 ///
-/// The two component scalars are concatenated and sealed with the existing
-/// per-identity Secure Enclave envelope (ephemeral×static ECDH → HKDF-SHA256 →
-/// AES-GCM). Their lengths depend on the tier: a 32-byte Ed25519 + 32-byte
-/// X25519 pair for `.postQuantum`, or a 57-byte Ed448 + 56-byte X448 pair for
+/// The two component scalars are concatenated and sealed as a
+/// `.splitCustodyClassicalComponent` envelope (ephemeral×static ECDH →
+/// HKDF-SHA256 → AES-GCM), in this store's own Keychain namespace. Their
+/// lengths depend on the tier: a 32-byte Ed25519 + 32-byte X25519 pair for
+/// `.postQuantum`, or a 57-byte Ed448 + 56-byte X448 pair for
 /// `.postQuantumHigh`. The wrapping key uses FIXED biometric access — never
-/// the app's mode-dependent wrapping key. NOTE: the fixed policy does NOT by
-/// itself exempt this envelope from Standard/High-Security mode-switch
-/// re-wrap — it is stored through `KeyBundleStore` in the shared
-/// privkey-envelope namespace, and the rewrap workflow would re-wrap it under
-/// a mode-dependent policy if asked. The exemption is enforced entirely by
-/// the caller-side custody-kind filter
-/// (`PGPKeyIdentity.softwareCustodyFingerprints` — docs/CUSTODY.md §4).
+/// the app's mode-dependent wrapping key.
+///
+/// Nothing outside this store can reach the component: it is the only writer
+/// and reader of its namespace, and the payload kind is authenticated in the
+/// envelope binding, so a software-custody consumer handed one of these rows
+/// fails closed instead of opening it (docs/CUSTODY.md §7).
 ///
 /// SECURITY-CRITICAL: raw component secrets are handled here. All plaintext
 /// buffers are zeroized after use. See docs/SECURITY.md Section 10.
 struct SecureEnclaveCompositeClassicalComponentStore {
+    private static let payloadKind = PrivateKeyEnvelopePayloadKind.splitCustodyClassicalComponent
+
     private let secureEnclave: any SecureEnclaveManageable
-    private let bundleStore: KeyBundleStore
+    private let keychain: any KeychainManageable
 
     init(
         secureEnclave: any SecureEnclaveManageable,
-        bundleStore: KeyBundleStore
+        keychain: any KeychainManageable
     ) {
         self.secureEnclave = secureEnclave
-        self.bundleStore = bundleStore
+        self.keychain = keychain
     }
 
     /// Seal `eddsaSecret || ecdhSecret` under a fresh fixed-access Secure
@@ -45,7 +47,7 @@ struct SecureEnclaveCompositeClassicalComponentStore {
         eddsaSecret: inout Data,
         ecdhSecret: inout Data,
         tier: SecureEnclaveCustodyTier
-    ) throws -> KeyBundleWriteReceipt {
+    ) throws {
         defer {
             eddsaSecret.resetBytes(in: 0..<eddsaSecret.count)
             ecdhSecret.resetBytes(in: 0..<ecdhSecret.count)
@@ -73,9 +75,15 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             let bundle = try secureEnclave.wrap(
                 privateKey: concatenated,
                 using: handle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: Self.payloadKind
             )
-            return try bundleStore.saveNewBundle(bundle, fingerprint: fingerprint)
+            try keychain.save(
+                bundle.envelope,
+                service: Self.service(for: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
         } catch {
             try? secureEnclave.deleteKey(handle)
             throw error
@@ -95,10 +103,16 @@ struct SecureEnclaveCompositeClassicalComponentStore {
                 reason: "The requested custody tier has no classical component."
             )
         }
-        let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
+        let bundle = WrappedKeyBundle(
+            envelope: try keychain.load(
+                service: Self.service(for: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+        )
         let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
             from: bundle.envelope,
-            expectedFingerprint: fingerprint
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: Self.payloadKind
         )
         let handle = try secureEnclave.reconstructKey(
             from: seKeyData,
@@ -107,7 +121,8 @@ struct SecureEnclaveCompositeClassicalComponentStore {
         var concatenated = try secureEnclave.unwrap(
             bundle: bundle,
             using: handle,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            payloadKind: Self.payloadKind
         )
         defer { concatenated.resetBytes(in: 0..<concatenated.count) }
         let eddsaLength = lengths.signing
@@ -138,15 +153,29 @@ struct SecureEnclaveCompositeClassicalComponentStore {
         return ClassicalComponent(eddsaSecret: eddsaSecret, ecdhSecret: ecdhSecret)
     }
 
-    // Deletion of a committed classical component is handled by the shared
-    // identity-deletion keychain-material path, which removes the envelope row
-    // by the same `privateKeyEnvelopeService(fingerprint:)` key this store
-    // writes to (KeyMutationService.deleteAllPrivateKeychainMaterial). The
-    // wrapping key lives only as `dataRepresentation` inside that envelope, so
-    // removing the row destroys it — there is no separate teardown to perform.
+    /// Whether a committed component exists for `fingerprint`. Non-prompting:
+    /// row presence only, nothing is decoded or unwrapped.
+    func componentExists(fingerprint: String) -> Bool {
+        keychain.exists(
+            service: Self.service(for: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+    }
 
-    func rollback(_ receipt: KeyBundleWriteReceipt) {
-        bundleStore.rollback(receipt)
+    // Deletion of a committed classical component is handled by the shared
+    // identity-deletion keychain-material path, which enumerates this store's
+    // service name alongside the software envelope rows
+    // (KeyMutationService.deleteAllPrivateKeychainMaterial). The wrapping key
+    // lives only as `dataRepresentation` inside the envelope, so removing the
+    // row destroys it — there is no separate teardown to perform.
+
+    /// Best-effort removal of a component this generation attempt stored,
+    /// used when a later step of the same attempt fails.
+    func discardStoredComponent(fingerprint: String) {
+        try? keychain.delete(
+            service: Self.service(for: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
     }
 
     /// One identity's classical component. A reference type so the router can
@@ -169,6 +198,10 @@ struct SecureEnclaveCompositeClassicalComponentStore {
         deinit {
             zeroize()
         }
+    }
+
+    private static func service(for fingerprint: String) -> String {
+        KeychainConstants.splitCustodyClassicalComponentService(fingerprint: fingerprint)
     }
 
     private static func makeFixedAccessControl() throws -> SecAccessControl {

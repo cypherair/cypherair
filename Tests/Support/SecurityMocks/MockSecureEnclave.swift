@@ -72,7 +72,12 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         #endif
     }
 
-    func wrap(privateKey: Data, using handle: any SEKeyHandle, fingerprint: String) throws -> WrappedKeyBundle {
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> WrappedKeyBundle {
         if let error = nextError {
             nextError = nil
             throw error
@@ -90,6 +95,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         let envelope = try PrivateKeyEnvelopeCodec.seal(
             privateKey: privateKey,
             fingerprint: fingerprint,
+            payloadKind: payloadKind,
             seKeyData: handle.dataRepresentation,
             seKeyPublicKeyX963: mockKey.privateKey.publicKey.x963Representation
         )
@@ -99,7 +105,12 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         #endif
     }
 
-    func unwrap(bundle: WrappedKeyBundle, using handle: any SEKeyHandle, fingerprint: String) throws -> Data {
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> Data {
         if let error = nextError {
             nextError = nil
             throw error
@@ -115,7 +126,8 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         // mismatch, then open-side ECDH (mock private key x envelope ephemeral public key).
         let envelope = try PrivateKeyEnvelopeCodec.decode(
             bundle.envelope,
-            expectedFingerprint: fingerprint
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: payloadKind
         )
         guard envelope.seKeyPublicKeyX963 == mockKey.privateKey.publicKey.x963Representation else {
             throw PrivateKeyEnvelopeError.deviceBindingMismatch
@@ -127,7 +139,8 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         return try PrivateKeyEnvelopeCodec.open(
             envelope: envelope,
             sharedSecret: sharedSecret,
-            expectedFingerprint: fingerprint
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: payloadKind
         )
         #else
         fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")

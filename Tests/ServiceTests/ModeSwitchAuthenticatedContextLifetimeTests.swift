@@ -75,7 +75,8 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
             let bundle = try secureEnclave.wrap(
                 privateKey: Data(repeating: UInt8(0x40 + index), count: 32),
                 using: handle,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
+                payloadKind: .softwareSecretCertificate
             )
             try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
         }

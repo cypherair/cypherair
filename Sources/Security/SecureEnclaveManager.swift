@@ -66,7 +66,12 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         return HardwareSEKey(key: key)
     }
 
-    func wrap(privateKey: Data, using handle: any SEKeyHandle, fingerprint: String) throws -> WrappedKeyBundle {
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> WrappedKeyBundle {
         guard let hwKey = handle as? HardwareSEKey else {
             throw SecureEnclaveError.invalidKeyHandle
         }
@@ -78,6 +83,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         let envelope = try PrivateKeyEnvelopeCodec.seal(
             privateKey: privateKey,
             fingerprint: fingerprint,
+            payloadKind: payloadKind,
             seKeyData: handle.dataRepresentation,
             seKeyPublicKeyX963: hwKey.key.publicKey.x963Representation
         )
@@ -86,7 +92,12 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         return WrappedKeyBundle(envelope: encoded)
     }
 
-    func unwrap(bundle: WrappedKeyBundle, using handle: any SEKeyHandle, fingerprint: String) throws -> Data {
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String,
+        payloadKind: PrivateKeyEnvelopePayloadKind
+    ) throws -> Data {
         guard let hwKey = handle as? HardwareSEKey else {
             throw SecureEnclaveError.invalidKeyHandle
         }
@@ -95,7 +106,8 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         // persistent SE private key x the envelope's software ephemeral public key.
         let envelope = try PrivateKeyEnvelopeCodec.decode(
             bundle.envelope,
-            expectedFingerprint: fingerprint
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: payloadKind
         )
         // Fail closed before any key agreement if the bound SE public key does not
         // match this handle. The AAD already binds SHA-256(seKeyPublicKeyX963), so a
@@ -110,7 +122,8 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         let plaintext = try PrivateKeyEnvelopeCodec.open(
             envelope: envelope,
             sharedSecret: sharedSecret,
-            expectedFingerprint: fingerprint
+            expectedFingerprint: fingerprint,
+            expectedPayloadKind: payloadKind
         )
         return plaintext
     }

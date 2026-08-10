@@ -25,8 +25,9 @@ Five domains ship today: `contacts`, `key-metadata`, `protected-settings`, `priv
 
 Everything app-owned sits under the `com.cypherair.v5.` service prefix. Reset deletion is the default-account prefix sweep **plus two dedicated paths the sweep cannot reach**: an exact delete of the root-secret row (with its own failure key) and the custody handle store's namespace cleanup — the custody rows use random handle-set accounts, which a default-account sweep structurally cannot see. The promises attached to the row families:
 
-- **`privkey-envelope.<fingerprint>`** — one self-contained `CAPKEV5` envelope per software-custody key, **and, today, also the split-custody classical-component envelope for Device-Bound Post-Quantum keys** (shared tenancy — why the custody-kind filter is load-bearing: [CUSTODY.md](CUSTODY.md) §4/§7). **Roadmap:** the classical component relocates to its own namespace under `CAPKEV6` (§5).
+- **`privkey-envelope.<fingerprint>`** — one self-contained `CAPKEV6` envelope per software-custody key, sealed as the `software-secret-certificate` payload kind. Nothing else lives here.
 - **`pending-privkey-envelope.<fingerprint>`** — the crash-window artifact: it exists only between mode-switch / modify-expiry phases and is owned by the interrupted-rewrap recovery coordinators; it is promoted or cleaned, never trusted over a permanent row ([SECURITY.md](SECURITY.md) §4).
+- **`split-custody-classical.<fingerprint>`** — the Device-Bound Post-Quantum classical component, a `CAPKEV6` envelope sealed as the `split-custody-classical-component` payload kind ([CUSTODY.md](CUSTODY.md) §7). Its own row family and its own payload kind: a software-custody consumer handed one of these rows fails closed rather than opening it.
 - **`secure-enclave-custody.<tier>.<role>`** — device-bound enclave-key blob rows. **The account is a random handle-set id, never a fingerprint** — a deliberate unlinkability property between Keychain rows and key identities. Handle-set ids are Security-layer-private locators: never written to `key-metadata`, logs, UI, exports, or Rust.
 - **`protected-data.shared-right`** and **`protected-data.domain-key.[staged.]<domainID>`** — the §2 hierarchy's rows.
 
@@ -48,10 +49,10 @@ The map below is **ratified**; every *Next* entry is **roadmap-class** — it la
 
 | Envelope | Today | Next | Trigger |
 |---|---|---|---|
-| `CAPKEV5` (private-key / classical-component envelope) | v5 | **`CAPKEV6`** — adds the payload-kind to the authenticated binding | the custody relocation ([CUSTODY.md](CUSTODY.md) §7); until then v5 seals both payload kinds |
+| `CAPKEV6` (private-payload envelope) | v6 — the payload kind rides in the authenticated binding, so one envelope type seals two non-interchangeable payloads (§3) | none | — |
 | `CPDENV5` (protected-domain payload envelope) | v5 | **retires — no v6** | the §6 storage move replaces the plist payload container with per-domain SQLCipher |
-| `CAPDSEV5` (root-secret envelope) | v5 | stays v5 | its bytes do not change under either move |
-| `CADMKV5` (wrapped domain master key) | v5 | stays v5 | its bytes do not change under either move |
+| `CAPDSEV5` (root-secret envelope) | v5 | stays v5 | its bytes do not change under the §6 storage move |
+| `CADMKV5` (wrapped domain master key) | v5 | stays v5 | its bytes do not change under the §6 storage move |
 
 The **`com.cypherair.v5.` Keychain prefix is a separate axis** — the schema generation of the persisted format family as a whole, nothing more. It is **not** bumped in isolation and does not move with any single envelope's version.
 
