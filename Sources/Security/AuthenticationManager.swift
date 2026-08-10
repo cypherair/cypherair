@@ -111,19 +111,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
     // MARK: - State
 
-    /// The LAContext from the most recent successful evaluate() call.
-    /// Used by switchMode to pass a pre-authenticated context to SE key
-    /// reconstruction, avoiding repeated Face ID prompts.
-    private(set) var lastEvaluatedContext: LAContext?
-
     /// The current authentication mode when the private-key control domain is unlocked.
     var currentMode: AuthenticationMode? {
         try? privateKeyControlStore?.requireUnlockedAuthMode()
-    }
-
-    func clearCachedAuthenticationContextAfterLocalDataReset() {
-        lastEvaluatedContext?.invalidate()
-        lastEvaluatedContext = nil
     }
 
     // MARK: - Init
@@ -199,9 +189,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
         )
     }
 
-    func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
+    func evaluate(
+        mode: AuthenticationMode,
+        reason: String
+    ) async throws -> PrivateKeyAuthenticationResult {
         if isUITestAuthenticationBypassEnabled {
-            return true
+            return .authenticated(context: nil)
         }
 
         let context = LAContext()
@@ -226,10 +219,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 )
             }
 
-            if success {
-                lastEvaluatedContext = context
-            }
-            return success
+            return success ? .authenticated(context: context) : .failed
         } catch let error as LAError where mode == .highSecurity
                                         && (error.code == .biometryNotAvailable
                                             || error.code == .biometryNotEnrolled
@@ -393,17 +383,26 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         // Step 0: Authenticate under the CURRENT mode before any Keychain modification.
-        try await authenticationPromptCoordinator.withOperationPrompt {
+        let authenticationContext = try await authenticationPromptCoordinator.withOperationPrompt {
             try await modeSwitchAuthenticator.authenticateCurrentMode(
                 oldMode,
                 authenticator: authenticator
             )
         }
+        // SECURITY-CRITICAL: this switch owns the authentication it just took.
+        // The re-wrap reuses one context across every key so the user
+        // authenticates once, and the switch's end is where that reuse stops:
+        // invalidating here is what keeps a Secure Enclave capability from
+        // outliving the operation it was granted for, on the success path and on
+        // every failure path alike.
+        defer {
+            authenticationContext?.invalidate()
+        }
 
         try await rewrapWorkflow.run(
             targetMode: newMode,
             fingerprints: fingerprints,
-            authenticator: authenticator,
+            authenticationContext: authenticationContext,
             privateKeyControlStore: privateKeyControlStore
         )
     }

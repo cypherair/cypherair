@@ -1789,7 +1789,6 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
             defaultsDomainName: defaultsSuiteName,
             config: container.config,
             protectedOrdinarySettingsCoordinator: container.protectedOrdinarySettingsCoordinator,
-            authManager: container.authManager,
             keyManagement: container.keyManagement,
             contactService: container.contactService,
             selfTestService: container.selfTestService,

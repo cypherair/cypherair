@@ -17,10 +17,17 @@ final class PrivateKeyRewrapWorkflow {
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
     }
 
+    /// Re-wrap every listed key into the target mode, journal first.
+    ///
+    /// - Parameter authenticationContext: The caller's authenticated context,
+    ///   reused across every key so one authentication covers the whole switch.
+    ///   `nil` leaves each Secure Enclave operation to authenticate implicitly.
+    ///   Ownership stays with the caller, which invalidates it when the switch
+    ///   ends — this workflow never retains it.
     func run(
         targetMode: AuthenticationMode,
         fingerprints: [String],
-        authenticator: any AuthenticationEvaluable,
+        authenticationContext: LAContext?,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol
     ) async throws {
         // Step 1: Write protected rewrap journal before any Keychain modifications.
@@ -29,7 +36,7 @@ final class PrivateKeyRewrapWorkflow {
         try await runPhaseA(
             targetMode: targetMode,
             fingerprints: fingerprints,
-            authenticator: authenticator,
+            authenticationContext: authenticationContext,
             privateKeyControlStore: privateKeyControlStore
         )
         try runPhaseB(
@@ -42,7 +49,7 @@ final class PrivateKeyRewrapWorkflow {
     private func runPhaseA(
         targetMode: AuthenticationMode,
         fingerprints: [String],
-        authenticator: any AuthenticationEvaluable,
+        authenticationContext: LAContext?,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol
     ) async throws {
         // Phase A: Create all pending items. If anything fails here, old items
@@ -56,7 +63,7 @@ final class PrivateKeyRewrapWorkflow {
                     existingBundle: existingBundle,
                     fingerprint: fingerprint,
                     newAccessControl: newAccessControl,
-                    authenticator: authenticator
+                    authenticationContext: authenticationContext
                 )
 
                 try bundleStore.saveBundle(
@@ -87,7 +94,7 @@ final class PrivateKeyRewrapWorkflow {
         existingBundle: WrappedKeyBundle,
         fingerprint: String,
         newAccessControl: SecAccessControl,
-        authenticator: any AuthenticationEvaluable
+        authenticationContext: LAContext?
     ) async throws -> WrappedKeyBundle {
         try await authenticationPromptCoordinator.withOperationPrompt {
             let existingSeKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
@@ -96,7 +103,7 @@ final class PrivateKeyRewrapWorkflow {
             )
             let existingHandle = try secureEnclave.reconstructKey(
                 from: existingSeKeyData,
-                authenticationContext: authenticator.lastEvaluatedContext
+                authenticationContext: authenticationContext
             )
 
             var rawKeyBytes = try secureEnclave.unwrap(
@@ -111,7 +118,7 @@ final class PrivateKeyRewrapWorkflow {
 
             let newHandle = try secureEnclave.generateWrappingKey(
                 accessControl: newAccessControl,
-                authenticationContext: authenticator.lastEvaluatedContext
+                authenticationContext: authenticationContext
             )
             return try secureEnclave.wrap(
                 privateKey: rawKeyBytes,
