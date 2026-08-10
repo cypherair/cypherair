@@ -14,10 +14,15 @@ enum OutgoingMessageFormat: Equatable, Hashable, Sendable {
 
 /// What the engine will do with a recipient set that has not been sent to yet.
 ///
-/// This is a read-only mirror of the engine's rule, never an instruction to it:
-/// SEIPDv2 is an RFC 9580 container, so a message is SEIPDv2 only when every
-/// certificate it is encrypted to is v6, and a single v4 certificate pulls the
-/// whole message down to SEIPDv1. The engine side of that rule is pinned by
+/// This is a read-only mirror, never an instruction to the engine. It mirrors
+/// the canonical rule (CLAUDE.md Hard Constraint 8, docs/PRODUCT.md §5): a
+/// message is SEIPDv2 only when every certificate it is encrypted to is v6,
+/// and a single v4 certificate pulls the whole message down to SEIPDv1. The
+/// engine's literal predicate is the certificates' *advertised features*, not
+/// their version; the app enforces that features track version for every key
+/// it generates (`pgp-mobile/src/keys/generation.rs`), while an imported
+/// certificate can diverge — reading advertised capability over FFI instead
+/// is #814. The engine side of the rule is pinned by
 /// `pgp-mobile/tests/cross_suite_tests.rs::test_format_selection_*`.
 ///
 /// Build this from **every** certificate the message will be encrypted to — the
