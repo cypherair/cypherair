@@ -55,7 +55,13 @@ final class ContactService: @unchecked Sendable {
                 wrappingRootKey: wrappingKey
             )
             var reconciledSnapshot = openedSnapshot
-            if try snapshotMutator.recomputeCertificationProjections(in: &reconciledSnapshot) {
+            let refreshedLifecycleState = try snapshotMutator.refreshCertificateLifecycleState(
+                in: &reconciledSnapshot
+            )
+            let recomputedProjections = try snapshotMutator.recomputeCertificationProjections(
+                in: &reconciledSnapshot
+            )
+            if refreshedLifecycleState || recomputedProjections {
                 try contactsDomainStore.replaceSnapshot(reconciledSnapshot)
             }
             try applyProtectedRuntimeSnapshot(reconciledSnapshot)
