@@ -14341,22 +14341,6 @@
         }
       }
     },
-    "signature.valid.fingerprint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valid signature from %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "来自 %@ 的有效签名"
-          }
-        }
-      }
-    },
     "signature.valid.known" : {
       "localizations" : {
         "en" : {

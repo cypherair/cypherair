@@ -698,15 +698,25 @@ struct ContactSnapshotMutator {
 
     /// Re-derive the certificate lifecycle flags cached on every key record.
     ///
-    /// `hasEncryptionSubkey`, `isRevoked` and `isExpired` are all answers about a
-    /// certificate *at a moment in time*, but they are written once at import and
-    /// then read for the life of the record. A key whose expiry passed afterwards,
-    /// or whose only encryption subkey expired, keeps reading as usable and the
-    /// app keeps offering it as a recipient. Re-parsing the stored certificate
-    /// refreshes all three together — they combine into a single `canEncryptTo`
-    /// answer, so refreshing a subset would leave the same false claim standing —
-    /// and key usage is re-normalized afterwards so a key that can no longer
-    /// receive messages also stops being presented as a live one.
+    /// `hasEncryptionSubkey`, `isRevoked` and `isExpired` are written once, at
+    /// import, and then read for the life of the record. Each is an answer about
+    /// a certificate under a policy at a moment in time, so a key whose expiry
+    /// passed afterwards keeps reading as usable and the app keeps offering it as
+    /// a recipient. Key usage is re-normalized after the refresh, so a key that
+    /// can no longer receive messages also stops being presented as a live one.
+    ///
+    /// All three are refreshed rather than the two whose staleness shows first:
+    /// they are the three inputs to one boolean, `canEncryptTo`, and re-deriving
+    /// a subset would leave that boolean an incoherent mixture of fresh and
+    /// import-time answers. `hasEncryptionSubkey` also earns it on its own — it
+    /// depends on a subkey binding signature still being valid at the current
+    /// time, and on `.supported()` under the engine's standard policy, which
+    /// drifts between Sequoia releases.
+    ///
+    /// This does *not* cover an encryption subkey whose own expiry has passed.
+    /// The engine computes `hasEncryptionSubkey` without the aliveness check the
+    /// encrypt path applies, so re-parsing recomputes the same `true`; that gap is
+    /// engine-side and tracked separately (issue #808).
     ///
     /// A record whose stored certificate cannot be re-parsed keeps the values it
     /// has: this runs on the Contacts unlock path, and one unreadable record must
