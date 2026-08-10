@@ -498,10 +498,11 @@ final class SettingsScreenModel {
         return softwareKeys.contains(where: \.isBackedUp)
     }
 
-    /// Mode switching re-wraps software-custody bundles only. The custody-kind
-    /// filter is the enforcement of the device-bound exemption — not the fixed
-    /// access policy (docs/CUSTODY.md §4) — so device-bound keys must never
-    /// enter the rewrap workflow.
+    /// Mode switching re-wraps software-custody bundles only. The device-bound
+    /// exemption is enforced structurally by the component's own Keychain
+    /// namespace and its envelope's authenticated payloadKind
+    /// (docs/CUSTODY.md §4); this filter keeps the enumeration accurate so a
+    /// bundleless device-bound fingerprint never poisons recovery.
     nonisolated static func rewrapFingerprints(keys: [PGPKeyIdentity]) -> [String] {
         PGPKeyIdentity.softwareCustodyFingerprints(in: keys)
     }

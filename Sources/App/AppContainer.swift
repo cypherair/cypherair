@@ -1483,13 +1483,14 @@ final class AppContainer: @unchecked Sendable {
             return
         }
 
-        // Re-wrap recovery enumerates software-custody keys only — the
-        // custody-kind filter is the enforcement of the device-bound exemption
-        // (docs/CUSTODY.md §4). Unfiltered, a pure-enclave key (no bundle)
-        // classifies as unrecoverable and would block target-mode persistence
-        // while the recovery journal is destroyed (silent mode/ACL desync),
-        // and a split-custody classical envelope would be re-wrapped under a
-        // mode-dependent policy.
+        // Re-wrap recovery enumerates software-custody keys only. The
+        // device-bound exemption is enforced structurally — the classical
+        // component lives in its own Keychain namespace and its envelope's
+        // authenticated payloadKind is not the one this workflow pins
+        // (docs/CUSTODY.md §4) — so the filter's remaining job is accuracy:
+        // unfiltered, a pure-enclave key (no bundle) classifies as
+        // unrecoverable and would block target-mode persistence while the
+        // recovery journal is destroyed (silent mode/ACL desync).
         let rewrapSummary = authManager.checkAndRecoverFromInterruptedRewrap(
             fingerprints: PGPKeyIdentity.softwareCustodyFingerprints(in: keyManagement.keys)
         )
