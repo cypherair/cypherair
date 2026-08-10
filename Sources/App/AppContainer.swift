@@ -179,12 +179,18 @@ final class AppContainer: @unchecked Sendable {
                     reason: reason
                 )
             },
+            beginPolicySwitchJournal: { target in
+                config.beginAppSessionAuthenticationPolicySwitch(to: target)
+            },
             reprotectPersistedRootSecret: { from, to, context in
                 try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
                     from: from,
                     to: to,
                     authenticationContext: context
                 )
+            },
+            commitPolicySwitch: { target in
+                config.completeAppSessionAuthenticationPolicySwitch(to: target)
             },
             discardHandoffContextForPolicyChange: {
                 appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
@@ -900,6 +906,22 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+                // Must stay AFTER the first-domain bootstrap and the post-unlock
+                // domain open: re-protection sets `interactionNotAllowed = true`
+                // on this shared handoff `LAContext`
+                // (`ProtectedDataRootSecretCoordinator`), and that mutation
+                // sticks for every later consumer of the context in this unlock.
+                AppAccessPolicySwitchRecovery.recover(
+                    config: config,
+                    authenticationContext: authenticationContext,
+                    reprotectPersistedRootSecretIfPresent: { from, to, context in
+                        try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                            from: from,
+                            to: to,
+                            authenticationContext: context
+                        )
+                    }
+                )
                 appSessionOrchestrator.recordPostAuthenticationCompletion()
             },
             contentClearHandler: {
@@ -1226,6 +1248,22 @@ final class AppContainer: @unchecked Sendable {
                     keyManagement: keyManagement,
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
+                )
+                // Must stay AFTER the first-domain bootstrap and the post-unlock
+                // domain open: re-protection sets `interactionNotAllowed = true`
+                // on this shared handoff `LAContext`
+                // (`ProtectedDataRootSecretCoordinator`), and that mutation
+                // sticks for every later consumer of the context in this unlock.
+                AppAccessPolicySwitchRecovery.recover(
+                    config: config,
+                    authenticationContext: authenticationContext,
+                    reprotectPersistedRootSecretIfPresent: { from, to, context in
+                        try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                            from: from,
+                            to: to,
+                            authenticationContext: context
+                        )
+                    }
                 )
                 appSessionOrchestrator.recordPostAuthenticationCompletion()
             },

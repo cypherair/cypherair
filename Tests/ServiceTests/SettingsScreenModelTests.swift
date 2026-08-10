@@ -206,8 +206,10 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     @MainActor
     func test_appAccessPolicySelection_biometricsOnly_confirmSwitches() async {
         var receivedPolicy: AppSessionAuthenticationPolicy?
+        let config = config!
         let model = makeModel(appAccessPolicySwitchAction: { policy in
             receivedPolicy = policy
+            config.completeAppSessionAuthenticationPolicySwitch(to: policy)
         })
 
         model.handleAppAccessPolicySelection(.biometricsOnly)
@@ -232,8 +234,10 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         // still happen — guarding it on the request still being present dropped
         // every confirmation (audit C11 regression).
         var receivedPolicy: AppSessionAuthenticationPolicy?
+        let config = config!
         let model = makeModel(appAccessPolicySwitchAction: { policy in
             receivedPolicy = policy
+            config.completeAppSessionAuthenticationPolicySwitch(to: policy)
         })
 
         model.handleAppAccessPolicySelection(.biometricsOnly)
@@ -267,10 +271,12 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_appAccessPolicySelection_userPresence_switchesDirectlyWithoutConfirmation() async {
-        config.appSessionAuthenticationPolicy = .biometricsOnly
+        config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
         var receivedPolicy: AppSessionAuthenticationPolicy?
+        let config = config!
         let model = makeModel(appAccessPolicySwitchAction: { policy in
             receivedPolicy = policy
+            config.completeAppSessionAuthenticationPolicySwitch(to: policy)
         })
 
         // Switching back to the safe direction (passcode fallback restored) needs
@@ -302,6 +308,29 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         XCTAssertTrue(model.showSwitchError)
         XCTAssertEqual(model.switchError, "App access switch failed")
         XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    /// The switch action owns the whole two-store transaction, preference commit
+    /// included (issue #747). A commit from this screen would be a second,
+    /// unjournaled store and would reopen the crash window the journal closes.
+    @MainActor
+    func test_appAccessPolicySelection_screenDoesNotCommitPreferenceItself() async {
+        var switchActionCalled = false
+        let model = makeModel(appAccessPolicySwitchAction: { _ in
+            switchActionCalled = true
+        })
+
+        model.handleAppAccessPolicySelection(.biometricsOnly)
+        model.presentedAppAccessConfirmation?.onConfirm()
+
+        await waitUntil("app access policy switch to finish") {
+            model.isSwitchingAppAccessPolicy == false
+        }
+
+        XCTAssertTrue(switchActionCalled)
+        XCTAssertFalse(model.showSwitchError)
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+        XCTAssertNil(config.pendingAppSessionAuthenticationPolicySwitch)
     }
 
     @MainActor
