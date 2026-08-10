@@ -51,7 +51,7 @@ final class QRService {
         }
 
         // Validate host/path format
-        guard url.host == "import" || urlString.hasPrefix("\(CypherAirImportURL.scheme)://import/") else {
+        guard url.host == "import" || urlString.hasPrefix("\(CypherAirImportURL.schemePrefix)import/") else {
             throw CypherAirError.invalidQRCode
         }
 

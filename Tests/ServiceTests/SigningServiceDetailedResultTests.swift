@@ -135,7 +135,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
     }
 
-    /// The second signature in `ffi_detailed_mixedfold_expired_bad.sig` carries no
+    /// The second signature in `ffi_detailed_mixedfold_expired_malformed.sig` carries no
     /// signature-creation-time subpacket, so the engine rejects it as malformed
     /// before checking anything. It reads as `.unverifiable` — not `.invalid`,
     /// which would tell the user the content may have been modified.
@@ -146,7 +146,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         let badSigner = try loadFixture("ffi_detailed_mixedfold_bad_signer")
         let expiredInfo = try stack.engine.parseKeyInfo(keyData: expiredSigner)
         let data = try loadFixture("ffi_detailed_mixedfold_data", ext: "txt")
-        let signature = try loadFixture("ffi_detailed_mixedfold_expired_bad", ext: "sig")
+        let signature = try loadFixture("ffi_detailed_mixedfold_expired_malformed", ext: "sig")
 
         try addContact(expiredSigner)
         try addContact(badSigner)

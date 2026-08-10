@@ -313,6 +313,28 @@ mod tests {
         assert_eq!(collector.signatures.len(), 2);
     }
 
+    /// `Unverifiable` is not a verdict, so unlike `Bad` and `Expired` it must
+    /// not freeze the verify-side summary — a signature that *was* checked still
+    /// decides it. Folding this status in with the hard failures would compile
+    /// and pass every other test while silently restoring the downgrade.
+    #[test]
+    fn verify_like_summary_is_not_frozen_by_an_unverifiable_signature() {
+        let mut collector = SignatureCollector::new(SummaryFoldMode::VerifyLike);
+        collector.observe_synthetic(DetailedSignatureStatus::Unverifiable, None);
+        collector.observe_synthetic(DetailedSignatureStatus::Valid, Some("good-fp"));
+
+        assert_eq!(
+            collector.summary_state(),
+            SignatureVerificationState::Verified
+        );
+        assert_eq!(collector.summary_entry_index(), Some(1));
+        assert_eq!(collector.signatures.len(), 2);
+        assert_eq!(
+            collector.signatures[0].status,
+            DetailedSignatureStatus::Unverifiable
+        );
+    }
+
     #[test]
     fn repeated_signers_are_not_collapsed() {
         let mut collector = SignatureCollector::new(SummaryFoldMode::VerifyLike);

@@ -4,7 +4,8 @@
 //! - multi-signer cleartext and detached fixtures,
 //! - repeated-signer detached fixtures,
 //! - encrypted multi-signer fixtures,
-//! - verify-family mixed-fold detached fixtures for `expired + unknown` and `expired + bad`.
+//! - verify-family mixed-fold detached fixtures for `expired + unknown` and
+//!   `expired + malformed`.
 
 use std::fs;
 use std::io::Write;
@@ -136,7 +137,12 @@ fn serialize_packet_pile(pile: &openpgp::PacketPile) -> Vec<u8> {
     serialized
 }
 
-fn invalidate_second_signature(binary_signature: &[u8]) -> Vec<u8> {
+/// Strip the signature-creation-time subpacket from the second signature.
+///
+/// Sequoia rejects the result as `MalformedSignature` — a signature it never
+/// checks, not one it checked and rejected — which is what makes this fixture
+/// exercise the `Unverifiable` grade rather than a `Bad` verdict.
+fn malform_second_signature(binary_signature: &[u8]) -> Vec<u8> {
     let mut pile =
         openpgp::PacketPile::from_bytes(binary_signature).expect("signature should parse cleanly");
     match pile.path_ref_mut(&[1]) {
@@ -256,7 +262,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mixedfold_data,
         &[&expired_signer.cert_data, &unknown_signer.cert_data],
     );
-    let expired_bad_binary = invalidate_second_signature(&sign_detached_multi_binary(
+    let expired_malformed_binary = malform_second_signature(&sign_detached_multi_binary(
         &mixedfold_data,
         &[&bad_signer.cert_data, &expired_signer.cert_data],
     ));
@@ -264,7 +270,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::thread::sleep(Duration::from_secs(2));
 
     let expired_unknown = armor::encode_armor(&expired_unknown_binary, ArmorKind::Signature)?;
-    let expired_bad = armor::encode_armor(&expired_bad_binary, ArmorKind::Signature)?;
+    let expired_malformed =
+        armor::encode_armor(&expired_malformed_binary, ArmorKind::Signature)?;
 
     let expired_unknown_verify = verify_detached_file(
         &mixedfold_data,
@@ -285,26 +292,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DetailedSignatureStatus::Expired
     );
 
-    let expired_bad_verify = verify_detached_file(
+    let expired_malformed_verify = verify_detached_file(
         &mixedfold_data,
-        &expired_bad,
+        &expired_malformed,
         &[
             expired_signer.public_key_data.clone(),
             bad_signer.public_key_data.clone(),
         ],
     )?;
     assert_eq!(
-        expired_bad_verify.summary_state,
+        expired_malformed_verify.summary_state,
         SignatureVerificationState::Expired
     );
-    assert_eq!(expired_bad_verify.signatures.len(), 2);
+    assert_eq!(expired_malformed_verify.signatures.len(), 2);
     assert_eq!(
-        expired_bad_verify.signatures[0].status,
+        expired_malformed_verify.signatures[0].status,
         DetailedSignatureStatus::Expired
     );
     assert_eq!(
-        expired_bad_verify.signatures[1].status,
-        DetailedSignatureStatus::Bad
+        expired_malformed_verify.signatures[1].status,
+        DetailedSignatureStatus::Unverifiable
     );
 
     fs::write(
@@ -360,8 +367,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         expired_unknown,
     )?;
     fs::write(
-        fixtures_dir.join("ffi_detailed_mixedfold_expired_bad.sig"),
-        expired_bad,
+        fixtures_dir.join("ffi_detailed_mixedfold_expired_malformed.sig"),
+        expired_malformed,
     )?;
 
     Ok(())

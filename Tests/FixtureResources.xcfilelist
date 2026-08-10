@@ -6,7 +6,7 @@ $(SRCROOT)/Tests/Fixtures/ffi_cert_binding_target.gpg
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_detached_data.txt
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_mixedfold_bad_signer.gpg
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_mixedfold_data.txt
-$(SRCROOT)/Tests/Fixtures/ffi_detailed_mixedfold_expired_bad.sig
+$(SRCROOT)/Tests/Fixtures/ffi_detailed_mixedfold_expired_malformed.sig
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_mixedfold_expired_signer.gpg
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_mixedfold_expired_unknown.sig
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_multisig_cleartext.asc
