@@ -155,7 +155,10 @@ final class DecryptionService {
         // reason to refuse — this pre-flight fails only for missing space, and an
         // unreadable input reports itself through the pipeline's own file error.
         if let encryptedInputSize = Self.fileSize(atPath: phase1.inputPath) {
-            try diskSpaceChecker.validateForDecryption(encryptedInputSize: encryptedInputSize)
+            try diskSpaceChecker.validateForDecryption(
+                encryptedInputSize: encryptedInputSize,
+                isArmored: Self.hasArmorHeader(atPath: phase1.inputPath)
+            )
         }
 
         // Custody-specific private-key access is owned by the router-backed streaming
@@ -201,6 +204,33 @@ final class DecryptionService {
             return nil
         }
         return attributes[.size] as? UInt64
+    }
+
+    /// Enough bytes for a byte-order mark, a little leading whitespace, and the armor
+    /// header line itself.
+    private static let armorProbeByteCount = 64
+
+    /// Whether the file's payload is base64 rather than binary, which decides how much
+    /// plaintext its size implies. Reads only the head — the answer has to be cheap for
+    /// a multi-gigabyte input. Any armor kind counts: the question is the encoding, not
+    /// the packet type. Anything unreadable or undecodable counts as binary, the
+    /// arithmetic that demands more space.
+    private static func hasArmorHeader(atPath path: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else {
+            return false
+        }
+        defer { try? handle.close() }
+
+        guard let head = try? handle.read(upToCount: armorProbeByteCount),
+              let text = String(data: head, encoding: .utf8) else {
+            return false
+        }
+
+        var leading = text[...]
+        if leading.hasPrefix("\u{FEFF}") {
+            leading = leading.dropFirst()
+        }
+        return leading.drop(while: { $0.isWhitespace }).hasPrefix("-----BEGIN PGP")
     }
 
     private func verificationContext() -> PGPMessageVerificationContext {

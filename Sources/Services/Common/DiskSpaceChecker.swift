@@ -23,10 +23,11 @@ struct SystemDiskSpace: DiskSpaceProvidable {
 /// whole copy of the user's data into the app's temporary directory: file
 /// encryption and file decryption.
 ///
-/// Both stream through Rust and can only discover a full volume mid-write —
-/// after the user has authenticated and waited, and after the volume has already
-/// been driven toward zero (storage pressure can jetsam other apps). Refusing up
-/// front costs the user nothing and names the one thing they can act on.
+/// Both stream through Rust and can only discover a full volume mid-write — after
+/// the user has waited, after any private-key step has made them authenticate, and
+/// after the volume has already been driven toward zero (storage pressure can
+/// jetsam other apps). Refusing up front costs the user nothing and names the one
+/// thing they can act on.
 ///
 /// Detached signing is deliberately not covered: it produces a small `.sig`, not
 /// a second copy of the payload.
@@ -40,8 +41,11 @@ struct DiskSpaceChecker {
 
     /// Validate that sufficient disk space is available for streaming file encryption.
     ///
-    /// Uses a 2x multiplier as a conservative estimate for encryption overhead
-    /// (PKESK headers, session key packets, AEAD/MDC tags, potential armor encoding).
+    /// Requires twice the input size. That figure is not derived from anything: file
+    /// encryption writes binary output — it never armors — and the output's overhead
+    /// over the plaintext is packet headers and AEAD chunk tags, a small percentage,
+    /// nowhere near a second copy. The margin therefore refuses encrypts that would
+    /// have succeeded. Correcting it is tracked as #813 and left alone here.
     ///
     /// - Parameter inputFileSize: Size of the plaintext input file in bytes.
     /// - Throws: `CypherAirError.insufficientDiskSpace` if available space is insufficient.
@@ -51,8 +55,8 @@ struct DiskSpaceChecker {
 
     /// Validate that sufficient disk space is available for streaming file decryption.
     ///
-    /// The decrypted size is unknowable before the message is decrypted, so the
-    /// encrypted input size is the estimate, with nothing added on top:
+    /// The decrypted size is unknowable before the message is decrypted, so the size
+    /// of the ciphertext is the estimate, with nothing added on top:
     ///
     /// - CypherAir never compresses what it encrypts, and the foreign payloads
     ///   large enough to matter here (media, archives) are already incompressible,
@@ -63,15 +67,27 @@ struct DiskSpaceChecker {
     ///   copy: the pipeline writes a sibling temp file and renames it into place on
     ///   the same volume.
     ///
+    /// Armored input is the same ciphertext in base64, which encodes 3 bytes as 4
+    /// characters (RFC 4648 §4), so the file is a third larger than the ciphertext
+    /// inside it and the estimate is three quarters of the file size. The armor
+    /// headers, the newline every 64 characters, and the footer are not subtracted,
+    /// which leaves that marginally on the demanding side — by well under 2%, where
+    /// dropping the correction entirely would over-demand by a third and produce
+    /// exactly the refusals the paragraph above rejects.
+    ///
     /// A message that expands far beyond its ciphertext still fails during the
     /// write. That path is already safe — the partial output is destroyed and the
     /// failure is reported — it is merely late, which is what this pre-flight
     /// removes for the common case.
     ///
-    /// - Parameter encryptedInputSize: Size of the encrypted input file in bytes.
+    /// - Parameters:
+    ///   - encryptedInputSize: Size of the encrypted input file in bytes.
+    ///   - isArmored: Whether that file is ASCII-armored rather than binary.
     /// - Throws: `CypherAirError.insufficientDiskSpace` if available space is insufficient.
-    func validateForDecryption(encryptedInputSize: UInt64) throws {
-        try validate(requiredBytes: encryptedInputSize)
+    func validateForDecryption(encryptedInputSize: UInt64, isArmored: Bool) throws {
+        try validate(
+            requiredBytes: isArmored ? encryptedInputSize / 4 * 3 : encryptedInputSize
+        )
     }
 
     private func validate(requiredBytes: UInt64) throws {
