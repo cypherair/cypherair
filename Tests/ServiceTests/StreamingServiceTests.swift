@@ -396,6 +396,43 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(mockDisk.callCount, 1, "Disk space should have been checked once")
     }
 
+    /// An input whose size cannot be read is not a reason to refuse: the pre-flight
+    /// only ever fails for missing space, and the real problem with the file surfaces
+    /// from the encrypt pipeline itself. Reported free space is zero here, so a
+    /// pre-flight that ran anyway would refuse and fail this test.
+    func test_encryptFileStreaming_unreadableInputSize_skipsPreflightAndProceeds() async throws {
+        let mockDisk = MockDiskSpace()
+        mockDisk.availableBytes = 0
+        let spyEncryptor = SpyStreamingFileEncryptor()
+        let artifactRoot = try makeIsolatedArtifactRoot()
+        defer { try? FileManager.default.removeItem(at: artifactRoot) }
+
+        let recipient = try await generateKeyAndContact(
+            suite: .ed25519LegacyCurve25519Legacy,
+            name: "Unreadable Encrypt Input Recipient"
+        )
+
+        let encryptedArtifact = try await makeEncryptionService(
+            fileEncryptor: spyEncryptor,
+            diskSpace: mockDisk,
+            artifactRoot: artifactRoot
+        ).encryptFileStreaming(
+            inputURL: URL(fileURLWithPath: "/nonexistent/CypherAirDiskPreflightTests/missing.bin"),
+            recipientContactIds: [try contactId(for: recipient)],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { encryptedArtifact.cleanup() }
+
+        XCTAssertEqual(spyEncryptor.callCount, 1, "Encryption should have proceeded to the pipeline")
+        XCTAssertEqual(
+            mockDisk.callCount,
+            0,
+            "The skip must happen before free space is ever consulted"
+        )
+    }
+
     /// The decrypt pre-flight has to land before the private-key route, because the
     /// point of it is to spare the user an authentication prompt and a long write
     /// that the volume cannot finish. A refusal raised after the decryptor had run
@@ -579,6 +616,11 @@ final class StreamingServiceTests: XCTestCase {
         defer { result.artifact.cleanup() }
 
         XCTAssertEqual(spyDecryptor.callCount, 1, "Decryption should have proceeded to the pipeline")
+        XCTAssertEqual(
+            mockDisk.callCount,
+            0,
+            "The skip must happen before free space is ever consulted"
+        )
     }
 
     private func makeDecryptionService(
@@ -597,6 +639,21 @@ final class StreamingServiceTests: XCTestCase {
                 messageAdapter: messageAdapter
             ),
             fileDecryptor: fileDecryptor,
+            diskSpaceChecker: DiskSpaceChecker(diskSpace: diskSpace),
+            temporaryArtifactStore: AppTemporaryArtifactStore(temporaryDirectory: artifactRoot)
+        )
+    }
+
+    private func makeEncryptionService(
+        fileEncryptor: any StreamingFileEncrypting,
+        diskSpace: any DiskSpaceProvidable,
+        artifactRoot: URL
+    ) -> EncryptionService {
+        EncryptionService(
+            keyManagement: stack.keyManagement,
+            contactService: stack.contactService,
+            textEncryptor: stack.textEncryptor,
+            fileEncryptor: fileEncryptor,
             diskSpaceChecker: DiskSpaceChecker(diskSpace: diskSpace),
             temporaryArtifactStore: AppTemporaryArtifactStore(temporaryDirectory: artifactRoot)
         )
@@ -759,10 +816,11 @@ final class StreamingServiceTests: XCTestCase {
                 progress: nil
             )
             XCTFail("Expected error for non-existent input file")
-        } catch {
-            // The error may surface as CypherAirError.fileIoError (from pgp-mobile streaming)
-            // or as NSCocoaErrorDomain/NSPOSIXErrorDomain (from Swift file validation).
-            // The key invariant is that encryption does NOT succeed for a nonexistent path.
+        } catch let error as CypherAirError {
+            guard case .fileIoError = error else {
+                XCTFail("Expected fileIoError from the streaming pipeline, got: \(error)")
+                return
+            }
         }
     }
 
@@ -778,6 +836,29 @@ final class StreamingServiceTests: XCTestCase {
             file: file,
             line: line
         )
+    }
+}
+
+/// Records whether the streaming file encryptor was reached, which is what lets a
+/// pre-flight test distinguish "refused up front" from "refused after the work".
+/// Creates the output file on the way out because `EncryptionService` applies file
+/// protection to it before returning.
+///
+/// `@unchecked Sendable`: the counter is written once inside the awaited call and
+/// read after it returns, never concurrently.
+private final class SpyStreamingFileEncryptor: StreamingFileEncrypting, @unchecked Sendable {
+    private(set) var callCount = 0
+
+    func encryptFile(
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signerFingerprint: String?,
+        selfKey: Data?,
+        progress: FileProgressReporter?
+    ) async throws {
+        callCount += 1
+        try Data().write(to: URL(fileURLWithPath: outputPath))
     }
 }
 

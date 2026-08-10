@@ -29,6 +29,10 @@ struct SystemDiskSpace: DiskSpaceProvidable {
 /// jetsam other apps). Refusing up front costs the user nothing and names the one
 /// thing they can act on.
 ///
+/// The pre-flight owns the whole requirement: it reads the input's size itself,
+/// and **an input whose size cannot be read is never a reason to refuse** — it
+/// reports itself through the pipeline's own file error instead.
+///
 /// Detached signing is deliberately not covered: it produces a small `.sig`, not
 /// a second copy of the payload.
 struct DiskSpaceChecker {
@@ -39,21 +43,25 @@ struct DiskSpaceChecker {
         self.diskSpace = diskSpace
     }
 
-    /// Validate that sufficient disk space is available for streaming file encryption.
+    /// Validate that sufficient disk space is available for streaming file
+    /// encryption of the file at `inputPath`.
     ///
-    /// Requires twice the input size. That figure is not derived from anything: file
-    /// encryption writes binary output — it never armors — and the output's overhead
-    /// over the plaintext is packet headers and AEAD chunk tags, a small percentage,
-    /// nowhere near a second copy. The margin therefore refuses encrypts that would
-    /// have succeeded. Correcting it is tracked as #813 and left alone here.
+    /// Requires twice the input size. That is a deliberately conservative posture,
+    /// not a derived estimate: the output barely exceeds the input — file
+    /// encryption writes binary output, never armored — but a volume within one
+    /// output-copy of full is refused on purpose, because nothing about the app
+    /// works well on a device that low on space and the margin keeps this write
+    /// from driving it there.
     ///
-    /// - Parameter inputFileSize: Size of the plaintext input file in bytes.
+    /// - Parameter inputPath: Path of the plaintext input file.
     /// - Throws: `CypherAirError.insufficientDiskSpace` if available space is insufficient.
-    func validateForEncryption(inputFileSize: UInt64) throws {
+    func validateForEncryption(inputPath: String) throws {
+        guard let inputFileSize = Self.fileSize(atPath: inputPath) else { return }
         try validate(requiredBytes: inputFileSize * 2)
     }
 
-    /// Validate that sufficient disk space is available for streaming file decryption.
+    /// Validate that sufficient disk space is available for streaming file
+    /// decryption of the file at `inputPath`.
     ///
     /// The decrypted size is unknowable before the message is decrypted, so the size
     /// of the ciphertext is the estimate, with nothing added on top:
@@ -80,13 +88,14 @@ struct DiskSpaceChecker {
     /// failure is reported — it is merely late, which is what this pre-flight
     /// removes for the common case.
     ///
-    /// - Parameters:
-    ///   - encryptedInputSize: Size of the encrypted input file in bytes.
-    ///   - isArmored: Whether that file is ASCII-armored rather than binary.
+    /// - Parameter inputPath: Path of the encrypted input file.
     /// - Throws: `CypherAirError.insufficientDiskSpace` if available space is insufficient.
-    func validateForDecryption(encryptedInputSize: UInt64, isArmored: Bool) throws {
+    func validateForDecryption(inputPath: String) throws {
+        guard let encryptedInputSize = Self.fileSize(atPath: inputPath) else { return }
         try validate(
-            requiredBytes: isArmored ? encryptedInputSize / 4 * 3 : encryptedInputSize
+            requiredBytes: Self.hasArmorHeader(atPath: inputPath)
+                ? encryptedInputSize / 4 * 3
+                : encryptedInputSize
         )
     }
 
@@ -98,5 +107,39 @@ struct DiskSpaceChecker {
                 availableMB: Int(available / (1024 * 1024))
             )
         }
+    }
+
+    private static func fileSize(atPath path: String) -> UInt64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return nil
+        }
+        return attributes[.size] as? UInt64
+    }
+
+    /// Enough bytes for a byte-order mark, a little leading whitespace, and the armor
+    /// header line itself.
+    private static let armorProbeByteCount = 64
+
+    /// Whether the file's payload is base64 rather than binary, which decides how much
+    /// plaintext its size implies. Reads only the head — the answer has to be cheap for
+    /// a multi-gigabyte input. Any armor kind counts: the question is the encoding, not
+    /// the packet type. Anything unreadable or undecodable counts as binary, the
+    /// arithmetic that demands more space.
+    private static func hasArmorHeader(atPath path: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else {
+            return false
+        }
+        defer { try? handle.close() }
+
+        guard let head = try? handle.read(upToCount: armorProbeByteCount),
+              let text = String(data: head, encoding: .utf8) else {
+            return false
+        }
+
+        var leading = text[...]
+        if leading.hasPrefix("\u{FEFF}") {
+            leading = leading.dropFirst()
+        }
+        return leading.drop(while: { $0.isWhitespace }).hasPrefix("-----BEGIN PGP")
     }
 }
