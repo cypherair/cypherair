@@ -68,10 +68,6 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
         )
     }
 
-    func deleteKey(_ handle: any SEKeyHandle) throws {
-        try base.deleteKey(handle)
-    }
-
     func reconstructKey(
         from data: Data,
         authenticationContext: LAContext?
@@ -151,10 +147,6 @@ final class BlockingReconstructSecureEnclave: SecureEnclaveManageable, @unchecke
             fingerprint: fingerprint,
             payloadKind: payloadKind
         )
-    }
-
-    func deleteKey(_ handle: any SEKeyHandle) throws {
-        try base.deleteKey(handle)
     }
 
     func reconstructKey(

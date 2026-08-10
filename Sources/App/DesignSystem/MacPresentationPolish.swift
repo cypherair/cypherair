@@ -99,12 +99,11 @@ struct CypherOutputTextBlock: View {
 
 struct CypherScrollableTextLine: View {
     let text: String
-    var font: Font = .system(.footnote, design: .monospaced)
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
             Text(verbatim: text)
-                .font(font)
+                .font(.system(.footnote, design: .monospaced))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: true, vertical: false)
                 .padding(.vertical, 1)

@@ -29,7 +29,6 @@ struct ProtectedDataFirstDomainSharedRightCleaner: @unchecked Sendable {
 
     func cleanupJournaledFirstDomainSharedRightIfSafe(
         expectedDomainID: ProtectedDataDomainID,
-        source: String,
         loadCurrentRegistry: @Sendable () throws -> ProtectedDataRegistry
     ) async throws -> ProtectedDataFirstDomainSharedRightCleanupOutcome {
         let registry = try loadCurrentRegistry()

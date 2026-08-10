@@ -5,7 +5,6 @@ struct FingerprintView: View {
     var font: Font = .system(.body, design: .monospaced)
     var foregroundColor: Color?
     var textSelectionEnabled = false
-    var multilineTextAlignment: TextAlignment = .leading
     var expandsHorizontally = true
 
     private var groups: [String] {
@@ -24,7 +23,7 @@ struct FingerprintView: View {
         let text = Text(IdentityPresentation.formattedFingerprint(fingerprint))
             .font(font)
             .fixedSize(horizontal: false, vertical: true)
-            .multilineTextAlignment(multilineTextAlignment)
+            .multilineTextAlignment(.leading)
 
         if let foregroundColor {
             if expandsHorizontally {

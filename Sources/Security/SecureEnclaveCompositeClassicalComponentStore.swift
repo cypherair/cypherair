@@ -71,23 +71,18 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             accessControl: accessControl,
             authenticationContext: nil
         )
-        do {
-            let bundle = try secureEnclave.wrap(
-                privateKey: concatenated,
-                using: handle,
-                fingerprint: fingerprint,
-                payloadKind: Self.payloadKind
-            )
-            try keychain.save(
-                bundle.envelope,
-                service: Self.service(for: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            try? secureEnclave.deleteKey(handle)
-            throw error
-        }
+        let bundle = try secureEnclave.wrap(
+            privateKey: concatenated,
+            using: handle,
+            fingerprint: fingerprint,
+            payloadKind: Self.payloadKind
+        )
+        try keychain.save(
+            bundle.envelope,
+            service: Self.service(for: fingerprint),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
     }
 
     /// Unwrap and return the classical component for `fingerprint`. Triggers a

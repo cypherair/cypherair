@@ -33,7 +33,7 @@ final class AppLockControllerTests: XCTestCase {
         private(set) var evaluateCount = 0
         private(set) var evaluateReasons: [String] = []
         private(set) var recordedContexts: [LAContext?] = []
-        private(set) var discardReasons: [String] = []
+        private(set) var discardCount = 0
         private(set) var relockCount = 0
         private(set) var postAuthCount = 0
         private(set) var postAuthContexts: [LAContext?] = []
@@ -62,12 +62,12 @@ final class AppLockControllerTests: XCTestCase {
             recordedContexts.append(context)
             operationLog.append("record")
         }
-        func discard(_ reason: String) { discardReasons.append(reason) }
+        func discard() { discardCount += 1 }
         func relock() async {
             relockCount += 1
             operationLog.append("relock")
         }
-        func postAuth(_ context: LAContext?, _ source: String) async {
+        func postAuth(_ context: LAContext?) async {
             postAuthCount += 1
             postAuthContexts.append(context)
             operationLog.append("postAuth")
@@ -156,11 +156,11 @@ final class AppLockControllerTests: XCTestCase {
         return AppLockController(
             gracePeriodProvider: { spy.gracePeriod },
             lastAuthenticationDateProvider: { spy.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason, _ in try await spy.evaluate(reason: reason) },
+            evaluateAppSessionAuthentication: { reason in try await spy.evaluate(reason: reason) },
             recordSuccessfulAuthentication: { spy.recordSuccessful($0) },
-            discardHandoffContext: { spy.discard($0) },
+            discardHandoffContext: { spy.discard() },
             relockProtectedData: { await spy.relock() },
-            postAuthenticationHandler: { await spy.postAuth($0, $1) },
+            postAuthenticationHandler: { await spy.postAuth($0) },
             contentClearHandler: { spy.contentClear() },
             shouldBypassAuthentication: { spy.bypass },
             operationPromptInProgressProvider: operationPromptInProgressProvider,
@@ -192,7 +192,7 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.authenticated(context: context))
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1)
@@ -214,12 +214,12 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.failed)
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.lockState, .authenticationFailed(.authenticationFailed))
         XCTAssertTrue(controller.isLocked)
         XCTAssertEqual(spy.recordedContexts.count, 0, "A failed auth must not record/hand off a context.")
-        XCTAssertTrue(spy.discardReasons.contains("authReturnedFalse"))
+        XCTAssertEqual(spy.discardCount, 1, "A failed auth discards the handoff context (fail-closed).")
     }
 
     func test_foregroundActive_authThrowsBiometricsLockedOut_mapsReason() async {
@@ -227,7 +227,7 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .failure(AuthenticationError.appAccessBiometricsLockedOut)
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.lockState, .authenticationFailed(.biometricsLockedOut))
         XCTAssertEqual(controller.authenticationFailure, .biometricsLockedOut)
@@ -239,7 +239,7 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .failure(LAError(.biometryLockout))
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.authenticationFailure, .biometricsLockedOut)
     }
@@ -249,7 +249,7 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .failure(AuthenticationError.cancelled)
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.authenticationFailure, .authenticationFailed)
     }
@@ -258,11 +258,11 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.authOutcome = .success(.failed)
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.authenticationFailure, .authenticationFailed)
 
         spy.authOutcome = .success(.authenticated(context: nil))
-        await controller.retryUnlock(source: "test")
+        await controller.retryUnlock()
 
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 2)
@@ -278,12 +278,12 @@ final class AppLockControllerTests: XCTestCase {
 
         // First unlock.
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "first")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1)
 
         // A foreground round-trip inside the grace window stays unlocked.
-        await controller.handleForegroundActive(source: "withinGrace")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1, "No re-auth within the grace window (cover ≠ lock).")
     }
@@ -294,16 +294,16 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.authenticated(context: nil))
         let controller = makeController(spy: spy)
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "first")
+        await controller.handleForegroundActive()
         XCTAssertEqual(spy.evaluateCount, 1)
 
         // Last auth is well past the grace window, and a genuine away (non-zero interval
         // → deferred, stays unlocked) precedes the resume — re-auth requires a genuine
         // resume, not a spurious `.active`.
         spy.lastAuthenticationDate = Date(timeIntervalSinceNow: -600)
-        controller.handleAwayEvent(source: "background")
+        controller.handleAwayEvent()
         await settle()
-        await controller.handleForegroundActive(source: "graceExpired")
+        await controller.handleForegroundActive()
         XCTAssertEqual(spy.evaluateCount, 2)
     }
 
@@ -313,15 +313,15 @@ final class AppLockControllerTests: XCTestCase {
         spy.lastAuthenticationDate = Date()
         spy.authOutcome = .success(.authenticated(context: nil))
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "first")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         // nil grace → 0 → a genuine away locks immediately, and the next resume
         // re-authenticates (nil treated as Immediately).
-        controller.handleAwayEvent(source: "background")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(controller.lockState, .locked)
-        await controller.handleForegroundActive(source: "again")
+        await controller.handleForegroundActive()
         XCTAssertEqual(spy.evaluateCount, 2)
     }
 
@@ -331,7 +331,7 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.bypass = true
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "test")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 0)
         XCTAssertEqual(spy.relockCount, 0)
@@ -350,7 +350,7 @@ final class AppLockControllerTests: XCTestCase {
 
         // Lock surface auto-invoke while the app is not foreground-active.
         controller.noteForegroundActive(false)
-        await controller.handleForegroundActive(source: "lockSurface.appear")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .locked, "A not-foreground-active foreground call must not unlock.")
         XCTAssertEqual(spy.evaluateCount, 0, "No auth may be attempted while not foreground-active.")
         XCTAssertEqual(spy.relockCount, 0)
@@ -358,7 +358,7 @@ final class AppLockControllerTests: XCTestCase {
 
         // The genuine foreground return then drives auth (epoch was not consumed).
         controller.noteForegroundActive(true)
-        await controller.handleForegroundActive(source: "scenePhase.active")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1, "The genuine foreground-active return authenticates.")
     }
@@ -375,25 +375,25 @@ final class AppLockControllerTests: XCTestCase {
 
         // Normal in-app unlock (foreground-active by default).
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1)
 
         // Background (grace=0): observer sets not-foreground, then the away locks.
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "scenePhase.background")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(controller.lockState, .locked)
 
         // The lock surface is inserted during the background transition; its `.task`
         // fires while backgrounded — must be a no-op (epoch not consumed).
-        await controller.handleForegroundActive(source: "lockSurface.appear")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .locked, "The backgrounded lock-surface auto-invoke must not consume the epoch.")
         XCTAssertEqual(spy.evaluateCount, 1)
 
         // FIRST genuine return → auth auto-starts (the regressed behavior).
         controller.noteForegroundActive(true)
-        await controller.handleForegroundActive(source: "scenePhase.active")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked, "The first genuine return after a normal unlock auto-authenticates.")
         XCTAssertEqual(spy.evaluateCount, 2)
     }
@@ -421,7 +421,7 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertTrue(controller.isCosmeticallyCovered)
 
         // Resolve the foreground (from .locked → full unlock flow).
-        await controller.handleForegroundActive(source: "scenePhase.active")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertFalse(controller.isResolvingForegroundLock, "The resume hold releases once the decision resolves.")
@@ -441,7 +441,7 @@ final class AppLockControllerTests: XCTestCase {
 
         let suspended = expectation(description: "auth suspended")
         spy.onAuthSuspended = { suspended.fulfill() }
-        let task = Task { await controller.handleForegroundActive(source: "scenePhase.active") }
+        let task = Task { await controller.handleForegroundActive() }
         await fulfillment(of: [suspended], timeout: 1.0)
 
         XCTAssertEqual(controller.lockState, .authenticating)
@@ -469,17 +469,17 @@ final class AppLockControllerTests: XCTestCase {
         let controller = makeController(spy: spy)
 
         // Prime to unlocked.
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1)
 
         // Away (non-zero grace: no immediate lock) then a genuine return.
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "scenePhase.background")
+        controller.handleAwayEvent()
         controller.noteForegroundActive(true)
         XCTAssertTrue(controller.isCosmeticallyCovered, "Cover held across the resume gap.")
 
-        await controller.handleForegroundActive(source: "scenePhase.active")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1, "A within-grace return must not re-authenticate.")
@@ -505,7 +505,7 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertTrue(controller.isResolvingForegroundLock, "Still set; only handleForegroundActive clears it.")
         XCTAssertTrue(controller.isCosmeticallyCovered)
 
-        await controller.handleForegroundActive(source: "scenePhase.active")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(spy.evaluateCount, 0, "A not-foreground-active resolution must not authenticate.")
         XCTAssertFalse(controller.isResolvingForegroundLock, "The hold must never stick, even on the early return.")
@@ -520,16 +520,17 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.authenticated(context: nil))
         let controller = makeController(spy: spy)
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksAfterUnlock = spy.relockCount
+        let discardsAfterUnlock = spy.discardCount
 
-        controller.handleAwayEvent(source: "background")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(controller.lockState, .locked, "Interval 0 locks on the away event.")
         XCTAssertEqual(spy.relockCount, relocksAfterUnlock + 1, "Entering locked fails closed via relock.")
-        XCTAssertTrue(spy.discardReasons.contains { $0.hasPrefix("away:") })
+        XCTAssertGreaterThan(spy.discardCount, discardsAfterUnlock)
     }
 
     func test_awayEvent_nonZeroInterval_doesNotRelockImmediately() async {
@@ -538,15 +539,16 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.authenticated(context: nil))
         let controller = makeController(spy: spy)
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         let relocksAfterUnlock = spy.relockCount
+        let discardsAfterUnlock = spy.discardCount
 
-        controller.handleAwayEvent(source: "background")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(controller.lockState, .unlocked, "A non-zero interval defers locking to the next resume.")
         XCTAssertEqual(spy.relockCount, relocksAfterUnlock, "No eager relock for a non-zero interval.")
-        XCTAssertTrue(spy.discardReasons.contains { $0.hasPrefix("away:") }, "Handoff context is discarded on away (fail-closed).")
+        XCTAssertGreaterThan(spy.discardCount, discardsAfterUnlock, "Handoff context is discarded on away (fail-closed).")
     }
 
     #if os(macOS)
@@ -571,13 +573,13 @@ final class AppLockControllerTests: XCTestCase {
         // authentication (40 seconds left) is a different number from a fresh
         // full interval (60) — an away must not extend the session.
         spy.lastAuthenticationDate = Date(timeIntervalSinceNow: -20)
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksAfterUnlock = spy.relockCount
         let contentClearsAfterUnlock = spy.contentClearCount
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(controller.lockState, .unlocked, "The session stays open for the rest of the grace window.")
@@ -612,16 +614,16 @@ final class AppLockControllerTests: XCTestCase {
         let deadline = AwayDeadlineClock()
         let controller = makeController(spy: spy, awayDeadline: deadline)
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         let relocksAfterUnlock = spy.relockCount
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertTrue(deadline.isPending)
 
         controller.noteForegroundActive(true)
-        await controller.handleForegroundActive(source: "macBecomeActive")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked, "A return within grace stays unlocked.")
 
         deadline.arrive()
@@ -641,11 +643,11 @@ final class AppLockControllerTests: XCTestCase {
         let deadline = AwayDeadlineClock()
         let controller = makeController(spy: spy, awayDeadline: deadline)
         spy.lastAuthenticationDate = Date(timeIntervalSinceNow: -20)
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         let relocksAfterUnlock = spy.relockCount
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         deadline.arrive()
@@ -672,14 +674,14 @@ final class AppLockControllerTests: XCTestCase {
         let deadline = AwayDeadlineClock()
         let controller = makeController(spy: spy, awayDeadline: deadline)
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         let relocksBeforeLock = spy.relockCount
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
-        controller.lockNow(source: "screenLock")
+        controller.lockNow()
         deadline.arrive()
         await settle()
 
@@ -704,14 +706,14 @@ final class AppLockControllerTests: XCTestCase {
         let suspended = expectation(description: "postAuth suspended")
         spy.onPostAuthSuspended = { suspended.fulfill() }
 
-        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        async let unlock: Void = controller.handleForegroundActive()
         await fulfillment(of: [suspended], timeout: 2)
 
         // The user leaves while the post-auth fan-out is still running. The
         // `.authenticating` rule swallows the resign — no generation bump, no
         // arming from the away path.
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(deadline.armCount, 0, "The away event itself is swallowed mid-unlock.")
 
@@ -734,7 +736,7 @@ final class AppLockControllerTests: XCTestCase {
         // the spurious-foreground gate no longer suppresses it.
         let evaluationsBeforeReturn = spy.evaluateCount
         controller.noteForegroundActive(true)
-        await controller.handleForegroundActive(source: "macBecomeActive")
+        await controller.handleForegroundActive()
 
         XCTAssertEqual(spy.evaluateCount, evaluationsBeforeReturn + 1, "The return authenticates.")
         XCTAssertEqual(controller.lockState, .unlocked)
@@ -747,11 +749,11 @@ final class AppLockControllerTests: XCTestCase {
         spy.bypass = true
         let deadline = AwayDeadlineClock()
         let controller = makeController(spy: spy, awayDeadline: deadline)
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(deadline.armCount, 0)
@@ -765,10 +767,10 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.authenticated(context: nil))
         let controller = makeController(spy: spy)
         spy.lastAuthenticationDate = Date()
-        await controller.handleForegroundActive(source: "unlock")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
-        controller.lockNow(source: "menu")
+        controller.lockNow()
         await settle()
 
         XCTAssertEqual(controller.lockState, .locked)
@@ -785,11 +787,11 @@ final class AppLockControllerTests: XCTestCase {
         let suspended = expectation(description: "auth suspended")
         spy.onAuthSuspended = { suspended.fulfill() }
 
-        async let first: Void = controller.handleForegroundActive(source: "a")
+        async let first: Void = controller.handleForegroundActive()
         await fulfillment(of: [suspended], timeout: 2)
 
         // A second resume while the first is in flight must not start a second prompt.
-        await controller.handleForegroundActive(source: "b")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .authenticating)
         XCTAssertEqual(spy.evaluateCount, 1)
 
@@ -808,14 +810,14 @@ final class AppLockControllerTests: XCTestCase {
         let suspended = expectation(description: "auth suspended")
         spy.onAuthSuspended = { suspended.fulfill() }
 
-        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        async let unlock: Void = controller.handleForegroundActive()
         await fulfillment(of: [suspended], timeout: 2)
         let relocksDuringAuth = spy.relockCount
 
         // The macOS system auth sheet resigns the app while the controller drives
         // the unlock; under the `.authenticating` rule that is explicit state, not
         // an away event.
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(controller.lockState, .authenticating, "The sheet's own resign is not an away event.")
@@ -830,7 +832,7 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
@@ -838,7 +840,7 @@ final class AppLockControllerTests: XCTestCase {
         // (the began-hop has landed on the main actor).
         controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(
@@ -853,12 +855,12 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(controller.lockState, .unlocked)
 
@@ -876,13 +878,13 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
         controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         // The prompt completes and focus returned to the app before the prompts
@@ -899,14 +901,14 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         // Screen-lock / "Lock Now" routes through lockNow, which the
         // `.authenticating` rule never filters: a genuine lock signal wins even
         // mid-prompt.
         controller.handleOperationPromptSessionBegan()
-        controller.lockNow(source: "screenLock")
+        controller.lockNow()
         await settle()
 
         XCTAssertEqual(controller.lockState, .locked, "Genuine lock signals win during a prompt.")
@@ -916,15 +918,15 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         controller.noteForegroundActive(true)
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(controller.lockState, .unlocked, "All resigns during the prompt are deferred.")
 
@@ -940,19 +942,19 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         // Adversarial ordering: the prompts-ended hop runs BEFORE lockNow's
         // queued enterLocked task. lockNow clears the deferral synchronously, so
         // the hop must be a no-op and exactly one relock cycle runs.
         let relocksBeforeLock = spy.relockCount
-        controller.lockNow(source: "screenLock")
+        controller.lockNow()
         controller.handleOperationPromptsEnded()
         await settle()
 
@@ -970,7 +972,7 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
 
         controller.handleOperationPromptSessionBegan()   // session 1
@@ -978,7 +980,7 @@ final class AppLockControllerTests: XCTestCase {
         controller.handleOperationPromptsEnded()         // session 1 ended-hop arrives late
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(controller.lockState, .unlocked, "The live session keeps the resign deferred.")
 
@@ -1007,13 +1009,13 @@ final class AppLockControllerTests: XCTestCase {
             Task { @MainActor in controller?.handleOperationPromptsEnded() }
         }
 
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
         let prompt = coordinator.beginOperationPrompt()
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
 
         XCTAssertEqual(
             controller.lockState,
@@ -1048,7 +1050,7 @@ final class AppLockControllerTests: XCTestCase {
             Task { @MainActor in controller?.handleOperationPromptsEnded() }
         }
 
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
@@ -1057,7 +1059,7 @@ final class AppLockControllerTests: XCTestCase {
         coordinator.endOperationPrompt(prompt)
 
         controller.noteForegroundActive(false)
-        controller.handleAwayEvent(source: "macResignActive")
+        controller.handleAwayEvent()
         await settle()
 
         XCTAssertEqual(
@@ -1072,7 +1074,7 @@ final class AppLockControllerTests: XCTestCase {
         let spy = Spy()
         spy.gracePeriod = 0
         let controller = makeController(spy: spy)
-        await controller.handleForegroundActive(source: "boot")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
@@ -1095,10 +1097,10 @@ final class AppLockControllerTests: XCTestCase {
         let suspended = expectation(description: "auth suspended")
         spy.onAuthSuspended = { suspended.fulfill() }
 
-        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        async let unlock: Void = controller.handleForegroundActive()
         await fulfillment(of: [suspended], timeout: 2)
 
-        controller.lockNow(source: "lockDuringAuth")
+        controller.lockNow()
         await settle()
         XCTAssertEqual(controller.lockState, .locked)
 
@@ -1118,14 +1120,14 @@ final class AppLockControllerTests: XCTestCase {
         let suspended = expectation(description: "postAuth suspended")
         spy.onPostAuthSuspended = { suspended.fulfill() }
 
-        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        async let unlock: Void = controller.handleForegroundActive()
         await fulfillment(of: [suspended], timeout: 2)
 
         // lockNow is platform-agnostic (NOT subject to the macOS in-flight guard that
         // swallows handleAwayEvent during controller-driven auth), so it actually
         // invalidates the in-flight attempt on macOS where unit tests run — exercising
         // "an away during the post-auth fan-out → discard + REAL relock."
-        controller.lockNow(source: "lockDuringPostAuth")
+        controller.lockNow()
         await settle()                                   // lockNow's enterLocked relocks + sets .locked
         let relocksAfterLockNow = spy.relockCount
         XCTAssertEqual(controller.lockState, .locked)
@@ -1149,7 +1151,7 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.authenticated(context: nil))
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "cold")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 1)
 
@@ -1157,16 +1159,16 @@ final class AppLockControllerTests: XCTestCase {
         // banner) deliver spurious `.active`s with no genuine `.background`. At grace=0
         // these MUST NOT re-authenticate — that was the infinite Face ID loop.
         for _ in 0..<6 {
-            await controller.handleForegroundActive(source: "scenePhase.active#spurious")
+            await controller.handleForegroundActive()
         }
         XCTAssertEqual(spy.evaluateCount, 1, "Spurious .active must not re-auth at grace=0 (no loop).")
         XCTAssertEqual(controller.lockState, .unlocked)
 
         // A genuine away at grace=0 locks; the next foreground is exactly one fresh prompt.
-        controller.handleAwayEvent(source: "scenePhase.background")
+        controller.handleAwayEvent()
         await settle()
         XCTAssertEqual(controller.lockState, .locked)
-        await controller.handleForegroundActive(source: "scenePhase.active#genuineReturn")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 2, "Exactly one auth per genuine return.")
     }
@@ -1177,21 +1179,21 @@ final class AppLockControllerTests: XCTestCase {
         spy.authOutcome = .success(.failed)
         let controller = makeController(spy: spy)
 
-        await controller.handleForegroundActive(source: "cold")
+        await controller.handleForegroundActive()
         XCTAssertEqual(controller.authenticationFailure, .authenticationFailed)
         XCTAssertEqual(spy.evaluateCount, 1)
 
         // A cancelled/failed auth must leave the retry affordance visible; the just-
         // dismissed failed sheet's `.active` must NOT auto-retry (the cancel→reprompt loop).
         for _ in 0..<5 {
-            await controller.handleForegroundActive(source: "scenePhase.active#postCancel")
+            await controller.handleForegroundActive()
         }
         XCTAssertEqual(spy.evaluateCount, 1, "A spurious .active after a failed/cancelled auth must not auto-retry.")
         XCTAssertEqual(controller.authenticationFailure, .authenticationFailed)
 
         // The explicit retry button still works (it bypasses the spurious-foreground gate).
         spy.authOutcome = .success(.authenticated(context: nil))
-        await controller.retryUnlock(source: "retryButton")
+        await controller.retryUnlock()
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertEqual(spy.evaluateCount, 2)
     }
@@ -1203,7 +1205,7 @@ final class AppLockControllerTests: XCTestCase {
         let controller = makeController(spy: spy)
         controller.resetAfterLocalDataReset(preserveAuthentication: false)
         XCTAssertEqual(controller.lockState, .locked)
-        XCTAssertTrue(spy.discardReasons.contains("localDataReset"))
+        XCTAssertEqual(spy.discardCount, 1, "The reset discards the handoff context (fail-closed).")
     }
 
     func test_resetAfterLocalDataReset_preserveAuthentication_staysUnlocked() {

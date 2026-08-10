@@ -265,7 +265,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         }
         await gate.waitUntilSuspended()
         try keyManagement.setDefaultKey(fingerprint: fingerprint)
-        keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
+        try keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
         await gate.resume()
 
         let updated = try await task.value

@@ -197,26 +197,24 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         let context = LAContext()
+        let policy: LAPolicy
+        switch mode {
+        case .standard:
+            // Face ID / Touch ID with device passcode fallback.
+            policy = .deviceOwnerAuthentication
+
+        case .highSecurity:
+            // Face ID / Touch ID only. Hide the passcode fallback button.
+            context.localizedFallbackTitle = ""
+            policy = .deviceOwnerAuthenticationWithBiometrics
+        }
+
         do {
-            let success = try await authenticationPromptCoordinator.withPrivacyPrompt { _ in
-                let policy: LAPolicy
-                switch mode {
-                case .standard:
-                    // Face ID / Touch ID with device passcode fallback.
-                    policy = .deviceOwnerAuthentication
-
-                case .highSecurity:
-                    // Face ID / Touch ID only. Hide the passcode fallback button.
-                    context.localizedFallbackTitle = ""
-                    policy = .deviceOwnerAuthenticationWithBiometrics
-                }
-
-                return try await evaluateLocalAuthenticationPolicy(
-                    context,
-                    policy: policy,
-                    reason: reason
-                )
-            }
+            let success = try await evaluateLocalAuthenticationPolicy(
+                context,
+                policy: policy,
+                reason: reason
+            )
 
             return success ? .authenticated(context: context) : .failed
         } catch let error as LAError where mode == .highSecurity
@@ -249,13 +247,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
         policy.configure(context)
 
         do {
-            let success = try await authenticationPromptCoordinator.withPrivacyPrompt { _ in
-                try await evaluateLocalAuthenticationPolicyWithCallback(
-                    context,
-                    appSessionPolicy: policy,
-                    reason: reason
-                )
-            }
+            let success = try await evaluateLocalAuthenticationPolicyWithCallback(
+                context,
+                appSessionPolicy: policy,
+                reason: reason
+            )
             return success ? .authenticated(context: context) : .failed
         } catch let error as LAError where error.code == .biometryLockout {
             throw AuthenticationError.appAccessBiometricsLockedOut

@@ -417,16 +417,16 @@ struct CypherAirApp: App {
         .incomingURLImportAlerts(coordinator: incomingURLImportCoordinator)
         .appLoadWarningAlert(coordinator: loadWarningCoordinator)
         .onAppear {
-            presentPendingLoadWarningIfPossible(source: "initialState")
+            presentPendingLoadWarningIfPossible()
         }
         .onChange(of: loadWarningPresentationState) { _, _ in
-            presentPendingLoadWarningIfPossible(source: "presentationStateChange")
+            presentPendingLoadWarningIfPossible()
         }
         .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
             guard let warning else { return }
             loadWarningCoordinator.enqueue(warning)
             container.config.clearPostUnlockRecoveryLoadWarning()
-            presentPendingLoadWarningIfPossible(source: "postUnlockRecovery")
+            presentPendingLoadWarningIfPossible()
         }
         .onOpenURL { url in
             incomingURLRouter.handle(url)
@@ -459,9 +459,8 @@ struct CypherAirApp: App {
         )
     }
 
-    private func presentPendingLoadWarningIfPossible(source: String) {
+    private func presentPendingLoadWarningIfPossible() {
         loadWarningCoordinator.presentPendingIfPossible(
-            source: source,
             presentationState: loadWarningPresentationState,
             isRestartRequiredAfterLocalDataReset: localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset
         )

@@ -113,7 +113,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
             suite: .ed25519LegacyCurve25519Legacy
         )
         let passphrase = "import-composition-pass"
-        let exported = try await fixture.service.exportKey(
+        let exported = try await fixture.service.exportKeyBackupData(
             fingerprint: original.fingerprint,
             passphrase: passphrase
         )

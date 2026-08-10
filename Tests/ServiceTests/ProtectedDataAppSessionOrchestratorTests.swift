@@ -69,7 +69,7 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
         let orchestrator = makeOrchestrator()
         orchestrator.recordSuccessfulAppSessionAuthentication(context: LAContext())
 
-        orchestrator.discardAuthorizationHandoffContext(reason: "test")
+        orchestrator.discardAuthorizationHandoffContext()
 
         XCTAssertFalse(orchestrator.hasProtectedDataAuthorizationHandoffContext)
     }

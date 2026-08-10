@@ -37,7 +37,6 @@ private struct TagManagementHostView: View {
         .navigationTitle(String(localized: "tagManagement.title", defaultValue: "Manage Tags"))
         .cypherSearchable(
             text: $model.searchText,
-            placement: .automatic,
             prompt: String(localized: "tagManagement.search", defaultValue: "Search tags")
         )
         .toolbar {

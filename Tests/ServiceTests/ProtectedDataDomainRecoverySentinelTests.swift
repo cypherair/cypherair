@@ -246,8 +246,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
         let outcome = await coordinator.openRegisteredDomains(
             authenticationContext: handoffContext,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
+            localizedReason: "Open protected domains"
         )
 
         XCTAssertEqual(outcome, .noProtectedDomainPresent)

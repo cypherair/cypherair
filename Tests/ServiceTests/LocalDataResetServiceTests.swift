@@ -305,7 +305,6 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
 
         let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
             expectedDomainID: ProtectedSettingsStore.domainID,
-            source: "test",
             loadCurrentRegistry: { registry }
         )
 
@@ -345,7 +344,6 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
 
         let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
             expectedDomainID: ProtectedSettingsStore.domainID,
-            source: "test",
             loadCurrentRegistry: { registry }
         )
 

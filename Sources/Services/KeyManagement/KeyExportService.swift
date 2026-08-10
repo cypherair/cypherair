@@ -21,8 +21,7 @@ final class KeyExportService {
 
     func exportKey(
         fingerprint: String,
-        passphrase: String,
-        markBackedUp: Bool = true
+        passphrase: String
     ) async throws -> Data {
         guard let identity = catalogStore.identity(for: fingerprint) else {
             throw CypherAirError.keyMetadataUnavailable
@@ -45,15 +44,10 @@ final class KeyExportService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        let exported = try await keyAdapter.exportSecretKey(
+        return try await keyAdapter.exportSecretKey(
             certData: secretKey,
             passphrase: passphrase
         )
-
-        if markBackedUp {
-            catalogStore.markBackedUp(fingerprint: fingerprint)
-        }
-        return exported
     }
 
     func exportRevocationCertificate(fingerprint: String) async throws -> Data {

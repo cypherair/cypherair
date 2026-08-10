@@ -10,14 +10,6 @@ enum CypherSingleLineTextInputProfile {
     case confirmationPhrase
 }
 
-enum CypherSecureTextInputProfile {
-    case passphrase
-}
-
-enum CypherSearchTextInputProfile {
-    case search
-}
-
 struct CypherSingleLineTextField: View {
     let title: String
     @Binding var text: String
@@ -50,27 +42,24 @@ struct CypherSingleLineTextField: View {
 struct CypherSecureTextField: View {
     let title: String
     @Binding var text: String
-    let profile: CypherSecureTextInputProfile
-    var submitLabel: SubmitLabel = .done
-    var onSubmit: () -> Void = {}
+    let submitLabel: SubmitLabel
+    let onSubmit: () -> Void
 
     init(
         _ title: String,
         text: Binding<String>,
-        profile: CypherSecureTextInputProfile = .passphrase,
         submitLabel: SubmitLabel = .done,
         onSubmit: @escaping () -> Void = {}
     ) {
         self.title = title
         self._text = text
-        self.profile = profile
         self.submitLabel = submitLabel
         self.onSubmit = onSubmit
     }
 
     var body: some View {
         SecureField(title, text: $text)
-            .cypherSecureTextTraits(profile)
+            .cypherOpaqueTextTraits()
             .submitLabel(submitLabel)
             .onSubmit(onSubmit)
     }
@@ -80,12 +69,10 @@ extension View {
     @ViewBuilder
     func cypherSearchable(
         text: Binding<String>,
-        placement: SearchFieldPlacement = .automatic,
-        prompt: String,
-        profile: CypherSearchTextInputProfile = .search
+        prompt: String
     ) -> some View {
-        self.searchable(text: text, placement: placement, prompt: prompt)
-            .cypherSearchTextTraits(profile)
+        self.searchable(text: text, prompt: prompt)
+            .cypherOpaqueTextTraits()
     }
 }
 
@@ -105,38 +92,20 @@ private extension View {
         #endif
     }
 
+    /// Traits for text the keyboard must not learn from or transform: passphrases
+    /// and search terms over contact data.
     @ViewBuilder
-    func cypherSecureTextTraits(_ profile: CypherSecureTextInputProfile) -> some View {
-        switch profile {
-        case .passphrase:
-            #if canImport(UIKit)
-            self.autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                .privacySensitive()
-                .textInputAutocapitalization(.never)
-            #else
-            self.autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                .privacySensitive()
-            #endif
-        }
-    }
-
-    @ViewBuilder
-    func cypherSearchTextTraits(_ profile: CypherSearchTextInputProfile) -> some View {
-        switch profile {
-        case .search:
-            #if canImport(UIKit)
-            self.autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                .privacySensitive()
-                .textInputAutocapitalization(.never)
-            #else
-            self.autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                .privacySensitive()
-            #endif
-        }
+    func cypherOpaqueTextTraits() -> some View {
+        #if canImport(UIKit)
+        self.autocorrectionDisabled(true)
+            .applyMacWritingToolsPolicy()
+            .privacySensitive()
+            .textInputAutocapitalization(.never)
+        #else
+        self.autocorrectionDisabled(true)
+            .applyMacWritingToolsPolicy()
+            .privacySensitive()
+        #endif
     }
 }
 

@@ -37,13 +37,17 @@ final class KeyCatalogStore {
         keys.removeAll { $0.fingerprint == fingerprint }
     }
 
-    func markBackedUp(fingerprint: String) {
+    /// Persist first, then commit in memory, so a failed write leaves the session
+    /// agreeing with storage rather than claiming a backup that was never recorded.
+    func markBackedUp(fingerprint: String) throws {
         guard let index = keys.firstIndex(where: { $0.fingerprint == fingerprint }) else {
-            return
+            throw CypherAirError.keyMetadataUnavailable
         }
 
-        keys[index].isBackedUp = true
-        try? metadataStore.update(keys[index])
+        var updated = keys[index]
+        updated.isBackedUp = true
+        try metadataStore.update(updated)
+        keys[index] = updated
     }
 
     func updateExpiry(

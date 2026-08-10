@@ -172,7 +172,6 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
             right: CypherSpacing.tight
         )
         textView.adjustsFontForContentSizeCategory = true
-        textView.inputModeProfile = mode
         textView.autoFocusesOnWindowAttach = true
         textView.text = text
         applyTraits(to: textView)
@@ -183,7 +182,6 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         if uiView.text != text {
             uiView.text = text
         }
-        uiView.inputModeProfile = mode
         applyTraits(to: uiView)
     }
 
@@ -259,12 +257,6 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
     }
 
     final class CypherHardenedTextView: UITextView {
-        var inputModeProfile: CypherMultilineTextInputMode = .prose {
-            didSet {
-                applyInteractionRestrictions()
-            }
-        }
-
         var autoFocusesOnWindowAttach = false
 
         override func didMoveToWindow() {

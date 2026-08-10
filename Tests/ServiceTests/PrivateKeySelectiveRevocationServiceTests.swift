@@ -22,7 +22,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                 digestSigner: UnexpectedSelectiveRevocationDigestSigner()
             )
         )
-        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
 
         do {
@@ -63,7 +63,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                     digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
                 )
             )
-            let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+            let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
             let subkey = try XCTUnwrap(catalog.subkeys.first)
             let userId = try XCTUnwrap(catalog.userIds.first)
             let snapshot = catalogSnapshot(
@@ -167,7 +167,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                     digestSigner: UnexpectedSelectiveRevocationDigestSigner()
                 )
             )
-            let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+            let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
             let subkey = try XCTUnwrap(catalog.subkeys.first)
 
             do {
@@ -216,7 +216,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                     digestSigner: ThrowingSelectiveRevocationDigestSigner(error: signingError)
                 )
             )
-            let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+            let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
             let userId = try XCTUnwrap(catalog.userIds.first)
 
             do {
@@ -257,7 +257,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                 digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
             )
         )
-        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
         let userId = try XCTUnwrap(catalog.userIds.first)
 
@@ -300,7 +300,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                 digestSigner: UnexpectedSelectiveRevocationDigestSigner()
             )
         )
-        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
         let userId = try XCTUnwrap(catalog.userIds.first)
 
@@ -357,7 +357,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                 )
             )
         )
-        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let catalog = try await keyManagement.loadSelectionCatalog(fingerprint: fixture.identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
         let userId = try XCTUnwrap(catalog.userIds.first)
 

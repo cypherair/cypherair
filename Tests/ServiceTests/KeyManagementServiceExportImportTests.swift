@@ -9,23 +9,13 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
     func test_exportKey_legacy_returnsArmoredData() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service)
 
-        let exported = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-123")
+        let exported = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: "test-pass-123")
 
         XCTAssertFalse(exported.isEmpty, "Exported data should not be empty")
         // Check it starts with PGP armor header
         let armorHeader = String(data: exported.prefix(27), encoding: .utf8)
         XCTAssertTrue(armorHeader?.hasPrefix("-----BEGIN PGP") == true,
                       "Exported data should be ASCII-armored")
-    }
-
-    func test_exportKey_marksKeyAsBackedUp() async throws {
-        let identity = try await TestHelpers.generateLegacyKey(service: service)
-        XCTAssertFalse(identity.isBackedUp)
-
-        _ = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "backup-pass")
-
-        XCTAssertTrue(service.keys.first?.isBackedUp == true,
-                      "Key should be marked as backed up after export")
     }
 
     func test_exportKeyBackupData_doesNotMarkBackedUpUntilConfirmed() async throws {
@@ -42,21 +32,23 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertFalse(try XCTUnwrap(service.keys.first).isBackedUp)
 
-        service.confirmKeyBackupExported(fingerprint: identity.fingerprint)
+        try service.confirmKeyBackupExported(fingerprint: identity.fingerprint)
 
         XCTAssertTrue(try XCTUnwrap(service.keys.first).isBackedUp)
     }
 
-    func test_exportKey_metadataUpdateFailure_keepsSessionBackedUp_butFreshServiceSeesOldState() async throws {
+    /// A failed backup-flag write must surface, and must not leave the session
+    /// claiming a backup that storage never recorded.
+    func test_confirmKeyBackupExported_metadataUpdateFailure_throwsAndLeavesFlagUnset() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service)
         metadataPersistence.failNextUpdate = true
 
-        _ = try await service.exportKey(
-            fingerprint: identity.fingerprint,
-            passphrase: "backup-pass"
-        )
+        XCTAssertThrowsError(try service.confirmKeyBackupExported(fingerprint: identity.fingerprint))
 
-        XCTAssertTrue(try XCTUnwrap(service.keys.first).isBackedUp)
+        XCTAssertFalse(
+            try XCTUnwrap(service.keys.first).isBackedUp,
+            "The in-memory flag must not move ahead of the write that failed."
+        )
 
         let freshService = makeFreshService()
         try freshService.loadKeys()
@@ -67,7 +59,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
     func test_exportKey_nonexistentFingerprint_throwsError() async {
         do {
-            _ = try await service.exportKey(fingerprint: "nonexistent", passphrase: "pass")
+            _ = try await service.exportKeyBackupData(fingerprint: "nonexistent", passphrase: "pass")
             XCTFail("Expected error for nonexistent fingerprint")
         } catch {
             // Should fail — no key with this fingerprint exists in Keychain
@@ -77,7 +69,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
     func test_exportKey_modernHigh_returnsArmoredData() async throws {
         let identity = try await TestHelpers.generateModernHighKey(service: service)
 
-        let exported = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-456")
+        let exported = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: "test-pass-456")
         XCTAssertFalse(exported.isEmpty)
     }
 
@@ -86,7 +78,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         let passphrase = "test-passphrase-123"
 
         // Export the key
-        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: passphrase)
         XCTAssertFalse(exportedData.isEmpty)
 
         // Delete the original key
@@ -111,7 +103,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Export Test B")
         let passphrase = "test-passphrase-456"
 
-        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: passphrase)
         XCTAssertFalse(exportedData.isEmpty)
 
         try service.deleteKey(fingerprint: identity.fingerprint)
@@ -134,7 +126,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         let passphrase = "test-pass-dup-a"
 
         // Export the key (to get armored data for re-import)
-        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: passphrase)
 
         // Attempt to import without deleting — should throw duplicateKey
         do {
@@ -157,7 +149,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Original B")
         let passphrase = "test-pass-dup-b"
 
-        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: passphrase)
 
         do {
             _ = try await service.importKey(armoredData: exportedData, passphrase: passphrase)
@@ -178,7 +170,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         let passphrase = "binary-test-pass-a"
 
         // Export produces ASCII armor
-        let armoredData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let armoredData = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: passphrase)
         XCTAssertTrue(String(data: armoredData.prefix(5), encoding: .utf8)?.hasPrefix("-----") == true)
 
         // Convert to binary OpenPGP format
@@ -207,7 +199,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Binary Import B")
         let passphrase = "binary-test-pass-b"
 
-        let armoredData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let armoredData = try await service.exportKeyBackupData(fingerprint: identity.fingerprint, passphrase: passphrase)
         let binaryData = try engine.dearmor(armored: armoredData)
 
         try service.deleteKey(fingerprint: identity.fingerprint)

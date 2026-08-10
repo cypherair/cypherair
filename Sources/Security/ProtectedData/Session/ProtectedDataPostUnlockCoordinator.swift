@@ -62,8 +62,7 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
 
     func openRegisteredDomains(
         authenticationContext: LAContext?,
-        localizedReason: String,
-        source: String
+        localizedReason: String
     ) async -> ProtectedDataPostUnlockOutcome {
         guard !domainOpeners.isEmpty else {
             return .noRegisteredOpeners

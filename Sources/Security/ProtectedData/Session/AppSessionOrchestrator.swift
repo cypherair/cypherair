@@ -48,7 +48,7 @@ final class AppSessionOrchestrator {
     /// the authentication. Called by `AppLockController` on a successful unlock
     /// (the orchestrator is the handoff-context custodian).
     func recordSuccessfulAppSessionAuthentication(context: LAContext?) {
-        replacePendingAuthenticatedContext(with: context, reason: "unlockHandoff")
+        replacePendingAuthenticatedContext(with: context)
         recordAuthentication()
     }
 
@@ -65,12 +65,12 @@ final class AppSessionOrchestrator {
     /// observe to clear decrypted content on relock. The settings relock is
     /// performed by the caller (the controller's content-clear closure).
     func requestContentClear() {
-        discardPendingAuthenticatedContext(reason: "contentClear")
+        discardPendingAuthenticatedContext()
         contentClearGeneration += 1
     }
 
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
-        discardPendingAuthenticatedContext(reason: "localDataReset")
+        discardPendingAuthenticatedContext()
         lastAuthenticationDate = preserveAuthentication ? Date() : nil
         contentClearGeneration += 1
     }
@@ -82,13 +82,13 @@ final class AppSessionOrchestrator {
     }
 
     func discardProtectedDataAuthorizationHandoffContextForPolicyChange() {
-        discardAuthorizationHandoffContext(reason: "appAccessPolicyChange")
+        discardPendingAuthenticatedContext()
     }
 
     /// Discard the pending handoff context (fail-closed). Used by the controller's
     /// away / relock / failure paths.
-    func discardAuthorizationHandoffContext(reason: String) {
-        discardPendingAuthenticatedContext(reason: reason)
+    func discardAuthorizationHandoffContext() {
+        discardPendingAuthenticatedContext()
     }
 
     func consumeAuthenticatedContextForProtectedData() -> LAContext? {
@@ -111,12 +111,12 @@ final class AppSessionOrchestrator {
 
     // MARK: - Private helpers
 
-    private func replacePendingAuthenticatedContext(with context: LAContext?, reason: String) {
+    private func replacePendingAuthenticatedContext(with context: LAContext?) {
         pendingAuthenticatedContext?.invalidate()
         pendingAuthenticatedContext = context
     }
 
-    private func discardPendingAuthenticatedContext(reason: String) {
+    private func discardPendingAuthenticatedContext() {
         pendingAuthenticatedContext?.invalidate()
         pendingAuthenticatedContext = nil
     }

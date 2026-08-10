@@ -4,7 +4,7 @@ import Foundation
 @Observable
 final class BackupKeyScreenModel {
     typealias ExportBackupAction = @MainActor (String, String) async throws -> Data
-    typealias ConfirmBackupExportedAction = @MainActor (String) -> Void
+    typealias ConfirmBackupExportedAction = @MainActor (String) throws -> Void
 
     let fingerprint: String
     let configuration: BackupKeyView.Configuration
@@ -41,7 +41,7 @@ final class BackupKeyScreenModel {
             )
         }
         self.confirmBackupExportedAction = confirmBackupExportedAction ?? { fingerprint in
-            keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
+            try keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
         }
     }
 
@@ -112,7 +112,7 @@ final class BackupKeyScreenModel {
 
                 if self.configuration.resultPresentation == .inlinePreview {
                     self.configuration.onExported?(data)
-                    self.confirmBackupExportedAction(fingerprint)
+                    self.recordBackupExported()
                 }
 
                 self.passphrase = ""
@@ -138,13 +138,25 @@ final class BackupKeyScreenModel {
                 exportedData.zeroize()
             }
             configuration.onExported?(exportedData)
-            confirmBackupExportedAction(fingerprint)
+            recordBackupExported()
         case .failure(let exportError):
             guard exportedDataToken == exportToken else {
                 return
             }
             clearExportedData()
             error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
+            showError = true
+        }
+    }
+
+    /// The export reached the user, so record the backup. A persistence failure is
+    /// surfaced rather than swallowed: the key would otherwise read as backed up
+    /// for this session only, and the next launch would silently disagree.
+    private func recordBackupExported() {
+        do {
+            try confirmBackupExportedAction(fingerprint)
+        } catch {
+            self.error = CypherAirError.from(error) { .internalError(reason: $0) }
             showError = true
         }
     }

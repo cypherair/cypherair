@@ -161,7 +161,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
                 )
                 let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
                     expectedDomainID: domainID,
-                    source: "unitTest",
                     loadCurrentRegistry: {
                         let currentRegistry = try registryStore.loadRegistry()
                         XCTAssertEqual(currentRegistry, journaledRegistry)
@@ -206,7 +205,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
 
         let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
             expectedDomainID: "committed-domain",
-            source: "unitTest",
             loadCurrentRegistry: { registry }
         )
 
@@ -240,7 +238,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
 
         let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
             expectedDomainID: "requested-domain",
-            source: "unitTest",
             loadCurrentRegistry: { registry }
         )
 
@@ -274,7 +271,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
 
         let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
             expectedDomainID: "competing-first-domain",
-            source: "unitTest",
             loadCurrentRegistry: { registry }
         )
 
@@ -322,7 +318,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
 
         let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
             expectedDomainID: "protected-settings",
-            source: "unitTest",
             loadCurrentRegistry: { registry }
         )
 

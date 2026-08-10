@@ -41,7 +41,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         mockSE.biometricsAvailable = false
 
         do {
-            _ = try await service.exportKey(
+            _ = try await service.exportKeyBackupData(
                 fingerprint: identity.fingerprint,
                 passphrase: "backup-pass"
             )
@@ -53,7 +53,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
 
     func test_importKey_legacy_wrongPassphrase_throwsError() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service)
-        let exported = try await service.exportKey(
+        let exported = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: "correct-passphrase"
         )
@@ -78,7 +78,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
 
     func test_importKey_modernHigh_wrongPassphrase_throwsError() async throws {
         let identity = try await TestHelpers.generateModernHighKey(service: service)
-        let exported = try await service.exportKey(
+        let exported = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: "correct-passphrase"
         )
@@ -102,7 +102,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
     func test_importKey_modernHigh_lowMemory_throwsArgon2idExceeded() async throws {
         // Service with full memory for key generation + export
         let identity = try await TestHelpers.generateModernHighKey(service: service)
-        let exported = try await service.exportKey(
+        let exported = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: "test-pass"
         )
@@ -130,7 +130,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
 
     func test_importKey_legacy_lowMemory_succeeds() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: service)
-        let exported = try await service.exportKey(
+        let exported = try await service.exportKeyBackupData(
             fingerprint: identity.fingerprint,
             passphrase: "test-pass"
         )
