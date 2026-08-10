@@ -15,6 +15,7 @@ final class DecryptionService {
     private let contactService: ContactService
     private let messageDecryptor: any RecipientMessageDecrypting
     private let fileDecryptor: any StreamingFileDecrypting
+    private let diskSpaceChecker: DiskSpaceChecker
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
@@ -23,6 +24,7 @@ final class DecryptionService {
         contactService: ContactService,
         messageDecryptor: any RecipientMessageDecrypting,
         fileDecryptor: any StreamingFileDecrypting,
+        diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.messageAdapter = messageAdapter
@@ -30,6 +32,7 @@ final class DecryptionService {
         self.contactService = contactService
         self.messageDecryptor = messageDecryptor
         self.fileDecryptor = fileDecryptor
+        self.diskSpaceChecker = diskSpaceChecker
         self.temporaryArtifactStore = temporaryArtifactStore
     }
 
@@ -146,6 +149,18 @@ final class DecryptionService {
             throw CypherAirError.noMatchingKey
         }
 
+        // Refuse a decrypt the volume cannot hold before it costs the user anything:
+        // ahead of the output artifact, and ahead of the private-key route below,
+        // which prompts for authentication. A size that cannot be read is not a
+        // reason to refuse — this pre-flight fails only for missing space, and an
+        // unreadable input reports itself through the pipeline's own file error.
+        if let encryptedInputSize = Self.fileSize(atPath: phase1.inputPath) {
+            try diskSpaceChecker.validateForDecryption(
+                encryptedInputSize: encryptedInputSize,
+                isArmored: Self.hasArmorHeader(atPath: phase1.inputPath)
+            )
+        }
+
         // Custody-specific private-key access is owned by the router-backed streaming
         // file decryptor: software custody unwraps and zeroizes a secret certificate;
         // Secure Enclave custody uses the external P-256 key-agreement route. This
@@ -183,6 +198,40 @@ final class DecryptionService {
     }
 
     // MARK: - Private
+
+    private static func fileSize(atPath path: String) -> UInt64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return nil
+        }
+        return attributes[.size] as? UInt64
+    }
+
+    /// Enough bytes for a byte-order mark, a little leading whitespace, and the armor
+    /// header line itself.
+    private static let armorProbeByteCount = 64
+
+    /// Whether the file's payload is base64 rather than binary, which decides how much
+    /// plaintext its size implies. Reads only the head — the answer has to be cheap for
+    /// a multi-gigabyte input. Any armor kind counts: the question is the encoding, not
+    /// the packet type. Anything unreadable or undecodable counts as binary, the
+    /// arithmetic that demands more space.
+    private static func hasArmorHeader(atPath path: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else {
+            return false
+        }
+        defer { try? handle.close() }
+
+        guard let head = try? handle.read(upToCount: armorProbeByteCount),
+              let text = String(data: head, encoding: .utf8) else {
+            return false
+        }
+
+        var leading = text[...]
+        if leading.hasPrefix("\u{FEFF}") {
+            leading = leading.dropFirst()
+        }
+        return leading.drop(while: { $0.isWhitespace }).hasPrefix("-----BEGIN PGP")
+    }
 
     private func verificationContext() -> PGPMessageVerificationContext {
         let contactsContext = contactService.contactsVerificationContext()

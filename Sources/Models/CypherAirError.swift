@@ -34,7 +34,7 @@ enum CypherAirError: Error {
     case invalidQRCode
     case unsupportedQRVersion
     case contactImportRequiresPublicCertificate
-    case insufficientDiskSpace(fileSizeMB: Int, requiredMB: Int, availableMB: Int)
+    case insufficientDiskSpace(requiredMB: Int, availableMB: Int)
     case noKeySelected
     case noRecipientsSelected
     case biometricsUnavailable
