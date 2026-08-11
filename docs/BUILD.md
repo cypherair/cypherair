@@ -56,27 +56,26 @@ The compiler fork (`cypherair/rust`, plus the LLVM work it depends on) carries i
 
 ## 5. FFI artifact shape
 
-`PgpMobile.xcframework` is a **static-library** XCFramework, built locally from the pinned stage1, and the UniFFI outputs are tracked in the tree. **That shape is deliberate, not accidental** — Apple-supported, idiomatic for UniFFI/Rust static linking, and correct for a single first-party consumer. The cost it accepts is real and known: the module map and header search paths that let Swift see the C FFI layer are repeated in every build configuration of the project rather than travelling inside the artifact.
+`PgpMobile.xcframework` is a **static-library** XCFramework, built locally from the pinned stage1. **That shape is deliberate, not accidental** — Apple-supported, idiomatic for UniFFI/Rust static linking, and correct for a single first-party consumer. The cost it accepts is real and known: the module map and header search paths that let Swift see the C FFI layer are repeated in every build configuration of the project rather than travelling inside the artifact.
 
-Five generated files are tracked, as two byte-identical pairs plus a header, and only one file of each pair is live:
+**Generated output is a build product and is never committed.** The bundle is where it lives, so it travels every path the artifact already takes — `ditto -c -k` of the bundle, the CI artifact, the release asset — and reaches consumers that link a packaged build instead of running the sync:
 
-- `Sources/PgpMobile/pgp_mobile.swift` is the compile source; `bindings/pgp_mobile.swift` is its staging copy.
-- `bindings/module.modulemap` is what Xcode reads through `-fmodule-map-file`; `bindings/pgp_mobileFFI.modulemap` has **no consumer at all** — the build copies its scratch counterpart into each slice and merely syncs the tracked file.
-- `bindings/pgp_mobileFFI.h` is the fifth.
+- `cypherair-generated-bindings/` carries the three files the app build reads. `scripts/restore_generated_bindings.sh` places them: `pgp_mobile.swift` at `Sources/PgpMobile/pgp_mobile.swift`, compiled as app source; `module.modulemap` and the `pgp_mobileFFI.h` it names at `bindings/`, where `-fmodule-map-file` and the header search paths point.
+- `PgpMobileSourceInputs.xcfilelist` sits beside `cypherair-source-fingerprint.json` and declares the same recorded input set to the sandboxed build phase (§6).
 
-Invariants that survive any future reshape: static linking stays (no dynamic or embedded runtime framework — this is what preserves the single-binary MIE posture); the generated Swift stays compiled as app source; any reshape keeps every gate green — clean-checkout local build, GitHub CI, Xcode Cloud WF1/WF2, stable releases — and updates the release-asset contract (names, manifest, attestation, relink-kit, source-compliance surface) in the same change. Out of bounds: splitting `pgp-mobile/` into its own repository, and touching Contacts SQLCipher storage.
+Invariants that survive any future reshape: static linking stays (no dynamic or embedded runtime framework — this is what preserves the single-binary MIE posture); the generated Swift stays compiled as app source; generated output stays out of version control; any reshape keeps every gate green — clean-checkout local build, GitHub CI, Xcode Cloud WF1/WF2, stable releases — and updates the release-asset contract (names, manifest, attestation, relink-kit, source-compliance surface) in the same change. Out of bounds: splitting `pgp-mobile/` into its own repository, and touching Contacts SQLCipher storage.
 
-Reopen the decision when one of these becomes true: a second consumer needs to link PgpMobile without hand-copying the per-configuration settings; PgpMobile is vended as a SwiftPM binary target; a UniFFI release beyond the pinned 0.32.x changes the generated module name, layout, or packaging path; generated-output friction crosses a threshold (recurring merge conflicts, the byte-identical copies drifting, or clean checkouts needing a mandatory bindgen bootstrap anyway); or a future Xcode toolchain changes how static-library XCFrameworks or global `-fmodule-map-file` resolution behave.
+Reopen the decision when one of these becomes true: a second consumer needs to link PgpMobile without hand-copying the per-configuration settings; PgpMobile is vended as a SwiftPM binary target; a UniFFI release beyond the pinned 0.32.x changes the generated module name, layout, or packaging path; or a future Xcode toolchain changes how static-library XCFrameworks or global `-fmodule-map-file` resolution behave.
 
 ## 6. The sync contract
 
-Rust changes under `pgp-mobile/src` do **not** automatically refresh what Xcode links. The project consumes three artifacts a Swift build never produces:
+Rust changes under `pgp-mobile/src` do **not** automatically refresh what Xcode links. The project consumes three build inputs a Swift build never produces, none of which are in git — **a fresh clone runs the sync below before Xcode can build at all**:
 
-- `PgpMobile.xcframework` (git-ignored, locally generated) plus `PgpMobile.arm64e-build-manifest.json`
-- `bindings/module.modulemap` plus the generated `Sources/PgpMobile/pgp_mobile.swift`
-- `SQLCipher.xcframework` (git-ignored, restored from the pinned external release) plus its manifest, privacy file, and release record
+- `PgpMobile.xcframework` (locally generated) plus `PgpMobile.arm64e-build-manifest.json`
+- the generated UniFFI outputs, `Sources/PgpMobile/pgp_mobile.swift` and `bindings/`, which ride inside the bundle (§5); the sync places them, and a checkout that restores a packaged artifact instead runs `scripts/restore_generated_bindings.sh`
+- `SQLCipher.xcframework` (restored from the pinned external release) plus its manifest, privacy file, and release record
 
-**Staleness is machine-checked, not remembered.** A successful sync records the crate inputs it consumed — the non-test crate sources, `Cargo.toml`/`Cargo.lock`, `build.rs`, `uniffi-bindgen.rs`, both build scripts, and the stage1 pin (the tracked `PgpMobileSourceInputs.xcfilelist` is the exact list) — and the SHA-256 of each packaged `libpgp_mobile.a`, into `PgpMobile.xcframework/cypherair-source-fingerprint.json`, and refreshes the tracked `PgpMobileSourceInputs.xcfilelist` that the sandboxed build phase declares — the input list is where a *newly added* crate file surfaces, because the check re-hashes exactly the recorded set and never walks the tree. Every Xcode build re-hashes both and fails with the sync command when either no longer matches. The gate is content-based, so **any** edit to a fingerprinted input — comments included — requires the sync. `pgp-mobile/Cargo.lock` is one of those inputs: even a lockfile-only bump needs the audit, the Rust tests, and a full sync before Swift validation, so the local artifacts are built from the lockfile being submitted. Because the fingerprint lives inside the bundle it survives `ditto`, so an XCFramework restored from a CI artifact or a release asset is checked the same way. Commit the regenerated bindings and `PgpMobileSourceInputs.xcfilelist`; never commit the ignored XCFramework directories.
+**Staleness is machine-checked, not remembered.** A successful sync records the crate inputs it consumed — the non-test crate sources, `Cargo.toml`/`Cargo.lock`, `build.rs`, `uniffi-bindgen.rs`, both build scripts, and the stage1 pin (`PgpMobile.xcframework/PgpMobileSourceInputs.xcfilelist` is the exact list) — and the SHA-256 of each packaged `libpgp_mobile.a`, into `PgpMobile.xcframework/cypherair-source-fingerprint.json`. Every Xcode build re-hashes both and fails with the sync command when either no longer matches; the check re-hashes exactly the recorded set and never walks the tree, which is why the input list has to name every one of those files for the sandboxed build phase. The gate is content-based, so **any** edit to a fingerprinted input — comments included — requires the sync. `pgp-mobile/Cargo.lock` is one of those inputs: even a lockfile-only bump needs the audit, the Rust tests, and a full sync before Swift validation, so the local artifacts are built from the lockfile being submitted. Because the fingerprint lives inside the bundle it survives `ditto`, so an XCFramework restored from a CI artifact or a release asset is checked the same way.
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
@@ -92,13 +91,13 @@ Force-download matches the GitHub Actions path: it consumes the pinned stage1 pr
 
 **Stale-artifact symptom:** the Rust tests show the new behavior but the Swift/FFI tests still show the old one, or new UniFFI symbols are missing at link time. Suspect a stale `PgpMobile.xcframework` or stale generated bindings before suspecting Swift source.
 
-Manual bindgen runs from `pgp-mobile/` — the repo root has no `Cargo.toml`:
+To read the generated surface without a full sync, run bindgen by hand into a scratch directory — from `pgp-mobile/`, because the repo root has no `Cargo.toml`. Its output is for inspection; only the sync places bindings the fingerprint gate will vouch for:
 
 ```bash
 cd pgp-mobile
 cargo +stable run --release --bin uniffi-bindgen generate \
     --library target/release/libpgp_mobile.dylib \
-    --language swift --out-dir ../bindings
+    --language swift --out-dir "$(mktemp -d)"
 ```
 
 After a sync, `cargo clean --manifest-path pgp-mobile/Cargo.toml` is safe — the per-target release archives are intermediates, not Xcode link inputs. Target-specific `libpgp_mobile.dylib` files must not linger beside them: a stale dylib from an older direct-link flow can shadow the static archive that was meant to be linked.

@@ -687,12 +687,12 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"$(SRCROOT)/PgpMobileSourceInputs.xcfilelist",
+				"$(SRCROOT)/PgpMobile.xcframework/PgpMobileSourceInputs.xcfilelist",
 			);
 			inputPaths = (
 				"$(SRCROOT)/PgpMobile.xcframework/Info.plist",
+				"$(SRCROOT)/PgpMobile.xcframework/PgpMobileSourceInputs.xcfilelist",
 				"$(SRCROOT)/PgpMobile.xcframework/cypherair-source-fingerprint.json",
-				"$(SRCROOT)/PgpMobileSourceInputs.xcfilelist",
 				"$(SRCROOT)/scripts/xcframework_source_fingerprint.py",
 			);
 			name = "Check PgpMobile XCFramework";

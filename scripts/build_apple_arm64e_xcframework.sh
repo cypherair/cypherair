@@ -11,8 +11,6 @@ unset GH_TOKEN GITHUB_TOKEN GITHUB_PAT ASC_ISSUER_ID ASC_KEY_ID ASC_PRIVATE_KEY 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/pgp-mobile/Cargo.toml"
-BINDINGS_DIR="$REPO_ROOT/bindings"
-SOURCES_BINDING="$REPO_ROOT/Sources/PgpMobile/pgp_mobile.swift"
 XCFRAMEWORK_OUTPUT="$REPO_ROOT/PgpMobile.xcframework"
 ARM64E_MANIFEST_OUTPUT="$REPO_ROOT/PgpMobile.arm64e-build-manifest.json"
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$REPO_ROOT/pgp-mobile/target}"
@@ -240,21 +238,6 @@ normalize_generated_bindings() {
     normalize_generated_text_file "$GENERATED_BINDINGS_DIR/pgp_mobile.swift"
 }
 
-sync_file_if_changed() {
-    local src="$1"
-    local dst="$2"
-    if [ ! -f "$src" ]; then
-        echo "error: generated file missing: $src" >&2
-        exit 1
-    fi
-    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
-        echo "unchanged: $dst"
-        return
-    fi
-    cp "$src" "$dst"
-    echo "synced: $dst"
-}
-
 # sequoia-openpgp >= 2.4.0 pulls in ossl, which enables openssl-sys's
 # `bindgen` feature. bindgen (libclang) does not infer Apple cross-target
 # sysroots the way cc/openssl-src do, so without an explicit sysroot it
@@ -376,12 +359,6 @@ generate_bindings() {
         cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" "$GENERATED_BINDINGS_DIR/module.modulemap"
     fi
     normalize_generated_bindings
-
-    sync_file_if_changed "$GENERATED_BINDINGS_DIR/module.modulemap" "$BINDINGS_DIR/module.modulemap"
-    sync_file_if_changed "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" "$BINDINGS_DIR/pgp_mobileFFI.modulemap"
-    sync_file_if_changed "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h" "$BINDINGS_DIR/pgp_mobileFFI.h"
-    sync_file_if_changed "$GENERATED_BINDINGS_DIR/pgp_mobile.swift" "$BINDINGS_DIR/pgp_mobile.swift"
-    sync_file_if_changed "$GENERATED_BINDINGS_DIR/pgp_mobile.swift" "$SOURCES_BINDING"
 }
 
 create_xcframework() {
@@ -409,6 +386,16 @@ create_xcframework() {
         -library "$visionos_device_lib" -headers "$headers_dir" \
         -library "$visionos_sim_lib" -headers "$headers_dir" \
         -output "$XCFRAMEWORK_OUTPUT"
+
+    # The Swift binding Xcode compiles and the C interop pair its module map
+    # exposes ride inside the bundle, so they reach every consumer the artifact
+    # reaches -- the zip, the CI artifact, the release asset -- including the
+    # ones that restore a packaged build instead of running this script.
+    local carried_bindings="$XCFRAMEWORK_OUTPUT/cypherair-generated-bindings"
+    mkdir -p "$carried_bindings"
+    cp "$GENERATED_BINDINGS_DIR/pgp_mobile.swift" "$carried_bindings/"
+    cp "$GENERATED_BINDINGS_DIR/module.modulemap" "$carried_bindings/"
+    cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h" "$carried_bindings/"
 }
 
 verify_xcframework() {
@@ -433,10 +420,10 @@ verify_xcframework() {
 
 # Record which pgp-mobile sources produced this artifact, inside the bundle so
 # the fingerprint travels with every zip, CI artifact, and release asset. The
-# Xcode "Check PgpMobile XCFramework" phase and pr-checks compare it against the
-# checkout being built, which turns a silently stale library or stale generated
-# bindings into a build failure. Written last: a run that fails earlier must not
-# leave a fingerprint claiming the artifact is current.
+# Xcode "Check PgpMobile XCFramework" phase compares it against the checkout
+# being built, which turns a silently stale library or stale generated bindings
+# into a build failure. Written last: a run that fails earlier must not leave a
+# fingerprint claiming the artifact is current.
 record_source_fingerprint() {
     log_step "fingerprint" "Recording pgp-mobile source fingerprint..."
     env -u GH_TOKEN -u GITHUB_TOKEN \
@@ -444,6 +431,14 @@ record_source_fingerprint() {
         --write \
         --repo-root "$REPO_ROOT" \
         --xcframework "$XCFRAMEWORK_OUTPUT"
+}
+
+# One placer for the generated bindings, shared with every consumer that
+# restores a packaged artifact, so a local sync and a restored build leave the
+# checkout in the same state.
+place_generated_bindings() {
+    log_step "bindings" "Placing the generated bindings for Xcode..."
+    "$SCRIPT_DIR/restore_generated_bindings.sh"
 }
 
 echo "=== CypherAir: Apple arm64e XCFramework Build ==="
@@ -501,6 +496,7 @@ generate_bindings
 create_xcframework "$IOS_DEVICE_LIB" "$IOS_SIM_LIB" "$MACOS_LIB" "$VISIONOS_DEVICE_LIB" "$VISIONOS_SIM_LIB"
 verify_xcframework
 record_source_fingerprint
+place_generated_bindings
 
 echo
 echo "=== Build Complete ==="

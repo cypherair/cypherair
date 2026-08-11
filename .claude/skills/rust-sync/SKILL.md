@@ -30,7 +30,8 @@ the local artifact — plan the rebuild into any re-pin.
 substitute `latest`). Then run the Swift validation lane. The sync contract and
 stale-artifact troubleshooting: docs/BUILD.md Section 6.
 
-**Verify:** the rebuild refreshed `PgpMobile.arm64e-build-manifest.json`, the
-generated bindings, and `PgpMobileSourceInputs.xcfilelist` (commit the last two
-when they change), `python3 scripts/xcframework_source_fingerprint.py --check`
-passes, and the Swift test lane passes against the new artifact.
+**Verify:** the rebuild refreshed `PgpMobile.arm64e-build-manifest.json` and the
+generated bindings — all build products, none of them committed, so a clean
+`git status` is the expected outcome — `python3
+scripts/xcframework_source_fingerprint.py --check` passes, and the Swift test
+lane passes against the new artifact.

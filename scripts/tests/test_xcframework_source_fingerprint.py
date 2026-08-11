@@ -87,17 +87,16 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
 
     def test_added_crate_source_appears_in_the_regenerated_input_list(self) -> None:
         # --check re-hashes only what was recorded, because the Xcode build
-        # phase is sandboxed and cannot walk the crate. A file added without a
-        # sync surfaces as a diff in the tracked input list instead, and in
-        # practice it also edits an existing module file, which the hashes catch.
+        # phase is sandboxed and cannot walk the crate. The next sync has to
+        # declare a newly added crate file, or the phase could not read it.
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root, xcframework = self.make_repo(Path(temp_dir_name))
             module.write_fingerprint(root, xcframework)
-            before = (root / module.INPUT_LIST_NAME).read_text(encoding="utf-8")
+            before = (xcframework / module.INPUT_LIST_NAME).read_text(encoding="utf-8")
 
             (root / "pgp-mobile/src/pqc.rs").write_text("pub fn ml_kem() {}\n", encoding="utf-8")
             module.write_fingerprint(root, xcframework)
-            after = (root / module.INPUT_LIST_NAME).read_text(encoding="utf-8")
+            after = (xcframework / module.INPUT_LIST_NAME).read_text(encoding="utf-8")
 
             self.assertNotEqual(before, after)
             self.assertIn("$(SRCROOT)/pgp-mobile/src/pqc.rs", after)
@@ -121,7 +120,7 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
 
             declared = {
                 line.strip().replace("$(SRCROOT)/", "")
-                for line in (root / module.INPUT_LIST_NAME).read_text(encoding="utf-8").splitlines()
+                for line in (xcframework / module.INPUT_LIST_NAME).read_text(encoding="utf-8").splitlines()
                 if line.strip() and not line.startswith("#")
             }
             self.assertTrue(opened)
@@ -178,8 +177,8 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
             module.check_fingerprint(root, xcframework)
 
     def test_non_rust_files_under_src_are_not_inputs(self) -> None:
-        # A stray .DS_Store must not break every build, nor land a gitignored
-        # path in the tracked input list.
+        # A stray .DS_Store must not break every build, nor land in the input
+        # list the sandboxed build phase declares.
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root, xcframework = self.make_repo(Path(temp_dir_name))
             (root / "pgp-mobile/src/.DS_Store").write_bytes(b"\x00\x01finder junk")
@@ -189,7 +188,7 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
             recorded = json.loads(
                 module.fingerprint_path(xcframework).read_text(encoding="utf-8")
             )["files"]
-            listed = (root / module.INPUT_LIST_NAME).read_text(encoding="utf-8")
+            listed = (xcframework / module.INPUT_LIST_NAME).read_text(encoding="utf-8")
 
             self.assertNotIn("pgp-mobile/src/.DS_Store", recorded)
             self.assertNotIn("pgp-mobile/src/notes.md", recorded)

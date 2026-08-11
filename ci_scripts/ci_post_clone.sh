@@ -248,6 +248,13 @@ release_consumer_workflow() {
     rm -rf PgpMobile.xcframework
     mv "$XCFRAMEWORK_STAGING_DIR/PgpMobile.xcframework" PgpMobile.xcframework
     clear_xcframework_staging_dir
+
+    # The archive links the published artifact instead of building it, so the
+    # generated bindings the app compiles come out of the bundle that just
+    # passed its checksum.
+    log "WF2: placing the generated bindings the artifact carries"
+    scripts/restore_generated_bindings.sh
+
     log "WF2: restoring pinned SQLCipher.xcframework for app archive"
     scripts/restore_sqlcipher_xcframework.sh --require-attestation
 
