@@ -54,6 +54,11 @@ const STREAM_BUFFER_SIZE: usize = 64 * 1024; // 64 KB
 /// legitimate deflate expansion (a zero-padded file from default GnuPG hits the
 /// deflate edge) while still bounding a bomb at ~2 KiB output per input byte.
 /// The 256 MiB floor mirrors the in-memory decrypt cap.
+///
+/// This is the output half of the defense. It can only count what a message
+/// produces, so it never fires on input that yields no literal packet at all;
+/// what bounds the reading of such input is `bounded_walk`, on the consumption
+/// side, and both halves are needed.
 const MAX_STREAMING_DECOMPRESSION_RATIO: u64 = 2048;
 const MIN_STREAMING_DECRYPT_OUTPUT_CEILING: u64 = 256 * 1024 * 1024;
 

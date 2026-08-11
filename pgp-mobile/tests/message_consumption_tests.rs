@@ -18,7 +18,9 @@ use std::io::Write as _;
 use openpgp::packet::{Padding, PKESK};
 use openpgp::parse::Parse as _;
 use openpgp::policy::StandardPolicy;
-use openpgp::serialize::stream::{Compressor, Encryptor, LiteralWriter, Message, Recipient};
+use openpgp::serialize::stream::{
+    Compressor, Encryptor, LiteralWriter, Message, Recipient, Signer,
+};
 use openpgp::serialize::Marshal as _;
 use openpgp::types::CompressionAlgorithm;
 use sequoia_openpgp as openpgp;
@@ -121,11 +123,120 @@ fn padding_flood_bomb(pkesk: &PKESK) -> Vec<u8> {
     })
 }
 
+/// The transport-encryption recipients of a certificate.
+fn recipients_of<'a>(cert: &'a openpgp::Cert, policy: &'a StandardPolicy) -> Vec<Recipient<'a>> {
+    cert.keys()
+        .with_policy(policy, None)
+        .supported()
+        .alive()
+        .revoked(false)
+        .for_transport_encryption()
+        .map(Into::into)
+        .collect()
+}
+
+/// A message that is entirely well-formed until after its literal data: a
+/// 512 KiB payload followed by three thousand padding packets.
+///
+/// This is the fixture for the *other* channel. Every bomb above breaches its
+/// bound while Sequoia is still building the decryptor, so the refusal comes
+/// back from `with_policy`. Here the walk reaches the literal packet, the
+/// decryptor is built, and the bound fires later — from the `Read` impl, which
+/// wraps what it is handed and used to make the refusal unrecognizable. A
+/// payload larger than the plaintext buffer is what keeps the trailing packets
+/// out of the setup walk, so the shape depends on the 64 KiB buffer as much as
+/// on the packet count.
+fn trailing_packet_flood(key: &GeneratedKey, encrypted: bool) -> Vec<u8> {
+    let policy = StandardPolicy::new();
+    let cert = openpgp::Cert::from_bytes(if encrypted {
+        &key.public_key_data
+    } else {
+        &key.cert_data
+    })
+    .expect("cert should parse");
+
+    let mut sink = Vec::new();
+    {
+        let mut message = Message::new(&mut sink);
+        if encrypted {
+            message = Encryptor::for_recipients(message, recipients_of(&cert, &policy))
+                .build()
+                .expect("encryptor should build");
+        } else {
+            let keypair = cert
+                .keys()
+                .with_policy(&policy, None)
+                .supported()
+                .secret()
+                .for_signing()
+                .next()
+                .expect("a signing key")
+                .key()
+                .clone()
+                .into_keypair()
+                .expect("signing keypair");
+            message = Signer::new(message, keypair)
+                .expect("signer should build")
+                .build()
+                .expect("signer should build");
+        }
+
+        {
+            let mut literal = LiteralWriter::new(message)
+                .build()
+                .expect("literal writer should build");
+            literal
+                .write_all(&vec![b'x'; 512 * 1024])
+                .expect("write plaintext");
+            message = literal
+                .finalize_one()
+                .expect("finalize literal")
+                .expect("inner message");
+        }
+
+        // Inside the encryption container, where the payload is; after the
+        // signature otherwise, since a signed message admits no trailing
+        // packets within its own structure.
+        let padding = openpgp::Packet::from(Padding::from(vec![0u8; 16]));
+        if encrypted {
+            for _ in 0..3000 {
+                padding
+                    .serialize(&mut message)
+                    .expect("padding should serialize");
+            }
+            message.finalize().expect("finalize message");
+        } else {
+            message.finalize().expect("finalize message");
+        }
+    }
+
+    if !encrypted {
+        let padding = openpgp::Packet::from(Padding::from(vec![0u8; 16]));
+        for _ in 0..3000 {
+            padding
+                .serialize(&mut sink)
+                .expect("padding should serialize");
+        }
+    }
+    sink
+}
+
+fn temp_dir() -> tempfile::TempDir {
+    tempfile::tempdir().expect("temp dir")
+}
+
+fn temp_path(dir: &tempfile::TempDir, name: &str) -> String {
+    dir.path()
+        .join(name)
+        .to_str()
+        .expect("utf-8 path")
+        .to_string()
+}
+
 fn write_temp_file(name: &str, contents: &[u8]) -> (tempfile::TempDir, String) {
-    let dir = tempfile::tempdir().expect("temp dir");
-    let path = dir.path().join(name);
+    let dir = temp_dir();
+    let path = temp_path(&dir, name);
     std::fs::write(&path, contents).expect("write temp file");
-    let path = path.to_str().expect("utf-8 path").to_string();
     (dir, path)
 }
 
@@ -140,30 +251,31 @@ fn nested_compressed_layers_do_not_expand_in_phase_one() {
         bomb.len()
     );
 
-    // Each phase-1 route refuses without descending far enough to inflate: the
-    // walk stops at the second compression layer, so it never reaches the
-    // session-key packet or the padding beneath it.
+    // Each phase-1 route refuses at the second compression layer, without
+    // descending far enough to inflate: it never reaches the session-key packet
+    // or the padding beneath it. The refusal says so rather than reporting
+    // nothing found, which would reach the reader as "the data appears damaged".
     assert!(matches!(
         decrypt::parse_recipients(&bomb),
-        Err(PgpError::CorruptData { .. })
+        Err(PgpError::MessageLimitsExceeded { .. })
     ));
     assert!(matches!(
         decrypt::match_recipients(&bomb, &[key.public_key_data.clone()]),
-        Err(PgpError::CorruptData { .. })
+        Err(PgpError::MessageLimitsExceeded { .. })
     ));
     assert!(matches!(
         decrypt::message_quantum_safety(&bomb),
-        Err(PgpError::CorruptData { .. })
+        Err(PgpError::MessageLimitsExceeded { .. })
     ));
     assert!(matches!(
         password::decrypt(&bomb, &openpgp::crypto::Password::from("secret"), &[]),
-        Err(PgpError::CorruptData { .. })
+        Err(PgpError::MessageLimitsExceeded { .. })
     ));
 
     let (_dir, path) = write_temp_file("nested.gpg", &bomb);
     assert!(matches!(
         streaming::match_recipients_from_file(&path, &[key.public_key_data.clone()]),
-        Err(PgpError::CorruptData { .. })
+        Err(PgpError::MessageLimitsExceeded { .. })
     ));
 }
 
@@ -226,6 +338,55 @@ fn packets_that_outweigh_their_message_are_refused_before_they_are_read() {
 }
 
 #[test]
+fn a_bound_that_fires_during_the_read_is_still_reported_as_a_bound() {
+    // The refusal has to survive Sequoia's `Read` impl, which wraps what it is
+    // handed. Landing here as `CorruptData` would tell the reader their message
+    // is damaged and to ask the sender to resend — wrong on both counts.
+    let key = test_key();
+    let encrypted = trailing_packet_flood(&key, true);
+    assert!(
+        encrypted.len() > 64 * 1024,
+        "the payload must exceed the plaintext buffer, or the trailing packets \
+         are walked during setup instead: {} bytes",
+        encrypted.len()
+    );
+
+    assert!(matches!(
+        decrypt::decrypt_detailed(&encrypted, &[key.cert_data.clone()], &[]),
+        Err(PgpError::MessageLimitsExceeded { .. })
+    ));
+
+    // The verify route reaches the same channel through a signed message; an
+    // encrypted one is refused by the message grammar first, since a verifier
+    // does not open the container.
+    let signed = trailing_packet_flood(&key, false);
+    assert!(matches!(
+        verify::verify_cleartext_detailed(&signed, &[key.public_key_data.clone()]),
+        Err(PgpError::MessageLimitsExceeded { .. })
+    ));
+
+    let dir = temp_dir();
+    let input = temp_path(&dir, "trailing.gpg");
+    std::fs::write(&input, &encrypted).expect("write input");
+    let output = temp_path(&dir, "out.bin");
+    assert!(matches!(
+        streaming::decrypt_file_detailed(&input, &output, &[key.cert_data.clone()], &[], None),
+        Err(PgpError::MessageLimitsExceeded { .. })
+    ));
+    // The success-only output contract holds through the new error path: this
+    // refusal arrives after the temp file has been written to, so the cleanup
+    // is the thing being checked, not the absence of an attempt.
+    assert!(!std::path::Path::new(&output).exists());
+    assert!(
+        std::fs::read_dir(dir.path())
+            .expect("read temp dir")
+            .filter_map(Result::ok)
+            .all(|entry| entry.file_name() == std::ffi::OsStr::new("trailing.gpg")),
+        "no partial plaintext may be left behind"
+    );
+}
+
+#[test]
 fn a_compressed_message_still_decrypts() {
     // The bounds must leave the deepest shape a producer emits alone: an
     // encryption container over a compression container, putting the literal
@@ -266,6 +427,43 @@ fn a_compressed_message_still_decrypts() {
         result.plaintext,
         b"compressed inside the encryption container".to_vec()
     );
+}
+
+#[test]
+fn the_two_walks_do_not_split_a_verdict_on_a_crowded_message() {
+    // Phase 1 counts the session-key packets; the setup walk counts those plus
+    // the framing around the payload. If their allowances were equal, a message
+    // near the ceiling would pass phase 1 — showing its recipient a key — and
+    // then be refused when they used it. A thousand recipients is already past
+    // anything real, so this is the boundary that has to hold.
+    let key = test_key();
+    let policy = StandardPolicy::new();
+    let cert = openpgp::Cert::from_bytes(&key.public_key_data).expect("cert should parse");
+    let crowd: Vec<Recipient> = (0..1024)
+        .flat_map(|_| recipients_of(&cert, &policy))
+        .collect();
+    assert_eq!(
+        crowd.len(),
+        1024,
+        "the test key must contribute exactly one encryption subkey per pass"
+    );
+
+    let mut sink = Vec::new();
+    {
+        let message = Message::new(&mut sink);
+        let message = Encryptor::for_recipients(message, crowd)
+            .build()
+            .expect("encryptor should build");
+        let mut message = LiteralWriter::new(message).build().expect("literal writer");
+        message.write_all(b"crowded").expect("write plaintext");
+        message.finalize().expect("finalize");
+    }
+
+    let recipients = decrypt::parse_recipients(&sink).expect("phase 1 must accept the message");
+    assert_eq!(recipients.len(), 1024);
+    let result = decrypt::decrypt_detailed(&sink, &[key.cert_data.clone()], &[])
+        .expect("what phase 1 accepted, phase 2 must open");
+    assert_eq!(result.plaintext, b"crowded".to_vec());
 }
 
 #[test]

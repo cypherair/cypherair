@@ -10,8 +10,14 @@
 //! input that never yields a literal packet produces no output bytes to count.
 //!
 //! So the bounds live here, on the consumption side, and each one is charged
-//! *before* the bytes it guards are read. Exceeding one fails closed with
-//! `PgpError::MessageLimitsExceeded`.
+//! before the walk reads *past* the packet it is charged for — which is what
+//! makes them bounds rather than post-mortems. Sequoia produces an ordinary
+//! packet by parsing its body, so one such body is always already read when its
+//! charge is refused; that body is bounded by the parser's own
+//! `max_packet_size`, 1 MiB by default. Total consumption is therefore the
+//! budget plus that one packet, and everything a walk goes *on* to read —
+//! container bodies, and the bodies of packets it skips — is bounded outright.
+//! Exceeding a bound fails closed with `PgpError::MessageLimitsExceeded`.
 
 use std::fmt;
 use std::io::Read;
@@ -25,22 +31,37 @@ use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
 
-/// Packets a walk over unauthenticated input may consume.
+/// Packets a phase-1 header walk may consume.
 ///
-/// The walks bounded here read a message's framing, never its payload: the
-/// session-key packets, the one-pass-signature and signature packets around the
-/// literal data, and the ignorable marker and padding packets. A message that
-/// needs more than a thousand of those is not a message anybody composed.
-const MAX_WALK_PACKETS: u32 = 1024;
+/// This walk reads the session-key packets and stops. A message addressed to
+/// more than a thousand recipients is not a message anybody composed, and this
+/// is the bound that decides that question — phase 1 runs first, so it is the
+/// one a recipient meets.
+const MAX_PREFIX_WALK_PACKETS: u32 = 1024;
+
+/// Packets Sequoia's setup walk may consume.
+///
+/// Twice the phase-1 allowance, so that the two walks cannot split a verdict on
+/// the same message — which would show a recipient a key for a message that
+/// then refuses to open. They count different packets: phase 1 sees only the
+/// session-key prefix, while this walk also sees the one-pass-signature,
+/// signature, marker and padding packets around the literal data. Equal
+/// allowances would therefore make this the effective ceiling on recipients,
+/// and a lower one here would refuse messages phase 1 had just accepted. The
+/// doubling is slack for framing, not tolerance for more of it: a message
+/// carrying a thousand packets of framing around its payload is already past
+/// anything a producer emits.
+const MAX_SETUP_WALK_PACKETS: u32 = 2 * MAX_PREFIX_WALK_PACKETS;
 
 /// Bytes a phase-1 header walk may consume.
 ///
 /// The walk stops at the encrypted container, so this covers the session-key
 /// packets alone; the largest one we can receive is a v6 PKESK carrying an
-/// ML-KEM-1024 ciphertext, under 2 KiB. 4 MiB is well past `MAX_WALK_PACKETS`
-/// of those and still bounds the read a crafted file can provoke. The bound is
-/// absolute rather than input-relative because this walk stops before any
-/// payload: a large input does not entitle a message to a larger header.
+/// ML-KEM-1024 ciphertext, under 2 KiB. 4 MiB is well past
+/// `MAX_PREFIX_WALK_PACKETS` of those and still bounds the read a crafted file
+/// can provoke. The bound is absolute rather than input-relative because this
+/// walk stops before any payload: a large input does not entitle a message to a
+/// larger header.
 const MAX_PREFIX_WALK_BYTES: u64 = 4 * 1024 * 1024;
 
 /// How deep the phase-1 header walk may descend.
@@ -54,10 +75,14 @@ const MAX_PREFIX_WALK_DEPTH: u8 = 1;
 
 /// How deep Sequoia's setup walk may descend before we refuse the message.
 ///
-/// Producers nest two containers at most — an encryption container over a
-/// compression container — putting the literal data at depth 2. Each further
-/// layer multiplies the expansion an attacker gets per input byte, so the
-/// headroom here is deliberately small.
+/// Four, and it should stay four. The deepest shape a real producer can emit is
+/// a compressed message holding an encrypted one holding a compressed, signed
+/// one — `Compressed( PKESK, SEIP( Compressed( OPS, Literal, Sig ) ) )` — which
+/// verifies at depth 3, one layer inside this bound. Raising it buys nothing:
+/// the phase-1 depth rule below is the earlier and tighter gate, so the only
+/// inputs this constant decides are ones nesting *below* the encryption
+/// container, which is exactly where each further layer multiplies the
+/// expansion an attacker gets per byte of input.
 const MAX_SETUP_WALK_DEPTH: isize = 4;
 
 /// Bytes Sequoia's setup walk may consume per byte of input, and the floor
@@ -70,6 +95,13 @@ const MAX_SETUP_WALK_DEPTH: isize = 4;
 /// is framing throughout, and Padmé padding adds at most 12% — so a factor of
 /// four is headroom rather than a guess. The floor keeps a small input from
 /// being judged by a ratio of something too small to carry framing at all.
+///
+/// What holds that reasoning up is that every packet class `charge` counts is
+/// incompressible in practice: key-exchange packets and signatures are
+/// ciphertext, and Sequoia fills a padding packet with CSPRNG bytes
+/// (`packet/padding.rs`). None of them can be charged at a size the input did
+/// not pay for. Adding a compressible packet class to what `charge` counts
+/// would break that silently, and the ratio would have to be revisited.
 const MAX_SETUP_WALK_RATIO: u64 = 4;
 const MIN_SETUP_WALK_BYTES: u64 = 1024 * 1024;
 
@@ -107,39 +139,45 @@ impl From<WalkBoundExceeded> for PgpError {
     }
 }
 
+impl WalkBoundExceeded {
+    /// Hand the bound to Sequoia as an `io::Error`.
+    ///
+    /// Sequoia returns a bound raised in `inspect` by one of two routes: as
+    /// itself, when the walk runs under `with_policy`, or through
+    /// `Decryptor::read`, which passes an inner `io::Error` on unchanged and
+    /// boxes anything else. Only the `io::Error` survives that second route
+    /// intact — `anyhow`'s box is its own wrapper type, which downcasts to
+    /// neither the value inside it nor anything reachable from `source()`, so a
+    /// bound handed over bare comes back unrecognizable and gets classified as
+    /// a damaged message. Wrapping here makes both routes deliver one shape:
+    /// an `io::Error` whose `get_ref()` is this value.
+    ///
+    /// `ErrorKind::Other` deliberately, never `Interrupted`: readers in the
+    /// stack retry that one, and a bound must not be retried.
+    fn into_sequoia_error(self) -> openpgp::anyhow::Error {
+        std::io::Error::new(std::io::ErrorKind::Other, self).into()
+    }
+}
+
 /// Recover a consumption bound from a Sequoia error chain.
 ///
-/// The setup walk reports through `VerificationHelper::inspect`, so the bound
-/// comes back wrapped in `anyhow` — and, when that walk runs from `Decryptor`'s
-/// `Read` impl rather than from `with_policy`, inside an `io::Error` as well.
-/// An `io::Error`'s `source()` skips the error it wraps, so the chain walk
-/// steps through `get_ref()` explicitly.
+/// Both routes out of `inspect` carry the bound as the inner error of an
+/// `io::Error` (see `into_sequoia_error`), so one shape is all this looks for.
+/// It has to reach through `get_ref()` rather than follow `source()`, because
+/// an `io::Error`'s `source()` is the source *of* the error it wraps and skips
+/// that error itself.
 pub(crate) fn walk_bound_error(error: &openpgp::anyhow::Error) -> Option<PgpError> {
     error
         .chain()
-        .find_map(bound_in_error_chain)
+        .find_map(|cause| {
+            cause
+                .downcast_ref::<std::io::Error>()
+                .and_then(|io_error| io_error.get_ref())
+                .and_then(|inner| inner.downcast_ref::<WalkBoundExceeded>())
+        })
         .map(|exceeded| PgpError::MessageLimitsExceeded {
             reason: exceeded.reason.clone(),
         })
-}
-
-fn bound_in_error_chain<'e>(
-    error: &'e (dyn std::error::Error + 'static),
-) -> Option<&'e WalkBoundExceeded> {
-    let mut current = Some(error);
-    while let Some(error) = current {
-        if let Some(exceeded) = error.downcast_ref::<WalkBoundExceeded>() {
-            return Some(exceeded);
-        }
-        current = match error
-            .downcast_ref::<std::io::Error>()
-            .and_then(|io_error| io_error.get_ref())
-        {
-            Some(inner) => Some(inner as &(dyn std::error::Error + 'static)),
-            None => error.source(),
-        };
-    }
-    None
 }
 
 /// What a walk may still consume.
@@ -148,6 +186,7 @@ fn bound_in_error_chain<'e>(
 /// allowed and how deep they may go, never in what counts.
 struct WalkBudget {
     packets: u32,
+    packet_limit: u32,
     bytes: u64,
     max_depth: isize,
 }
@@ -156,7 +195,8 @@ impl WalkBudget {
     /// The budget for a phase-1 header walk.
     fn message_prefix() -> Self {
         Self {
-            packets: MAX_WALK_PACKETS,
+            packets: MAX_PREFIX_WALK_PACKETS,
+            packet_limit: MAX_PREFIX_WALK_PACKETS,
             bytes: MAX_PREFIX_WALK_BYTES,
             max_depth: isize::from(MAX_PREFIX_WALK_DEPTH),
         }
@@ -166,7 +206,8 @@ impl WalkBudget {
     /// received input.
     fn message_setup(input_bytes: u64) -> Self {
         Self {
-            packets: MAX_WALK_PACKETS,
+            packets: MAX_SETUP_WALK_PACKETS,
+            packet_limit: MAX_SETUP_WALK_PACKETS,
             bytes: input_bytes
                 .saturating_mul(MAX_SETUP_WALK_RATIO)
                 .max(MIN_SETUP_WALK_BYTES),
@@ -188,7 +229,8 @@ impl WalkBudget {
 
         self.packets = self.packets.checked_sub(1).ok_or_else(|| WalkBoundExceeded {
             reason: format!(
-                "Message carries more than {MAX_WALK_PACKETS} packets before its payload"
+                "Message carries more than {} packets before its payload",
+                self.packet_limit
             ),
         })?;
 
@@ -260,12 +302,9 @@ where
 }
 
 /// Walk the session-key packets of a message read from a file.
-pub(crate) fn walk_message_prefix_reader<'a, R, V>(
-    reader: R,
-    visit: V,
-) -> Result<PrefixEnd, PgpError>
+pub(crate) fn walk_message_prefix_reader<R, V>(reader: R, visit: V) -> Result<PrefixEnd, PgpError>
 where
-    R: Read + Send + Sync + 'a,
+    R: Read + Send + Sync,
     V: FnMut(&openpgp::Packet) -> Result<(), PgpError>,
 {
     let builder = PacketParserBuilder::from_reader(reader).map_err(parse_failure)?;
@@ -322,9 +361,24 @@ where
             {
                 budget.charge(&pp)?;
             }
-            // Anything else ends the session-key sequence. Returning here drops
-            // the parser without reading the packet — the whole point of
-            // stopping is to leave a container uninflated.
+            // A container this walk will not open. Refusing it is a bound
+            // firing, not an absence of session-key packets, and it says so:
+            // left to the caller's "nothing found" path it would reach the
+            // reader as "the data appears damaged, ask the sender to resend",
+            // which is the misleading advice this error exists to avoid.
+            openpgp::Packet::CompressedData(_) => {
+                return Err(WalkBoundExceeded {
+                    reason: format!(
+                        "Message nests compressed data more than \
+                         {MAX_PREFIX_WALK_DEPTH} container deep"
+                    ),
+                }
+                .into())
+            }
+            // Anything else ends the session-key sequence, and ends it as an
+            // absence rather than a refusal: this is where a signed-only
+            // message or a certificate file lands. Returning here drops the
+            // parser without reading the packet.
             _ => return Ok(PrefixEnd::NoContainer),
         }
 
@@ -364,7 +418,9 @@ impl<H> BoundedHelper<H> {
 
 impl<H: VerificationHelper> VerificationHelper for BoundedHelper<H> {
     fn inspect(&mut self, pp: &PacketParser) -> openpgp::Result<()> {
-        self.budget.charge(pp)?;
+        if let Err(exceeded) = self.budget.charge(pp) {
+            return Err(exceeded.into_sequoia_error());
+        }
         self.inner.inspect(pp)
     }
 
