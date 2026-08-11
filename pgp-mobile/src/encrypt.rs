@@ -333,8 +333,8 @@ pub fn encrypt(
             reason: format!("Armor setup failed: {e}"),
         })?;
 
-    // Set up encryption — Sequoia automatically selects SEIPDv1 or SEIPDv2
-    // based on the recipient key versions
+    // Set up encryption — Sequoia selects SEIPDv1 or SEIPDv2 itself, from
+    // what the recipient certificates advertise
     let message = Encryptor::for_recipients(message, recipient_keys)
         .build()
         .map_err(|e| PgpError::EncryptionFailed {
