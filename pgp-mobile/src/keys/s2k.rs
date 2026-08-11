@@ -3,7 +3,10 @@ use super::*;
 /// The Argon2id parameters every v6 export derives under: RFC 9106 §4's first
 /// recommended option — 2 GiB of memory, one pass, four lanes. Staying exactly
 /// on the RFC keeps the external-standard anchor, and the high memory cost is
-/// what makes a stolen backup expensive to attack offline.
+/// what makes a stolen backup expensive to attack offline. Each secret-key
+/// packet carries its own S2K, so an export of a v6 certificate runs the
+/// derivation three times — sequentially, leaving 2 GiB the peak and tripling
+/// only the wall-clock cost (SECURITY.md §7).
 ///
 /// RFC 9580 encodes the memory cost as `2^m` KiB, so 2 GiB is `m = 21`.
 /// `export_s2k_params` publishes the resulting requirement to the app's memory
@@ -101,9 +104,13 @@ pub enum S2kType {
 }
 
 /// S2K (String-to-Key) parameters of a passphrase-protected key. The app reads
-/// these to check the device's memory headroom before running the derivation —
-/// as declared by an incoming key file (`parse_s2k_params`) or as an outgoing
+/// these to check the device's memory headroom before any derivation runs — as
+/// declared by an incoming key file (`parse_s2k_params`) or as an outgoing
 /// export will use them (`export_s2k_params`).
+///
+/// `memory_kib` is the cost of a single derivation, which is also the peak: a
+/// certificate protects each of its secret-key packets under its own S2K, so an
+/// export or import derives once per packet, one after another (SECURITY.md §7).
 #[derive(Debug, uniffi::Record)]
 pub struct S2kInfo {
     pub s2k_type: S2kType,

@@ -3777,18 +3777,34 @@
         }
       }
     },
-    "encrypt.compat.downgrade" : {
+    "encrypt.compat.limitsMessageFormat" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Format downgrade to SEIPDv1"
+            "value" : "Holds this message at SEIPDv1, with no AEAD for the other recipients"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "格式降级为 SEIPDv1"
+            "value" : "使本条消息停留在 SEIPDv1，其他收件人无法获得 AEAD"
+          }
+        }
+      }
+    },
+    "encrypt.compat.messageDowngraded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One of this message's keys has no AEAD support, so the whole message uses SEIPDv1. Recipients whose keys do support AEAD will not get it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本条消息的密钥中有一把不支持 AEAD，因此整条消息使用 SEIPDv1。密钥本可支持 AEAD 的收件人也将得不到 AEAD。"
           }
         }
       }

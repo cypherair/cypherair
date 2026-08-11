@@ -192,23 +192,8 @@ final class EncryptionService {
             return nil
         }
 
-        if let fp = encryptToSelfFingerprint {
-            guard let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) else {
-                // A user-chosen self key that no longer resolves must fail loudly —
-                // silently re-targeting the self copy to the default key would
-                // contradict the selection still shown in the UI.
-                throw CypherAirError.encryptionFailed(
-                    reason: String(
-                        localized: "encrypt.encryptToSelf.staleSelection",
-                        defaultValue: "Your Encrypt to Self key is no longer available. Review the selection and try again."
-                    )
-                )
-            }
-            return key.publicKeyData
-        }
-        if let defaultKey = keyManagement.defaultKey {
-            return defaultKey.publicKeyData
-        }
-        throw CypherAirError.noKeySelected
+        return try keyManagement.encryptToSelfIdentity(
+            fingerprint: encryptToSelfFingerprint
+        ).publicKeyData
     }
 }

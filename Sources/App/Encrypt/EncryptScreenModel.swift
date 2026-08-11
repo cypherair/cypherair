@@ -252,8 +252,38 @@ final class EncryptScreenModel {
         keyManagement.keys
     }
 
-    var defaultKeyVersion: UInt8? {
-        keyManagement.defaultKey.map(\.keyVersion)
+    /// What the engine will produce for the current selection: the message
+    /// format, whether AEAD is being given up, and which recipients decide it.
+    ///
+    /// Built from the very arguments the encrypt call would receive — the
+    /// resolved recipient selection plus the Encrypt to Self copy — and answered
+    /// by the engine, so the preview and the message cannot describe different
+    /// things. `nil` when there is no message to describe: nothing addressed
+    /// yet, or a selection the encrypt path would refuse, both of which the
+    /// chooser already reports in their own terms.
+    var outgoingFormatDecision: OutgoingFormatDecision? {
+        guard let recipientKeys = try? contactService.publicKeysForRecipientContactIDs(
+            effectiveRecipientContactIds
+        ) else {
+            return nil
+        }
+        return try? PGPMessageFormatAdapter.decision(
+            recipientKeys: recipientKeys,
+            encryptToSelfKey: encryptToSelfPublicKeyData
+        )
+    }
+
+    /// The self copy's certificate, or nil when no copy is being made. A chosen
+    /// key that no longer resolves is omitted rather than replaced: the send path
+    /// fails loudly on it, and quietly describing a message addressed to some
+    /// other key of the user's would be worse than describing none.
+    private var encryptToSelfPublicKeyData: Data? {
+        guard encryptToSelfToggleValue else {
+            return nil
+        }
+        return try? keyManagement.encryptToSelfIdentity(
+            fingerprint: encryptToSelfFingerprint
+        ).publicKeyData
     }
 
     var selectedUnverifiedContacts: [ContactRecipientSummary] {

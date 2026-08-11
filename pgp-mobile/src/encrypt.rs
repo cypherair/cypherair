@@ -290,18 +290,20 @@ fn signer_error(context: &'static str) -> impl FnOnce(String) -> PgpError {
 
 /// Encrypt plaintext for the given recipients.
 ///
-/// Message format is determined automatically by recipient key versions:
-/// - All v4 recipients → SEIPDv1 (MDC)
-/// - All v6 recipients → SEIPDv2 (AEAD OCB)
-/// - Mixed v4+v6 → SEIPDv1 (lowest common denominator)
+/// The message format is never passed in. Sequoia's `Encryptor` selects it from
+/// the recipient certificates' advertised Features subpackets: SEIPDv2 (AEAD
+/// OCB) when every recipient advertises it, SEIPDv1 (MDC) otherwise. Callers
+/// that must state the format before the message exists ask
+/// `crate::message_format` — the one place that rule is written down outside
+/// Sequoia.
 ///
-/// SECURITY NOTE: Format auto-selection is intentionally
-/// delegated to Sequoia's `Encryptor`, which inspects recipient certificates'
-/// Features subpackets to determine the correct message format. This invariant
-/// is verified by packet-level assertions in `pgp-mobile/tests/cross_suite_tests.rs`
-/// (test_format_selection_*), which parse the raw SEIP version field for every
-/// recipient key version combination. After any Sequoia version bump, these tests
-/// must pass to confirm no regression in format selection behavior.
+/// SECURITY NOTE: the delegation is deliberate, and pinned by packet-level
+/// assertions that parse the raw SEIP version field —
+/// `pgp-mobile/tests/cross_suite_tests.rs` (`test_format_selection_*`) across
+/// recipient key-version combinations, and
+/// `pgp-mobile/tests/message_format_tests.rs` for certificates whose advertised
+/// features contradict their version. After any Sequoia version bump these
+/// tests must pass to confirm format selection has not regressed.
 ///
 /// Parameters:
 /// - `plaintext`: The data to encrypt.
