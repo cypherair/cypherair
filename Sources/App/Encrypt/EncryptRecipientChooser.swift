@@ -79,8 +79,8 @@ struct EncryptRecipientChooser: View {
                 }
             }
 
-            if formatDecision?.withholdsAead == true {
-                messageFormatNotice
+            if let formatDecision, formatDecision.withholdsAead {
+                messageFormatNotice(format: formatDecision.format)
             }
 
             if !model.selectedUnverifiedContacts.isEmpty {
@@ -205,12 +205,19 @@ struct EncryptRecipientChooser: View {
     /// carry it alone: the Encrypt to Self copy is a recipient with no row, so a
     /// legacy self key can hold the whole message at SEIPDv1 over a chooser
     /// showing nothing but green.
+    ///
+    /// The container it names is the engine's own answer, not one inferred from
+    /// the fact that AEAD is being withheld — the copy cannot then claim a format
+    /// other than the one the message will carry.
     @ViewBuilder
-    private var messageFormatNotice: some View {
+    private func messageFormatNotice(format: OutgoingMessageFormat) -> some View {
         Label(
-            String(
-                localized: "encrypt.compat.messageDowngraded",
-                defaultValue: "One of this message's keys has no AEAD support, so the whole message uses SEIPDv1. Recipients whose keys do support AEAD will not get it."
+            String.localizedStringWithFormat(
+                String(
+                    localized: "encrypt.compat.messageDowngraded",
+                    defaultValue: "One of this message's keys has no AEAD support, so the whole message uses %@. Recipients whose keys do support AEAD will not get it."
+                ),
+                format.containerName
             ),
             systemImage: "exclamationmark.triangle.fill"
         )
@@ -255,6 +262,18 @@ struct EncryptRecipientChooser: View {
             localized: "encrypt.recipients.hiddenByFilter",
             defaultValue: "\(count) selected recipients hidden by the current filter"
         )
+    }
+}
+
+private extension OutgoingMessageFormat {
+    /// The container's name on the wire. A protocol identifier rather than
+    /// prose, so it reads the same in every language and stays out of the
+    /// String Catalog.
+    var containerName: String {
+        switch self {
+        case .seipdV1: "SEIPDv1"
+        case .seipdV2: "SEIPDv2"
+        }
     }
 }
 

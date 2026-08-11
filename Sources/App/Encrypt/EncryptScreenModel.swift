@@ -8,6 +8,18 @@ private struct InitialRecipientSelectionSignature: Equatable {
     }
 }
 
+/// Everything the engine is given when asked what format a message will take.
+///
+/// Identity is the certificates themselves, not the contact ids they were
+/// resolved from: a contact whose certificate is replaced keeps its id, and an
+/// answer remembered against ids would go on describing the certificate that is
+/// no longer there. Keyed this way, a remembered answer cannot be stale — it
+/// answers a question that is byte-for-byte the one being asked.
+private struct OutgoingFormatQuestion: Equatable {
+    let recipientKeys: [Data]
+    let encryptToSelfKey: Data?
+}
+
 struct EncryptFileRequest {
     let fileURL: URL
     let recipientContactIds: [String]
@@ -49,6 +61,12 @@ final class EncryptScreenModel {
     private let clipboardWriter: ClipboardWriter
     @ObservationIgnored private var encryptedFileOutput: TemporaryFileOutput?
     @ObservationIgnored private var lastAppliedInitialRecipientSelectionSignature: InitialRecipientSelectionSignature?
+    /// The last question put to the engine and the answer it gave. Observation
+    /// ignores it: it is a record of work already done, never a reason to render.
+    @ObservationIgnored private var lastOutgoingFormatAnswer: (
+        question: OutgoingFormatQuestion,
+        decision: OutgoingFormatDecision?
+    )?
     @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var clipboardToken: UInt64 = 0
     private var fileImportRequestGate = FileImportRequestGate()
@@ -261,16 +279,30 @@ final class EncryptScreenModel {
     /// things. `nil` when there is no message to describe: nothing addressed
     /// yet, or a selection the encrypt path would refuse, both of which the
     /// chooser already reports in their own terms.
+    ///
+    /// The engine parses every addressed certificate to answer, so the answer is
+    /// kept until the question changes rather than re-asked per render — the
+    /// chooser re-renders on things that leave the message identical, a keystroke
+    /// in the recipient search field among them.
     var outgoingFormatDecision: OutgoingFormatDecision? {
         guard let recipientKeys = try? contactService.publicKeysForRecipientContactIDs(
             effectiveRecipientContactIds
         ) else {
             return nil
         }
-        return try? PGPMessageFormatAdapter.decision(
+        let question = OutgoingFormatQuestion(
             recipientKeys: recipientKeys,
             encryptToSelfKey: encryptToSelfPublicKeyData
         )
+        if let lastOutgoingFormatAnswer, lastOutgoingFormatAnswer.question == question {
+            return lastOutgoingFormatAnswer.decision
+        }
+        let decision = try? PGPMessageFormatAdapter.decision(
+            recipientKeys: question.recipientKeys,
+            encryptToSelfKey: question.encryptToSelfKey
+        )
+        lastOutgoingFormatAnswer = (question, decision)
+        return decision
     }
 
     /// The self copy's certificate, or nil when no copy is being made. A chosen

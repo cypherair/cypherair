@@ -3798,13 +3798,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "One of this message's keys has no AEAD support, so the whole message uses SEIPDv1. Recipients whose keys do support AEAD will not get it."
+            "value" : "One of this message's keys has no AEAD support, so the whole message uses %@. Recipients whose keys do support AEAD will not get it."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本条消息的密钥中有一把不支持 AEAD，因此整条消息使用 SEIPDv1。密钥本可支持 AEAD 的收件人也将得不到 AEAD。"
+            "value" : "本条消息的密钥中有一把不支持 AEAD，因此整条消息使用 %@。密钥本可支持 AEAD 的收件人也将得不到 AEAD。"
           }
         }
       }

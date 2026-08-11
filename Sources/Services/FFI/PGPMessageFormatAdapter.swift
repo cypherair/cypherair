@@ -7,6 +7,13 @@ import Foundation
 /// recipient arguments the encrypt call receives and normalizes its error;
 /// nothing on this side restates the rule, because a second copy is exactly how
 /// a format preview comes to contradict the message it previews.
+///
+/// The engine is constructed here rather than injected, unlike every other
+/// adapter. That is the point: an injectable engine is a seam through which a
+/// test double could state a format rule the real engine does not apply, which
+/// is the one thing this type exists to make impossible. There is nothing to
+/// substitute for either — the call reads public certificates and touches no
+/// custody, and the engine is stateless.
 enum PGPMessageFormatAdapter {
     /// The format an encrypt of these recipients will produce, and which of them
     /// decide it.
@@ -17,8 +24,6 @@ enum PGPMessageFormatAdapter {
     /// encrypt path would refuse the same recipients: there is no message to
     /// describe then.
     ///
-    /// Public certificates only, and the engine is stateless, so a transient
-    /// instance needs no custody wiring.
     static func decision(
         recipientKeys: [Data],
         encryptToSelfKey: Data?
