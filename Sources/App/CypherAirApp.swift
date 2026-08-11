@@ -32,6 +32,11 @@ struct CypherAirApp: App {
     // MARK: - Init
 
     init() {
+        #if os(macOS)
+        // Armed before the first window exists, so no window this process ever
+        // shows is capturable by another process.
+        ScreenCaptureExclusion.install()
+        #endif
         let launchConfiguration = AppLaunchConfiguration()
         let container: AppContainer
         #if DEBUG
