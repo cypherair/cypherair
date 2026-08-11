@@ -13,6 +13,11 @@ enum CypherAirError: Error {
     case verificationUnavailable(reason: String)
     case unknownSigner
     case corruptData(reason: String)
+    /// A message exceeded a processing limit — how much of it the engine will
+    /// walk, how deeply it nests, or how far it expands — and was refused
+    /// before the resource was spent. Kept apart from `corruptData`: nothing
+    /// here says the message is damaged, and resending it would not help.
+    case messageLimitsExceeded(reason: String)
     case wrongPassphrase
     case invalidKeyData(reason: String)
     case encryptionFailed(reason: String)

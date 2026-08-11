@@ -13,6 +13,19 @@ Six statements an auditor needs that the code cannot make:
 5. **ASLR, sandboxing, and MIE are the defense-in-depth floor** under the accepted residuals in §9 — they raise the cost of memory scanning; they do not eliminate it.
 6. **MIE exists because vendored OpenSSL is C** (§8).
 
+### Screen Capture (macOS)
+
+Every window the macOS app puts on screen is `NSWindowSharingNone`, in every build configuration, so another process holding the Screen Recording grant — a conferencing tool, a capture utility, malware that obtained the permission — cannot read plaintext, contact identities or armored key material out of the app's windows. One process-wide rule (`Sources/App/Shell/ScreenCaptureExclusion.swift`), because SwiftUI and AppKit create most of the windows, not this app.
+
+What it does not cover:
+
+- **Window titles and bounds stay readable** to any process enumerating windows. The app's titles are generic; keeping them generic is now a constraint, not an accident.
+- **It stops processes, not people.** Anyone looking at the screen sees everything. That is the case the lock shield's privacy cover addresses, and why the two are not redundant.
+- **UI drawn by other processes is outside it entirely.** The sharpest case is an input method: with Simplified Chinese a first-class locale, a user composing plaintext through the Chinese IME has that text rendered in the input method's own candidate window, owned by the IM process, which this app cannot exclude.
+- **iOS, iPadOS and visionOS are not addressed here.** The platform answer there is `EnvironmentValues.isSceneCaptured`, which is `@available(macOS, unavailable)`; the macOS capture surface is the whole of what this covers.
+
+The mechanism rests on an API in tension with itself: the shipped SDK header describes `NSWindowSharingNone` in the present tense with no deprecation, while Apple's documentation calls it a legacy constant and says not to use it for this. Measurement agrees with the header today, on macOS 27. **Re-check it each macOS major** with `scripts/probe_macos_window_capture.sh`, which attempts a real cross-process capture and fails loudly if the system has stopped enforcing the flag. The unit lane guards only that the app still *sets* it (`Tests/ServiceTests/ScreenCaptureExclusionTests.swift`); no lane can tell whether macOS still honours it.
+
 ## 2. Format & Interop Security Rules
 
 - **Read-support contract:** the app reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. The legacy Symmetrically Encrypted Data packet (tag 9, no MDC) is hard-rejected on decrypt.

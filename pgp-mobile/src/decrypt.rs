@@ -8,6 +8,7 @@ use openpgp::types::SymmetricAlgorithm;
 use sequoia_openpgp as openpgp;
 use zeroize::{Zeroize, Zeroizing};
 
+use crate::bounded_walk::{self, BoundedHelper};
 use crate::error::PgpError;
 use crate::external_composite_decryptor::ExternalCompositeDecryptorError;
 use crate::external_decryptor::ExternalP256DecryptorError;
@@ -31,35 +32,16 @@ pub(crate) fn parse_verification_certs(
 ///
 /// Returns a list of recipient key IDs (as hex strings).
 pub fn parse_recipients(ciphertext: &[u8]) -> Result<Vec<String>, PgpError> {
-    let ppr = openpgp::parse::PacketParser::from_bytes(ciphertext).map_err(|e| {
-        PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        }
-    })?;
-
     let mut recipients = Vec::new();
 
-    // Walk through packets looking for PKESK (Public-Key Encrypted Session Key)
-    let mut ppr = ppr;
-    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
-        match pp.packet {
-            openpgp::Packet::PKESK(ref pkesk) => {
-                if let Some(rid) = pkesk.recipient() {
-                    recipients.push(rid.to_hex());
-                }
+    bounded_walk::walk_message_prefix_bytes(ciphertext, |packet| {
+        if let openpgp::Packet::PKESK(pkesk) = packet {
+            if let Some(rid) = pkesk.recipient() {
+                recipients.push(rid.to_hex());
             }
-            // Stop after we've seen all PKESKs (they come before the encrypted data).
-            // In Sequoia 2.x, both SEIPDv1 and SEIPDv2 are under Packet::SEIP.
-            openpgp::Packet::SEIP(_) => {
-                break;
-            }
-            _ => {}
         }
-        let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?;
-        ppr = next;
-    }
+        Ok(())
+    })?;
 
     if recipients.is_empty() {
         return Err(PgpError::CorruptData {
@@ -88,57 +70,36 @@ pub enum MessageQuantumSafety {
 /// file output): parsing stops at the first encrypted-container packet,
 /// which follows all PKESKs. That container is therefore the proof that
 /// every session-key packet has been seen — so this function fails closed
-/// (returns `CorruptData`) if it reaches the end of the input without
-/// observing the container. Otherwise a prefix truncated *before* some
-/// PKESKs could silently downgrade the verdict (e.g. report `NonePostQuantum`
-/// or `Mixed` for a message that is actually fully post-quantum). Callers
-/// map the error to "no badge" rather than a misleading one.
+/// (returns `CorruptData`) if the walk ends without observing the container.
+/// Otherwise a prefix truncated *before* some PKESKs could silently downgrade
+/// the verdict (e.g. report `NonePostQuantum` or `Mixed` for a message that is
+/// actually fully post-quantum). Callers map the error to "no badge" rather
+/// than a misleading one.
 pub fn message_quantum_safety(ciphertext: &[u8]) -> Result<MessageQuantumSafety, PgpError> {
     use openpgp::types::PublicKeyAlgorithm;
 
-    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext).map_err(|e| {
-        PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        }
-    })?;
-
     let mut total = 0usize;
     let mut post_quantum = 0usize;
-    let mut saw_container = false;
 
-    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
-        match pp.packet {
-            openpgp::Packet::PKESK(ref pkesk) => {
-                total += 1;
-                let algo = match pkesk {
-                    openpgp::packet::PKESK::V3(p) => p.pk_algo(),
-                    openpgp::packet::PKESK::V6(p) => p.pk_algo(),
-                    _ => PublicKeyAlgorithm::Unknown(0),
-                };
-                if matches!(
-                    algo,
-                    PublicKeyAlgorithm::MLKEM768_X25519 | PublicKeyAlgorithm::MLKEM1024_X448
-                ) {
-                    post_quantum += 1;
-                }
+    let end = bounded_walk::walk_message_prefix_bytes(ciphertext, |packet| {
+        if let openpgp::Packet::PKESK(pkesk) = packet {
+            total += 1;
+            let algo = match pkesk {
+                openpgp::packet::PKESK::V3(p) => p.pk_algo(),
+                openpgp::packet::PKESK::V6(p) => p.pk_algo(),
+                _ => PublicKeyAlgorithm::Unknown(0),
+            };
+            if matches!(
+                algo,
+                PublicKeyAlgorithm::MLKEM768_X25519 | PublicKeyAlgorithm::MLKEM1024_X448
+            ) {
+                post_quantum += 1;
             }
-            openpgp::Packet::SEIP(_) => {
-                // The encrypted container follows all session-key packets;
-                // reaching it means every PKESK has been counted. Padding and
-                // Marker packets deliberately fall through to `_` so they never
-                // stand in for the container.
-                saw_container = true;
-                break;
-            }
-            _ => {}
         }
-        let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?;
-        ppr = next;
-    }
+        Ok(())
+    })?;
 
-    if !saw_container {
+    if end != bounded_walk::PrefixEnd::Container {
         return Err(PgpError::CorruptData {
             reason: "Encrypted container not found before end of input; cannot classify \
                      quantum-safety from a truncated prefix"
@@ -178,29 +139,14 @@ pub fn match_recipients(
 
     // Parse PKESK recipients as KeyHandle values (not strings).
     let mut pkesk_recipients: Vec<openpgp::KeyHandle> = Vec::new();
-    let ppr = openpgp::parse::PacketParser::from_bytes(ciphertext).map_err(|e| {
-        PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
+    bounded_walk::walk_message_prefix_bytes(ciphertext, |packet| {
+        if let openpgp::Packet::PKESK(pkesk) = packet {
+            if let Some(rid) = pkesk.recipient() {
+                pkesk_recipients.push(rid.clone());
+            }
         }
+        Ok(())
     })?;
-    let mut ppr = ppr;
-    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
-        match pp.packet {
-            openpgp::Packet::PKESK(ref pkesk) => {
-                if let Some(rid) = pkesk.recipient() {
-                    pkesk_recipients.push(rid.clone());
-                }
-            }
-            openpgp::Packet::SEIP(_) => {
-                break;
-            }
-            _ => {}
-        }
-        let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?;
-        ppr = next;
-    }
 
     if pkesk_recipients.is_empty() {
         return Err(PgpError::CorruptData {
@@ -311,12 +257,22 @@ pub(crate) fn decrypt_with_helper<'a, H>(
 where
     H: VerificationHelper + DecryptionHelper,
 {
+    // The walk from here to the literal packet runs on unauthenticated input
+    // and inflates whatever compressed containers it meets, so it is bounded by
+    // `BoundedHelper` and by a plaintext buffer far under Sequoia's 25 MiB
+    // default. Neither bound can be expressed through `DecryptorBuilder`'s own
+    // settings; see `bounded_walk`.
     let mut decryptor = DecryptorBuilder::from_bytes(ciphertext)
         .map_err(|e| PgpError::CorruptData {
             reason: format!("Failed to parse message: {e}"),
         })?
-        .with_policy(policy, None, helper)
-        .map_err(|e| classify_decrypt_error(e))?;
+        .buffer_size(bounded_walk::SETUP_BUFFER_BYTES)
+        .with_policy(
+            policy,
+            None,
+            BoundedHelper::new(helper, ciphertext.len() as u64),
+        )
+        .map_err(classify_decrypt_error)?;
 
     let mut plaintext = Vec::new();
     if let Err(e) =
@@ -328,7 +284,7 @@ where
         return Err(e);
     }
 
-    let helper = decryptor.into_helper();
+    let helper = decryptor.into_helper().into_inner();
     Ok((plaintext, helper))
 }
 
@@ -337,7 +293,7 @@ where
 ///
 /// Bounds the decompression-bomb OOM on the in-memory decrypt path: a read that
 /// would push the accumulated plaintext past `max_bytes` fails closed with
-/// `CorruptData` instead of allocating without bound. Any reader error (including
+/// `MessageLimitsExceeded` instead of allocating without bound. Any reader error (including
 /// the terminal AEAD/MDC authentication failure surfaced on the final read) is
 /// classified and returned, so the caller still enforces the AEAD hard-fail
 /// contract before the plaintext is used. The chunk buffer is `Zeroizing`, so no
@@ -358,7 +314,7 @@ pub(crate) fn read_capped_zeroizing<R: Read>(
         // `sink.len() <= max_bytes` holds by construction, so the subtraction
         // never underflows; a read that would exceed the ceiling fails closed.
         if read > max_bytes - sink.len() {
-            return Err(PgpError::CorruptData {
+            return Err(PgpError::MessageLimitsExceeded {
                 reason: "Decrypted message exceeds the maximum in-memory size".to_string(),
             });
         }
@@ -463,6 +419,13 @@ impl<'a> VerificationHelper for FixedSessionKeyDecryptHelper<'a> {
 /// MAINTENANCE: After Sequoia version bumps, verify that `openpgp::Error` variants still cover
 /// the expected cases. The string fallback provides defense-in-depth if new error paths appear.
 pub(crate) fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
+    // A consumption bound that fired inside Sequoia's own packet walk is a
+    // refusal we issued, not a property of the message, so it is restored
+    // before any classification runs.
+    if let Some(bound_error) = bounded_walk::walk_bound_error(&e) {
+        return bound_error;
+    }
+
     if let Some(external_error) = e
         .chain()
         .find_map(|cause| cause.downcast_ref::<ExternalP256DecryptorError>().copied())
@@ -706,7 +669,7 @@ mod tests {
         let data = vec![0xABu8; 20];
         let mut sink = Vec::new();
         let result = read_capped_zeroizing(&mut data.as_slice(), &mut sink, 10);
-        assert!(matches!(result, Err(PgpError::CorruptData { .. })));
+        assert!(matches!(result, Err(PgpError::MessageLimitsExceeded { .. })));
     }
 
     #[test]

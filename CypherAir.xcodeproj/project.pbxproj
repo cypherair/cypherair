@@ -230,6 +230,7 @@
 				App/Shell/MacPresentation.swift,
 				App/Shell/MacPresentationHost.swift,
 				App/Shell/MacShellNavigationState.swift,
+				App/Shell/ScreenCaptureExclusion.swift,
 				App/Shell/ScreenReadyModifier.swift,
 				App/Shell/SharedIOSTabShellView.swift,
 				App/Sign/SignScreenModel.swift,

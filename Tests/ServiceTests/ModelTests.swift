@@ -253,6 +253,7 @@ final class ModelTests: XCTestCase {
             .badSignature,
             .unknownSigner,
             .corruptData(reason: "test"),
+            .messageLimitsExceeded(reason: "test"),
             .wrongPassphrase,
             .invalidKeyData(reason: "test"),
             .encryptionFailed(reason: "test"),

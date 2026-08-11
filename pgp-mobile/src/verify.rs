@@ -3,6 +3,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
+use crate::bounded_walk::{self, BoundedHelper};
 use crate::decrypt::{
     parse_verification_certs, read_capped_zeroizing, MAX_IN_MEMORY_PLAINTEXT_BYTES,
 };
@@ -18,29 +19,42 @@ pub fn verify_cleartext_detailed(
     let certs = parse_verification_certs(verification_keys)?;
     let helper = VerifyHelper::new(&certs);
 
+    // Sequoia transparently decompresses an embedded CompressedData packet
+    // while streaming, so a few-KB signed message can expand without bound —
+    // and the expansion starts in the walk `with_policy` runs to reach the
+    // literal data, before there is any output to count. `BoundedHelper` bounds
+    // what that walk may consume, and the read below caps what it may produce.
     let verifier_result = VerifierBuilder::from_bytes(signed_message)
         .map_err(|e| PgpError::CorruptData {
             reason: format!("Failed to parse signed message: {e}"),
         })?
-        .with_policy(&policy, None, helper);
+        .buffer_size(bounded_walk::SETUP_BUFFER_BYTES)
+        .with_policy(
+            &policy,
+            None,
+            BoundedHelper::new(helper, signed_message.len() as u64),
+        );
 
     // A verifier that cannot be constructed has checked nothing, so it has no
     // verdict to report. This is the error channel's business, not the
-    // graded-result channel's.
-    let mut verifier = verifier_result.map_err(|error| PgpError::VerificationSetupFailed {
-        reason: format!("Could not start verifying the signed message: {error}"),
+    // graded-result channel's. A consumption bound that fired while walking the
+    // message is a refusal of ours rather than a statement about it, so it
+    // keeps its own error.
+    let mut verifier = verifier_result.map_err(|error| {
+        bounded_walk::walk_bound_error(&error).unwrap_or_else(|| {
+            PgpError::VerificationSetupFailed {
+                reason: format!("Could not start verifying the signed message: {error}"),
+            }
+        })
     })?;
 
-    // Sequoia transparently decompresses an embedded CompressedData packet
-    // while streaming, so a few-KB signed message can expand without bound.
-    // Cap the read at the same 256 MiB in-memory ceiling the decrypt path
-    // uses, bounding the decompression-bomb OOM. The OOM would otherwise
-    // occur before the trailing signature is checked at EOF, so no valid
+    // The 256 MiB output ceiling the decrypt path uses. Without it the OOM
+    // would arrive before the trailing signature is checked at EOF, so no valid
     // attacker signature is even required.
     let mut content = Vec::new();
     read_capped_zeroizing(&mut verifier, &mut content, MAX_IN_MEMORY_PLAINTEXT_BYTES)?;
 
-    let helper = verifier.into_helper();
+    let helper = verifier.into_helper().into_inner();
     let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(VerifyDetailedResult {

@@ -7,6 +7,7 @@ $(SRCROOT)/pgp-mobile/Cargo.lock
 $(SRCROOT)/pgp-mobile/Cargo.toml
 $(SRCROOT)/pgp-mobile/build.rs
 $(SRCROOT)/pgp-mobile/src/armor.rs
+$(SRCROOT)/pgp-mobile/src/bounded_walk.rs
 $(SRCROOT)/pgp-mobile/src/cert_signature.rs
 $(SRCROOT)/pgp-mobile/src/composite_classical.rs
 $(SRCROOT)/pgp-mobile/src/composite_kem.rs

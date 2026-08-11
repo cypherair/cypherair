@@ -59,6 +59,14 @@ pub enum PgpError {
     #[error("Corrupt data: {reason}")]
     CorruptData { reason: String },
 
+    /// A received message exceeds a processing limit — how much of it a header
+    /// walk may consume, how deeply it nests, or how far it expands on the way
+    /// out — so it is refused before the resource is spent. Distinct from
+    /// `CorruptData` on purpose: nothing here says the message is damaged, and
+    /// resending it would not help.
+    #[error("Message exceeds processing limits: {reason}")]
+    MessageLimitsExceeded { reason: String },
+
     /// Wrong passphrase for key import/unlock.
     #[error("Wrong passphrase")]
     WrongPassphrase,
