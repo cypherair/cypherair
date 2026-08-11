@@ -46,14 +46,13 @@ struct KeyGenerationDetailsView: View {
             Section {
                 Picker(
                     String(localized: "keygen.expiry", defaultValue: "Expires After"),
-                    selection: $model.expiryMonths
+                    selection: $model.expiry
                 ) {
-                    ForEach(model.expiryOptions, id: \.self) { months in
-                        Text(String(localized: "keygen.expiry.months", defaultValue: "\(months) months"))
-                            .tag(months)
+                    ForEach(KeyExpiryPolicy.offeredTerms, id: \.self) { term in
+                        Text(Self.expiryLabel(term)).tag(term)
                     }
                 }
-                .disabled(model.configuration.lockedExpiryMonths != nil)
+                .disabled(model.isExpiryLocked)
             } header: {
                 Text(String(localized: "keygen.expiry.header", defaultValue: "Validity"))
             }
@@ -115,6 +114,15 @@ struct KeyGenerationDetailsView: View {
                     .environment(keyManagement)
                     .interactiveDismissDisabled(false)
             }
+        }
+    }
+
+    private static func expiryLabel(_ term: KeyExpiry) -> String {
+        switch term {
+        case .years(let years):
+            String(localized: "keygen.expiry.years", defaultValue: "\(years) years")
+        case .never:
+            String(localized: "keygen.expiry.never", defaultValue: "Never")
         }
     }
 

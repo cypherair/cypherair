@@ -8,6 +8,8 @@ private struct KeyGenerationScreenModelTestError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+private let secondsPerDay: TimeInterval = 24 * 60 * 60
+
 private actor KeyGenerationTestGate {
     private var continuation: CheckedContinuation<Void, Never>?
 
@@ -35,7 +37,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
                 prefilledName: "Alice",
                 prefilledEmail: "alice@example.com",
                 lockedFamily: .portableEd25519X25519,
-                lockedExpiryMonths: 36,
+                lockedExpiry: .years(5),
                 postGenerationBehavior: .suppressPrompt
             )
         )
@@ -45,7 +47,8 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(model.name, "Alice")
         XCTAssertEqual(model.email, "alice@example.com")
         XCTAssertEqual(model.selectedFamily, .portableEd25519X25519)
-        XCTAssertEqual(model.expiryMonths, 36)
+        XCTAssertEqual(model.expiry, .years(5))
+        XCTAssertTrue(model.isExpiryLocked)
     }
 
     func test_selectFamily_isIgnoredWhenFamilyIsLocked() {
@@ -226,7 +229,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertFalse(model.isGenerating)
     }
 
-    func test_generate_softwareFamilyStartsImmediatelyAndPresentsLocalPrompt() async {
+    func test_generate_softwareFamilyStartsImmediatelyAndPresentsLocalPrompt() async throws {
         let identity = makeKeyRouteTestIdentity(fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         var generatedIdentity: PGPKeyIdentity?
         var capturedName: String?
@@ -264,9 +267,37 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(capturedName, "Alice")
         XCTAssertEqual(capturedEmail, "alice@example.com")
         XCTAssertEqual(capturedFamily, .portableEd25519X25519)
-        XCTAssertNotNil(capturedExpirySeconds)
+        XCTAssertEqual(
+            Double(try XCTUnwrap(capturedExpirySeconds)),
+            3 * 365 * secondsPerDay,
+            accuracy: 2 * secondsPerDay,
+            "the untouched picker generates a key valid for three years — years, not months"
+        )
         XCTAssertFalse(model.isGenerating)
         XCTAssertFalse(model.showError)
+    }
+
+    func test_generate_neverExpiryReachesTheActionAsNoExpiry() async {
+        let identity = makeKeyRouteTestIdentity(fingerprint: "9999999999999999999999999999999999999999")
+        var receivedExpirySeconds: [UInt64?] = []
+        let model = makeModel(generateKeyAction: { _, _, expirySeconds, _ in
+            receivedExpirySeconds.append(expirySeconds)
+            return identity
+        })
+        model.name = "Alice"
+        model.expiry = .never
+
+        model.generate()
+
+        await waitUntilKeyRoute("key generation to finish") {
+            model.generatedIdentity == identity
+        }
+
+        XCTAssertEqual(
+            receivedExpirySeconds,
+            [nil],
+            "Never must reach the engine as an absent expiry, not as a distant date"
+        )
     }
 
     func test_generate_routesMacPromptThroughInjectedAction() async {

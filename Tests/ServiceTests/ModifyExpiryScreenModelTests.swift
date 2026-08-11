@@ -89,6 +89,20 @@ final class ModifyExpiryScreenModelTests: XCTestCase {
         XCTAssertFalse(model.isModifyingExpiry)
     }
 
+    func test_initialDateBeyondThePolicyRangeIsSeededInsideIt() {
+        let model = makeModel(
+            request: ModifyExpiryRequest(
+                fingerprint: fingerprint,
+                initialDate: Date().addingTimeInterval(50 * 365 * 24 * 60 * 60)
+            )
+        )
+
+        XCTAssertTrue(
+            KeyExpiryPolicy.settableDateRange().contains(model.newExpiryDate),
+            "an expiry from outside the band must not be savable straight back"
+        )
+    }
+
     func test_modifyFailureSurfacesMappedError() async {
         let model = makeModel(modifyExpiryAction: { _, _ in
             throw ModifyExpiryScreenModelTestError(message: "modify failed")

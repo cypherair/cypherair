@@ -24,7 +24,7 @@ final class ModifyExpiryScreenModel {
         modifyExpiryAction: ModifyExpiryAction? = nil
     ) {
         self.request = request
-        self.newExpiryDate = request.initialDate
+        self.newExpiryDate = KeyExpiryPolicy.settableDate(nearest: request.initialDate)
         self.dismissAction = dismissAction
         self.modifyExpiryAction = modifyExpiryAction ?? { fingerprint, seconds in
             try await keyManagement.modifyExpiry(
@@ -35,8 +35,7 @@ final class ModifyExpiryScreenModel {
     }
 
     func saveSelectedExpiryDate() {
-        let seconds = UInt64(max(0, newExpiryDate.timeIntervalSinceNow))
-        performModifyExpiry(seconds: seconds)
+        performModifyExpiry(seconds: KeyExpiryPolicy.expirySeconds(until: newExpiryDate))
     }
 
     func removeExpiry() {

@@ -7,7 +7,6 @@ final class KeyGenerationScreenModel {
     typealias PostGenerationPromptAction = @MainActor (PGPKeyIdentity) -> Void
 
     let configuration: KeyGenerationView.Configuration
-    let expiryOptions = [12, 24, 36, 48, 60]
 
     private let generateKeyAction: GenerateKeyAction
     private let postGenerationPromptAction: PostGenerationPromptAction?
@@ -20,7 +19,7 @@ final class KeyGenerationScreenModel {
     var email = ""
     var selectedFamily: PGPKeyFamily = .recommendedDefault
     var detailFamily: PGPKeyFamily?
-    var expiryMonths = 24
+    var expiry = KeyExpiryPolicy.defaultTerm
     var isGenerating = false
     var deviceBoundCommitmentPending = false
     var presentedFamilyDetail: PGPKeyFamily?
@@ -80,6 +79,12 @@ final class KeyGenerationScreenModel {
         name.trimmingCharacters(in: .whitespaces).isEmpty || isGenerating
     }
 
+    /// The tutorial sandbox pins validity along with the family, so the picker
+    /// shows the term the key will get without offering to change it.
+    var isExpiryLocked: Bool {
+        configuration.lockedExpiry != nil
+    }
+
     func handleAppear() {
         if name.isEmpty, let prefilledName = configuration.prefilledName {
             name = prefilledName
@@ -90,8 +95,8 @@ final class KeyGenerationScreenModel {
         if let lockedFamily = configuration.lockedFamily {
             selectedFamily = lockedFamily
         }
-        if let lockedExpiryMonths = configuration.lockedExpiryMonths {
-            expiryMonths = lockedExpiryMonths
+        if let lockedExpiry = configuration.lockedExpiry {
+            expiry = lockedExpiry
         }
     }
 
@@ -198,12 +203,7 @@ final class KeyGenerationScreenModel {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
         let selectedFamily = selectedFamily
-        let expiryDate = Calendar.current.date(
-            byAdding: .month,
-            value: expiryMonths,
-            to: Date()
-        ) ?? Date()
-        let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
+        let expirySeconds = KeyExpiryPolicy.expirySeconds(for: expiry)
 
         generationTask = Task { @MainActor [weak self, token] in
             guard let self else { return }

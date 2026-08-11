@@ -273,6 +273,7 @@
 				Models/KeyOperations/PGPKeyOperationSupport.swift,
 				Models/Keys/CertificateSelectionCatalog.swift,
 				Models/Keys/IdentityPresentation.swift,
+				Models/Keys/KeyExpiryPolicy.swift,
 				Models/Keys/PGPKeyFamily.swift,
 				Models/Keys/PGPKeyIdentity.swift,
 				Models/Keys/PGPKeyMetadata.swift,

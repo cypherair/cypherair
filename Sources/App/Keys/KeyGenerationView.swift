@@ -13,7 +13,7 @@ struct KeyGenerationView: View {
         var prefilledName: String?
         var prefilledEmail: String?
         var lockedFamily: PGPKeyFamily?
-        var lockedExpiryMonths: Int?
+        var lockedExpiry: KeyExpiry?
         var postGenerationBehavior: PostGenerationBehavior = .showPrompt
         var onGenerated: (@MainActor (PGPKeyIdentity) -> Void)?
         var onPostGenerationPromptRequested: (@MainActor (PGPKeyIdentity) -> Void)?
