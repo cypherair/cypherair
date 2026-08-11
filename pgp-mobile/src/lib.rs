@@ -561,10 +561,10 @@ impl PgpEngine {
 
     /// Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
     ///
-    /// Message format is auto-selected by recipient key versions:
-    /// - All v4 → SEIPDv1 (MDC)
-    /// - All v6 → SEIPDv2 (AEAD OCB)
-    /// - Mixed → SEIPDv1
+    /// The message format is never passed in: SEIPDv2 (AEAD OCB) when every
+    /// recipient certificate advertises that capability, SEIPDv1 (MDC)
+    /// otherwise. `decide_outgoing_message_format` states the same answer ahead
+    /// of the message.
     pub fn encrypt(
         &self,
         plaintext: Vec<u8>,
@@ -1182,7 +1182,8 @@ impl PgpEngine {
     // ── Streaming File Operations ──────────────────────────────────────
 
     /// Encrypt a file using streaming I/O. Constant memory usage.
-    /// Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+    /// Output is binary (.gpg format). Message format selected from what the
+    /// recipient certificates advertise, as in `encrypt`.
     pub fn encrypt_file(
         &self,
         input_path: String,

@@ -19,7 +19,7 @@ Six statements an auditor needs that the code cannot make:
 - **Outgoing messages are never compressed.** `deflate` is read-only for compatibility; bzip2 is excluded (a second C dependency).
 - **Any post-quantum recipient enforces an AES-256 floor**, inside both SEIPDv1 and SEIPDv2 containers.
 - **The quantum-safety badge derives from the produced artifact** — the session-key (PKESK) algorithms of the message — never from the live recipient selection. Classification fails closed on a truncated prefix (`pgp-mobile/src/decrypt.rs`, `message_quantum_safety`); callers map the failure to *no badge*, never a misleading one.
-- Format selection by recipient key version is CLAUDE.md Hard Constraint 8; AEAD hard-fail with no partial plaintext is Hard Constraint 3. This document does not restate them.
+- Message-format selection is CLAUDE.md Hard Constraint 8; AEAD hard-fail with no partial plaintext is Hard Constraint 3. This document does not restate them.
 
 ## 3. Key Custody & Storage
 

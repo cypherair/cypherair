@@ -2038,10 +2038,10 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     /**
      * Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
      *
-     * Message format is auto-selected by recipient key versions:
-     * - All v4 → SEIPDv1 (MDC)
-     * - All v6 → SEIPDv2 (AEAD OCB)
-     * - Mixed → SEIPDv1
+     * The message format is never passed in: SEIPDv2 (AEAD OCB) when every
+     * recipient certificate advertises that capability, SEIPDv1 (MDC)
+     * otherwise. `decide_outgoing_message_format` states the same answer ahead
+     * of the message.
      */
     func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?) throws  -> Data
 
@@ -2074,7 +2074,8 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
 
     /**
      * Encrypt a file using streaming I/O. Constant memory usage.
-     * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+     * Output is binary (.gpg format). Message format selected from what the
+     * recipient certificates advertise, as in `encrypt`.
      */
     func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
 
@@ -2814,10 +2815,10 @@ open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
     /**
      * Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
      *
-     * Message format is auto-selected by recipient key versions:
-     * - All v4 → SEIPDv1 (MDC)
-     * - All v6 → SEIPDv2 (AEAD OCB)
-     * - Mixed → SEIPDv1
+     * The message format is never passed in: SEIPDv2 (AEAD OCB) when every
+     * recipient certificate advertises that capability, SEIPDv1 (MDC)
+     * otherwise. `decide_outgoing_message_format` states the same answer ahead
+     * of the message.
      */
 open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -2924,7 +2925,8 @@ open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, passwo
 
     /**
      * Encrypt a file using streaming I/O. Constant memory usage.
-     * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+     * Output is binary (.gpg format). Message format selected from what the
+     * recipient certificates advertise, as in `encrypt`.
      */
 open func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
         uniffiCallStatus in
@@ -10052,7 +10054,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 51888) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 14997) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 34591) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 37542) {
@@ -10070,7 +10072,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer() != 25406) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 25489) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 5927) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_high_signer() != 29470) {
