@@ -31,13 +31,17 @@ private actor KeyGenerationTestGate {
 
 @MainActor
 final class KeyGenerationScreenModelTests: XCTestCase {
-    func test_handleAppear_appliesPrefillAndLockedConfiguration() {
+    func test_handleAppear_appliesPrefillAndLockedConfiguration() throws {
+        let lockedTerm = try XCTUnwrap(
+            KeyExpiryPolicy.offeredTerms.first { $0 != KeyExpiryPolicy.defaultTerm },
+            "a locked term the picker would not have opened on is what this checks"
+        )
         let model = makeModel(
             configuration: KeyGenerationView.Configuration(
                 prefilledName: "Alice",
                 prefilledEmail: "alice@example.com",
                 lockedFamily: .portableEd25519X25519,
-                lockedExpiry: .years(5),
+                lockedExpiry: lockedTerm,
                 postGenerationBehavior: .suppressPrompt
             )
         )
@@ -47,7 +51,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(model.name, "Alice")
         XCTAssertEqual(model.email, "alice@example.com")
         XCTAssertEqual(model.selectedFamily, .portableEd25519X25519)
-        XCTAssertEqual(model.expiry, .years(5))
+        XCTAssertEqual(model.expiry, lockedTerm)
         XCTAssertTrue(model.isExpiryLocked)
     }
 
@@ -235,7 +239,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         var capturedName: String?
         var capturedEmail: String?
         var capturedFamily: PGPKeyFamily?
-        var capturedExpirySeconds: UInt64?
+        var capturedValidity: PGPKeyValidity?
         var configuration = KeyGenerationView.Configuration()
         configuration.onGenerated = { identity in
             generatedIdentity = identity
@@ -243,10 +247,10 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            generateKeyAction: { name, email, expirySeconds, family in
+            generateKeyAction: { name, email, validity, family in
                 capturedName = name
                 capturedEmail = email
-                capturedExpirySeconds = expirySeconds
+                capturedValidity = validity
                 capturedFamily = family
                 return identity
             }
@@ -267,8 +271,11 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(capturedName, "Alice")
         XCTAssertEqual(capturedEmail, "alice@example.com")
         XCTAssertEqual(capturedFamily, .portableEd25519X25519)
+        guard case .expiresIn(let seconds) = capturedValidity else {
+            return XCTFail("the untouched picker must state a term, got \(String(describing: capturedValidity))")
+        }
         XCTAssertEqual(
-            Double(try XCTUnwrap(capturedExpirySeconds)),
+            Double(seconds),
             3 * 365 * secondsPerDay,
             accuracy: 2 * secondsPerDay,
             "the untouched picker generates a key valid for three years — years, not months"
@@ -279,9 +286,9 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
     func test_generate_neverExpiryReachesTheActionAsNoExpiry() async {
         let identity = makeKeyRouteTestIdentity(fingerprint: "9999999999999999999999999999999999999999")
-        var receivedExpirySeconds: [UInt64?] = []
-        let model = makeModel(generateKeyAction: { _, _, expirySeconds, _ in
-            receivedExpirySeconds.append(expirySeconds)
+        var receivedValidities: [PGPKeyValidity] = []
+        let model = makeModel(generateKeyAction: { _, _, validity, _ in
+            receivedValidities.append(validity)
             return identity
         })
         model.name = "Alice"
@@ -294,9 +301,9 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(
-            receivedExpirySeconds,
-            [nil],
-            "Never must reach the engine as an absent expiry, not as a distant date"
+            receivedValidities,
+            [.never],
+            "Never must reach the engine as no expiry, not as a distant date"
         )
     }
 

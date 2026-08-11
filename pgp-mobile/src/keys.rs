@@ -37,6 +37,33 @@ pub enum KeySuite {
     MlDsa87Ed448MlKem1024X448,
 }
 
+/// How long a key stays valid, as its creator stated it.
+///
+/// There is no unspecified case. A caller that wants no expiry says `Never`, and
+/// the wrapper writes no Key Expiration Time subpacket; a caller that wants one
+/// states the term. The wrapper holds no validity policy of its own on any path,
+/// so nothing here can quietly outlive or undercut what the caller asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum KeyValidity {
+    /// The key never expires.
+    Never,
+    /// The key expires this many seconds after the signature that states it —
+    /// creation for a new key, the amendment for an existing one.
+    ExpiresIn { seconds: u64 },
+}
+
+impl KeyValidity {
+    /// The validity period Sequoia takes, where `None` is precisely its
+    /// "never expires" (`CertBuilder::set_validity_period`,
+    /// `SignatureBuilder::set_key_validity_period`).
+    pub(crate) fn period(self) -> Option<Duration> {
+        match self {
+            Self::Never => None,
+            Self::ExpiresIn { seconds } => Some(Duration::from_secs(seconds)),
+        }
+    }
+}
+
 /// Result of key generation, containing the key pair and revocation certificate.
 ///
 /// SECURITY: `cert_data` contains unencrypted secret key material. The Swift caller must:
@@ -78,8 +105,8 @@ pub struct SecureEnclavePublicCertificateInput {
     pub name: String,
     /// Optional email address for the User ID.
     pub email: Option<String>,
-    /// Validity period from now in seconds. Defaults to two years when omitted.
-    pub expiry_seconds: Option<u64>,
+    /// How long the certificate stays valid.
+    pub validity: KeyValidity,
     /// Desired OpenPGP certificate version.
     pub version: SecureEnclaveCertificateVersion,
     /// 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
@@ -535,8 +562,8 @@ pub struct SecureEnclaveCompositePublicCertificateInput {
     pub name: String,
     /// Optional email address for the User ID.
     pub email: Option<String>,
-    /// Validity period from now in seconds. Defaults to two years when omitted.
-    pub expiry_seconds: Option<u64>,
+    /// How long the certificate stays valid.
+    pub validity: KeyValidity,
     /// 1952-byte FIPS 204 ML-DSA-65 verification key for signing/certification.
     pub mldsa65_signing_public_key: Vec<u8>,
     /// 1184-byte FIPS 203 ML-KEM-768 encapsulation key for key agreement.
@@ -670,8 +697,8 @@ pub struct SecureEnclaveCompositeHighPublicCertificateInput {
     pub name: String,
     /// Optional email address for the User ID.
     pub email: Option<String>,
-    /// Validity period from now in seconds. Defaults to two years when omitted.
-    pub expiry_seconds: Option<u64>,
+    /// How long the certificate stays valid.
+    pub validity: KeyValidity,
     /// 2592-byte FIPS 204 ML-DSA-87 verification key for signing/certification.
     pub mldsa87_signing_public_key: Vec<u8>,
     /// 1568-byte FIPS 203 ML-KEM-1024 encapsulation key for key agreement.

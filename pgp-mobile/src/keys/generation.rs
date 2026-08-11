@@ -4,7 +4,7 @@ use super::*;
 pub fn generate_key_with_suite(
     name: String,
     email: Option<String>,
-    expiry_seconds: Option<u64>,
+    validity: KeyValidity,
     suite: KeySuite,
 ) -> Result<GeneratedKey, PgpError> {
     let user_id = match &email {
@@ -78,14 +78,10 @@ pub fn generate_key_with_suite(
         }
     }
 
-    // Set expiry
-    if let Some(secs) = expiry_seconds {
-        builder = builder.set_validity_period(Some(std::time::Duration::from_secs(secs)));
-    } else {
-        // Default: 2 years
-        builder = builder
-            .set_validity_period(Some(std::time::Duration::from_secs(2 * 365 * 24 * 60 * 60)));
-    }
+    // Set unconditionally: `CertBuilder::general_purpose` seeds a three-year
+    // validity of its own, so skipping the call for `Never` would silently date a
+    // certificate the caller asked to be perpetual.
+    builder = builder.set_validity_period(validity.period());
 
     let (cert, rev) = builder
         .generate()

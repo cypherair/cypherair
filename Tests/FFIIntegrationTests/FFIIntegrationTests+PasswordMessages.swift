@@ -65,7 +65,7 @@ extension FFIIntegrationTests {
         let signer = try engine.generateKey(
             name: "Password FFI Signer",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         let plaintext = Data("Password SEIPDv2 signed via FFI".utf8)
@@ -94,7 +94,7 @@ extension FFIIntegrationTests {
         let recipient = try engine.generateKey(
             name: "No SKESK Recipient",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 

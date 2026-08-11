@@ -67,12 +67,12 @@ impl ExpirySignatureHashStrategy {
 /// own validity period. Works identically for v4 (Portable Legacy) and v6 (Portable Modern · High) keys.
 ///
 /// - `cert_data`: Full certificate with secret key material (binary OpenPGP format).
-/// - `new_expiry_seconds`: Duration from now in seconds. `None` removes expiry (never expire).
+/// - `new_validity`: The validity to state from the amendment onward.
 ///
 /// Returns the updated certificate (with secret keys) and updated public key + key info.
 pub fn modify_expiry(
     cert_data: &[u8],
-    new_expiry_seconds: Option<u64>,
+    new_validity: KeyValidity,
 ) -> Result<ModifyExpiryResult, PgpError> {
     let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
         reason: e.to_string(),
@@ -103,7 +103,7 @@ pub fn modify_expiry(
         &mut keypair,
         true,
         ExpirySignatureHashStrategy::PreserveTemplate,
-        new_expiry_seconds,
+        new_validity,
         reference_time,
     )
     .map_err(|error| {
@@ -135,7 +135,7 @@ pub fn modify_expiry_with_external_p256_signer(
     public_cert_data: &[u8],
     signing_key_fingerprint: &str,
     signer: Arc<dyn ExternalP256SigningProvider>,
-    new_expiry_seconds: Option<u64>,
+    new_validity: KeyValidity,
 ) -> Result<ModifyExpiryPublicResult, PgpError> {
     let policy = StandardPolicy::new();
     let cert =
@@ -173,7 +173,7 @@ pub fn modify_expiry_with_external_p256_signer(
         &mut external_signer,
         false,
         ExpirySignatureHashStrategy::Force(HashAlgorithm::SHA256),
-        new_expiry_seconds,
+        new_validity,
         reference_time,
     )
     .map_err(|error| {
@@ -189,7 +189,7 @@ pub fn modify_expiry_with_external_composite_signer(
     signing_key_fingerprint: &str,
     classical_eddsa_secret: &[u8],
     signer: Arc<dyn ExternalMlDsa65SigningProvider>,
-    new_expiry_seconds: Option<u64>,
+    new_validity: KeyValidity,
 ) -> Result<ModifyExpiryPublicResult, PgpError> {
     let policy = StandardPolicy::new();
     let cert =
@@ -228,7 +228,7 @@ pub fn modify_expiry_with_external_composite_signer(
         &mut external_signer,
         false,
         ExpirySignatureHashStrategy::Force(HashAlgorithm::SHA512),
-        new_expiry_seconds,
+        new_validity,
         reference_time,
     )
     .map_err(|error| {
@@ -244,7 +244,7 @@ pub fn modify_expiry_with_external_composite_high_signer(
     signing_key_fingerprint: &str,
     classical_eddsa_secret: &[u8],
     signer: Arc<dyn ExternalMlDsa87SigningProvider>,
-    new_expiry_seconds: Option<u64>,
+    new_validity: KeyValidity,
 ) -> Result<ModifyExpiryPublicResult, PgpError> {
     let policy = StandardPolicy::new();
     let cert =
@@ -282,7 +282,7 @@ pub fn modify_expiry_with_external_composite_high_signer(
         &mut external_signer,
         false,
         ExpirySignatureHashStrategy::Force(HashAlgorithm::SHA512),
-        new_expiry_seconds,
+        new_validity,
         reference_time,
     )
     .map_err(|error| {
@@ -297,7 +297,7 @@ fn modify_expiry_with_signer(
     primary_signer: &mut dyn openpgp::crypto::Signer,
     allow_secret_subkey_signers: bool,
     hash_strategy: ExpirySignatureHashStrategy,
-    new_expiry_seconds: Option<u64>,
+    new_validity: KeyValidity,
     reference_time: SystemTime,
 ) -> openpgp::Result<openpgp::Cert> {
     ensure_expiry_certificate_not_revoked(&cert, policy, reference_time)?;
@@ -307,7 +307,7 @@ fn modify_expiry_with_signer(
         policy,
         reference_time,
     )?)?;
-    let expiration_time = new_expiry_seconds.map(|secs| mutation_time + Duration::from_secs(secs));
+    let expiration_time = new_validity.period().map(|period| mutation_time + period);
 
     let mut sigs = primary_expiration_signatures(
         &cert,

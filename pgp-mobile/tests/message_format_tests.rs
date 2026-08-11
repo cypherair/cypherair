@@ -21,7 +21,7 @@ use openpgp::types::Features;
 use sequoia_openpgp as openpgp;
 
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::message_format::{decide_outgoing_message_format, OutgoingMessageFormat};
 
 /// A v6 certificate whose valid self-signature does not advertise SEIPDv2 — the
@@ -61,7 +61,7 @@ fn forge_certificate(user_id: &str, profile: openpgp::Profile, features: Feature
 }
 
 fn generated_certificate(name: &str, suite: KeySuite) -> Vec<u8> {
-    keys::generate_key_with_suite(name.to_string(), None, None, suite)
+    keys::generate_key_with_suite(name.to_string(), None, KeyValidity::Never, suite)
         .expect("Key generation should succeed")
         .public_key_data
 }

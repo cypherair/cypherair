@@ -38,8 +38,8 @@ use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, ExternalMlDsa65SigningProvider,
     ExternalMlDsa87SigningProvider, ExternalMlKem1024DecapsulationProvider,
     ExternalMlKem768DecapsulationProvider, ExternalP256KeyAgreementProvider,
-    ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeySuite, ModifyExpiryPublicResult,
-    ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
+    ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeySuite, KeyValidity,
+    ModifyExpiryPublicResult, ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
     SecureEnclaveCompositeBindingInspection, SecureEnclaveCompositeGeneratedCertificate,
     SecureEnclaveCompositeHighBindingInspection, SecureEnclaveCompositeHighPublicCertificateInput,
     SecureEnclaveCompositePublicCertificateInput, SecureEnclaveGeneratedPublicCertificate,
@@ -84,10 +84,10 @@ impl PgpEngine {
         &self,
         name: String,
         email: Option<String>,
-        expiry_seconds: Option<u64>,
+        validity: KeyValidity,
         suite: KeySuite,
     ) -> Result<GeneratedKey, PgpError> {
-        keys::generate_key_with_suite(name, email, expiry_seconds, suite)
+        keys::generate_key_with_suite(name, email, validity, suite)
     }
 
     /// Build a public-only P-256 OpenPGP certificate whose private operations are external.
@@ -174,7 +174,7 @@ impl PgpEngine {
         signing_key_fingerprint: String,
         classical_eddsa_secret: Vec<u8>,
         signer: Arc<dyn ExternalMlDsa87SigningProvider>,
-        new_expiry_seconds: Option<u64>,
+        new_validity: KeyValidity,
     ) -> Result<ModifyExpiryPublicResult, PgpError> {
         let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
         keys::modify_expiry_with_external_composite_high_signer(
@@ -182,7 +182,7 @@ impl PgpEngine {
             &signing_key_fingerprint,
             &classical_eddsa_secret,
             signer,
-            new_expiry_seconds,
+            new_validity,
         )
     }
 
@@ -509,10 +509,10 @@ impl PgpEngine {
     pub fn modify_expiry(
         &self,
         cert_data: Vec<u8>,
-        new_expiry_seconds: Option<u64>,
+        new_validity: KeyValidity,
     ) -> Result<ModifyExpiryResult, PgpError> {
         let cert_data = Zeroizing::new(cert_data);
-        keys::modify_expiry(&cert_data, new_expiry_seconds)
+        keys::modify_expiry(&cert_data, new_validity)
     }
 
     /// Modify the expiration time of a public-only P-256 certificate with an
@@ -525,13 +525,13 @@ impl PgpEngine {
         public_cert_data: Vec<u8>,
         signing_key_fingerprint: String,
         signer: Arc<dyn ExternalP256SigningProvider>,
-        new_expiry_seconds: Option<u64>,
+        new_validity: KeyValidity,
     ) -> Result<ModifyExpiryPublicResult, PgpError> {
         keys::modify_expiry_with_external_p256_signer(
             &public_cert_data,
             &signing_key_fingerprint,
             signer,
-            new_expiry_seconds,
+            new_validity,
         )
     }
 
@@ -545,7 +545,7 @@ impl PgpEngine {
         signing_key_fingerprint: String,
         classical_eddsa_secret: Vec<u8>,
         signer: Arc<dyn ExternalMlDsa65SigningProvider>,
-        new_expiry_seconds: Option<u64>,
+        new_validity: KeyValidity,
     ) -> Result<ModifyExpiryPublicResult, PgpError> {
         let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
         keys::modify_expiry_with_external_composite_signer(
@@ -553,7 +553,7 @@ impl PgpEngine {
             &signing_key_fingerprint,
             &classical_eddsa_secret,
             signer,
-            new_expiry_seconds,
+            new_validity,
         )
     }
 

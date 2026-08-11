@@ -24,7 +24,6 @@ const MLKEM1024_PUBLIC_KEY_LENGTH: usize = 1568;
 const MLKEM1024_PACKED_VECTOR_LENGTH: usize = 1536;
 /// FIPS 203 modulus q: every 12-bit packed coefficient must be canonical.
 const MLKEM_Q: u16 = 3329;
-const DEFAULT_VALIDITY_SECONDS: u64 = 2 * 365 * 24 * 60 * 60;
 
 /// The certificate-derived outputs of `assemble_composite_public_certificate`,
 /// before the tier's classical component secrets are attached.
@@ -47,13 +46,16 @@ struct AssembledCompositeCertificate {
 /// external composite signer, which self-verifies before releasing a signature.
 /// Both PQC tiers share this single definition so the self-signature policy can
 /// only ever be changed in one place.
+///
+/// A `validity` of `None` leaves the Key Expiration Time subpacket off both
+/// bindings: the certificate never expires.
 fn assemble_composite_public_certificate<S: Signer>(
     mut external_signer: S,
     signing_public: &Key<key::PublicParts, key::UnspecifiedRole>,
     signing_key: Key<key::PublicParts, key::PrimaryRole>,
     key_agreement_key: Key<key::PublicParts, key::SubordinateRole>,
     user_id: String,
-    validity: Duration,
+    validity: Option<Duration>,
 ) -> Result<AssembledCompositeCertificate, PgpError> {
     let mut cert = openpgp::Cert::try_from(vec![Packet::from(signing_key)]).map_err(|error| {
         PgpError::KeyGenerationFailed {
@@ -211,7 +213,7 @@ pub fn generate_secure_enclave_composite_public_certificate(
         &input.mlkem768_key_agreement_public_key,
     )?;
     let signing_public = signing_key.clone().role_as_unspecified().clone();
-    let validity = Duration::from_secs(input.expiry_seconds.unwrap_or(DEFAULT_VALIDITY_SECONDS));
+    let validity = input.validity.period();
 
     let external_signer =
         composite_signer_for_provider(signing_public.clone(), &classical_eddsa_secret, signer)
@@ -271,7 +273,7 @@ pub fn generate_secure_enclave_composite_high_public_certificate(
         &input.mlkem1024_key_agreement_public_key,
     )?;
     let signing_public = signing_key.clone().role_as_unspecified().clone();
-    let validity = Duration::from_secs(input.expiry_seconds.unwrap_or(DEFAULT_VALIDITY_SECONDS));
+    let validity = input.validity.period();
 
     let external_signer =
         composite_high_signer_for_provider(signing_public.clone(), &classical_eddsa_secret, signer)

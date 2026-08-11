@@ -198,21 +198,21 @@ final class KeyManagementService: @unchecked Sendable {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily
     ) async throws -> PGPKeyIdentity {
         if let suite = family.softwareGenerationSuite {
             return try await generateKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 suite: suite
             )
         }
         return try await generateSecureEnclaveCustodyKey(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity,
             family: family
         )
     }
@@ -224,7 +224,7 @@ final class KeyManagementService: @unchecked Sendable {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite
     ) async throws -> PGPKeyIdentity {
         let token = provisioningInvalidationGate.makeToken()
@@ -239,7 +239,7 @@ final class KeyManagementService: @unchecked Sendable {
         return try await generateKeyWithValidatedAuthMode(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity,
             suite: suite,
             authMode: authMode,
             token: token
@@ -249,7 +249,7 @@ final class KeyManagementService: @unchecked Sendable {
     private func generateKeyWithValidatedAuthMode(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite,
         authMode: AuthenticationMode,
         token: KeyProvisioningInvalidationGate.Token
@@ -257,7 +257,7 @@ final class KeyManagementService: @unchecked Sendable {
         let identity = try await provisioningService.generateKey(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity,
             suite: suite,
             authMode: authMode,
             invalidationToken: token
@@ -273,7 +273,7 @@ final class KeyManagementService: @unchecked Sendable {
     func generateSecureEnclaveCustodyKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily
     ) async throws -> PGPKeyIdentity {
         guard let secureEnclaveCustodyGenerationService else {
@@ -285,7 +285,7 @@ final class KeyManagementService: @unchecked Sendable {
             identity = try await secureEnclaveCustodyGenerationService.generateKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 invalidationToken: token
             )
@@ -443,14 +443,14 @@ final class KeyManagementService: @unchecked Sendable {
     /// external signer route and does not create a pending bundle or recovery journal.
     func modifyExpiry(
         fingerprint: String,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPKeyIdentity {
         defer {
             syncKeysAndSecureEnclaveRecoveryReport()
         }
         return try await mutationService.modifyExpiry(
             fingerprint: fingerprint,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity
         )
     }
 
@@ -464,12 +464,12 @@ final class KeyManagementService: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key to modify.
-    ///   - newExpirySeconds: New expiry duration from now in seconds, or nil to remove expiry.
+    ///   - newValidity: The validity the key carries from this amendment onward.
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The updated key identity with new expiry information.
     func modifyExpiry(
         fingerprint: String,
-        newExpirySeconds: UInt64?,
+        newValidity: PGPKeyValidity,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
         defer {
@@ -477,7 +477,7 @@ final class KeyManagementService: @unchecked Sendable {
         }
         return try await mutationService.modifyExpiry(
             fingerprint: fingerprint,
-            newExpirySeconds: newExpirySeconds,
+            newValidity: newValidity,
             authMode: authMode
         )
     }

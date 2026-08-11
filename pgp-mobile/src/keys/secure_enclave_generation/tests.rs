@@ -168,7 +168,7 @@ fn input_for(
     SecureEnclavePublicCertificateInput {
         name: format!("Secure Enclave {:?}", version),
         email: Some("secure-enclave@example.test".to_string()),
-        expiry_seconds: Some(3600),
+        validity: KeyValidity::ExpiresIn { seconds: 3600 },
         version,
         signing_public_key_x963: material.signing_public_key_x963.clone(),
         key_agreement_public_key_x963: material.key_agreement_public_key_x963.clone(),
@@ -346,9 +346,11 @@ fn test_secure_enclave_public_certificate_advertises_algorithm_preferences() {
         SecureEnclaveCertificateVersion::V6,
     ] {
         let material = public_material(version).expect("material should generate");
-        let result =
-            generate_secure_enclave_public_certificate(input_for(version, &material), provider_for(material))
-                .expect("certificate should generate");
+        let result = generate_secure_enclave_public_certificate(
+            input_for(version, &material),
+            provider_for(material),
+        )
+        .expect("certificate should generate");
 
         let cert = openpgp::Cert::from_bytes(&result.public_key_data)
             .expect("public certificate should parse");
@@ -396,7 +398,7 @@ fn test_secure_enclave_public_binding_inspection_rejects_non_se_certificates() {
     let generated = generate_key_with_suite(
         "Software".to_string(),
         Some("software@example.test".to_string()),
-        Some(3600),
+        KeyValidity::ExpiresIn { seconds: 3600 },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
@@ -483,7 +485,7 @@ fn test_secure_enclave_public_binding_inspection_preserves_expired_bindings() {
         let signing_public_key_x963 = material.signing_public_key_x963.clone();
         let key_agreement_public_key_x963 = material.key_agreement_public_key_x963.clone();
         let mut input = input_for(version, &material);
-        input.expiry_seconds = Some(1);
+        input.validity = KeyValidity::ExpiresIn { seconds: 1 };
         let result = generate_secure_enclave_public_certificate(input, provider_for(material))
             .expect("certificate should generate");
         (

@@ -33,7 +33,7 @@ final class ModifyExpiryScreenModelTests: XCTestCase {
 
     func test_saveSelectedExpiryDate_invokesModifyCompletesAndDismisses() async {
         var capturedFingerprint: String?
-        var capturedSeconds: UInt64?
+        var capturedValidity: PGPKeyValidity?
         var completeCount = 0
         var dismissCount = 0
         let model = makeModel(
@@ -47,9 +47,9 @@ final class ModifyExpiryScreenModelTests: XCTestCase {
             dismissAction: {
                 dismissCount += 1
             },
-            modifyExpiryAction: { fingerprint, seconds in
+            modifyExpiryAction: { fingerprint, validity in
                 capturedFingerprint = fingerprint
-                capturedSeconds = seconds
+                capturedValidity = validity
                 return makeKeyRouteTestIdentity(fingerprint: fingerprint)
             }
         )
@@ -61,20 +61,22 @@ final class ModifyExpiryScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(capturedFingerprint, fingerprint)
-        XCTAssertNotNil(capturedSeconds)
+        guard case .expiresIn = capturedValidity else {
+            return XCTFail("saving a chosen date must state a term, got \(String(describing: capturedValidity))")
+        }
         XCTAssertEqual(completeCount, 1)
         XCTAssertFalse(model.isModifyingExpiry)
     }
 
-    func test_removeExpiry_invokesModifyWithNilExpiry() async {
-        var capturedSeconds: UInt64?
+    func test_removeExpiry_invokesModifyWithNoExpiry() async {
+        var capturedValidity: PGPKeyValidity?
         var dismissCount = 0
         let model = makeModel(
             dismissAction: {
                 dismissCount += 1
             },
-            modifyExpiryAction: { fingerprint, seconds in
-                capturedSeconds = seconds
+            modifyExpiryAction: { fingerprint, validity in
+                capturedValidity = validity
                 return makeKeyRouteTestIdentity(fingerprint: fingerprint)
             }
         )
@@ -85,7 +87,7 @@ final class ModifyExpiryScreenModelTests: XCTestCase {
             dismissCount == 1
         }
 
-        XCTAssertNil(capturedSeconds)
+        XCTAssertEqual(capturedValidity, .never)
         XCTAssertFalse(model.isModifyingExpiry)
     }
 

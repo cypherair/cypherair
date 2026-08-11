@@ -7,14 +7,14 @@ mod common;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::PublicKeyAlgorithm;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use sequoia_openpgp as openpgp;
 
 fn generate_pq() -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         "PQ Lifecycle".to_string(),
         Some("pq@lifecycle.example".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::MlDsa65Ed25519MlKem768X25519,
     )
     .expect("Post-Quantum key gen should succeed")
@@ -96,12 +96,20 @@ fn test_detect_suite_classifies_mldsa87_tier_as_post_quantum_high() {
 /// The classical fallbacks must be unchanged by the algorithm-aware rule.
 #[test]
 fn test_detect_suite_classical_fallbacks_unchanged() {
-    let legacy =
-        keys::generate_key_with_suite("A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("gen A");
-    let ed448 =
-        keys::generate_key_with_suite("B".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("gen B");
+    let legacy = keys::generate_key_with_suite(
+        "A".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("gen A");
+    let ed448 = keys::generate_key_with_suite(
+        "B".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("gen B");
 
     assert_eq!(
         keys::detect_suite(&legacy.public_key_data).expect("detect A"),
@@ -118,8 +126,7 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
     let key = generate_pq();
 
     let exported =
-        keys::export_secret_key(&key.cert_data, "correct horse")
-            .expect("PQ export should succeed");
+        keys::export_secret_key(&key.cert_data, "correct horse").expect("PQ export should succeed");
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
     assert_eq!(

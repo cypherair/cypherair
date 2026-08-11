@@ -112,7 +112,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
         let otherRecipient = try engine.generateKey(
             name: "Device Other Recipient",
             email: "device-other-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -211,7 +211,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             .generatePublicCertificate(
                 name: "Device Secure Enclave Decrypt",
                 email: "device-secure-decrypt@example.invalid",
-                expirySeconds: 3600,
+                validity: .expiresIn(seconds: 3600),
                 family: configuration,
                 handlePair: loadedPair,
                 digestSigner: SystemSecureEnclaveCustodyDigestSigner()

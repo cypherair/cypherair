@@ -118,12 +118,10 @@ struct KeyGenerationDetailsView: View {
     }
 
     private static func expiryLabel(_ term: KeyExpiry) -> String {
-        switch term {
-        case .years(let years):
-            String(localized: "keygen.expiry.years", defaultValue: "\(years) years")
-        case .never:
-            String(localized: "keygen.expiry.never", defaultValue: "Never")
+        guard let years = term.years else {
+            return String(localized: "keygen.expiry.never", defaultValue: "Never")
         }
+        return String(localized: "keygen.expiry.years", defaultValue: "\(years) years")
     }
 
     private var summaryHeader: some View {

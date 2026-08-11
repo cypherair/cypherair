@@ -33,6 +33,18 @@ enum PGPKeyMetadataAdapter {
     }
 }
 
+extension PGPKeyValidity {
+    /// The two types are the same statement on either side of the FFI, so this
+    /// is a rename rather than a decision — which is the point of both carrying
+    /// "no expiry" as a case instead of as an absent number.
+    var ffiValue: KeyValidity {
+        switch self {
+        case .never: .never
+        case .expiresIn(let seconds): .expiresIn(seconds: seconds)
+        }
+    }
+}
+
 extension PGPKeySuite {
     var ffiValue: KeySuite {
         switch self {

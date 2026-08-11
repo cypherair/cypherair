@@ -18,13 +18,13 @@ use openpgp::types::{AEADAlgorithm, HashAlgorithm, SymmetricAlgorithm};
 use openssl::kdf::{hkdf, HkdfMode};
 use openssl::md::Md;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::password::{self, PasswordDecryptStatus, PasswordMessageFormat};
 use pgp_mobile::signature_details::{DetailedSignatureStatus, SignatureVerificationState};
 use sequoia_openpgp as openpgp;
 
 fn gen_key(name: &str, profile: KeySuite) -> keys::GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), None, None, profile)
+    keys::generate_key_with_suite(name.to_string(), None, KeyValidity::Never, profile)
         .expect("key generation should succeed")
 }
 
@@ -333,16 +333,16 @@ fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
         Some(signer.fingerprint)
     );
     assert_eq!(result.signatures.len(), 1);
-    assert_eq!(
-        result.signatures[0].status,
-        DetailedSignatureStatus::Valid
-    );
+    assert_eq!(result.signatures[0].status, DetailedSignatureStatus::Valid);
 }
 
 #[test]
 fn test_password_decrypt_signed_without_verification_cert_reports_missing_certificate() {
     let password: Password = "password missing verification cert".into();
-    let signer = gen_key("Password Missing Signer", KeySuite::Ed25519LegacyCurve25519Legacy);
+    let signer = gen_key(
+        "Password Missing Signer",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    );
     let plaintext = b"Password signed message without verification cert.";
 
     let ciphertext = password::encrypt_binary(

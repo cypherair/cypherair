@@ -36,7 +36,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         var signer = try engine.generateKey(
             name: "Password Software Signer",
             email: "password-software@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         defer { signer.certData.resetBytes(in: 0..<signer.certData.count) }
@@ -494,7 +494,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Password \(label)",
             email: "secure-password-\(label)@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

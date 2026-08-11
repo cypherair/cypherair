@@ -106,7 +106,7 @@ final class AddContactScreenModelTests: XCTestCase {
         let generated = try stack.engine.generateKey(
             name: "Contact",
             email: "contact@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let armoredPublicKeyData = try stack.engine.armorPublicKey(certData: generated.publicKeyData)
@@ -139,13 +139,13 @@ final class AddContactScreenModelTests: XCTestCase {
         let firstKey = try stack.engine.generateKey(
             name: "Carol",
             email: "carol@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Carol",
             email: "carol@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
@@ -181,7 +181,7 @@ final class AddContactScreenModelTests: XCTestCase {
         let generated = try stack.engine.generateKey(
             name: "Duplicate",
             email: "duplicate@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try stack.contactService.importContact(publicKeyData: generated.publicKeyData)
@@ -207,13 +207,13 @@ final class AddContactScreenModelTests: XCTestCase {
         let firstKey = try stack.engine.generateKey(
             name: "Stale Candidate",
             email: "stale-candidate@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Stale Candidate",
             email: "stale-candidate@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let model = makeModel()
@@ -252,7 +252,7 @@ final class AddContactScreenModelTests: XCTestCase {
         let generated = try stack.engine.generateKey(
             name: "Pending",
             email: "pending@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let model = makeModel()

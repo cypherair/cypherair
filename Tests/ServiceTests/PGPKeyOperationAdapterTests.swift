@@ -17,7 +17,7 @@ final class PGPKeyOperationAdapterTests: XCTestCase {
             _ = try await adapter.generateKey(
                 name: "Alice",
                 email: nil,
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
             XCTFail("Expected generateKey to throw")
@@ -64,7 +64,7 @@ final class PGPKeyOperationAdapterTests: XCTestCase {
         let generated = try await generateAdapter.generateKey(
             name: "Alice",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -107,7 +107,7 @@ private class GeneratedKeySuccessEngine: PgpEngine {
     override func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: KeyValidity,
         suite: KeySuite
     ) throws -> GeneratedKey {
         GeneratedKey(

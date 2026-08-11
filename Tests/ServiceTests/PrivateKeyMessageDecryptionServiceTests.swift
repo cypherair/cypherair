@@ -11,7 +11,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         let generated = try engine.generateKey(
             name: "Software Recipient",
             email: "software-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let identity = try softwareIdentity(from: generated, suite: .ed25519LegacyCurve25519Legacy, isDefault: true)
@@ -67,7 +67,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         let signer = try engine.generateKey(
             name: "Folding Signer",
             email: "folding-signer@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let signerIdentity = try softwareIdentity(from: signer, suite: .ed25519LegacyCurve25519Legacy)
@@ -323,7 +323,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         let otherRecipient = try engine.generateKey(
             name: "Other Recipient",
             email: "other-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
@@ -605,7 +605,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Decrypt",
             email: "secure-decrypt@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

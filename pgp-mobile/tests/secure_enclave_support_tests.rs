@@ -8,7 +8,7 @@ mod common;
 use common::secure_enclave::SoftwareP256Material;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
-use pgp_mobile::keys::SecureEnclaveCertificateVersion;
+use pgp_mobile::keys::{KeyValidity, SecureEnclaveCertificateVersion};
 use sequoia_openpgp as openpgp;
 
 #[test]
@@ -18,7 +18,8 @@ fn software_material_exports_gpg_importable_tsk_matching_public_cert() {
         SecureEnclaveCertificateVersion::V6,
     ] {
         let material =
-            SoftwareP256Material::generate(version, Some(3600)).expect("material should build");
+            SoftwareP256Material::generate(version, KeyValidity::ExpiresIn { seconds: 3600 })
+                .expect("material should build");
 
         // The SE-shaped public certificate is public-only.
         let public = openpgp::Cert::from_bytes(&material.public_key_data)

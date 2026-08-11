@@ -71,7 +71,7 @@ final class ModifyExpiryOperationPromptCompositionTests: XCTestCase {
         let identity = try await made.service.generateKey(
             name: "Composition",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         return (made, stub, identity.fingerprint)
@@ -87,7 +87,7 @@ final class ModifyExpiryOperationPromptCompositionTests: XCTestCase {
         let action = Task {
             try await flow.made.service.modifyExpiry(
                 fingerprint: flow.fingerprint,
-                newExpirySeconds: 60 * 60
+                newValidity: .expiresIn(seconds: 60 * 60)
             )
         }
         await fulfillment(of: [flow.stub.suspendedExpectation], timeout: 10)
@@ -131,7 +131,7 @@ final class ModifyExpiryOperationPromptCompositionTests: XCTestCase {
         let action = Task {
             try await flow.made.service.modifyExpiry(
                 fingerprint: flow.fingerprint,
-                newExpirySeconds: 60 * 60
+                newValidity: .expiresIn(seconds: 60 * 60)
             )
         }
         await fulfillment(of: [flow.stub.suspendedExpectation], timeout: 10)

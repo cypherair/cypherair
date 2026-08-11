@@ -8,7 +8,7 @@ use common::detect_message_format;
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::verify;
@@ -17,13 +17,21 @@ use pgp_mobile::verify;
 /// Pass: message format is SEIPDv2. Recipient decrypts.
 #[test]
 fn test_legacy_encrypts_to_modern_high() {
-    let sender_a =
-        keys::generate_key_with_suite("Alice (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Sender key gen should succeed");
+    let sender_a = keys::generate_key_with_suite(
+        "Alice (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_b =
-        keys::generate_key_with_suite("Bob (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Recipient key gen should succeed");
+    let recipient_b = keys::generate_key_with_suite(
+        "Bob (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"From Legacy sender to Modern High recipient.";
 
@@ -51,13 +59,21 @@ fn test_legacy_encrypts_to_modern_high() {
 /// Pass: message format is SEIPDv1. Recipient decrypts.
 #[test]
 fn test_modern_high_encrypts_to_legacy() {
-    let sender_b =
-        keys::generate_key_with_suite("Alice (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Sender key gen should succeed");
+    let sender_b = keys::generate_key_with_suite(
+        "Alice (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_a =
-        keys::generate_key_with_suite("Bob (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Recipient key gen should succeed");
+    let recipient_a = keys::generate_key_with_suite(
+        "Bob (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"From Modern High sender to Legacy recipient.";
 
@@ -85,18 +101,26 @@ fn test_modern_high_encrypts_to_legacy() {
 /// Pass: format is SEIPDv1 (lowest common). Both decrypt.
 #[test]
 fn test_mixed_recipients_v4_and_v6() {
-    let sender_b =
-        keys::generate_key_with_suite("Alice (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Sender key gen should succeed");
+    let sender_b = keys::generate_key_with_suite(
+        "Alice (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_a =
-        keys::generate_key_with_suite("Bob (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("v4 recipient key gen should succeed");
+    let recipient_a = keys::generate_key_with_suite(
+        "Bob (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("v4 recipient key gen should succeed");
 
     let recipient_b = keys::generate_key_with_suite(
         "Charlie (B)".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("v6 recipient key gen should succeed");
@@ -130,13 +154,21 @@ fn test_mixed_recipients_v4_and_v6() {
 /// Pass: SEIPDv1 (mixed rule). Both sender and recipient decrypt.
 #[test]
 fn test_modern_high_encrypt_to_self_with_v4_recipient() {
-    let sender_b =
-        keys::generate_key_with_suite("Alice (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Sender key gen should succeed");
+    let sender_b = keys::generate_key_with_suite(
+        "Alice (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_a =
-        keys::generate_key_with_suite("Bob (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Recipient key gen should succeed");
+    let recipient_a = keys::generate_key_with_suite(
+        "Bob (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"B->A with encrypt-to-self (mixed -> SEIPDv1).";
 
@@ -162,13 +194,21 @@ fn test_modern_high_encrypt_to_self_with_v4_recipient() {
 /// Legacy signature verified by Modern High user, and vice versa.
 #[test]
 fn test_cross_suite_signature_verification() {
-    let key_a =
-        keys::generate_key_with_suite("Alice (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Legacy key gen should succeed");
+    let key_a = keys::generate_key_with_suite(
+        "Alice (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Legacy key gen should succeed");
 
-    let key_b =
-        keys::generate_key_with_suite("Bob (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Modern High key gen should succeed");
+    let key_b = keys::generate_key_with_suite(
+        "Bob (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Modern High key gen should succeed");
 
     let text = b"Cross-suite signature test.";
 
@@ -199,13 +239,21 @@ fn test_cross_suite_signature_verification() {
 /// Full round-trip: sign + encrypt + decrypt + verify.
 #[test]
 fn test_cross_suite_signed_encrypted_round_trip() {
-    let sender_a =
-        keys::generate_key_with_suite("Alice (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Sender key gen should succeed");
+    let sender_a = keys::generate_key_with_suite(
+        "Alice (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_b =
-        keys::generate_key_with_suite("Bob (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Recipient key gen should succeed");
+    let recipient_b = keys::generate_key_with_suite(
+        "Bob (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"Full round-trip: A->B signed+encrypted.";
 
@@ -243,13 +291,21 @@ fn test_cross_suite_signed_encrypted_round_trip() {
 /// Complements test_cross_suite_signed_encrypted_round_trip (which tests A→B).
 #[test]
 fn test_cross_modern_high_to_a_signed_encrypted_round_trip() {
-    let sender_b =
-        keys::generate_key_with_suite("Alice (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Sender key gen should succeed");
+    let sender_b = keys::generate_key_with_suite(
+        "Alice (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_a =
-        keys::generate_key_with_suite("Bob (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Recipient key gen should succeed");
+    let recipient_a = keys::generate_key_with_suite(
+        "Bob (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"Full round-trip: B->A signed+encrypted.";
 
@@ -301,9 +357,13 @@ fn test_cross_modern_high_to_a_signed_encrypted_round_trip() {
 /// This directly validates the CLAUDE.md hard constraint 8 format auto-selection rule.
 #[test]
 fn test_format_selection_v4_recipient_produces_seipd_v1() {
-    let recipient_a =
-        keys::generate_key_with_suite("Bob (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let recipient_a = keys::generate_key_with_suite(
+        "Bob (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"Format check v4",
@@ -321,9 +381,13 @@ fn test_format_selection_v4_recipient_produces_seipd_v1() {
 /// Verify that encrypting to v6 recipient produces SEIPDv2 (AEAD).
 #[test]
 fn test_format_selection_v6_recipient_produces_seipd_v2() {
-    let recipient_b =
-        keys::generate_key_with_suite("Bob (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let recipient_b = keys::generate_key_with_suite(
+        "Bob (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"Format check v6",
@@ -341,14 +405,18 @@ fn test_format_selection_v6_recipient_produces_seipd_v2() {
 /// Verify that mixed v4+v6 recipients produce SEIPDv1 (lowest common denominator).
 #[test]
 fn test_format_selection_mixed_recipients_produces_seipd_v1() {
-    let recipient_a =
-        keys::generate_key_with_suite("Bob (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let recipient_a = keys::generate_key_with_suite(
+        "Bob (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let recipient_b = keys::generate_key_with_suite(
         "Charlie (B)".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
@@ -376,14 +444,18 @@ fn test_format_selection_mixed_recipients_produces_seipd_v1() {
 /// the sender's suite.
 #[test]
 fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
-    let sender_a =
-        keys::generate_key_with_suite("Sender A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let sender_a = keys::generate_key_with_suite(
+        "Sender A".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let recipient_b = keys::generate_key_with_suite(
         "Recipient B".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
@@ -405,14 +477,18 @@ fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
 /// Validates format downgrade for v4 recipients regardless of sender's suite.
 #[test]
 fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
-    let sender_b =
-        keys::generate_key_with_suite("Sender B".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let sender_b = keys::generate_key_with_suite(
+        "Sender B".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let recipient_a = keys::generate_key_with_suite(
         "Recipient A".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -437,13 +513,21 @@ fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
 /// Inverse of test_modern_high_encrypt_to_self_with_v4_recipient.
 #[test]
 fn test_legacy_encrypt_to_self_with_v6_recipient() {
-    let sender_a =
-        keys::generate_key_with_suite("Alice (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Sender key gen should succeed");
+    let sender_a = keys::generate_key_with_suite(
+        "Alice (A)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient_b =
-        keys::generate_key_with_suite("Bob (B)".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Recipient key gen should succeed");
+    let recipient_b = keys::generate_key_with_suite(
+        "Bob (B)".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"A->B with encrypt-to-self (mixed -> SEIPDv1).";
 
@@ -486,13 +570,21 @@ fn test_legacy_encrypt_to_self_with_v6_recipient() {
 /// Revocation cert from Legacy key should not verify against Modern High key (and vice versa).
 #[test]
 fn test_revocation_cert_cross_suite_mismatch() {
-    let key_a =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Legacy key gen should succeed");
+    let key_a = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Legacy key gen should succeed");
 
-    let key_b =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Modern High key gen should succeed");
+    let key_b = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Modern High key gen should succeed");
 
     // Legacy revocation cert vs Modern High cert
     let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
@@ -515,14 +607,18 @@ fn test_revocation_cert_cross_suite_mismatch() {
 /// Message format is SEIPDv1 (mixed/v4 recipient). match_recipients should still find the match.
 #[test]
 fn test_match_recipients_cross_modern_high_sender_a_recipient() {
-    let sender_b =
-        keys::generate_key_with_suite("Sender B".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let sender_b = keys::generate_key_with_suite(
+        "Sender B".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let recipient_a = keys::generate_key_with_suite(
         "Recipient A".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -546,14 +642,18 @@ fn test_match_recipients_cross_modern_high_sender_a_recipient() {
 /// Message format is SEIPDv2 (v6 recipient). match_recipients should find the match.
 #[test]
 fn test_match_recipients_cross_legacy_sender_b_recipient() {
-    let sender_a =
-        keys::generate_key_with_suite("Sender A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let sender_a = keys::generate_key_with_suite(
+        "Sender A".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let recipient_b = keys::generate_key_with_suite(
         "Recipient B".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
@@ -582,13 +682,20 @@ fn test_modify_expiry_public_key_only_fails_legacy() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
 
     // Pass public key only — should fail because secret key is needed for re-signing
-    let result = keys::modify_expiry(&generated.public_key_data, Some(3 * 365 * 24 * 3600));
+    let result = keys::modify_expiry(
+        &generated.public_key_data,
+        KeyValidity::ExpiresIn {
+            seconds: 3 * 365 * 24 * 3600,
+        },
+    );
     assert!(
         result.is_err(),
         "modify_expiry should fail with public key only"
@@ -607,13 +714,20 @@ fn test_modify_expiry_public_key_only_fails_modern_high() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
 
     // Pass public key only — should fail because secret key is needed for re-signing
-    let result = keys::modify_expiry(&generated.public_key_data, Some(3 * 365 * 24 * 3600));
+    let result = keys::modify_expiry(
+        &generated.public_key_data,
+        KeyValidity::ExpiresIn {
+            seconds: 3 * 365 * 24 * 3600,
+        },
+    );
     assert!(
         result.is_err(),
         "modify_expiry should fail with public key only"
@@ -636,9 +750,13 @@ fn test_generated_public_certificates_carry_suite_key_version() {
         (KeySuite::Ed448X448, 6),
     ];
     for (suite, expected_version) in expectations {
-        let generated =
-            keys::generate_key_with_suite("Version Probe".to_string(), None, None, suite)
-                .expect("key generation should succeed");
+        let generated = keys::generate_key_with_suite(
+            "Version Probe".to_string(),
+            None,
+            KeyValidity::Never,
+            suite,
+        )
+        .expect("key generation should succeed");
         assert_eq!(generated.key_version, expected_version, "{suite:?}");
         assert_eq!(
             keys::get_key_version(&generated.public_key_data).expect("version should parse"),

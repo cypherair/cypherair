@@ -11,7 +11,7 @@ use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
@@ -106,7 +106,7 @@ fn test_app_encrypt_signed_to_gpg_key() {
     let sender = keys::generate_key_with_suite(
         "Sender".to_string(),
         Some("sender@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -139,9 +139,13 @@ fn test_app_encrypt_signed_to_gpg_key() {
 /// Sequoia Legacy cleartext signature is valid.
 #[test]
 fn test_app_sign_legacy() {
-    let sender =
-        keys::generate_key_with_suite("Signer".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Signer".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"This message is signed by CypherAir Legacy";
     let signed = sign::sign_cleartext(plaintext, &sender.cert_data)
@@ -348,7 +352,7 @@ fn test_full_roundtrip_signed() {
     let signer = keys::generate_key_with_suite(
         "App User".to_string(),
         Some("app@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -388,7 +392,7 @@ fn test_modern_high_key_is_v6_gnupg_incompatible() {
     let key_b = keys::generate_key_with_suite(
         "Modern High User".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
@@ -411,7 +415,7 @@ fn test_modern_high_encryption_not_gnupg_compatible() {
     let key_b = keys::generate_key_with_suite(
         "Modern High".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
@@ -510,9 +514,13 @@ fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
-    let sender =
-        keys::generate_key_with_suite("Sender".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Sender".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Encrypt-to-self with GnuPG recipient";
 
@@ -553,7 +561,7 @@ fn test_modern_high_sender_to_gpg_v4_recipient_uses_seipdv1() {
     let sender_b = keys::generate_key_with_suite(
         "Modern High Sender".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");

@@ -11,7 +11,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         let generated = try engine.generateKey(
             name: "Software File Recipient",
             email: "software-file-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let identity = try softwareIdentity(from: generated, suite: .ed25519LegacyCurve25519Legacy, isDefault: true)
@@ -68,7 +68,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         let signer = try engine.generateKey(
             name: "Folding File Signer",
             email: "folding-file-signer@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let signerIdentity = try softwareIdentity(from: signer, suite: .ed25519LegacyCurve25519Legacy)
@@ -342,7 +342,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         let otherRecipient = try engine.generateKey(
             name: "Other File Recipient",
             email: "other-file-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let adapter = PGPMessageOperationAdapter(engine: engine)
@@ -430,7 +430,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         let otherRecipient = try engine.generateKey(
             name: "Other Tamper Recipient",
             email: "other-tamper-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let adapter = PGPMessageOperationAdapter(engine: engine)
@@ -777,7 +777,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave File Decrypt",
             email: "secure-file-decrypt@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

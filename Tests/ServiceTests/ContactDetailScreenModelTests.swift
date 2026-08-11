@@ -12,13 +12,13 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
         let alpha = try engine.generateKey(
             name: "Alpha Detail",
             email: "alpha-detail@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let bravo = try engine.generateKey(
             name: "Bravo Detail",
             email: "bravo-detail@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -50,7 +50,7 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Delete Detail",
             email: "delete-detail@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -73,13 +73,13 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
         let first = try engine.generateKey(
             name: "Detail First",
             email: "detail-first@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try engine.generateKey(
             name: "Detail Second",
             email: "detail-second@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -136,7 +136,7 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Error Detail",
             email: "error-detail@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 

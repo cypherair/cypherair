@@ -44,7 +44,7 @@ final class EncryptionServiceTests: XCTestCase {
         var recipientKey = try stack.engine.generateKey(
             name: name,
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         defer {
@@ -351,7 +351,7 @@ final class EncryptionServiceTests: XCTestCase {
     func test_encryptText_encryptToSelf_noDefaultKey_throwsNoKeySelected() async {
         // Create a recipient contact directly (no own key generated → no default key)
         let recipientKey = try! PgpEngine().generateKey(
-            name: "Recipient", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Recipient", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         try! stack.contactService.importContact(publicKeyData: recipientKey.publicKeyData)
         let info = try! PgpEngine().parseKeyInfo(keyData: recipientKey.publicKeyData)

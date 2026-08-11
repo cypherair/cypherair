@@ -277,6 +277,7 @@
 				Models/Keys/PGPKeyFamily.swift,
 				Models/Keys/PGPKeyIdentity.swift,
 				Models/Keys/PGPKeyMetadata.swift,
+				Models/Keys/PGPKeyValidity.swift,
 				Models/Keys/PGPKeyS2KInfo.swift,
 				Models/Keys/PGPKeySuite.swift,
 				Models/Keys/PGPPrivateKeyCustodyKind.swift,

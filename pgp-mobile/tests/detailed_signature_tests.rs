@@ -9,7 +9,7 @@ use openpgp::types::SignatureType;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, GeneratedKey, KeySuite};
+use pgp_mobile::keys::{self, GeneratedKey, KeySuite, KeyValidity};
 use pgp_mobile::signature_details::{
     DetailedSignatureStatus, FileVerifyDetailedResult, SignatureVerificationState,
 };
@@ -17,8 +17,8 @@ use pgp_mobile::{streaming, verify};
 use sequoia_openpgp as openpgp;
 use tempfile::NamedTempFile;
 
-fn generate_key(name: &str, profile: KeySuite, expiry_seconds: Option<u64>) -> GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), None, expiry_seconds, profile)
+fn generate_key(name: &str, profile: KeySuite, validity: KeyValidity) -> GeneratedKey {
+    keys::generate_key_with_suite(name.to_string(), None, validity, profile)
         .expect("key generation should succeed")
 }
 
@@ -149,8 +149,16 @@ fn encrypt_multi_signed(
 
 #[test]
 fn test_verify_cleartext_detailed_multi_signature_all_valid() {
-    let signer_a = generate_key("Signer A", KeySuite::Ed25519LegacyCurve25519Legacy, None);
-    let signer_b = generate_key("Signer B", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer_a = generate_key(
+        "Signer A",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
+    let signer_b = generate_key(
+        "Signer B",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let signed = sign_cleartext_multi(
         b"cleartext detailed",
         &[&signer_a.cert_data, &signer_b.cert_data],
@@ -192,7 +200,11 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
 
 #[test]
 fn test_verify_cleartext_detailed_expired_signer_preserves_entries() {
-    let signer = generate_key("Expiring Signer", KeySuite::Ed25519LegacyCurve25519Legacy, Some(1));
+    let signer = generate_key(
+        "Expiring Signer",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::ExpiresIn { seconds: 1 },
+    );
     let signed = sign_cleartext_multi(b"expired cleartext", &[&signer.cert_data]);
     std::thread::sleep(Duration::from_secs(2));
 
@@ -217,7 +229,11 @@ fn test_verify_cleartext_detailed_expired_signer_preserves_entries() {
 
 #[test]
 fn test_verify_detached_file_detailed_repeated_signer_preserves_repeated_entries() {
-    let signer = generate_key("Repeated Signer", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer = generate_key(
+        "Repeated Signer",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let data = b"repeated signer detached";
     let signature = sign_detached_multi(data, &[&signer.cert_data, &signer.cert_data]);
 
@@ -245,8 +261,16 @@ fn test_verify_detached_file_detailed_repeated_signer_preserves_repeated_entries
 
 #[test]
 fn test_verify_detached_file_detailed_known_plus_unknown_preserves_unknown_nil_fingerprint() {
-    let signer_a = generate_key("Signer A", KeySuite::Ed25519LegacyCurve25519Legacy, None);
-    let signer_b = generate_key("Signer B", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer_a = generate_key(
+        "Signer A",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
+    let signer_b = generate_key(
+        "Signer B",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let data = b"known plus unknown";
     let signature = sign_detached_multi(data, &[&signer_a.cert_data, &signer_b.cert_data]);
 
@@ -266,7 +290,11 @@ fn test_verify_detached_file_detailed_known_plus_unknown_preserves_unknown_nil_f
 
 #[test]
 fn test_verify_detached_file_detailed_tampered_runtime_data_reports_bad() {
-    let signer = generate_key("Signer", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer = generate_key(
+        "Signer",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let data = b"detached tamper";
     let signature = sign_detached_multi(data, &[&signer.cert_data]);
 
@@ -281,8 +309,16 @@ fn test_verify_detached_file_detailed_tampered_runtime_data_reports_bad() {
 
 #[test]
 fn test_verify_detached_file_detailed_preserves_unknown_entry() {
-    let signer_a = generate_key("Signer A", KeySuite::Ed25519LegacyCurve25519Legacy, None);
-    let signer_b = generate_key("Signer B", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer_a = generate_key(
+        "Signer A",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
+    let signer_b = generate_key(
+        "Signer B",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let data = b"detached file detailed";
     let signature = sign_detached_multi(data, &[&signer_a.cert_data, &signer_b.cert_data]);
 
@@ -315,7 +351,11 @@ fn test_verify_detached_file_detailed_preserves_unknown_entry() {
 
 #[test]
 fn test_verify_detached_file_detailed_tampered_fixture_data_reports_bad() {
-    let signer = generate_key("Signer", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer = generate_key(
+        "Signer",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let data = b"tampered detached file";
     let signature = sign_detached_multi(data, &[&signer.cert_data]);
     let mut tampered = data.to_vec();
@@ -332,9 +372,21 @@ fn test_verify_detached_file_detailed_tampered_fixture_data_reports_bad() {
 
 #[test]
 fn test_decrypt_detailed_multi_signature_preserves_entries() {
-    let signer_a = generate_key("Signer A", KeySuite::Ed25519LegacyCurve25519Legacy, None);
-    let signer_b = generate_key("Signer B", KeySuite::Ed25519LegacyCurve25519Legacy, None);
-    let recipient = generate_key("Recipient", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer_a = generate_key(
+        "Signer A",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
+    let signer_b = generate_key(
+        "Signer B",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
+    let recipient = generate_key(
+        "Recipient",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let plaintext = b"decrypt detailed multi-sig";
     let ciphertext = encrypt_multi_signed(
         plaintext,
@@ -388,7 +440,11 @@ fn test_decrypt_detailed_multi_signature_preserves_entries() {
 
 #[test]
 fn test_decrypt_detailed_unsigned_returns_empty_signatures_and_not_signed() {
-    let recipient = generate_key("Recipient", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let recipient = generate_key(
+        "Recipient",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let ciphertext = encrypt::encrypt_binary(
         b"unsigned decrypt detailed",
         &[recipient.public_key_data.clone()],
@@ -410,7 +466,11 @@ fn test_decrypt_detailed_unsigned_returns_empty_signatures_and_not_signed() {
 
 #[test]
 fn test_decrypt_file_detailed_unsigned_returns_empty_signatures_and_not_signed() {
-    let recipient = generate_key("Recipient", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let recipient = generate_key(
+        "Recipient",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let input = NamedTempFile::new().expect("temp input should be created");
     let output = NamedTempFile::new().expect("temp output should be created");
     std::fs::write(input.path(), b"unsigned file detailed").expect("plaintext should be written");
@@ -456,7 +516,11 @@ impl streaming::StreamingProgressReporter for CancelImmediately {
 
 #[test]
 fn test_verify_detached_file_detailed_cancel_returns_operation_cancelled() {
-    let signer = generate_key("Signer", KeySuite::Ed25519LegacyCurve25519Legacy, None);
+    let signer = generate_key(
+        "Signer",
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        KeyValidity::Never,
+    );
     let input = NamedTempFile::new().expect("temp input should be created");
     std::fs::write(input.path(), vec![0x42; 256 * 1024]).expect("input file should be written");
     let signature = sign_detached_multi(

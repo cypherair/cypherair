@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 @Observable
 final class KeyGenerationScreenModel {
-    typealias GenerateKeyAction = @MainActor (String, String?, UInt64?, PGPKeyFamily) async throws -> PGPKeyIdentity
+    typealias GenerateKeyAction = @MainActor (String, String?, PGPKeyValidity, PGPKeyFamily) async throws -> PGPKeyIdentity
     typealias PostGenerationPromptAction = @MainActor (PGPKeyIdentity) -> Void
 
     let configuration: KeyGenerationView.Configuration
@@ -40,11 +40,11 @@ final class KeyGenerationScreenModel {
         self.capabilityResolver = capabilityResolver
         self.isSecureEnclaveGenerationAvailable = isSecureEnclaveGenerationAvailable
             ?? keyManagement.isSecureEnclaveCustodyGenerationAvailable
-        self.generateKeyAction = generateKeyAction ?? { name, email, expirySeconds, family in
+        self.generateKeyAction = generateKeyAction ?? { name, email, validity, family in
             try await keyManagement.generateKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family
             )
         }
@@ -203,7 +203,7 @@ final class KeyGenerationScreenModel {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
         let selectedFamily = selectedFamily
-        let expirySeconds = KeyExpiryPolicy.expirySeconds(for: expiry)
+        let validity = KeyExpiryPolicy.validity(for: expiry)
 
         generationTask = Task { @MainActor [weak self, token] in
             guard let self else { return }
@@ -218,7 +218,7 @@ final class KeyGenerationScreenModel {
                 let identity = try await self.generateKeyAction(
                     trimmedName,
                     trimmedEmail.isEmpty ? nil : trimmedEmail,
-                    expirySeconds,
+                    validity,
                     selectedFamily
                 )
                 try Task.checkCancellation()

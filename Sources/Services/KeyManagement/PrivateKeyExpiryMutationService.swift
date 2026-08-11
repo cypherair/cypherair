@@ -5,12 +5,12 @@ protocol PrivateKeyExpiryMutationRouting: Sendable {
 
     func modifySecureEnclaveExpiry(
         route: SecureEnclaveSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial
 
     func modifySecureEnclaveCompositeExpiry(
         route: SecureEnclaveCompositeSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial
 }
 
@@ -43,7 +43,7 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
 
     func modifySecureEnclaveExpiry(
         route: SecureEnclaveSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         try await keyAdapter.modifyExpiryWithExternalP256Signer(
             publicCert: route.identity.publicKeyData,
@@ -52,13 +52,13 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
                 handle: route.signingHandle,
                 digestSigner: digestSigner
             ),
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity
         )
     }
 
     func modifySecureEnclaveCompositeExpiry(
         route: SecureEnclaveCompositeSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         switch route.signingHandle.reference.tier {
         case .classicalP256:
@@ -74,7 +74,7 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
                     handle: route.signingHandle,
                     compositeSigner: compositeSigner
                 ),
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
         case .postQuantumHigh:
             return try await keyAdapter.modifyExpiryWithExternalCompositeHighSigner(
@@ -85,7 +85,7 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
                     handle: route.signingHandle,
                     compositeSigner: compositeSigner
                 ),
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
         }
     }

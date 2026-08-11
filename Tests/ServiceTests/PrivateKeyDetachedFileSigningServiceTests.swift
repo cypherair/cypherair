@@ -9,7 +9,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         var generated = try engine.generateKey(
             name: "Software Detached Signer",
             email: "software-detached@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         defer { generated.certData.resetBytes(in: 0..<generated.certData.count) }
@@ -475,7 +475,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Detached \(label)",
             email: "secure-detached-\(label)@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

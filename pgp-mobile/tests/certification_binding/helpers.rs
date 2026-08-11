@@ -1,10 +1,11 @@
 use super::*;
+use pgp_mobile::keys::KeyValidity;
 
 pub(super) fn generated_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
-        None,
+        KeyValidity::Never,
         profile,
     )
     .expect("key generation should succeed")
@@ -15,8 +16,13 @@ pub(super) fn generated_key_with_identity(
     name: &str,
     email: &str,
 ) -> keys::GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), Some(email.to_string()), None, profile)
-        .expect("key generation should succeed")
+    keys::generate_key_with_suite(
+        name.to_string(),
+        Some(email.to_string()),
+        KeyValidity::Never,
+        profile,
+    )
+    .expect("key generation should succeed")
 }
 
 pub(super) fn parse_cert(cert_data: &[u8]) -> openpgp::Cert {

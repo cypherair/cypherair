@@ -2,9 +2,19 @@ import Foundation
 
 /// A validity choice offered when a key is created: a whole number of years, or
 /// no expiry at all.
-enum KeyExpiry: Hashable {
-    case years(Int)
-    case never
+///
+/// Only `KeyExpiryPolicy` mints these — the initializer is private to this file —
+/// so a term the app does not offer cannot be expressed by a picker, by a
+/// tutorial's locked configuration, or by a test.
+struct KeyExpiry: Hashable {
+    /// Whole years of validity; `nil` is no expiry.
+    let years: Int?
+
+    static let never = KeyExpiry(years: nil)
+
+    fileprivate init(years: Int?) {
+        self.years = years
+    }
 }
 
 /// How long the keys CypherAir X creates and amends stay valid.
@@ -14,14 +24,14 @@ enum KeyExpiry: Hashable {
 /// sheet opens the same term out and takes any date in `settableDateRange()`.
 /// Declining an expiry is offered on both paths — `KeyExpiry.never` in the
 /// generation picker, Remove Expiry on the modify sheet — and reaches the engine as
-/// an absent expiry rather than as a distant date. The two surfaces differ in how
-/// they ask; they do not differ in what they will set.
+/// `PGPKeyValidity.never` rather than as a distant date. The two surfaces differ in
+/// how they ask; they do not differ in what they will set.
 enum KeyExpiryPolicy {
     /// What the generation picker offers, in order.
-    static let offeredTerms: [KeyExpiry] = offeredYears.map(KeyExpiry.years) + [.never]
+    static let offeredTerms: [KeyExpiry] = offeredYears.map { KeyExpiry(years: $0) } + [.never]
 
     /// Where a user who does not choose lands, on either surface.
-    static let defaultTerm = KeyExpiry.years(defaultYears)
+    static let defaultTerm = KeyExpiry(years: defaultYears)
 
     /// The date the modify-expiry sheet opens on: `defaultTerm` from now.
     static func defaultExpiryDate() -> Date {
@@ -43,20 +53,17 @@ enum KeyExpiryPolicy {
         return min(max(date, range.lowerBound), range.upperBound)
     }
 
-    /// Seconds until a key created now under `term` expires — `nil` only for
-    /// `.never`, which is the engine's absent expiry.
-    static func expirySeconds(for term: KeyExpiry) -> UInt64? {
-        switch term {
-        case .never:
-            nil
-        case .years(let years):
-            expirySeconds(until: expiryDate(inYears: years))
+    /// The validity a key created now under `term` should be given.
+    static func validity(for term: KeyExpiry) -> PGPKeyValidity {
+        guard let years = term.years else {
+            return .never
         }
+        return validity(until: expiryDate(inYears: years))
     }
 
-    /// Seconds until `date`, for an expiry chosen as an instant rather than a term.
-    static func expirySeconds(until date: Date) -> UInt64 {
-        UInt64(max(0, date.timeIntervalSinceNow))
+    /// The validity for an expiry chosen as an instant rather than as a term.
+    static func validity(until date: Date) -> PGPKeyValidity {
+        .expiresIn(seconds: UInt64(max(0, date.timeIntervalSinceNow)))
     }
 
     private static let defaultYears = 3
@@ -69,10 +76,15 @@ enum KeyExpiryPolicy {
 
     private static let secondsPerDay: TimeInterval = 24 * 60 * 60
 
-    /// A failed calendar addition falls back to the mean Gregorian year: a finite
-    /// term must never collapse into the absent expiry that `nil` stands for.
+    /// The terms are labelled in Gregorian years and must last that long whatever
+    /// calendar the device runs on: under a Hijri `Calendar.current`, adding three
+    /// years lands about a hundred days short of what the row promises.
+    private static let calendar = Calendar(identifier: .gregorian)
+
+    /// A failed calendar addition falls back to the mean Gregorian year, because a
+    /// finite term must never collapse to the reference date and expire on sight.
     private static func expiryDate(inYears years: Int, from reference: Date = Date()) -> Date {
-        Calendar.current.date(byAdding: .year, value: years, to: reference)
+        calendar.date(byAdding: .year, value: years, to: reference)
             ?? reference.addingTimeInterval(TimeInterval(years) * 365.2425 * secondsPerDay)
     }
 }

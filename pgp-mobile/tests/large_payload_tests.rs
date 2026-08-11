@@ -5,15 +5,19 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 
 /// (extended): 50 MB file encrypt/decrypt (Legacy).
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_50mb_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = vec![0xABu8; 50 * 1024 * 1024];
     let ciphertext =
@@ -38,9 +42,13 @@ fn test_file_encrypt_decrypt_50mb_legacy() {
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_100mb_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = vec![0xCDu8; 100 * 1024 * 1024];
     let ciphertext =
@@ -61,9 +69,13 @@ fn test_file_encrypt_decrypt_100mb_legacy() {
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_50mb_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = vec![0xABu8; 50 * 1024 * 1024];
     let ciphertext =
@@ -88,9 +100,13 @@ fn test_file_encrypt_decrypt_50mb_modern_high() {
 #[test]
 #[ignore = "slow"]
 fn test_file_encrypt_decrypt_100mb_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = vec![0xCDu8; 100 * 1024 * 1024];
     let ciphertext =

@@ -17,7 +17,7 @@ use common::gnupg::{
     assert_gpg_status_good_signature, gpg_cmd, gpg_import_key, require_gpg_or_skip, setup_gpg_home,
 };
 use common::secure_enclave::SoftwareP256Material;
-use pgp_mobile::keys::SecureEnclaveCertificateVersion;
+use pgp_mobile::keys::{KeyValidity, SecureEnclaveCertificateVersion};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{armor, encrypt, sign, PgpEngine};
 use tempfile::TempDir;
@@ -30,8 +30,11 @@ fn record_evidence(scenario: &str) {
 }
 
 fn build_v4_material() -> SoftwareP256Material {
-    SoftwareP256Material::generate(SecureEnclaveCertificateVersion::V4, Some(3600))
-        .expect("software SE v4 material should build")
+    SoftwareP256Material::generate(
+        SecureEnclaveCertificateVersion::V4,
+        KeyValidity::ExpiresIn { seconds: 3600 },
+    )
+    .expect("software SE v4 material should build")
 }
 
 fn write(gnupghome: &TempDir, name: &str, data: &[u8]) -> std::path::PathBuf {

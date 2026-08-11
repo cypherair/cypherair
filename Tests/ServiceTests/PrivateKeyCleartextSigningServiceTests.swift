@@ -9,7 +9,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
         let generated = try engine.generateKey(
             name: "Software Signer",
             email: "software@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
@@ -276,7 +276,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Cleartext",
             email: "secure-cleartext@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
