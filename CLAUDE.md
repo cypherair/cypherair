@@ -26,7 +26,8 @@ Sources/
 ├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData, Argon2id memory guard, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
-├── PgpMobile/        # Generated UniFFI Swift bindings (do not hand-edit)
+├── PgpMobile/        # Generated UniFFI Swift bindings — git-ignored build output,
+│                     # absent until the sync runs; never hand-edit
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
 docs/                 # product, security, custody, storage, architecture, testing, workflow, release

@@ -2,10 +2,10 @@
 pgp-mobile/target/
 target/
 
-# UniFFI generated bindings are tracked, but the temporary headers staging
-# directory created by build-xcframework.sh is not.
-bindings/headers/
-pgp-mobile/bindings/
+# Generated UniFFI outputs, written by ./build-xcframework.sh: the C interop
+# header and module map Xcode reads, and the Swift binding it compiles.
+/bindings/
+/Sources/PgpMobile/
 
 # macOS
 .DS_Store

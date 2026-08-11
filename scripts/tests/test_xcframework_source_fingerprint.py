@@ -14,6 +14,11 @@ module = load_script_module("xcframework_source_fingerprint", "scripts/xcframewo
 
 
 class XCFrameworkSourceFingerprintTests(unittest.TestCase):
+    CARRIED_BINDINGS = {
+        "Sources/PgpMobile/pgp_mobile.swift": "public func encrypt() {}\n",
+        "bindings/module.modulemap": "module PgpMobileFFI {}\n",
+    }
+
     def make_repo(self, root: Path) -> tuple[Path, Path]:
         crate = root / "pgp-mobile"
         (crate / "src").mkdir(parents=True)
@@ -44,6 +49,16 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
         (xcframework / "Info.plist").write_text("<plist/>\n", encoding="utf-8")
         (xcframework / "macos-arm64_arm64e" / module.SLICE_LIBRARY_NAME).write_bytes(b"macos slice")
         (xcframework / "ios-arm64_arm64e" / module.SLICE_LIBRARY_NAME).write_bytes(b"ios slice")
+
+        # The bundle carries the generated bindings at the paths they are placed
+        # at, and a synced checkout holds those exact bytes.
+        for relative, contents in self.CARRIED_BINDINGS.items():
+            carried = xcframework / module.CARRIED_BINDINGS_DIR / relative
+            carried.parent.mkdir(parents=True, exist_ok=True)
+            carried.write_text(contents, encoding="utf-8")
+            placed = root / relative
+            placed.parent.mkdir(parents=True, exist_ok=True)
+            placed.write_text(contents, encoding="utf-8")
         return root, xcframework
 
     def test_written_fingerprint_matches_a_fresh_tree(self) -> None:
@@ -87,9 +102,8 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
 
     def test_added_crate_source_appears_in_the_regenerated_input_list(self) -> None:
         # --check re-hashes only what was recorded, because the Xcode build
-        # phase is sandboxed and cannot walk the crate. A file added without a
-        # sync surfaces as a diff in the tracked input list instead, and in
-        # practice it also edits an existing module file, which the hashes catch.
+        # phase is sandboxed and cannot walk the crate. The next sync has to
+        # declare a newly added crate file, or the phase could not read it.
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root, xcframework = self.make_repo(Path(temp_dir_name))
             module.write_fingerprint(root, xcframework)
@@ -178,8 +192,8 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
             module.check_fingerprint(root, xcframework)
 
     def test_non_rust_files_under_src_are_not_inputs(self) -> None:
-        # A stray .DS_Store must not break every build, nor land a gitignored
-        # path in the tracked input list.
+        # A stray .DS_Store must not break every build, nor land in the input
+        # list the sandboxed build phase declares.
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root, xcframework = self.make_repo(Path(temp_dir_name))
             (root / "pgp-mobile/src/.DS_Store").write_bytes(b"\x00\x01finder junk")
@@ -234,6 +248,88 @@ class XCFrameworkSourceFingerprintTests(unittest.TestCase):
             message = str(raised.exception)
             self.assertIn("does not match its own fingerprint", message)
             self.assertIn("macos-arm64_arm64e/libpgp_mobile.a", message)
+
+    def test_hand_edited_generated_binding_is_rejected(self) -> None:
+        # The generated Swift is the whole FFI surface and is not in git, so
+        # this gate is the only thing standing between an edit to it and a
+        # binary that calls the engine differently than the engine expects.
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root, xcframework = self.make_repo(Path(temp_dir_name))
+            module.write_fingerprint(root, xcframework)
+
+            (root / "Sources/PgpMobile/pgp_mobile.swift").write_text(
+                "public func encrypt() { fatalError() }\n", encoding="utf-8"
+            )
+
+            with self.assertRaises(module.FingerprintError) as raised:
+                module.check_fingerprint(root, xcframework)
+            message = str(raised.exception)
+            self.assertIn("Sources/PgpMobile/pgp_mobile.swift", message)
+            self.assertIn(module.RESTORE_COMMAND, message)
+
+    def test_unplaced_binding_points_at_the_restore_script(self) -> None:
+        # An artifact restored without running the placement step: the remedy is
+        # the restore, not a rebuild of the crate.
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root, xcframework = self.make_repo(Path(temp_dir_name))
+            module.write_fingerprint(root, xcframework)
+
+            (root / "bindings/module.modulemap").unlink()
+
+            with self.assertRaises(module.FingerprintError) as raised:
+                module.check_fingerprint(root, xcframework)
+            message = str(raised.exception)
+            self.assertIn("bindings/module.modulemap", message)
+            self.assertIn(module.RESTORE_COMMAND, message)
+
+    def test_bundle_carrying_foreign_bindings_is_rejected(self) -> None:
+        # A bundle whose carried bindings are not the ones it recorded cannot
+        # vouch for anything; placing them would just spread the mismatch.
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root, xcframework = self.make_repo(Path(temp_dir_name))
+            module.write_fingerprint(root, xcframework)
+
+            carried = (
+                xcframework
+                / module.CARRIED_BINDINGS_DIR
+                / "Sources/PgpMobile/pgp_mobile.swift"
+            )
+            carried.write_text("public func encrypt(_ other: Int) {}\n", encoding="utf-8")
+
+            with self.assertRaises(module.FingerprintError) as raised:
+                module.check_fingerprint(root, xcframework)
+            message = str(raised.exception)
+            self.assertIn("does not carry the generated bindings", message)
+            self.assertIn(module.SYNC_COMMAND, message)
+            self.assertNotIn(module.RESTORE_COMMAND, message)
+
+    def test_artifact_predating_the_binding_gate_fails_closed(self) -> None:
+        # An artifact built before the bindings were fingerprinted would
+        # otherwise pass green and then fail in the compiler with no guidance.
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root, xcframework = self.make_repo(Path(temp_dir_name))
+            destination = module.write_fingerprint(root, xcframework)
+
+            payload = json.loads(destination.read_text(encoding="utf-8"))
+            payload.pop("bindings")
+            destination.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(module.FingerprintError) as raised:
+                module.check_fingerprint(root, xcframework)
+            self.assertIn("records no generated bindings", str(raised.exception))
+            self.assertIn(module.SYNC_COMMAND, str(raised.exception))
+
+    def test_write_requires_carried_bindings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            root, xcframework = self.make_repo(Path(temp_dir_name))
+            for path in sorted(
+                (xcframework / module.CARRIED_BINDINGS_DIR).rglob("*"), reverse=True
+            ):
+                path.unlink() if path.is_file() else path.rmdir()
+
+            with self.assertRaises(module.FingerprintError) as raised:
+                module.write_fingerprint(root, xcframework)
+            self.assertIn("carries no generated bindings", str(raised.exception))
 
     def test_missing_slice_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:

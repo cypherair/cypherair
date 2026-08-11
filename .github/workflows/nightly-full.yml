@@ -79,6 +79,7 @@ jobs:
       - name: Test repository freshness gates
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_xcframework_source_fingerprint.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_restore_generated_bindings.py'
           python3 -m unittest discover -s scripts/tests -p 'test_check_open_source_notices_freshness.py'
           python3 -m unittest discover -s scripts/tests -p 'test_check_device_test_skip_list.py'
           python3 -m unittest discover -s scripts/tests -p 'test_validate_xcframework_archive.py'
@@ -164,19 +165,6 @@ jobs:
         run: ./build-xcframework.sh --release
       - name: Check XCFramework source fingerprint
         run: python3 scripts/xcframework_source_fingerprint.py --check
-      - name: Check generated bindings match the crate
-        run: |
-          # build-xcframework.sh regenerates the UniFFI bindings and the sandbox
-          # input list and copies them over the tracked ones. Anything left in
-          # the working tree means the committed copies did not match
-          # pgp-mobile/src. --porcelain rather than `git diff`: a regenerated
-          # binding for a *new* interface file is untracked, which a diff misses.
-          if [ -n "$(git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist)" ]; then
-            git status --porcelain -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
-            git diff -- bindings Sources/PgpMobile PgpMobileSourceInputs.xcfilelist
-            echo "::error::Generated UniFFI bindings or the XCFramework input list are stale. Run ./build-xcframework.sh --release and commit bindings/, Sources/PgpMobile/, and PgpMobileSourceInputs.xcfilelist."
-            exit 1
-          fi
       - name: Package XCFramework artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
@@ -220,6 +208,9 @@ jobs:
             --tree "$staging/PgpMobile.xcframework"
           rm -rf PgpMobile.xcframework
           mv "$staging/PgpMobile.xcframework" PgpMobile.xcframework
+          # This job links the packaged artifact instead of building it, so the
+          # generated bindings the app compiles come out of the bundle.
+          scripts/restore_generated_bindings.sh
       - name: Restore SQLCipher XCFramework
         if: steps.platform_preflight.outputs.ready == 'true'
         env:

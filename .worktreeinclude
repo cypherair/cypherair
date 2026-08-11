@@ -1,5 +1,7 @@
 PgpMobile.xcframework/
 PgpMobile.arm64e-build-manifest.json
+bindings/
+Sources/PgpMobile/
 SQLCipher.xcframework/
 SQLCipher.arm64e-build-manifest.json
 SQLCipher-PrivacyInfo.xcprivacy
