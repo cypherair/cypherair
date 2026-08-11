@@ -8,6 +8,11 @@
 # at the end of a successful sync; every consumer that restores a packaged
 # artifact instead -- the CI platform probes, Xcode Cloud WF2 -- runs it right
 # after the restore.
+#
+# The carry layout mirrors the checkout, so every destination is the carried
+# path itself and this script names no file. Completeness is the fingerprint
+# gate's job: scripts/xcframework_source_fingerprint.py --check re-hashes both
+# ends of every recorded binding on every Xcode build.
 
 set -euo pipefail
 
@@ -15,29 +20,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CARRIED_DIR="$REPO_ROOT/PgpMobile.xcframework/cypherair-generated-bindings"
 
-place() {
-    local name="$1"
-    local destination="$2"
-    local source="$CARRIED_DIR/$name"
+carries_nothing() {
+    echo "error: PgpMobile.xcframework carries no generated bindings." >&2
+    echo "       Where the crate is built, run the XCFramework sync:" >&2
+    echo "           ./build-xcframework.sh --release" >&2
+    echo "       Where the artifact is restored rather than built, obtain a current" >&2
+    echo "       PgpMobile.xcframework and restore it again." >&2
+    exit 1
+}
 
-    if [ ! -f "$source" ]; then
-        echo "error: PgpMobile.xcframework carries no $name." >&2
-        echo "       Run the XCFramework sync: ./build-xcframework.sh --release" >&2
-        exit 1
-    fi
+[ -d "$CARRIED_DIR" ] || carries_nothing
+
+placed=0
+while IFS= read -r relative; do
+    source="$CARRIED_DIR/$relative"
+    destination="$REPO_ROOT/$relative"
+    placed=$((placed + 1))
 
     # Rewrite only on a real change: an identical file with a fresh timestamp
     # costs the next Xcode build a full recompile of everything downstream.
     if [ -f "$destination" ] && cmp -s "$source" "$destination"; then
-        echo "unchanged: $destination"
-        return
+        echo "unchanged: $relative"
+        continue
     fi
 
     mkdir -p "$(dirname "$destination")"
     cp "$source" "$destination"
-    echo "placed: $destination"
-}
+    echo "placed: $relative"
+done < <(cd "$CARRIED_DIR" && find . -type f -print | sed 's|^\./||' | sort)
 
-place pgp_mobile.swift "$REPO_ROOT/Sources/PgpMobile/pgp_mobile.swift"
-place module.modulemap "$REPO_ROOT/bindings/module.modulemap"
-place pgp_mobileFFI.h "$REPO_ROOT/bindings/pgp_mobileFFI.h"
+[ "$placed" -gt 0 ] || carries_nothing

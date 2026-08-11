@@ -390,12 +390,14 @@ create_xcframework() {
     # The Swift binding Xcode compiles and the C interop pair its module map
     # exposes ride inside the bundle, so they reach every consumer the artifact
     # reaches -- the zip, the CI artifact, the release asset -- including the
-    # ones that restore a packaged build instead of running this script.
+    # ones that restore a packaged build instead of running this script. The
+    # carry layout mirrors the checkout, so a carried path is the path it is
+    # placed at and nothing downstream has to name a file.
     local carried_bindings="$XCFRAMEWORK_OUTPUT/cypherair-generated-bindings"
-    mkdir -p "$carried_bindings"
-    cp "$GENERATED_BINDINGS_DIR/pgp_mobile.swift" "$carried_bindings/"
-    cp "$GENERATED_BINDINGS_DIR/module.modulemap" "$carried_bindings/"
-    cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h" "$carried_bindings/"
+    mkdir -p "$carried_bindings/Sources/PgpMobile" "$carried_bindings/bindings"
+    cp "$GENERATED_BINDINGS_DIR/pgp_mobile.swift" "$carried_bindings/Sources/PgpMobile/"
+    cp "$GENERATED_BINDINGS_DIR/module.modulemap" "$carried_bindings/bindings/"
+    cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h" "$carried_bindings/bindings/"
 }
 
 verify_xcframework() {

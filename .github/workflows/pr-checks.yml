@@ -82,6 +82,7 @@ jobs:
       - name: Test repository freshness gates
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_xcframework_source_fingerprint.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_restore_generated_bindings.py'
           python3 -m unittest discover -s scripts/tests -p 'test_check_open_source_notices_freshness.py'
           python3 -m unittest discover -s scripts/tests -p 'test_check_device_test_skip_list.py'
           python3 -m unittest discover -s scripts/tests -p 'test_validate_xcframework_archive.py'

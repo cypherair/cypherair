@@ -25,8 +25,9 @@ The repository ships a project-level `.mcp.json` configuring an `xcode` MCP serv
 # 1. Validate Rust behavior
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
-# 2. Refresh the XCFramework and generated bindings that Xcode links. The script
-# defaults to the current arm64e stage1 pin (docs/ARM64E_STATUS.md), never `latest`.
+# 2. Refresh the XCFramework and generated bindings that Xcode links (git-ignored
+# build outputs; a fresh clone cannot build until this runs). The script defaults
+# to the current arm64e stage1 pin (docs/ARM64E_STATUS.md), never `latest`.
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 
 # 3. Restore the pinned SQLCipher dependency (git-ignored artifact, attested on fetch)

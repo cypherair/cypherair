@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Record and verify which pgp-mobile sources produced PgpMobile.xcframework.
 
-The Xcode "Check PgpMobile XCFramework" build phase used to check only that the
-artifact exists. Existence says nothing about currency: editing pgp-mobile/src
-and rebuilding the app silently links yesterday's static library and yesterday's
-generated UniFFI bindings.
-
-This script closes that hole with a fingerprint of the crate inputs that feed
-the artifact, bound to the packaged library bytes those inputs produced.
+Existence says nothing about currency: without this gate, editing pgp-mobile/src
+and rebuilding the app links yesterday's static library and compiles yesterday's
+generated UniFFI bindings. The gate is a fingerprint of the crate inputs that
+feed the artifact, bound to the packaged library bytes and the generated
+bindings those inputs produced.
 scripts/build_apple_arm64e_xcframework.sh writes the fingerprint at the end of a
 successful build (--write); the Xcode build phase and CI verify it (--check).
 
@@ -18,14 +16,22 @@ artifact upload, the edge release asset, and the Xcode Cloud release consumer --
 without any new asset plumbing. A restored-from-zip artifact therefore keeps
 proving its provenance against the checkout it is being linked into.
 
---write also refreshes PgpMobileSourceInputs.xcfilelist, the list of crate inputs
-the Xcode build phase declares, which lives beside the fingerprint in the bundle
-because it describes the same recorded input set and has to travel the same
-paths. Script build phases run under ENABLE_USER_SCRIPT_SANDBOXING, which
-permits reading only declared inputs, so --check re-hashes exactly the files the
-fingerprint recorded and never walks the tree. A crate file added without
-re-running the sync is still caught, because adding one also edits an existing
-module file, and the hashes catch that directly.
+The generated bindings ride in the bundle too, under cypherair-generated-bindings/
+at the repository-relative paths they are placed at. --check verifies both ends
+of that copy: the bundle still carries the bindings it recorded, and the
+working-tree copies the app compiles are those exact bytes. An unplaced restore,
+a bundle from another build, and a hand-edit to the generated Swift are all
+build failures rather than a silently wrong FFI surface.
+
+--write also refreshes PgpMobileSourceInputs.xcfilelist, the list of everything
+--check reads. Script build phases run under ENABLE_USER_SCRIPT_SANDBOXING,
+which permits reading only declared inputs, so --check re-hashes exactly what
+the fingerprint recorded and never walks the tree. The list is tracked at the
+repository root because Xcode resolves it while building the dependency graph,
+before any build phase runs -- a list inside the ignored bundle would replace
+the phase's own missing-artifact guidance with a file-list load failure. A crate
+file added without re-running the sync is still caught, because adding one also
+edits an existing module file, and the hashes catch that directly.
 
 Both modes fail closed: a missing fingerprint, an unreadable fingerprint, a
 missing input file, or any content change is an error.
@@ -43,8 +49,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FINGERPRINT_NAME = "cypherair-source-fingerprint.json"
 INPUT_LIST_NAME = "PgpMobileSourceInputs.xcfilelist"
+CARRIED_BINDINGS_DIR = "cypherair-generated-bindings"
 SYNC_COMMAND = "./build-xcframework.sh --release"
-SCHEMA_VERSION = 1
+RESTORE_COMMAND = "scripts/restore_generated_bindings.sh"
+SCHEMA_VERSION = 2
 
 # Inputs that determine the compiled library and the generated UniFFI bindings.
 # pgp-mobile/tests and pgp-mobile/examples are deliberately excluded: they never
@@ -85,6 +93,21 @@ def _hash_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _digest_or_none(path: Path) -> str | None:
+    """The digest, or None when the file is absent or unreadable.
+
+    Both cases mean the same thing to a comparison against a recorded digest --
+    this content is not there -- and collapsing them keeps every caller
+    fail-closed without a second error path.
+    """
+    if not path.is_file():
+        return None
+    try:
+        return _hash_file(path)
+    except OSError:
+        return None
 
 
 def collect_input_files(repo_root: Path) -> list[Path]:
@@ -170,8 +193,41 @@ def hash_slice_libraries(xcframework: Path, relative_paths: list[str] | None = N
     return entries
 
 
+def carried_bindings_dir(xcframework: Path) -> Path:
+    return xcframework / CARRIED_BINDINGS_DIR
+
+
+def hash_carried_bindings(xcframework: Path) -> dict[str, str]:
+    """Hash the generated bindings the bundle carries.
+
+    The carry layout mirrors the checkout, so a carried path *is* the path the
+    binding is placed at. That is what lets --check and the restore script agree
+    on every destination without either of them naming a file.
+    """
+    directory = carried_bindings_dir(xcframework)
+    if not directory.is_dir():
+        raise FingerprintError(
+            f"XCFramework carries no generated bindings ({CARRIED_BINDINGS_DIR}/): {xcframework}"
+        )
+
+    entries: dict[str, str] = {}
+    for path in sorted(directory.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            entries[path.relative_to(directory).as_posix()] = _hash_file(path)
+        except OSError as error:
+            raise FingerprintError(f"unable to read carried binding {path.name}: {error}") from error
+
+    if not entries:
+        raise FingerprintError(
+            f"XCFramework carries no generated bindings ({CARRIED_BINDINGS_DIR}/ is empty): {xcframework}"
+        )
+    return entries
+
+
 def compute_fingerprint(repo_root: Path, xcframework: Path) -> dict:
-    """Hash every crate input and every packaged slice into stable digests."""
+    """Hash every crate input, packaged slice, and carried binding."""
     relative_paths = [
         path.relative_to(repo_root).as_posix() for path in collect_input_files(repo_root)
     ]
@@ -191,6 +247,7 @@ def compute_fingerprint(repo_root: Path, xcframework: Path) -> dict:
         "files": entries,
         "artifactDigest": aggregate_digest(slices),
         "slices": slices,
+        "bindings": hash_carried_bindings(xcframework),
     }
 
 
@@ -198,22 +255,30 @@ def fingerprint_path(xcframework: Path) -> Path:
     return xcframework / FINGERPRINT_NAME
 
 
-def render_input_list(entries: dict[str, str], slices: dict[str, str]) -> str:
+def render_input_list(
+    entries: dict[str, str], slices: dict[str, str], bindings: dict[str, str]
+) -> str:
     """The Xcode input list that lets the sandboxed build phase read its inputs.
 
     Script build phases run under ENABLE_USER_SCRIPT_SANDBOXING and may read
     only declared inputs, and declaring a directory grants readdir rather than
-    subpath access -- so every crate file and every packaged slice --check
-    re-hashes has to appear here by name.
+    subpath access -- so every file --check re-hashes has to appear here by
+    name: the crate inputs, the packaged slices, and both ends of every carried
+    binding.
     """
     header = (
         "# Generated by scripts/xcframework_source_fingerprint.py --write.\n"
-        "# Declares the crate inputs and packaged slices the sandboxed\n"
-        "# \"Check PgpMobile XCFramework\" build phase is allowed to read.\n"
-        f"# Refreshed by {SYNC_COMMAND}; never edited by hand.\n"
+        "# Declares everything the sandboxed \"Check PgpMobile XCFramework\"\n"
+        "# build phase is allowed to read.\n"
+        f"# Refreshed by {SYNC_COMMAND}; commit it when it changes.\n"
     )
     lines = [f"$(SRCROOT)/{relative}\n" for relative in sorted(entries)]
     lines += [f"$(SRCROOT)/PgpMobile.xcframework/{relative}\n" for relative in sorted(slices)]
+    lines += [
+        f"$(SRCROOT)/PgpMobile.xcframework/{CARRIED_BINDINGS_DIR}/{relative}\n"
+        for relative in sorted(bindings)
+    ]
+    lines += [f"$(SRCROOT)/{relative}\n" for relative in sorted(bindings)]
     return header + "".join(lines)
 
 
@@ -224,8 +289,9 @@ def write_fingerprint(repo_root: Path, xcframework: Path) -> Path:
     payload = compute_fingerprint(repo_root, xcframework)
     destination = fingerprint_path(xcframework)
     destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (xcframework / INPUT_LIST_NAME).write_text(
-        render_input_list(payload["files"], payload["slices"]), encoding="utf-8"
+    (repo_root / INPUT_LIST_NAME).write_text(
+        render_input_list(payload["files"], payload["slices"], payload["bindings"]),
+        encoding="utf-8",
     )
     return destination
 
@@ -279,6 +345,54 @@ def check_recorded_slices(recorded: dict, xcframework: Path) -> None:
     )
 
 
+def check_recorded_bindings(recorded: dict, repo_root: Path, xcframework: Path) -> None:
+    """Both ends of the binding copy must be the bytes the build recorded.
+
+    The slice hashes say nothing about the FFI surface the app compiles, so
+    without this a bundle carrying someone else's bindings, a checkout that
+    never ran the restore, and a hand-edit to the generated Swift all reach the
+    compiler unnoticed.
+    """
+    recorded_bindings = recorded.get("bindings")
+    if not isinstance(recorded_bindings, dict) or not recorded_bindings:
+        raise FingerprintError(
+            f"source fingerprint records no generated bindings: {fingerprint_path(xcframework)}\n"
+            f"       The artifact predates this gate. Run the XCFramework sync: {SYNC_COMMAND}"
+        )
+
+    carried_root = carried_bindings_dir(xcframework)
+    stale_carried: list[str] = []
+    unplaced: list[str] = []
+    for relative in sorted(recorded_bindings):
+        recorded_digest = recorded_bindings[relative]
+        if _digest_or_none(carried_root / relative) != recorded_digest:
+            stale_carried.append(relative)
+        elif _digest_or_none(repo_root / relative) != recorded_digest:
+            unplaced.append(relative)
+
+    if stale_carried:
+        listed = "\n".join(
+            f"         - {CARRIED_BINDINGS_DIR}/{relative}" for relative in stale_carried
+        )
+        raise FingerprintError(
+            "PgpMobile.xcframework does not carry the generated bindings its own\n"
+            "       fingerprint records, so it cannot vouch for the FFI surface the app\n"
+            "       would compile.\n"
+            f"       Run the XCFramework sync: {SYNC_COMMAND}\n"
+            f"       Missing or changed ({len(stale_carried)}):\n{listed}"
+        )
+
+    if unplaced:
+        listed = "\n".join(f"         - {relative}" for relative in unplaced)
+        raise FingerprintError(
+            "The generated bindings in this checkout are not the ones PgpMobile.xcframework\n"
+            "       carries, so the app would compile an FFI surface the artifact never\n"
+            "       produced. They are build output; never hand-edit them.\n"
+            f"       Place the carried bindings: {RESTORE_COMMAND}\n"
+            f"       Missing or changed ({len(unplaced)}):\n{listed}"
+        )
+
+
 def check_fingerprint(repo_root: Path, xcframework: Path) -> None:
     if not (xcframework / "Info.plist").is_file():
         raise FingerprintError(
@@ -297,25 +411,28 @@ def check_fingerprint(repo_root: Path, xcframework: Path) -> None:
     current_files = hash_relative_paths(repo_root, sorted(recorded_files))
     check_recorded_slices(recorded, xcframework)
 
-    if recorded["sourceDigest"] == aggregate_digest(current_files):
-        return
+    if recorded["sourceDigest"] != aggregate_digest(current_files):
+        details = [
+            relative
+            for relative in sorted(recorded_files)
+            if recorded_files[relative] != current_files.get(relative)
+        ]
+        listed = "\n".join(f"         - {relative}" for relative in details[:20])
+        if len(details) > 20:
+            listed += f"\n         - ... and {len(details) - 20} more"
 
-    details = [
-        relative
-        for relative in sorted(recorded_files)
-        if recorded_files[relative] != current_files.get(relative)
-    ]
-    listed = "\n".join(f"         - {relative}" for relative in details[:20])
-    if len(details) > 20:
-        listed += f"\n         - ... and {len(details) - 20} more"
+        raise FingerprintError(
+            "PgpMobile.xcframework is stale: it was built from different pgp-mobile sources\n"
+            "       than this checkout. The linked static library and the generated UniFFI\n"
+            "       bindings do not match the crate.\n"
+            f"       Run the XCFramework sync: {SYNC_COMMAND}\n"
+            f"       Changed crate inputs ({len(details)}):\n{listed}"
+        )
 
-    raise FingerprintError(
-        "PgpMobile.xcframework is stale: it was built from different pgp-mobile sources\n"
-        "       than this checkout. The linked static library and the generated UniFFI\n"
-        "       bindings do not match the crate.\n"
-        f"       Run the XCFramework sync: {SYNC_COMMAND}\n"
-        f"       Changed crate inputs ({len(details)}):\n{listed}"
-    )
+    # Last, because everything above fails with the same remedy: only once the
+    # artifact is proven current does an unplaced or edited binding become the
+    # most specific thing wrong.
+    check_recorded_bindings(recorded, repo_root, xcframework)
 
 
 def main(argv: list[str] | None = None) -> int:
