@@ -96,6 +96,8 @@ enum PGPErrorMapper {
             return .unknownSigner
         case .CorruptData(let reason):
             return .corruptData(reason: reason)
+        case .MessageLimitsExceeded(let reason):
+            return .messageLimitsExceeded(reason: reason)
         case .WrongPassphrase:
             return .wrongPassphrase
         case .InvalidKeyData(let reason):

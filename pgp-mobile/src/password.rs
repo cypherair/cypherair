@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use openpgp::crypto::{Password, SessionKey};
 use openpgp::packet::{SEIP, SKESK};
-use openpgp::parse::Parse;
 use openpgp::serialize::stream::{Armorer, Encryptor, Message};
 use openpgp::types::{AEADAlgorithm, SymmetricAlgorithm};
 use sequoia_openpgp as openpgp;
 
 use crate::armor;
+use crate::bounded_walk;
 use crate::decrypt;
 use crate::encrypt;
 use crate::error::PgpError;
@@ -157,8 +157,8 @@ pub fn decrypt(
     verification_keys: &[Vec<u8>],
 ) -> Result<PasswordDecryptResult, PgpError> {
     let normalized = normalize_message_bytes(encrypted_message)?;
-    let context = collect_message_context(&normalized)?;
-    if context.skesks.is_empty() {
+    let skesks = collect_message_skesks(&normalized)?;
+    if skesks.is_empty() {
         return Ok(PasswordDecryptResult {
             status: PasswordDecryptStatus::NoSkesk,
             plaintext: None,
@@ -167,21 +167,11 @@ pub fn decrypt(
             signatures: Vec::new(),
         });
     }
-    if context.skesks.len() > MAX_MESSAGE_SKESK_PACKETS {
-        // Fail closed before running any KDF: an unbounded SKESK count would
-        // multiply the per-message Argon2 cost on a wrong-password attempt.
-        return Err(PgpError::CorruptData {
-            reason: format!(
-                "Message carries {} SKESK packets, exceeding the maximum of {MAX_MESSAGE_SKESK_PACKETS}",
-                context.skesks.len()
-            ),
-        });
-    }
 
     let verifier_certs = decrypt::parse_verification_certs(verification_keys)?;
     let mut deferred_candidate_error: Option<PgpError> = None;
 
-    for skesk in &context.skesks {
+    for skesk in &skesks {
         let (session_key_algo, session_key) = match derive_candidate(skesk, password) {
             CandidateOutcome::Candidate {
                 session_key_algo,
@@ -486,58 +476,49 @@ fn normalize_message_bytes(message: &[u8]) -> Result<Vec<u8>, PgpError> {
     }
 }
 
-struct PasswordMessageContext {
-    skesks: Vec<SKESK>,
-    saw_encryption_container: bool,
-}
+fn collect_message_skesks(ciphertext: &[u8]) -> Result<Vec<SKESK>, PgpError> {
+    let mut skesks: Vec<SKESK> = Vec::new();
 
-fn collect_message_context(ciphertext: &[u8]) -> Result<PasswordMessageContext, PgpError> {
-    let mut context = PasswordMessageContext {
-        skesks: Vec::new(),
-        saw_encryption_container: false,
-    };
-
-    let ppr = openpgp::parse::PacketParser::from_bytes(ciphertext).map_err(|e| {
-        PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        }
-    })?;
-    let mut ppr = ppr;
-    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
-        match &pp.packet {
-            openpgp::Packet::SKESK(skesk) => context.skesks.push(skesk.clone()),
-            openpgp::Packet::SEIP(seip) => {
-                context.saw_encryption_container = true;
-                if let SEIP::V2(seip_v2) = seip {
-                    if !seip_v2.symmetric_algo().is_supported() {
-                        return Err(PgpError::UnsupportedAlgorithm {
-                            algo: seip_v2.symmetric_algo().to_string(),
-                        });
-                    }
-                    if !seip_v2.aead().is_supported() {
-                        return Err(PgpError::UnsupportedAlgorithm {
-                            algo: seip_v2.aead().to_string(),
-                        });
-                    }
+    let end = bounded_walk::walk_message_prefix_bytes(ciphertext, |packet| {
+        match packet {
+            openpgp::Packet::SKESK(skesk) => {
+                // Fail closed at the bound rather than after collecting: each
+                // SKESK is both an allocation here and a full Argon2 KDF on a
+                // wrong-password attempt, so an unbounded count would cost
+                // twice over before anything refused it.
+                if skesks.len() == MAX_MESSAGE_SKESK_PACKETS {
+                    return Err(PgpError::MessageLimitsExceeded {
+                        reason: format!(
+                            "Message carries more than {MAX_MESSAGE_SKESK_PACKETS} SKESK packets"
+                        ),
+                    });
                 }
-                break;
+                skesks.push(skesk.clone());
+            }
+            openpgp::Packet::SEIP(SEIP::V2(seip_v2)) => {
+                if !seip_v2.symmetric_algo().is_supported() {
+                    return Err(PgpError::UnsupportedAlgorithm {
+                        algo: seip_v2.symmetric_algo().to_string(),
+                    });
+                }
+                if !seip_v2.aead().is_supported() {
+                    return Err(PgpError::UnsupportedAlgorithm {
+                        algo: seip_v2.aead().to_string(),
+                    });
+                }
             }
             _ => {}
         }
+        Ok(())
+    })?;
 
-        let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?;
-        ppr = next;
-    }
-
-    if !context.saw_encryption_container {
+    if end != bounded_walk::PrefixEnd::Container {
         return Err(PgpError::CorruptData {
             reason: "No encrypted data found in message".to_string(),
         });
     }
 
-    Ok(context)
+    Ok(skesks)
 }
 
 /// Ceiling on the Argon2 memory cost accepted from a password-encrypted message.
@@ -561,9 +542,10 @@ const MAX_MESSAGE_ARGON2_MEMORY_KIB: u64 = 2 * 1024 * 1024; // 2 GiB
 const MAX_MESSAGE_ARGON2_PASSES: u8 = 16;
 
 /// Reject a password-encrypted message carrying an implausible number of SKESK
-/// packets. Each SKESK drives a full Argon2 KDF on a wrong-password attempt, so
-/// an unbounded count multiplies the per-message cost. A legitimate message
-/// carries one; 16 tolerates unusual multi-password constructions.
+/// packets. Each SKESK is collected into memory and drives a full Argon2 KDF on
+/// a wrong-password attempt, so an unbounded count multiplies the per-message
+/// cost. A legitimate message carries one; 16 tolerates unusual multi-password
+/// constructions.
 const MAX_MESSAGE_SKESK_PACKETS: usize = 16;
 
 fn validate_skesk(skesk: &SKESK) -> Result<(), PgpError> {

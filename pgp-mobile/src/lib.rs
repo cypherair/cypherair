@@ -5,6 +5,7 @@
 //! All Sequoia internal types are hidden behind this boundary.
 
 pub mod armor;
+mod bounded_walk;
 pub mod cert_signature;
 mod composite_classical;
 mod composite_kem;

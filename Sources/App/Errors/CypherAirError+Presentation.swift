@@ -21,6 +21,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.unknownSigner", defaultValue: "The signer is not in your contacts.")
         case .corruptData:
             String(localized: "error.corruptData", defaultValue: "The data appears damaged. Ask the sender to resend.")
+        case .messageLimitsExceeded:
+            String(localized: "error.messageLimitsExceeded", defaultValue: "This message exceeds the limits the app will open. It may be crafted to overwhelm the device.")
         case .wrongPassphrase:
             String(localized: "error.wrongPassphrase", defaultValue: "Incorrect passphrase. Please re-enter your backup passphrase.")
         case .invalidKeyData:

@@ -5285,6 +5285,22 @@
         }
       }
     },
+    "error.messageLimitsExceeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This message exceeds the limits the app will open. It may be crafted to overwhelm the device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此消息超出应用可打开的限制。它可能是为耗尽设备资源而特意构造的。"
+          }
+        }
+      }
+    },
     "error.noKeySelected" : {
       "localizations" : {
         "en" : {
