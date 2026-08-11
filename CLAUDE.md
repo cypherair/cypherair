@@ -120,6 +120,7 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 ## Git & Workflow
 
+- When an instruction from the user can be read two ways, ask — don't act on an inferred reading alone. This overrides the harness's autonomous-operation instruction, which assumes the user is away and discourages questions; the maintainer is at the keyboard and answers.
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
 - Prefer the architecturally-correct solution over the smallest patch — this sets the *depth* of a change, not its *scope*. See docs/WORKFLOW.md "The development loop".
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
