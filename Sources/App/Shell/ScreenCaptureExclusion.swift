@@ -26,13 +26,14 @@ enum ScreenCaptureExclusion {
     /// the window server has it — which is not the same moment the app next
     /// reaches its run loop:
     ///
-    /// - `NSWindowDidUpdate` is posted while a window is being created, before
-    ///   it is ordered on screen, so the window is already non-shareable when
-    ///   it first appears. That matters most exactly where it is hardest to
-    ///   see: a busy main thread lets the window server show and animate a
-    ///   window for as long as the app stays blocked. Measured for #920 on a
-    ///   launch that opens a sheet — without this trigger the scene window and
-    ///   the sheet were readable for ~240ms after appearing.
+    /// - `NSWindowDidUpdate` is posted from inside the call that shows a
+    ///   window, before the window server first publishes it — not at
+    ///   `NSWindow.init`, which posts nothing. So the window is already
+    ///   non-shareable when it first appears. That matters most exactly where
+    ///   it is hardest to see: a busy main thread lets the window server show
+    ///   and animate a window for as long as the app stays blocked. Measured
+    ///   for #920 on a launch that opens a sheet — without this trigger the
+    ///   scene window and the sheet were readable for ~240ms after appearing.
     /// - A run-loop observer at the lowest order for `beforeWaiting`/`exit`,
     ///   the activity where Core Animation commits the frame that publishes
     ///   new content; observers of one activity run in ascending order, so the
