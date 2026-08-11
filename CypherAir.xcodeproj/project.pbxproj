@@ -398,6 +398,7 @@
 				Services/FFI/PGPExternalP256SigningProviderBridge.swift,
 				Services/FFI/PGPKeyMetadataAdapter.swift,
 				Services/FFI/PGPKeyOperationAdapter.swift,
+				Services/FFI/PGPMessageFormatAdapter.swift,
 				Services/FFI/PGPMessageOperationAdapter.swift,
 				Services/FFI/PGPMessageResultMapper.swift,
 				Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift,

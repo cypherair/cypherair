@@ -121,8 +121,11 @@ documentation lookup for API behavior instead of relying on memory.
    uses Sequoia's `crypto-openssl` CSPRNG.
 7. **MIE enabled.** Enhanced Security with Hardware Memory Tagging must remain
    enabled. Never remove the entitlements.
-8. **Profile-correct message format.** Format is selected by recipient key
-   version; never send SEIPDv2 to a v4 key holder.
+8. **Profile-correct message format.** Never send a format a recipient cannot
+   read. The engine selects it from the capability each recipient certificate
+   advertises, through the same recipient collection `encrypt` uses. Key version
+   tracks that capability for keys the app generates and may not for imported
+   certificates, so no code derives the format from a version.
 
 ## Security-Sensitive Work
 

@@ -40,6 +40,92 @@ private actor EncryptClipboardNoticeGate {
     }
 }
 
+private enum OpenPGPPacketWalkError: Error {
+    case notAPacketHeader
+    case truncated
+    case unwalkablePacket
+    case noEncryptedContainer
+}
+
+/// Version byte of the Symmetrically Encrypted Integrity Protected Data packet
+/// (tag 18) in a de-armored OpenPGP message: `1` for SEIPDv1 (MDC), `2` for
+/// SEIPDv2 (AEAD). This is the message's real format, read off the wire rather
+/// than re-derived from the inputs the statement under test also used.
+///
+/// The container is the last top-level packet and everything ahead of it (the
+/// per-recipient session-key packets) carries a definite length, so the walk
+/// never has to follow a partial-length body to reach it.
+private func seipdVersion(ofDearmoredMessage message: Data) throws -> UInt8 {
+    let bytes = [UInt8](message)
+    var offset = 0
+
+    func nextByte() throws -> UInt8 {
+        guard offset < bytes.count else {
+            throw OpenPGPPacketWalkError.truncated
+        }
+        defer { offset += 1 }
+        return bytes[offset]
+    }
+
+    func bigEndianLength(octets: Int) throws -> Int {
+        var length = 0
+        for _ in 0..<octets {
+            length = (length << 8) | Int(try nextByte())
+        }
+        return length
+    }
+
+    while offset < bytes.count {
+        let header = try nextByte()
+        guard header & 0x80 != 0 else {
+            throw OpenPGPPacketWalkError.notAPacketHeader
+        }
+
+        let tag: UInt8
+        // nil = partial or indeterminate length: walkable only if it is the
+        // packet we are looking for.
+        let bodyLength: Int?
+
+        if header & 0x40 != 0 {
+            tag = header & 0x3F
+            let firstLengthOctet = try nextByte()
+            switch firstLengthOctet {
+            case 0..<192:
+                bodyLength = Int(firstLengthOctet)
+            case 192..<224:
+                bodyLength = ((Int(firstLengthOctet) - 192) << 8) + Int(try nextByte()) + 192
+            case 255:
+                bodyLength = try bigEndianLength(octets: 4)
+            default:
+                bodyLength = nil
+            }
+        } else {
+            tag = (header >> 2) & 0x0F
+            switch header & 0x03 {
+            case 0:
+                bodyLength = try bigEndianLength(octets: 1)
+            case 1:
+                bodyLength = try bigEndianLength(octets: 2)
+            case 2:
+                bodyLength = try bigEndianLength(octets: 4)
+            default:
+                bodyLength = nil
+            }
+        }
+
+        if tag == 18 {
+            return try nextByte()
+        }
+
+        guard let bodyLength, bytes.count - offset >= bodyLength else {
+            throw OpenPGPPacketWalkError.unwalkablePacket
+        }
+        offset += bodyLength
+    }
+
+    throw OpenPGPPacketWalkError.noEncryptedContainer
+}
+
 final class EncryptScreenModelTests: XCTestCase {
     private typealias ContactsProtectedHarness = (
         storageRoot: ProtectedDataStorageRoot,
@@ -727,6 +813,131 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertNil(model.resultQuantumSafety)
         XCTAssertFalse(model.showsQuantumSafeBadge)
         XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+    }
+
+    /// The chooser has to describe the message that actually goes out, so every
+    /// statement below is checked against the SEIPD version of the ciphertext the
+    /// same model then produces — the artifact, not a second derivation of the
+    /// prediction's own inputs. Each configuration is one the indicator got wrong
+    /// while it read the sender's default key version instead of the recipients.
+    ///
+    /// This guards the Swift half of the chain: selection and self-copy
+    /// resolution reaching the engine intact. The engine half — including
+    /// certificates whose advertised features contradict their version, which no
+    /// app-generated key can express — is guarded in
+    /// `pgp-mobile/tests/message_format_tests.rs`.
+    @MainActor
+    func test_outgoingFormatDecision_matchesTheSeipdVersionTheEncryptPathProduces() async throws {
+        let legacySelf = try await TestHelpers.generateLegacyKey(
+            service: stack.keyManagement,
+            name: "Legacy Self",
+            email: "legacy-self@example.invalid"
+        )
+        let modernSelf = try await TestHelpers.generateModernHighKey(
+            service: stack.keyManagement,
+            name: "Modern Self",
+            email: "modern-self@example.invalid"
+        )
+        let legacyRecipient = try stack.engine.generateKey(
+            name: "Legacy Recipient",
+            email: "legacy-recipient@example.invalid",
+            expirySeconds: nil,
+            suite: .ed25519LegacyCurve25519Legacy
+        )
+        let modernRecipient = try stack.engine.generateKey(
+            name: "Modern Recipient",
+            email: "modern-recipient@example.invalid",
+            expirySeconds: nil,
+            suite: .ed448X448
+        )
+        try stack.contactService.importContact(publicKeyData: legacyRecipient.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: modernRecipient.publicKeyData)
+        let legacyId = try XCTUnwrap(
+            stack.contactService.contactId(forFingerprint: legacyRecipient.fingerprint)
+        )
+        let modernId = try XCTUnwrap(
+            stack.contactService.contactId(forFingerprint: modernRecipient.fingerprint)
+        )
+
+        let model = makeModel()
+        model.signMessage = false
+        model.signerFingerprint = nil
+        model.encryptToSelf = false
+        model.plaintext = "the preview and the artifact must agree"
+
+        // Nothing addressed yet is not a message, and the chooser says nothing.
+        XCTAssertNil(model.outgoingFormatDecision)
+
+        // Every recipient supports AEAD: nobody is holding the format back.
+        model.selectedRecipients = [modernId]
+        var decision = try XCTUnwrap(model.outgoingFormatDecision)
+        XCTAssertEqual(decision.format, .seipdV2)
+        XCTAssertFalse(decision.withholdsAead)
+        XCTAssertTrue(decision.seipdV1ForcingFingerprints.isEmpty)
+        try await assertEncryptedSeipdVersion(2, model: model, description: "AEAD-capable selection")
+
+        // Mixed: the legacy recipient pulls the whole message down to SEIPDv1 and
+        // is the row worth marking. The default key is Legacy at this point, so
+        // the old sender-default predicate called every row compatible.
+        model.selectedRecipients = [modernId, legacyId]
+        decision = try XCTUnwrap(model.outgoingFormatDecision)
+        XCTAssertEqual(decision.format, .seipdV1)
+        XCTAssertTrue(decision.withholdsAead)
+        XCTAssertEqual(decision.seipdV1ForcingFingerprints, [legacyRecipient.fingerprint])
+        try await assertEncryptedSeipdVersion(1, model: model, description: "mixed selection")
+
+        // Only legacy recipients while the default key supports AEAD: SEIPDv1,
+        // but nothing was given up, so nothing is flagged. The old predicate
+        // warned here.
+        try stack.keyManagement.setDefaultKey(fingerprint: modernSelf.fingerprint)
+        model.selectedRecipients = [legacyId]
+        decision = try XCTUnwrap(model.outgoingFormatDecision)
+        XCTAssertEqual(decision.format, .seipdV1)
+        XCTAssertFalse(decision.withholdsAead)
+        XCTAssertTrue(decision.seipdV1ForcingFingerprints.isEmpty)
+        try await assertEncryptedSeipdVersion(1, model: model, description: "legacy-only selection")
+
+        // The Encrypt to Self copy is a recipient too: a legacy self key
+        // downgrades an otherwise AEAD-capable selection, it is the explicitly
+        // chosen key rather than the (AEAD-capable) default, and the key doing it
+        // has no row to carry the mark.
+        model.selectedRecipients = [modernId]
+        model.encryptToSelf = true
+        model.encryptToSelfFingerprint = legacySelf.fingerprint
+        decision = try XCTUnwrap(model.outgoingFormatDecision)
+        XCTAssertEqual(decision.format, .seipdV1)
+        XCTAssertTrue(decision.withholdsAead)
+        XCTAssertEqual(decision.seipdV1ForcingFingerprints, [legacySelf.fingerprint])
+        try await assertEncryptedSeipdVersion(1, model: model, description: "legacy Encrypt to Self copy")
+    }
+
+    @MainActor
+    private func assertEncryptedSeipdVersion(
+        _ expectedVersion: UInt8,
+        model: EncryptScreenModel,
+        description: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        model.requestEncrypt()
+        await waitUntil("\(description) encryption to finish", timeout: 10) {
+            model.operation.isRunning == false
+        }
+        XCTAssertFalse(model.operation.isShowingError, "\(description) failed to encrypt", file: file, line: line)
+        let ciphertext = try XCTUnwrap(
+            model.ciphertext,
+            "\(description) produced no ciphertext",
+            file: file,
+            line: line
+        )
+        let version = try seipdVersion(ofDearmoredMessage: stack.engine.dearmor(armored: ciphertext))
+        XCTAssertEqual(
+            version,
+            expectedVersion,
+            "\(description) was sent as SEIPDv\(version), not the stated SEIPDv\(expectedVersion)",
+            file: file,
+            line: line
+        )
     }
 
     @MainActor

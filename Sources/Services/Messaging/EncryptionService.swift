@@ -3,10 +3,10 @@ import Foundation
 /// Orchestrates text and file encryption with recipient selection,
 /// encrypt-to-self, and optional signing.
 ///
-/// Message format is auto-selected by recipient key versions (handled by Rust engine):
-/// - All v4 → SEIPDv1 (MDC)
-/// - All v6 → SEIPDv2 (AEAD OCB)
-/// - Mixed → SEIPDv1
+/// The message format is the engine's: it selects SEIPDv2 (AEAD OCB) when every
+/// recipient certificate advertises that capability and SEIPDv1 (MDC) otherwise,
+/// and nothing here passes a format in. `PGPMessageFormatAdapter` states the same
+/// answer before sending.
 @Observable
 final class EncryptionService {
 
@@ -192,23 +192,8 @@ final class EncryptionService {
             return nil
         }
 
-        if let fp = encryptToSelfFingerprint {
-            guard let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) else {
-                // A user-chosen self key that no longer resolves must fail loudly —
-                // silently re-targeting the self copy to the default key would
-                // contradict the selection still shown in the UI.
-                throw CypherAirError.encryptionFailed(
-                    reason: String(
-                        localized: "encrypt.encryptToSelf.staleSelection",
-                        defaultValue: "Your Encrypt to Self key is no longer available. Review the selection and try again."
-                    )
-                )
-            }
-            return key.publicKeyData
-        }
-        if let defaultKey = keyManagement.defaultKey {
-            return defaultKey.publicKeyData
-        }
-        throw CypherAirError.noKeySelected
+        return try keyManagement.encryptToSelfIdentity(
+            fingerprint: encryptToSelfFingerprint
+        ).publicKeyData
     }
 }

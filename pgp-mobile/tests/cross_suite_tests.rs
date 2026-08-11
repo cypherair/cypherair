@@ -1,5 +1,7 @@
 //! Cross-Suite Interoperability tests.
-//! Validates format auto-selection by recipient key version.
+//! Validates format auto-selection across recipient key versions. Every key
+//! here is app-generated, so advertised capability and version agree; the cases
+//! where they do not are in `message_format_tests.rs`.
 
 mod common;
 use common::detect_message_format;
@@ -370,7 +372,8 @@ fn test_format_selection_mixed_recipients_produces_seipd_v1() {
 // ── Format verification for cross-suite encrypt (sender ≠ recipient suite) ──
 
 /// Legacy sender encrypts to Modern High recipient → must produce SEIPDv2.
-/// Validates that format selection depends on RECIPIENT key version, not sender's suite.
+/// Validates that format selection depends on the RECIPIENT certificates, not
+/// the sender's suite.
 #[test]
 fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
     let sender_a =

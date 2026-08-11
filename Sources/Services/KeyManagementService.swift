@@ -507,6 +507,32 @@ final class KeyManagementService: @unchecked Sendable {
         keys.first(where: \.isDefault)
     }
 
+    /// The identity an Encrypt to Self copy goes to: the key the user picked in
+    /// the "Encrypt to Self With" menu, or the default key when they picked
+    /// none.
+    ///
+    /// One home for the resolution, so the pre-send format preview and the send
+    /// path address the same key. A chosen fingerprint that no longer resolves
+    /// fails loudly — silently re-targeting the self copy to the default key
+    /// would contradict the selection still shown in the UI.
+    func encryptToSelfIdentity(fingerprint: String?) throws -> PGPKeyIdentity {
+        if let fingerprint {
+            guard let key = keys.first(where: { $0.fingerprint == fingerprint }) else {
+                throw CypherAirError.encryptionFailed(
+                    reason: String(
+                        localized: "encrypt.encryptToSelf.staleSelection",
+                        defaultValue: "Your Encrypt to Self key is no longer available. Review the selection and try again."
+                    )
+                )
+            }
+            return key
+        }
+        guard let defaultKey else {
+            throw CypherAirError.noKeySelected
+        }
+        return defaultKey
+    }
+
     // MARK: - Public Key Export
 
     /// Export the public key in ASCII-armored format for sharing.

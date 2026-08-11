@@ -16,6 +16,7 @@ mod external_composite_signer;
 mod external_decryptor;
 mod external_signer;
 pub mod keys;
+pub mod message_format;
 pub mod password;
 mod qr_url;
 pub mod sign;
@@ -44,6 +45,7 @@ use crate::keys::{
     SecureEnclaveCompositePublicCertificateInput, SecureEnclaveGeneratedPublicCertificate,
     SecureEnclavePublicBindingInspection, SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
+use crate::message_format::OutgoingFormatDecision;
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
     DecryptDetailedResult, FileDecryptDetailedResult, FileVerifyDetailedResult,
@@ -465,6 +467,24 @@ impl PgpEngine {
         keys::validate_public_certificate(&cert_data)
     }
 
+    // ── Outgoing Message Format ─────────────────────────────────────
+
+    /// The container format an `encrypt` of these recipients will produce, and
+    /// which of them decide it.
+    ///
+    /// Takes the recipient arguments of `encrypt` so a caller can state the
+    /// format before sending without restating the rule: the answer comes from
+    /// the same recipient resolution and the certificates' advertised SEIPDv2
+    /// capability, which is the only thing the encryptor reads. Errors exactly
+    /// where `encrypt` would refuse the same recipients.
+    pub fn decide_outgoing_message_format(
+        &self,
+        recipients: Vec<Vec<u8>>,
+        encrypt_to_self: Option<Vec<u8>>,
+    ) -> Result<OutgoingFormatDecision, PgpError> {
+        message_format::decide_outgoing_message_format(&recipients, encrypt_to_self.as_deref())
+    }
+
     // ── Certificate Merge / Update ──────────────────────────────────
 
     /// Merge same-fingerprint public certificate update material into an existing public certificate.
@@ -541,10 +561,10 @@ impl PgpEngine {
 
     /// Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
     ///
-    /// Message format is auto-selected by recipient key versions:
-    /// - All v4 → SEIPDv1 (MDC)
-    /// - All v6 → SEIPDv2 (AEAD OCB)
-    /// - Mixed → SEIPDv1
+    /// The message format is never passed in: SEIPDv2 (AEAD OCB) when every
+    /// recipient certificate advertises that capability, SEIPDv1 (MDC)
+    /// otherwise. `decide_outgoing_message_format` states the same answer ahead
+    /// of the message.
     pub fn encrypt(
         &self,
         plaintext: Vec<u8>,
@@ -1162,7 +1182,8 @@ impl PgpEngine {
     // ── Streaming File Operations ──────────────────────────────────────
 
     /// Encrypt a file using streaming I/O. Constant memory usage.
-    /// Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+    /// Output is binary (.gpg format). Message format selected from what the
+    /// recipient certificates advertise, as in `encrypt`.
     pub fn encrypt_file(
         &self,
         input_path: String,

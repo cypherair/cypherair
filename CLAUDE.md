@@ -82,7 +82,7 @@ The Rust↔Xcode sync contract, the per-change rebuild table, and stale-artifact
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
 6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: Sequoia's `crypto-openssl` CSPRNG (`openpgp::crypto::random`).
 7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See docs/SECURITY.md Section 8.
-8. **Profile-correct message format.** Format is chosen automatically by recipient key version; never send SEIPDv2 to a v4 key holder. See docs/PRODUCT.md Section 5.
+8. **Profile-correct message format.** Never send a format a recipient cannot read. The engine chooses it — SEIPDv2 only when every recipient certificate advertises that capability — through the same recipient collection `encrypt` uses; no other code may derive it, least of all from a key version, which tracks capability for every key the app generates but not for an imported certificate. See docs/PRODUCT.md Section 5.
 
 ## Security-Sensitive Code — Edit, Then Explain
 
@@ -90,7 +90,7 @@ You may edit security-critical areas directly, but every such edit must be expli
 
 ## Encryption Profiles & Authentication Modes
 
-Multiple keys of different families are allowed; message format is auto-selected by recipient key version (docs/PRODUCT.md Section 5). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt). Details: docs/PRODUCT.md and docs/SECURITY.md Section 4.
+Multiple keys of different families are allowed; message format is auto-selected from what the recipient certificates advertise (docs/PRODUCT.md Section 5). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt). Details: docs/PRODUCT.md and docs/SECURITY.md Section 4.
 
 ## Code Style
 

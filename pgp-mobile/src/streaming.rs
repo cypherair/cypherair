@@ -382,7 +382,8 @@ fn secure_delete_file(path: &std::path::Path) {
 /// Encrypt a file using streaming I/O. Constant memory usage.
 ///
 /// Output format is binary (.gpg, no ASCII armor) for file encryption.
-/// Message format is auto-selected by recipient key versions (same rules as `encrypt()`).
+/// Message format is selected from what the recipient certificates advertise,
+/// by the same rule as `encrypt()` (`crate::message_format`).
 pub fn encrypt_file(
     input_path: &str,
     output_path: &str,

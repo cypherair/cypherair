@@ -20,4 +20,5 @@ Boundary rules:
 - **Payload input classes stay explicit** — every input is `binary-only`, `armored-only`, or `dual-format`, stated at the function.
 - **Cryptographic selectors use bytes, not display strings** (e.g. `userIdData` + occurrence index); discovery helpers are part of the contract when a selector needs enumerating, so string inference never leaks into Swift.
 - **Signer fingerprint means the primary key's fingerprint, not the subkey's** — the naming trap the contract exists to pin.
+- **The outgoing message format is the engine's to state, never Swift's to derive.** `pgp-mobile/src/message_format.rs` answers it from the same recipient arguments `encrypt` takes, so anything shown before sending describes the message that gets sent ([PRODUCT.md](PRODUCT.md) §5).
 - Sequoia was chosen as the only Rust OpenPGP implementation with complete RFC 9580 support plus production RFC 9980.

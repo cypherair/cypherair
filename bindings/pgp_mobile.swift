@@ -1930,6 +1930,18 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func dearmor(armored: Data) throws  -> Data
 
     /**
+     * The container format an `encrypt` of these recipients will produce, and
+     * which of them decide it.
+     *
+     * Takes the recipient arguments of `encrypt` so a caller can state the
+     * format before sending without restating the rule: the answer comes from
+     * the same recipient resolution and the certificates' advertised SEIPDv2
+     * capability, which is the only thing the encryptor reads. Errors exactly
+     * where `encrypt` would refuse the same recipients.
+     */
+    func decideOutgoingMessageFormat(recipients: [Data], encryptToSelf: Data?) throws  -> OutgoingFormatDecision
+
+    /**
      * Decode a QR code URL and extract the public key.
      * Validates the URL format, parses the key, and rejects secret key material.
      * Only public keys should be exchanged via QR codes.
@@ -2026,10 +2038,10 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     /**
      * Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
      *
-     * Message format is auto-selected by recipient key versions:
-     * - All v4 → SEIPDv1 (MDC)
-     * - All v6 → SEIPDv2 (AEAD OCB)
-     * - Mixed → SEIPDv1
+     * The message format is never passed in: SEIPDv2 (AEAD OCB) when every
+     * recipient certificate advertises that capability, SEIPDv1 (MDC)
+     * otherwise. `decide_outgoing_message_format` states the same answer ahead
+     * of the message.
      */
     func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?) throws  -> Data
 
@@ -2062,7 +2074,8 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
 
     /**
      * Encrypt a file using streaming I/O. Constant memory usage.
-     * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+     * Output is binary (.gpg format). Message format selected from what the
+     * recipient certificates advertise, as in `encrypt`.
      */
     func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
 
@@ -2539,6 +2552,27 @@ open func dearmor(armored: Data)throws  -> Data  {
 }
 
     /**
+     * The container format an `encrypt` of these recipients will produce, and
+     * which of them decide it.
+     *
+     * Takes the recipient arguments of `encrypt` so a caller can state the
+     * format before sending without restating the rule: the answer comes from
+     * the same recipient resolution and the certificates' advertised SEIPDv2
+     * capability, which is the only thing the encryptor reads. Errors exactly
+     * where `encrypt` would refuse the same recipients.
+     */
+open func decideOutgoingMessageFormat(recipients: [Data], encryptToSelf: Data?)throws  -> OutgoingFormatDecision  {
+    return try  FfiConverterTypeOutgoingFormatDecision_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
+    uniffi_pgp_mobile_fn_method_pgpengine_decide_outgoing_message_format(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceData.lower(recipients),
+        FfiConverterOptionData.lower(encryptToSelf),uniffiCallStatus
+    )
+})
+}
+
+    /**
      * Decode a QR code URL and extract the public key.
      * Validates the URL format, parses the key, and rejects secret key material.
      * Only public keys should be exchanged via QR codes.
@@ -2781,10 +2815,10 @@ open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
     /**
      * Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
      *
-     * Message format is auto-selected by recipient key versions:
-     * - All v4 → SEIPDv1 (MDC)
-     * - All v6 → SEIPDv2 (AEAD OCB)
-     * - Mixed → SEIPDv1
+     * The message format is never passed in: SEIPDv2 (AEAD OCB) when every
+     * recipient certificate advertises that capability, SEIPDv1 (MDC)
+     * otherwise. `decide_outgoing_message_format` states the same answer ahead
+     * of the message.
      */
 open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -2891,7 +2925,8 @@ open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, passwo
 
     /**
      * Encrypt a file using streaming I/O. Constant memory usage.
-     * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+     * Output is binary (.gpg format). Message format selected from what the
+     * recipient certificates advertise, as in `encrypt`.
      */
 open func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
         uniffiCallStatus in
@@ -5734,6 +5769,97 @@ public func FfiConverterTypeModifyExpiryResult_lower(_ value: ModifyExpiryResult
 
 
 /**
+ * What the format rule answers for one outgoing message.
+ */
+public struct OutgoingFormatDecision: Equatable, Hashable {
+    /**
+     * The container this recipient set produces.
+     */
+    public var format: OutgoingMessageFormat
+    /**
+     * The format is SEIPDv1 while a recipient advertises SEIPDv2: AEAD is being
+     * given up, not merely unavailable. False when no recipient could have
+     * received AEAD in the first place — SEIPDv1 costs those nothing.
+     */
+    public var withholdsAead: Bool
+    /**
+     * Fingerprints, lowercase hex, of the recipients that hold the message at
+     * SEIPDv1 while another recipient advertises SEIPDv2: dropping all of them
+     * restores AEAD. Non-empty exactly when `withholds_aead` is set, and
+     * includes the encrypt-to-self copy when that is what costs the message its
+     * AEAD.
+     */
+    public var seipdV1ForcingFingerprints: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The container this recipient set produces.
+         */format: OutgoingMessageFormat,
+        /**
+         * The format is SEIPDv1 while a recipient advertises SEIPDv2: AEAD is being
+         * given up, not merely unavailable. False when no recipient could have
+         * received AEAD in the first place — SEIPDv1 costs those nothing.
+         */withholdsAead: Bool,
+        /**
+         * Fingerprints, lowercase hex, of the recipients that hold the message at
+         * SEIPDv1 while another recipient advertises SEIPDv2: dropping all of them
+         * restores AEAD. Non-empty exactly when `withholds_aead` is set, and
+         * includes the encrypt-to-self copy when that is what costs the message its
+         * AEAD.
+         */seipdV1ForcingFingerprints: [String]) {
+        self.format = format
+        self.withholdsAead = withholdsAead
+        self.seipdV1ForcingFingerprints = seipdV1ForcingFingerprints
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension OutgoingFormatDecision: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOutgoingFormatDecision: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OutgoingFormatDecision {
+        return
+            try OutgoingFormatDecision(
+                format: FfiConverterTypeOutgoingMessageFormat.read(from: &buf),
+                withholdsAead: FfiConverterBool.read(from: &buf),
+                seipdV1ForcingFingerprints: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: OutgoingFormatDecision, into buf: inout [UInt8]) {
+        FfiConverterTypeOutgoingMessageFormat.write(value.format, into: &buf)
+        FfiConverterBool.write(value.withholdsAead, into: &buf)
+        FfiConverterSequenceString.write(value.seipdV1ForcingFingerprints, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOutgoingFormatDecision_lift(_ buf: RustBuffer) throws -> OutgoingFormatDecision {
+    return try FfiConverterTypeOutgoingFormatDecision.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOutgoingFormatDecision_lower(_ value: OutgoingFormatDecision) -> RustBuffer {
+    return FfiConverterTypeOutgoingFormatDecision.lower(value)
+}
+
+
+/**
  * Fixed-width P-256 ECDSA signature returned by an external private-operation provider.
  */
 public struct P256EcdsaSignature: Equatable, Hashable {
@@ -6014,9 +6140,13 @@ public func FfiConverterTypePublicCertificateValidationResult_lower(_ value: Pub
 
 /**
  * S2K (String-to-Key) parameters of a passphrase-protected key. The app reads
- * these to check the device's memory headroom before running the derivation —
- * as declared by an incoming key file (`parse_s2k_params`) or as an outgoing
+ * these to check the device's memory headroom before any derivation runs — as
+ * declared by an incoming key file (`parse_s2k_params`) or as an outgoing
  * export will use them (`export_s2k_params`).
+ *
+ * `memory_kib` is the cost of a single derivation, which is also the peak: a
+ * certificate protects each of its secret-key packets under its own S2K, so an
+ * export or import derives once per packet, one after another (SECURITY.md §7).
  */
 public struct S2kInfo: Equatable, Hashable {
     public var s2kType: S2kType
@@ -8727,6 +8857,81 @@ public func FfiConverterTypeMessageQuantumSafety_lower(_ value: MessageQuantumSa
 
 
 /**
+ * The symmetrically-encrypted container an outgoing public-key message carries.
+ */
+
+public enum OutgoingMessageFormat: Equatable, Hashable {
+
+    /**
+     * RFC 4880 SEIPDv1 — integrity by MDC, no AEAD.
+     */
+    case seipdV1
+    /**
+     * RFC 9580 SEIPDv2 — AEAD (OCB).
+     */
+    case seipdV2
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension OutgoingMessageFormat: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOutgoingMessageFormat: FfiConverterRustBuffer {
+    typealias SwiftType = OutgoingMessageFormat
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OutgoingMessageFormat {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .seipdV1
+
+        case 2: return .seipdV2
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: OutgoingMessageFormat, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .seipdV1:
+            writeInt(&buf, Int32(1))
+
+
+        case .seipdV2:
+            writeInt(&buf, Int32(2))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOutgoingMessageFormat_lift(_ buf: RustBuffer) throws -> OutgoingMessageFormat {
+    return try FfiConverterTypeOutgoingMessageFormat.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOutgoingMessageFormat_lower(_ value: OutgoingMessageFormat) -> RustBuffer {
+    return FfiConverterTypeOutgoingMessageFormat.lower(value)
+}
+
+
+
+/**
  * Result status for password-based decryption.
  */
 
@@ -9807,6 +10012,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_dearmor() != 42356) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decide_outgoing_message_format() != 14331) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url() != 27851) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -9846,7 +10054,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 51888) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 14997) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 34591) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 37542) {
@@ -9864,7 +10072,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer() != 25406) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 25489) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 5927) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_high_signer() != 29470) {

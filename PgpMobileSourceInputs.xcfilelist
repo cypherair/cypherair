@@ -38,6 +38,7 @@ $(SRCROOT)/pgp-mobile/src/keys/secure_enclave_generation/mod.rs
 $(SRCROOT)/pgp-mobile/src/keys/selector_discovery.rs
 $(SRCROOT)/pgp-mobile/src/keys/suite.rs
 $(SRCROOT)/pgp-mobile/src/lib.rs
+$(SRCROOT)/pgp-mobile/src/message_format.rs
 $(SRCROOT)/pgp-mobile/src/password.rs
 $(SRCROOT)/pgp-mobile/src/qr_url.rs
 $(SRCROOT)/pgp-mobile/src/sign.rs

@@ -44,8 +44,8 @@ Actions that never proceed without an explicit user step:
 
 Choices, not mechanisms — each could plausibly be built the other way and deliberately is not:
 
-- **Message format is never a manual choice.** It is selected automatically from recipient key versions (CLAUDE.md Hard Constraint 8).
-- **Format downgrade is surfaced before encryption** — as a warning on the recipient chooser — never as a post-hoc error.
+- **Message format is never a manual choice.** The engine selects it from what the recipient certificates advertise: AEAD only when every certificate the message is encrypted to advertises SEIPDv2 (CLAUDE.md Hard Constraint 8). For every key CypherAir generates that tracks the key version exactly; an imported certificate may advertise otherwise, and the advertised capability is what decides.
+- **Format downgrade is surfaced before encryption** — as a warning on the recipient chooser — never as a post-hoc error. The warning comes from the engine's decision for the recipients actually addressed, so it cannot describe a different message than the one that gets sent.
 - **A message not addressed to you never triggers an authentication prompt.** Decrypt Phase 1 matches recipients against public certificates only and fails without touching any private key ([SECURITY.md](SECURITY.md) §3).
 - **Signature verification is graded, not binary** — during decryption a bad or unknown signature is reported alongside the plaintext, never used to suppress it. The standalone Verify surface grades the same way; only its summary verdict is stricter (the first bad or expired signature is decisive).
 - **Every key ships with a revocation certificate**, generated at key creation and at import, and exportable from the key detail page. If the stored artifact is missing (e.g. interrupted device-bound generation), export fails closed rather than regenerating ([SECURITY.md](SECURITY.md) §3).
@@ -64,7 +64,7 @@ Choices, not mechanisms — each could plausibly be built the other way and deli
 
 Honest statements about shipped indicator behavior, recorded so no document or comment re-inflates them:
 
-- The recipient compatibility indicator has exactly **two states**: format-downgrade warning and compatible. There is **no near-expiry warning**, and non-encryptable contacts are filtered out of the chooser rather than shown blocked. A contact key's encryptability is cached at import time, not re-evaluated against the clock.
+- The recipient compatibility indicator has exactly **two states** — holds-the-message-at-SEIPDv1 and compatible — and it appears only on rows the message is addressed to; an unselected row makes no claim, because there is no message for it to be a claim about. It marks the key *causing* the fallback, not the recipient losing AEAD, and a message addressed only to keys without AEAD support flags nobody. The message-level outcome is stated once below the list, since the Encrypt to Self copy decides the format and has no row of its own. There is **no near-expiry warning**, and non-encryptable contacts are filtered out of the chooser rather than shown blocked. A contact key's encryptability is cached at import time, not re-evaluated against the clock; the format statement is not cached at all — it re-reads the addressed certificates every time it is shown.
 - Encrypt **tags are a filter** over the recipient list (browse-only); batch selection is the separate "Select All Shown" action scoped to the filtered view.
 - The **quantum-safety badge is on the result surface**, derived from the produced artifact's session-key packets — never from the live recipient selection ([SECURITY.md](SECURITY.md) §2). Mixed recipient sets get a visible not-fully-quantum-safe state.
 - Revoked/expired keys are retained and shown for signer recognition, but the app does not surface *why* a key was revoked (the revocation reason is not carried past the FFI boundary).
