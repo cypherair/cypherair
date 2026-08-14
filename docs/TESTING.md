@@ -19,8 +19,6 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test portable_modern_
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 ```
 
-`gnupg_fixture_regression_tests.rs` is not a suite but a fixture *generator*: `#[ignore]`d by default and run by hand (`-- --ignored`) when the v6-rejection fixture is regenerated.
-
 **Dependency audit** — whenever `pgp-mobile/Cargo.lock` changes, and before release validation:
 
 ```bash
@@ -28,7 +26,7 @@ cargo +stable install cargo-audit --version 0.22.2 --locked
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 ```
 
-**Swift unit + FFI** — the iOS Simulator cannot host this lane; macOS is where it runs. The Simulator compiles, but the unit-test host app dies at launch: the ProtectedData storage root requires the volume to report file-protection support *and* re-reads the `.complete` attribute it just wrote, failing closed when either check fails — which is what the simulator's volume does. iOS-only behavior is therefore verified through the macOS lane plus real devices.
+**Swift unit + FFI** — the iOS Simulator cannot host this lane; macOS is where it runs. The Simulator compiles, but the unit-test host app dies at launch: the ProtectedData storage root requires the volume to report file-protection support *and* re-reads the `.complete` attribute it just wrote, failing closed when either check fails — which is what the simulator's volume does.
 
 **Device** — needs a real Secure Enclave. An Apple Silicon Mac runs the whole lane locally (the Mac host has one); SE-capable iPhones and iPads work too; the simulator cannot. Biometric steps use Touch ID or the system authentication prompt. The MIE subset additionally needs memory-tagging hardware (§6).
 
@@ -48,13 +46,13 @@ Five plans. Every invocation names one with `-testPlan`, so scope is never impli
 
 There is no visionOS test plan; native visionOS validation is the build probe in §2.3.
 
-**The unit plan's `skippedTests` list is fail-open by construction.** Every `XCTestCase`-deriving class under `Tests/DeviceSecurityTests/` that declares test methods must be listed there, or it runs in the unit lane and stops the run at a biometric prompt. The rule is scoped to that directory, not to a `Device*` name — `DeviceBoundKeyPresentationModelTests` lives in `Tests/ServiceTests/` and belongs in the unit lane. `scripts/check_device_test_skip_list.py` inverts the default in PR and nightly CI and fails with the missing class names; a base class that declares no test methods of its own is exempt until it declares one.
+**The unit plan's `skippedTests` list is fail-open by construction.** Every `XCTestCase`-deriving class under `Tests/DeviceSecurityTests/` that declares test methods must be listed there, or it runs in the unit lane and stops the run at a biometric prompt. The rule is scoped to that directory, not to a `Device*` name. `scripts/check_device_test_skip_list.py` inverts the default in PR and nightly CI and fails with the missing class names; a base class that declares no test methods of its own is exempt until it declares one.
 
-`-only-testing:` takes the **test target** name, not the scheme name: `-only-testing:CypherAirTests/TutorialSessionStoreTests`.
+The test target is named `CypherAirTests` — `-only-testing:` takes the target name, not the scheme name.
 
 Tutorial or UI-test launch-gating changes additionally need the Mac UI plan plus Release and `AppStore Candidate Release` macOS build probes — the proof that the `UITEST_*` launch overrides stay Debug-only.
 
-ProtectedData device tests use test-only shared-right identifiers, never the production one, and never call `removeAllRightsWithCompletion()` — it appears nowhere in the tree, deliberately.
+ProtectedData device tests use test-only shared-right identifiers, never the production one, and never call `removeAllRightsWithCompletion()`.
 
 ### 2.1 CI lanes
 
@@ -70,7 +68,7 @@ Hosted macOS images can lag the deployment target, or ship an Xcode before its m
 ### 2.3 Local validation
 
 ```bash
-# Swift + FFI source of truth
+# Swift unit + FFI lane
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
 
@@ -92,15 +90,11 @@ python3 -m unittest discover -s scripts/tests
 python3 scripts/check_text_hygiene.py
 ```
 
-**Script sandboxing.** User-script sandboxing is enabled for the app and test targets, and local validation must never depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`. A Run Script phase must declare every file it reads in `inputPaths`/`inputFileListPaths` and every product it writes in `outputPaths`/`outputFileListPaths` — **a declared parent directory is not recursive access.** That is why `.git/HEAD` and `.git/logs/HEAD` are each declared for the source-compliance fallback, why the script-owned, version-stamped `Settings.bundle/Root.plist` appears as both an input and an output, and why adding a test fixture means updating the fixture xcfilelists (`Tests/FixtureResources.xcfilelist` and its `.outputs` companion) rather than naming their directory.
-
-### 2.4 Rust artifacts before Swift validation
-
-A Swift lane validates the artifact Xcode last linked, not the working tree — run the sync first when crate inputs changed. Contract, command, change-type→run table, and stale-artifact symptom: [BUILD.md](BUILD.md) §6. Whether a given Rust change needs the rebuild at all: `.claude/skills/rust-sync`.
+**Script sandboxing.** User-script sandboxing is enabled for the app and test targets, and local validation must never depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`. A Run Script phase must declare every file it reads in `inputPaths`/`inputFileListPaths` and every product it writes in `outputPaths`/`outputFileListPaths` — **a declared parent directory is not recursive access.** That is why adding a test fixture means updating the fixture xcfilelists (`Tests/FixtureResources.xcfilelist` and its `.outputs` companion) rather than naming their directory.
 
 ## 3. Family coverage
 
-Crypto tests cover every family a change touches. The five portable families are what the Rust suites parameterize over, and the suite and fixture-generator names mirror them; the device-bound families get equivalent coverage through the custody unit suites (mocks plus software P-256 keys) and the device lane. Per-family algorithms, key versions, and message formats are canon in `Sources/Models/Keys/PGPKeyFamily.swift` and `pgp-mobile/src/keys.rs` — this document keeps no second copy of them.
+Crypto tests cover every family a change touches. The five portable families are what the Rust suites parameterize over; the device-bound families get equivalent coverage through the custody unit suites (mocks plus software P-256 keys) and the device lane. Per-family algorithms, key versions, and message formats are canon in code.
 
 Password/SKESK round-trips are recipient-key-independent and are covered per message format rather than per family. **Their tamper tests use targeted payload and tag-area mutations, not arbitrary bit flips** — a random flip usually fails for the wrong reason.
 
@@ -108,22 +102,19 @@ Password/SKESK round-trips are recipient-key-independent and are covered per mes
 
 - **Assert behavior, not source text.** No source-scanning XCTest assertions: architecture conformance is review's job, not a test's.
 - **Every crypto operation** needs a round-trip test per family it supports, a targeted tamper test proving hard-fail with no partial output, and format assertions wherever the format rule applies (SEIPDv1/v2 selection, the AES-256 floor).
-- Crash-recovery coverage exercises all four outcomes of the crash-recovery invariant ([SECURITY.md](SECURITY.md) §4), not only the successful promotion.
 
 ## 5. Cross-tool interoperability
 
-**The policy.** GnuPG interop applies to Portable Legacy (software v4) and Device-Bound Legacy (v4). **v6 output — Modern, Modern · High, and Device-Bound Modern — is expected to be rejected by GnuPG**, and that rejection is asserted rather than assumed (`gnupg_binary_tests::test_gpg_rejects_sequoia_modern_high_pubkey`). **The post-quantum families make no GnuPG claim at all**: GnuPG follows LibrePGP's different post-quantum wire format ([CUSTODY.md](CUSTODY.md) §8). `sq` (sequoia-sq) is the cross-implementation evidence for the RFC 9580/9980 families; the device-bound families share those wire formats, and their custody halves are covered by the custody suites and the device lane.
+**The policy.** GnuPG interop applies to Portable Legacy (software v4) and Device-Bound Legacy (v4). **v6 output — Modern, Modern · High, and Device-Bound Modern — is expected to be rejected by GnuPG**, and that rejection is asserted rather than assumed. **The post-quantum families make no GnuPG claim at all**: GnuPG follows LibrePGP's different post-quantum wire format ([CUSTODY.md](CUSTODY.md) §8). `sq` (sequoia-sq) is the cross-implementation evidence for the RFC 9580/9980 families; the device-bound families share those wire formats, and their custody halves are covered by the custody suites and the device lane.
 
-**Two mechanisms per tool.** Fixtures are tool-generated certificates, messages, and signatures committed as test data under `pgp-mobile/tests/fixtures/` (`generate_gpg_fixtures.sh`, `generate_sq_fixtures.sh`; the tested tool versions are recorded in `gpg_version.txt` and `sq_version.txt`) — deterministic and CI-safe. Live lanes drive the real binary through `pgp-mobile/tests/common/gnupg.rs` and `common/sq.rs`; `gpg` runs on macOS only. Regenerate fixtures when a Sequoia update changes emitted or accepted wire formats, when algorithm selection changes, or when the GnuPG major version changes. For wire-neutral Sequoia patch releases, validate the frozen fixtures and the live lanes instead of rotating randomized test material.
+**Two mechanisms per tool.** Fixtures are tool-generated certificates, messages, and signatures committed as test data, with the tested tool versions recorded beside them — deterministic and CI-safe. Live lanes drive the real binary; `gpg` runs on macOS only. Regenerate fixtures when a Sequoia update changes emitted or accepted wire formats, when algorithm selection changes, or when the GnuPG major version changes. For wire-neutral Sequoia patch releases, validate the frozen fixtures and the live lanes instead of rotating randomized test material.
 
-**The require flags fail; they do not skip.** `require_gpg_or_skip()` and `require_sq_or_skip()` skip when the binary is missing, but under `CYPHERAIR_REQUIRE_GPG=1` / `CYPHERAIR_REQUIRE_SQ=1` — how the CI interop job runs them — a missing binary fails the lane instead. One deliberate exception: the post-quantum live sq tests gate additionally on a capability probe (`require_pq_capable_sq_or_skip()`), because an sq built on pre-2.4 sequoia-openpgp predates the final RFC 9980 wire format and cannot read engine ML-DSA certificates. **Those tests skip loudly even under `CYPHERAIR_REQUIRE_SQ=1`** — the flag requires sq's presence, not its newest version — and self-activate once the installed sq can import an engine post-quantum key. The committed fixtures carry cross-implementation post-quantum coverage meanwhile.
+**The require flags fail; they do not skip.** The interop helpers skip when the binary is missing, but under `CYPHERAIR_REQUIRE_GPG=1` / `CYPHERAIR_REQUIRE_SQ=1` — how the CI interop job runs them — a missing binary fails the lane instead. One deliberate exception: the post-quantum live sq tests gate additionally on a capability probe, because an sq built on pre-2.4 sequoia-openpgp predates the final RFC 9980 wire format and cannot read engine ML-DSA certificates. **Those tests skip loudly even under `CYPHERAIR_REQUIRE_SQ=1`** — the flag requires sq's presence, not its newest version — and self-activate once the installed sq can import an engine post-quantum key. The committed fixtures carry cross-implementation post-quantum coverage meanwhile.
 
 **A format trap.** sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2. That is sq's behavior, not a format-selection defect; the v4-only SEIPDv1 floor is asserted by mixing an engine Portable Legacy key into the recipient set (CLAUDE.md hard constraint 8).
 
-Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan (§2); evidence and sanitizer rules: [CUSTODY.md](CUSTODY.md) §9.
-
 ## 6. MIE validation
 
-Run on hardware with Hardware Memory Tagging (A19 / A19 Pro class) with the Xcode memory-tagging diagnostic enabled. The same tests pass on hardware without tagging — they simply prove nothing about MIE there.
+Run on hardware with Hardware Memory Tagging (A19 / A19 Pro class) with the Xcode memory-tagging diagnostic enabled. The MIE tests also pass on hardware without tagging — they simply prove nothing about MIE there.
 
-The assertions are `DeviceMIETests` in the device lane (§1): the full workflows across families, the repeated wrap/unwrap, encrypt/decrypt and sign/verify cycles, the OpenSSL primitives, and armor/dearmor all complete with no tag-mismatch termination. **The pass criterion no test can assert is the out-of-band one:** after the run, Console.app and the crash logs must contain no `EXC_GUARD` / `GUARD_EXC_MTE_SYNC_FAULT` entry for the app.
+**The pass criterion no test can assert is the out-of-band one:** after the run, Console.app and the crash logs must contain no `EXC_GUARD` / `GUARD_EXC_MTE_SYNC_FAULT` entry for the app.

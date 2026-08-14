@@ -10,8 +10,8 @@ All four device-bound families are production-exposed wherever Secure Enclave ha
 
 ## 2. Custody promises
 
-- **Private material is never exportable in any operable form.** The enforcement is the custody-kind guard at the export service boundary — `KeyExportService` throws `.operationUnsupportedForCustody` for anything but software custody before touching any secret — backed by the UI never offering a backup flow for device-bound keys. `PGPKeyCapabilityResolver`'s hard-unsupported `exportPrivateMaterial` arm is belt-and-braces with no production caller today.
-- **Import into the enclave is not an operation** — `PGPKeyOperationKind` has no such case, by design.
+- **Private material is never exportable in any operable form.** The enforcement is the custody-kind guard at the export service boundary, which refuses anything but software custody before touching any secret, backed by the UI never offering a backup flow for device-bound keys.
+- **Import into the enclave is not an operation.**
 - **Existing private keys are never converted into Secure Enclave custody**, and the product must not imply otherwise.
 - **A Keychain handle, public key, or locator is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
 - **Never weaken portable software-key behavior to make custody integration easier** — the second stop-and-review condition.
@@ -19,20 +19,20 @@ All four device-bound families are production-exposed wherever Secure Enclave ha
 
 ## 3. Access control
 
-Every device-bound tier persists role-separated CryptoKit Secure Enclave keys as `dataRepresentation` blobs in tier/role-namespaced Keychain rows (row promises: [STORAGE.md](STORAGE.md) §3), with access control **fixed at creation**: `WhenUnlockedThisDeviceOnly` + `[.privateKeyUsage, .biometryAny]` — no passcode fallback, never the mode-dependent app policy. `SecureEnclaveCustodyAccessControlPolicy` authors it for every tier's enclave handles; the split-custody classical wrapping key (§7) fixes the same shape at its own creation site.
+Every device-bound tier persists role-separated Secure Enclave keys as sealed blobs in tier/role-namespaced Keychain rows (row promises: [STORAGE.md](STORAGE.md) §3), with access control **fixed at creation**: `WhenUnlockedThisDeviceOnly` + `[.privateKeyUsage, .biometryAny]` — no passcode fallback, never the mode-dependent app policy. The split-custody classical wrapping key (§7) fixes the same shape at its own creation site.
 
 Two product rules ride on the flag choice: `biometryAny` keeps the key usable when the enrolled biometric set changes, and `biometryCurrentSet` must **never** be exposed as a user-selectable option — for a non-exportable key, biometric-set invalidation is permanent key loss.
 
-## 4. The mode-switch exemption — invariant and true mechanism
+## 4. The mode-switch exemption — invariant and mechanism
 
 **Invariant:** a Standard ↔ High Security mode switch never re-wraps device-bound custody state.
 
-**Mechanism:** two layers, and the outer one is not the enforcement.
+**Mechanism:** two layers; the caller-side custody-kind filter is the enforcement.
 
-1. **Caller-side custody-kind filtering** decides what is enumerated: `PGPKeyIdentity.softwareCustodyFingerprints` selects `.softwareSecretCertificate` identities, and both the mode-switch caller and interrupted-rewrap recovery walk only that set. This keeps device-bound identities out of the workflow entirely — which matters because a fingerprint with no software envelope classifies as unrecoverable and poisons the whole mode-switch recovery.
-2. **The envelope's payload kind is what makes a mis-enumeration fail closed.** `PrivateKeyRewrapWorkflow` pins every envelope it opens and re-seals to `software-secret-certificate`. The split-custody classical component (§7) is sealed as a different kind in a namespace the workflow never reads, so it is rejected by contract validation before any Secure Enclave call, and would fail the AEAD even if that check were bypassed. There is no input to this workflow that produces a silent custody downgrade.
+1. **Caller-side custody-kind filtering** decides what is enumerated: the mode-switch caller and interrupted-rewrap recovery walk only software-custody identities. This keeps device-bound identities out of the workflow entirely — which matters because a fingerprint with no software envelope classifies as unrecoverable and poisons the whole mode-switch recovery.
+2. **The envelope's payload kind is what makes a mis-enumeration fail closed.** The re-wrap opens and re-seals only software-secret-certificate envelopes. The split-custody classical component (§7) is sealed as a different kind in a namespace the workflow never reads, so it is rejected by contract validation before any Secure Enclave call, and would fail the AEAD even if that check were bypassed. There is no input to this workflow that produces a silent custody downgrade.
 
-The fixed access policy (§3) enforces neither: it constrains how the wrapping key may be used, not which envelopes a re-wrap may open. The filter remains a [SECURITY.md](SECURITY.md) §10 predicate — it is the difference between a clean switch and a poisoned recovery — but it is no longer the only thing standing between a mode switch and device-bound custody state.
+The fixed access policy (§3) enforces neither: it constrains how the wrapping key may be used, not which envelopes a re-wrap may open. The filter is the difference between a clean switch and a poisoned recovery.
 
 ## 5. Operation routing
 
@@ -40,7 +40,7 @@ The fixed access policy (§3) enforces neither: it constrains how the wrapping k
 - **One approval per operation.** A single authenticated window covers the enclave-handle load and — for split custody — the classical-component unwrap in the same breath.
 - **Roles are distinct handles.** Signing and key agreement route by required role; wrong-role or wrong-public-binding requests fail closed. A Secure Enclave route never falls back to software material ([SECURITY.md](SECURITY.md) §3).
 
-## 6. Split custody (the single home for this invariant)
+## 6. Split custody
 
 CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classical curves, so a whole RFC 9980 composite key cannot be enclave-resident. Device-Bound Post-Quantum therefore splits custody: the PQ components are generated in and never leave the enclave; the classical components are sealed under a fixed-access envelope (§7).
 
@@ -48,11 +48,9 @@ CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classica
 
 Structural red lines:
 
-- **Seam invariant — no OpenPGP wire-format cryptography in Swift.** Swift custody providers perform *exactly* the enclave-resident primitive (ML-KEM decapsulation returns the 32-byte key share; ML-DSA signing returns the raw signature); all OpenPGP-standardized derivation — the RFC 9980 KEM combiner, AES-256 key unwrap, packet assembly, composite self-verification before any signature is released — stays in the Rust engine. The FFI is **not** a trust boundary (same process); the rule exists to keep wire-format cryptography single-sourced and vector-testable in Rust.
-- **Never construct Sequoia's native composite secret-key material for device-bound keys** — `mpi::SecretKeyMaterial::MLKEM768_X25519 { ecdh, mlkem }` requires both components at once. Split custody pairs the public key with custom `Decryptor`/`Signer` implementations (the proven external-P-256 architecture).
-- **One OpenSSL.** The `crypto-openssl` backend routes through `ossl`/`openssl-sys`; linkage must continue to flow through the vendored CypherAir OpenSSL fork — no second OpenSSL build may enter the dependency graph. Nothing mechanical checks this; the next dependency addition is where it would break.
-- The **· High tier is not blocked by CryptoKit lacking X448/Ed448**: its classical halves are generated and operated in Rust/OpenSSL software (then sealed under the §7 envelope), so no CryptoKit X448/Ed448 support is required.
-- The **vendored KEM combiner** (`pgp-mobile/src/composite_kem.rs`) exists because Sequoia's `multi_key_combine` is crate-private; it is byte-verified against the pinned Sequoia release, and the module header carries its own deletion trigger (upstream export, sequoia issue #1249).
+- **Seam invariant — no OpenPGP wire-format cryptography in Swift.** Swift custody providers perform *exactly* the enclave-resident primitive; all OpenPGP-standardized derivation — the RFC 9980 KEM combiner, AES-256 key unwrap, packet assembly, composite self-verification before any signature is released — stays in the Rust engine. The FFI is **not** a trust boundary (same process); the rule exists to keep wire-format cryptography single-sourced and vector-testable in Rust.
+- **Never construct Sequoia's native composite secret-key material for device-bound keys** — the native representation requires both components at once. Split custody pairs the public key with custom decryptor/signer implementations (the proven external-P-256 architecture).
+- **One OpenSSL.** The `crypto-openssl` backend must continue to link through the vendored CypherAir OpenSSL fork — no second OpenSSL build may enter the dependency graph. Nothing mechanical checks this; the next dependency addition is where it would break.
 
 ## 7. Classical-component storage
 
@@ -60,7 +58,7 @@ The classical component secrets (Ed25519+X25519, or Ed448+X448 for · High) are 
 
 Two properties hold the boundary, and they are independent:
 
-- **Location.** `SecureEnclaveCompositeClassicalComponentStore` is the only writer and only reader of that namespace. No software-custody path resolves a service name that reaches it.
+- **Location.** A single component store is the only writer and only reader of that namespace. No software-custody path resolves a service name that reaches it.
 - **Payload kind.** The envelope binding names what it seals (`split-custody-classical-component`), authenticated by both the HKDF `sharedInfo` and the AES-GCM AAD (version map: [STORAGE.md](STORAGE.md) §5). Moving a row does not change what it is: a component handed to a software-certificate consumer is rejected before any Secure Enclave call, and fails the AEAD even if that check is bypassed.
 
 The custody health check reports the component's presence as its own availability value: split custody needs both halves, and an intact enclave handle pair says nothing about the sealed component (§5 routing depends on both).
@@ -69,16 +67,11 @@ The custody health check reports the component's presence as its own availabilit
 
 - **The PQ families make no GnuPG claim, and product copy must never imply one.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only; the two do not interoperate. Portable Legacy remains the GnuPG-compatibility story ([PRODUCT.md](PRODUCT.md) §6).
 - **The interop target for PQ artifacts is the Sequoia lineage** (`sq` at RFC 9980-capable releases). Device-Bound Modern (v6) likewise makes no GnuPG claim (GnuPG has no v6 support); Device-Bound Legacy (v4) is the GnuPG-oriented device-bound family.
-- **GnuPG floor decision:** the v4 interop contract (ECDSA/ECDH P-256, PKESK v3, SEIPDv1/MDC, v6 rejection) is stable across GnuPG ≥ 2.4, so the mandatory lane asserts a `>= 2.4.0` floor and never pins a release (`scripts/assert_min_gpg_version.sh`; lanes: [TESTING.md](TESTING.md) §5).
 - **QR surfaces show an explicit unavailable state, never a silent omission** — PQ certificates are an order of magnitude beyond single-QR capacity (the size classification is Rust-side), and multi-part QR is rejected by decision.
-- **Scope declinations** (recorded so they are not re-proposed): SLH-DSA; multi-part QR; LibrePGP-format PQ; first-party constant-time / side-channel auditing of the PQ dependency chain — CypherAir consumes pinned upstream releases and carries no cryptographic delta beyond the byte-verified combiner (§6), so side-channel posture belongs to the upstreams.
 
 ## 9. Evidence rules
-
-The dated evidence matrices are gone; the rules that governed them are the durable content:
 
 - **Sanitizer vocabulary for all evidence and diagnostic output** (console summaries, committed entries, attachments). Must exclude: plaintext, private-key material, ECDH shared secrets, session keys, KEKs, Keychain locators / handle-set identifiers, stable fingerprints, and temporary capability paths. Allowed: pass/fail, scenario labels, sanitized failure-category values, algorithm/curve identifiers, packet versions/tags, counts, and the gpg version string. Enforcement: the evidence summary types are sanitized by construction and test-pinned.
 - **Coverage honesty.** v6 third-party AEAD interop is verified **by composition only** (production seam + packet-shape assertions; no non-Sequoia RFC 9580 implementation is exercised — a committed fixture would upgrade this to direct interop). The software-backed CI lanes drive the production seams with a software-P256 stand-in and validate seams, formats, and gpg interop — they **never substitute for real-hardware evidence**. Interactive authentication-cancellation and biometric-lockout evidence is deliberately out of scope (a low-value attended edge case); fail-closed behavior is covered by the automated interaction-not-allowed proxy.
 - **The platform-claim rule.** A platform-specific custody claim requires that platform's own capture; the shared CryptoKit substrate justifies exposure, not claims.
 - **Accepted risks:** visionOS is exposed without dedicated evidence (maintainer-accepted 2026-06-14 — no Vision Pro hardware; based on the shared substrate, the visionOS build probe, and macOS capture). iPad capture is deferred (shares the iPhone iOS Secure Enclave substrate) and not required for release.
-- **Cross-device gpg procedure** (gpg runs only on the Mac): produce the Secure Enclave artifacts on the iPhone/iPad, transfer them to the Mac for gpg verification/encryption, transfer the ciphertext back, and decrypt through the production path on the device.
