@@ -2,11 +2,9 @@
 
 CypherAir is an offline OpenPGP encryption app for Apple platforms.
 
-This file is the Codex-facing agent guide. `CLAUDE.md` is maintained separately
-for Claude-facing sessions; keep shared project constraints semantically
-aligned, but do not force the two files to be identical. Canonical project docs
-live under `docs/`. `docs/ARM64E_STATUS.md` owns the machine-parsed arm64e
-stage1 pin; the toolchain contract lives in `docs/BUILD.md` Section 3.
+## Pre-Release Stance (Temporary)
+
+This stance is in force until the first public App Store release; internal TestFlight builds do not end it. The app has never shipped: no users, no user data, no old on-disk state. Prefer the correct foundation over compatibility shims — redesign from zero rather than rename in place, change persisted formats and identifiers freely and update every reference together, and never write migration, compatibility, or capability code for a past that does not exist. Version markers serve architectural integrity only and are refreshed to one consistent scheme, never kept for future migration. A keep must name a concrete fresh-install input; "robustness" and "future migration" do not qualify. The stance is foundational — it rests on no other documents and outranks them all: when another document conflicts with it, that document changes.
 
 ## Project Snapshot
 
