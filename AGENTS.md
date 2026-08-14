@@ -1,6 +1,6 @@
 # CypherAir Agent Guide
 
-CypherAir is an offline OpenPGP encryption app for Apple platforms.
+CypherAir is an offline OpenPGP encryption app for Apple platforms. Which document owns which facts: `docs/CLAUDE.md`.
 
 ## Pre-Release Stance (Temporary)
 
@@ -27,25 +27,6 @@ This stance is in force until the first public App Store release; internal TestF
   and explicit memory zeroing.
 - **Localization:** English and Simplified Chinese via `.xcstrings` String
   Catalog.
-
-Architecture is Rust (`pgp-mobile`) -> UniFFI scaffolding -> Swift app:
-
-```
-Sources/
-├── App/              # SwiftUI views, navigation, onboarding
-├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData
-├── Models/           # Data types, PGP key representations, error types
-├── Extensions/       # Swift/Foundation extensions
-├── PgpMobile/        # Generated UniFFI Swift bindings — git-ignored build output,
-│                     # absent until the sync runs; do not hand-edit
-└── Resources/        # Assets, String Catalog
-pgp-mobile/           # Rust wrapper crate
-docs/                 # canonical docs — map: docs/CLAUDE.md
-CypherAir-Info.plist  # Root-level app Info.plist source
-```
-
-Which document owns which facts: `docs/CLAUDE.md`.
 
 ## Build And Validation
 

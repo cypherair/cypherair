@@ -1,6 +1,6 @@
 # CypherAir
 
-Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
+Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only). Which document owns which facts: docs/CLAUDE.md.
 
 ## Zero-Compatibility Premise — Foundation Over Blast Radius
 
@@ -16,27 +16,6 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-o
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
 - **Build:** development runs on the Xcode beta at `/Applications/Xcode-beta.app`, which is not the `xcode-select` default — set `DEVELOPER_DIR` for device-family probes. Stable and App Store builds use the release Xcode. CI pins its Xcode version and its SDK expectation separately in `scripts/ci_xcode_platform_preflight.sh`. Rust stable (MSRV follows sequoia-openpgp), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
 - **Localization:** English + Simplified Chinese via `.xcstrings` String Catalog.
-
-## Architecture
-
-Three-layer bridge: Rust (`pgp-mobile`) → UniFFI scaffolding → Swift app.
-
-```
-Sources/
-├── App/              # SwiftUI views, navigation, onboarding
-├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData, Argon2id memory guard, memory zeroing
-├── Models/           # Data types, PGP key representations, error types
-├── Extensions/       # Swift/Foundation extensions
-├── PgpMobile/        # Generated UniFFI Swift bindings — git-ignored build output,
-│                     # absent until the sync runs; never hand-edit
-└── Resources/        # Assets, String Catalog
-pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
-docs/                 # canonical docs — map: docs/CLAUDE.md
-CypherAir-Info.plist  # Root-level app Info.plist source
-```
-
-Which document owns which facts: docs/CLAUDE.md.
 
 ## Build Commands
 
