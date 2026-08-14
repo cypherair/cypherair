@@ -2,8 +2,6 @@
 
 Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
-This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately for Codex; keep shared project constraints semantically aligned, but do not force the two files to be identical. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` owns the machine-parsed arm64e stage1 pin; the arm64e toolchain contract lives in docs/BUILD.md §3. Documentation classes and precedence are defined in docs/WORKFLOW.md.
-
 ## Zero-Compatibility Premise — Foundation Over Blast Radius
 
 **[Temporary — in force until the first public App Store release; internal TestFlight builds do not end it]** The app has never shipped: no users, no user data, no old on-disk state anywhere. Until the first release, every persisted format, identifier, name, and schema may change freely — redesign from zero rather than renaming in place, update every reference together, and never write migration, compatibility, or capability code for a past that does not exist. Version markers serve architectural integrity only and are refreshed to one consistent scheme, never kept "for future migration". A keep must name a concrete fresh-install input; category words (robustness, defense-in-depth, future migration) do not qualify. The premise is foundational — it rests on no other documents and outranks them all: when another document conflicts with it, that document changes.
