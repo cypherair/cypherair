@@ -136,6 +136,10 @@ verification pass checks these edits with extra care. The authoritative
 security-critical predicates and invariants live in
 `docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
 
+## Pre-Release Stance (Temporary)
+
+In force until the first public App Store release; internal TestFlight builds do not end it. The app has never shipped: no users, no user data, no old on-disk state. Prefer the correct foundation over compatibility shims — redesign from zero rather than rename in place, change persisted formats and identifiers freely and update every reference together, and never write migration, compatibility, or capability code for a past that does not exist. Version markers serve architectural integrity only and are refreshed to one consistent scheme (`docs/STORAGE.md` Section 5), never kept for future migration. A keep must name a concrete fresh-install input; "robustness" or "future migration" do not qualify.
+
 ## Code Style And Scope
 
 Standard Swift/SwiftUI idiom applies (use live Apple documentation for current
