@@ -93,14 +93,6 @@ documentation lookup for API behavior instead of relying on memory.
    tracks that capability for keys the app generates and may not for imported
    certificates, so no code derives the format from a version.
 
-## Security-Sensitive Work
-
-You may edit security-critical areas directly, but the summary and PR
-description must call out the file, what changed, and why; the PR's
-verification pass checks these edits with extra care. The authoritative
-security-critical predicates and invariants live in
-`docs/SECURITY.md` Section 10.
-
 ## Code Style And Scope
 
 Standard Swift/SwiftUI idiom applies (use live Apple documentation for current

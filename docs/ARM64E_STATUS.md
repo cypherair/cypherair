@@ -4,6 +4,6 @@
 
 - **Pinned prerelease tag:** `rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1`
 
-**`latest` is never allowed.** Every consumer force-downloads this exact tag against the digests in the machine pin.
+**`latest` is never allowed.**
 
 Everything else about arm64e — the packaging policy, the re-pin rule, the owned carry chains, the artifact and release contract — lives in [BUILD.md](BUILD.md).

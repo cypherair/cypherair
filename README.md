@@ -2,16 +2,16 @@
 
 **Fully offline OpenPGP encryption for Apple platforms — zero network, minimal permissions.** CypherAir X is an open-source OpenPGP tool for people who want to communicate securely without cryptographic knowledge: encrypt, decrypt, sign, and verify, with keys and contacts managed entirely on device. It is a SwiftUI app over a Rust OpenPGP engine (Sequoia PGP) bridged through UniFFI.
 
-- **Platforms** — iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+; 8 GB RAM minimum.
-- **Zero network access** — no HTTP(S), no networked SDKs, no telemetry, no update checks; the app works in airplane mode. The evidence chain lives in [docs/SECURITY.md](docs/SECURITY.md).
-- **One usage description** — `NSFaceIDUsageDescription`, for local biometric authentication, injected from the `INFOPLIST_KEY_NSFaceIDUsageDescription` build setting in `CypherAir.xcodeproj` (`CypherAir-Info.plist` declares none). No camera, photo library, contacts, or network permission; any other entitlement in the project is a resource, sandbox, or hardening entitlement, not a privacy permission.
-- **Nine key families** — five portable (software custody, exportable) and four device-bound (Secure Enclave custody, never exportable), chosen at key generation and immutable per key. Canon: `Sources/Models/Keys/PGPKeyFamily.swift`; promises: [docs/PRODUCT.md](docs/PRODUCT.md); custody: [docs/CUSTODY.md](docs/CUSTODY.md).
+- **Platforms** — iOS, iPadOS, macOS, and visionOS.
+- **Zero network access** — no HTTP(S), no networked SDKs, no telemetry, no update checks; the app works in airplane mode.
+- **One usage description** — for local biometric authentication. No camera, photo library, contacts, or network permission; any other entitlement in the project is a resource, sandbox, or hardening entitlement, not a privacy permission.
+- **Key families** — portable (software custody, exportable) and device-bound (Secure Enclave custody, never exportable), chosen at key generation and immutable per key. Promises: [docs/PRODUCT.md](docs/PRODUCT.md); custody: [docs/CUSTODY.md](docs/CUSTODY.md).
 
 ## Build
 
 ### Prerequisites
 
-- macOS on Apple Silicon with Xcode; pinned development and release toolchain versions are in [CLAUDE.md](CLAUDE.md) "Tech Stack".
+- macOS on Apple Silicon with Xcode.
 - Rust stable with the five Apple targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
 - **Steps 2 and 3 need network access** — they download and verify pinned prebuilt artifacts. Zero-network is a property of the shipped app, not of its build toolchain.
 
@@ -41,7 +41,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS'
 ```
 
-Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple Silicon Mac or a physical device — via the `CypherAir-DeviceTests` plan; macOS UI smoke coverage via `CypherAir-MacUITests`. There is no dedicated visionOS test plan; the build probe above plus the Rust and macOS lanes cover it. Lanes and plans: [docs/TESTING.md](docs/TESTING.md). Release flow, published artifacts, and stale-artifact troubleshooting: [docs/BUILD.md](docs/BUILD.md).
+Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple Silicon Mac or a physical device — via the `CypherAir-DeviceTests` plan; macOS UI smoke coverage via `CypherAir-MacUITests`. Lanes and plans: [docs/TESTING.md](docs/TESTING.md). Release flow, published artifacts, and stale-artifact troubleshooting: [docs/BUILD.md](docs/BUILD.md).
 
 ## Documentation
 
@@ -52,7 +52,7 @@ Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple S
 - [ARCHITECTURE](docs/ARCHITECTURE.md) — layer boundaries and the Rust/FFI contract rules
 - [BUILD](docs/BUILD.md) — stable release flow, published artifacts, arm64e toolchain contract, carry chains, and the Rust↔Xcode sync contract
 - [TESTING](docs/TESTING.md) — test layers, plans, and CI lanes
-- [WORKFLOW](docs/WORKFLOW.md) — development loop, "done" requirements, security gate, documentation contract
+- [WORKFLOW](docs/WORKFLOW.md) — development loop, "done" requirements, documentation contract
 - [ARM64E_STATUS](docs/ARM64E_STATUS.md) — the machine-parsed arm64e stage1 pin
 
 ## License

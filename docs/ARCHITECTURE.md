@@ -4,21 +4,18 @@
 
 ## Layers
 
-CypherAir X is a layered application: a SwiftUI presentation layer (`Sources/App/`), a Swift services layer (`Sources/Services/`), a Security layer (`Sources/Security/`), app-owned Models (`Sources/Models/`), and a Rust cryptographic engine (`pgp-mobile/`) reached through the Swift FFI adapters in `Sources/Services/FFI/` and generated UniFFI bindings. UI is SwiftUI; `UIKit`/`AppKit` imports are narrow platform bridges (pasteboard, windowing and the shield window, text-input hosting, presentation polish), never a screen framework.
+CypherAir X is a layered application: a SwiftUI presentation layer, a Swift services layer, a Security layer, app-owned Models, and a Rust cryptographic engine reached through Swift FFI adapters and generated UniFFI bindings. UI is SwiftUI; `UIKit`/`AppKit` imports are narrow platform bridges.
 
 Boundary rules:
 
-- **App → Security is a narrow edge.** Feature views reach crypto, Keychain, and lock state through the Services layer; only composition (`AppContainer`), the shell/lock surfaces, and the settings surfaces touch Security types directly.
-- **Services never call `PgpEngine` directly** — each operation family has a dedicated FFI adapter; the adapter directory listing is the source of truth for which exist. **One documented exception:** `EncryptScreenModel` calls the stateless generated engine directly for quantum-safety classification of the produced artifact.
-- **Error normalization has one chokepoint.** Generated `PgpError` is normalized into the app-owned `CypherAirError` vocabulary only at the FFI adapter boundary (`PGPErrorMapper`); Models, ScreenModels, and Views never see `PgpError`. External-seam callback failures travel as sanitized categories, never free-form strings.
-- **`PasswordMessageService` is deliberately outside the two-phase recipient flow** — no PKESK matching; it is its own path end to end.
+- **App → Security is a narrow edge.** Feature views reach crypto, Keychain, and lock state through the Services layer; only composition, the shell/lock surfaces, and the settings surfaces touch Security types directly.
+- **Services never call the engine directly** — each operation family has a dedicated FFI adapter. **One documented exception:** quantum-safety classification of the produced artifact calls the stateless generated engine directly.
+- **Error normalization has one chokepoint.** Generated `PgpError` is normalized into the app-owned `CypherAirError` vocabulary only at the FFI adapter boundary; Models, ScreenModels, and Views never see `PgpError`. External-seam callback failures travel as sanitized categories, never free-form strings.
 
 ## Rust / FFI contract rules
 
-- **The API surface is `pgp-mobile/src/lib.rs`**, UniFFI-annotated, taking and returning `Vec<u8>`/`String` — Sequoia types never cross the boundary.
-- **Evolution is additive.** Superseded surfaces are deleted intentionally; nothing is kept as a permanent compatibility API.
+- **The FFI surface is UniFFI-annotated, taking and returning `Vec<u8>`/`String`** — Sequoia types never cross the boundary.
 - **Payload input classes stay explicit** — every input is `binary-only`, `armored-only`, or `dual-format`, stated at the function.
-- **Cryptographic selectors use bytes, not display strings** (e.g. `userIdData` + occurrence index); discovery helpers are part of the contract when a selector needs enumerating, so string inference never leaks into Swift.
+- **Cryptographic selectors use bytes, not display strings**; discovery helpers are part of the contract when a selector needs enumerating, so string inference never leaks into Swift.
 - **Signer fingerprint means the primary key's fingerprint, not the subkey's** — the naming trap the contract exists to pin.
-- **The outgoing message format is the engine's to state, never Swift's to derive.** `pgp-mobile/src/message_format.rs` answers it from the same recipient arguments `encrypt` takes, so anything shown before sending describes the message that gets sent ([PRODUCT.md](PRODUCT.md) §5).
-- Sequoia was chosen as the only Rust OpenPGP implementation with complete RFC 9580 support plus production RFC 9980.
+- **The outgoing message format is the engine's to state, never Swift's to derive.** The engine answers it from the same recipient arguments `encrypt` takes, so anything shown before sending describes the message that gets sent ([PRODUCT.md](PRODUCT.md) §5).
