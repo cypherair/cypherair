@@ -89,7 +89,7 @@ When the `xcode` MCP server is available (see: README.md "Xcode MCP"), use `Docu
 
 ## Security-Sensitive Code — Edit, Then Explain
 
-You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care (docs/WORKFLOW.md §3). The authoritative security-critical predicates and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care (docs/WORKFLOW.md §3). The authoritative security-critical predicates and coding invariants: docs/SECURITY.md Section 10.
 
 ## Encryption Profiles & Authentication Modes
 

@@ -22,8 +22,6 @@ This stance is in force until the first public App Store release; internal TestF
   (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024).
   Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern
   (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody).
-  Per-family canon: `Sources/Models/Keys/PGPKeyFamily.swift`; product
-  promises: `docs/PRODUCT.md`.
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.
@@ -43,11 +41,11 @@ Sources/
 │                     # absent until the sync runs; do not hand-edit
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate
-docs/                 # product, security, custody, storage, architecture, testing, workflow, release
+docs/                 # canonical docs — map: docs/CLAUDE.md
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
-Detailed module breakdown: `docs/ARCHITECTURE.md`.
+Which document owns which facts: `docs/CLAUDE.md`.
 
 ## Build And Validation
 
@@ -87,8 +85,6 @@ xcodebuild build -scheme CypherAir \
 
 For Rust changes under `pgp-mobile/src` that can affect Swift-visible behavior,
 refresh the XCFramework and generated UniFFI bindings before Xcode validation.
-Per-target cargo commands, stale-artifact troubleshooting, CI lanes, and docs-only
-validation rules live in `docs/TESTING.md`.
 
 Use your judgment on tests — you don't need to justify each one or test
 everything. A test worth writing guards behavior a later change could quietly
@@ -132,7 +128,7 @@ You may edit security-critical areas directly, but the summary and PR
 description must call out the file, what changed, and why; the PR's
 verification pass checks these edits with extra care. The authoritative
 security-critical predicates and invariants live in
-`docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
+`docs/SECURITY.md` Section 10.
 
 ## Code Style And Scope
 
