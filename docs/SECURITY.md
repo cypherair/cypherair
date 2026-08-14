@@ -96,7 +96,7 @@ The guided tutorial may run real app services and real OpenPGP operations only i
 
 ## 7. Argon2id
 
-Argon2id S2K runs on exactly three paths: **private-key export**, **passphrase-protected private-key import** (both for the v6 portable families), and **reading a password-encrypted (SKESK) message whose sender chose Argon2** — a read-support obligation (§2), where the parameters are the sender's and are bounded before the KDF runs. It never runs for routine decrypt/sign with your own key, and never for Portable Legacy, which uses Iterated+Salted (mode 3) in both directions.
+Argon2id S2K runs on exactly three paths: **private-key export**, **passphrase-protected private-key import** (both for the v6 portable families), and **reading a password-encrypted (SKESK) message whose sender chose Argon2** — §2 read support, where the parameters are the sender's and are bounded before the KDF runs. It never runs for routine decrypt/sign with your own key, and never for Portable Legacy, which uses Iterated+Salted (mode 3) in both directions.
 
 The parameters we emit are RFC 9106's primary recommendation at 2 GiB; a foreign message's parameters are its own. The cost the memory guard checks is the cost the KDF runs under.
 
