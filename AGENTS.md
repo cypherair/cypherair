@@ -8,20 +8,10 @@ This stance is in force until the first public App Store release; internal TestF
 
 ## Project Snapshot
 
-- **Platforms:** iOS 26.5+, iPadOS 26.5+, macOS 26.5+, visionOS 26.5+. Minimum
-  device: 8 GB RAM.
-- **Language:** Apple Swift (6.4 beta on the Xcode 27.0 beta development
-  toolchain; 6.3.3 on the Xcode 26.6 release toolchain), SwiftUI, and Rust
-  stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler
-  release.
-- **OpenPGP:** Sequoia PGP 2.4.1 through the Rust `pgp-mobile` wrapper and
-  Mozilla UniFFI 0.32.x.
-- **Key families:** Nine, chosen at key generation and immutable per key.
-  Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible),
-  Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum
-  (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024).
-  Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern
-  (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody).
+- **Platforms:** iOS, iPadOS, macOS, and visionOS.
+- **Language:** Apple Swift (the development and release toolchains differ), SwiftUI, and Rust stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release.
+- **OpenPGP:** Sequoia PGP (version and carries in `pgp-mobile/Cargo.lock`) through the Rust `pgp-mobile` wrapper and Mozilla UniFFI (version in `pgp-mobile/Cargo.toml`).
+- **Key families:** a fixed set, chosen at key generation and immutable per key, split between portable software custody (exportable) and Secure Enclave custody (non-exportable).
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.

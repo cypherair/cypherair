@@ -12,7 +12,7 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-o
 - **Language:** Apple Swift (the development and release toolchains differ; see Build) — SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release. Framework choices during investigation are made on evidence, not by rule.
 - **OpenPGP:** Sequoia PGP (Rust, LGPL-2.0-or-later; version and carries in `pgp-mobile/Cargo.lock`) with `crypto-openssl` backend (vendored static linking).
 - **Key families:** a fixed set, chosen at key generation and immutable per key, split between portable software custody (exportable) and Secure Enclave custody (non-exportable).
-- **FFI:** Mozilla UniFFI (version in `pgp-mobile/Cargo.toml`). Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
+- **FFI:** Mozilla UniFFI (version in `pgp-mobile/Cargo.toml`) over the Rust wrapper crate `pgp-mobile`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
 - **Build:** development runs on the Xcode beta at `/Applications/Xcode-beta.app`, which is not the `xcode-select` default — set `DEVELOPER_DIR` for device-family probes. Stable and App Store builds use the release Xcode. CI pins its Xcode version and its SDK expectation separately in `scripts/ci_xcode_platform_preflight.sh`. Rust stable (MSRV follows sequoia-openpgp), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
 - **Localization:** English + Simplified Chinese via `.xcstrings` String Catalog.
@@ -69,10 +69,6 @@ When the `xcode` MCP server is available (see: README.md "Xcode MCP"), use `Docu
 ## Security-Sensitive Code — Edit, Then Explain
 
 You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care (docs/WORKFLOW.md §3). The authoritative security-critical predicates and coding invariants: docs/SECURITY.md Section 10.
-
-## Encryption Profiles & Authentication Modes
-
-Multiple keys of different families are allowed; message format is auto-selected from what the recipient certificates advertise (docs/PRODUCT.md Section 5). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt).
 
 ## Code Style
 
