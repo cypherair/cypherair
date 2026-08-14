@@ -1,6 +1,6 @@
 # CypherAir Agent Guide
 
-CypherAir is an offline OpenPGP encryption app for Apple platforms.
+CypherAir is an offline OpenPGP encryption app for Apple platforms. Which document owns which facts: `docs/CLAUDE.md`.
 
 ## Pre-Release Stance (Temporary)
 
@@ -8,46 +8,15 @@ This stance is in force until the first public App Store release; internal TestF
 
 ## Project Snapshot
 
-- **Platforms:** iOS 26.5+, iPadOS 26.5+, macOS 26.5+, visionOS 26.5+. Minimum
-  device: 8 GB RAM.
-- **Language:** Apple Swift (6.4 beta on the Xcode 27.0 beta development
-  toolchain; 6.3.3 on the Xcode 26.6 release toolchain), SwiftUI, and Rust
-  stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler
-  release.
-- **OpenPGP:** Sequoia PGP 2.4.1 through the Rust `pgp-mobile` wrapper and
-  Mozilla UniFFI 0.32.x.
-- **Key families:** Nine, chosen at key generation and immutable per key.
-  Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible),
-  Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum
-  (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024).
-  Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern
-  (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody).
-  Per-family canon: `Sources/Models/Keys/PGPKeyFamily.swift`; product
-  promises: `docs/PRODUCT.md`.
+- **Platforms:** iOS, iPadOS, macOS, and visionOS.
+- **Language:** Apple Swift (the development and release toolchains differ), SwiftUI, and Rust stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release.
+- **OpenPGP:** Sequoia PGP (version and carries in `pgp-mobile/Cargo.lock`) through the Rust `pgp-mobile` wrapper and Mozilla UniFFI (version in `pgp-mobile/Cargo.toml`).
+- **Key families:** a fixed set, chosen at key generation and immutable per key, split between portable software custody (exportable) and Secure Enclave custody (non-exportable).
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.
 - **Localization:** English and Simplified Chinese via `.xcstrings` String
   Catalog.
-
-Architecture is Rust (`pgp-mobile`) -> UniFFI scaffolding -> Swift app:
-
-```
-Sources/
-├── App/              # SwiftUI views, navigation, onboarding
-├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData
-├── Models/           # Data types, PGP key representations, error types
-├── Extensions/       # Swift/Foundation extensions
-├── PgpMobile/        # Generated UniFFI Swift bindings — git-ignored build output,
-│                     # absent until the sync runs; do not hand-edit
-└── Resources/        # Assets, String Catalog
-pgp-mobile/           # Rust wrapper crate
-docs/                 # product, security, custody, storage, architecture, testing, workflow, release
-CypherAir-Info.plist  # Root-level app Info.plist source
-```
-
-Detailed module breakdown: `docs/ARCHITECTURE.md`.
 
 ## Build And Validation
 
@@ -87,8 +56,6 @@ xcodebuild build -scheme CypherAir \
 
 For Rust changes under `pgp-mobile/src` that can affect Swift-visible behavior,
 refresh the XCFramework and generated UniFFI bindings before Xcode validation.
-Per-target cargo commands, stale-artifact troubleshooting, CI lanes, and docs-only
-validation rules live in `docs/TESTING.md`.
 
 Use your judgment on tests — you don't need to justify each one or test
 everything. A test worth writing guards behavior a later change could quietly
@@ -132,7 +99,7 @@ You may edit security-critical areas directly, but the summary and PR
 description must call out the file, what changed, and why; the PR's
 verification pass checks these edits with extra care. The authoritative
 security-critical predicates and invariants live in
-`docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
+`docs/SECURITY.md` Section 10.
 
 ## Code Style And Scope
 

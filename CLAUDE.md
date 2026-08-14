@@ -1,6 +1,6 @@
 # CypherAir
 
-Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
+Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only). Which document owns which facts: docs/CLAUDE.md.
 
 ## Zero-Compatibility Premise — Foundation Over Blast Radius
 
@@ -8,35 +8,14 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-o
 
 ## Tech Stack
 
-- **Platform:** iOS, iPadOS, macOS and visionOS. The deployment targets and the minimum-RAM floor are build settings and product promises — read them from `CypherAir.xcodeproj` and docs/PRODUCT.md rather than from here.
-- **Language:** Apple Swift (the development and release toolchains differ; see Build) — SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release. Where each UI framework is used is described in docs/ARCHITECTURE.md; framework choices during investigation are made on evidence, not by rule.
-- **OpenPGP:** Sequoia PGP (Rust, LGPL-2.0-or-later; version and carries in `pgp-mobile/Cargo.lock`) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/BUILD.md.
-- **Key families:** a fixed set, chosen at key generation and immutable per key, split between portable software custody (exportable) and Secure Enclave custody (non-exportable). The families, their algorithms and their key versions are canon in code, not here — `Sources/Models/Keys/PGPKeyFamily.swift` + `pgp-mobile/src/keys.rs`; product promises: docs/PRODUCT.md; custody: docs/CUSTODY.md.
-- **FFI:** Mozilla UniFFI (version in `pgp-mobile/Cargo.toml`). Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
+- **Platform:** iOS, iPadOS, macOS and visionOS.
+- **Language:** Apple Swift (the development and release toolchains differ; see Build) — SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release. Framework choices during investigation are made on evidence, not by rule.
+- **OpenPGP:** Sequoia PGP (Rust, LGPL-2.0-or-later; version and carries in `pgp-mobile/Cargo.lock`) with `crypto-openssl` backend (vendored static linking).
+- **Key families:** a fixed set, chosen at key generation and immutable per key, split between portable software custody (exportable) and Secure Enclave custody (non-exportable).
+- **FFI:** Mozilla UniFFI (version in `pgp-mobile/Cargo.toml`) over the Rust wrapper crate `pgp-mobile`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
-- **Build:** development runs on the Xcode beta at `/Applications/Xcode-beta.app`, which is not the `xcode-select` default — set `DEVELOPER_DIR` for device-family probes. Stable and App Store builds use the release Xcode. CI pins its Xcode version and its SDK expectation separately in `scripts/ci_xcode_platform_preflight.sh`, which is where those numbers live. Rust stable (MSRV follows sequoia-openpgp), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
+- **Build:** development runs on the Xcode beta at `/Applications/Xcode-beta.app`, which is not the `xcode-select` default — set `DEVELOPER_DIR` for device-family probes. Stable and App Store builds use the release Xcode. CI pins its Xcode version and its SDK expectation separately in `scripts/ci_xcode_platform_preflight.sh`. Rust stable (MSRV follows sequoia-openpgp), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
 - **Localization:** English + Simplified Chinese via `.xcstrings` String Catalog.
-
-## Architecture
-
-Three-layer bridge: Rust (`pgp-mobile`) → UniFFI scaffolding → Swift app.
-
-```
-Sources/
-├── App/              # SwiftUI views, navigation, onboarding
-├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData, Argon2id memory guard, memory zeroing
-├── Models/           # Data types, PGP key representations, error types
-├── Extensions/       # Swift/Foundation extensions
-├── PgpMobile/        # Generated UniFFI Swift bindings — git-ignored build output,
-│                     # absent until the sync runs; never hand-edit
-└── Resources/        # Assets, String Catalog
-pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
-docs/                 # product, security, custody, storage, architecture, testing, workflow, release
-CypherAir-Info.plist  # Root-level app Info.plist source
-```
-
-Detailed module breakdown: docs/ARCHITECTURE.md
 
 ## Build Commands
 
@@ -74,7 +53,7 @@ xcodebuild build -scheme CypherAir \
     -destination 'generic/platform=visionOS'
 ```
 
-The Rust↔Xcode sync contract, the per-change rebuild table, and stale-artifact troubleshooting live in docs/BUILD.md §6. When the `xcode` MCP server is available (see: README.md "Xcode MCP"), use `DocumentationSearch` for Apple API behavior instead of memory.
+When the `xcode` MCP server is available (see: README.md "Xcode MCP"), use `DocumentationSearch` for Apple API behavior instead of memory.
 
 ## Hard Constraints — NEVER Violate
 
@@ -89,11 +68,7 @@ The Rust↔Xcode sync contract, the per-change rebuild table, and stale-artifact
 
 ## Security-Sensitive Code — Edit, Then Explain
 
-You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care (docs/WORKFLOW.md §3). The authoritative security-critical predicates and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
-
-## Encryption Profiles & Authentication Modes
-
-Multiple keys of different families are allowed; message format is auto-selected from what the recipient certificates advertise (docs/PRODUCT.md Section 5). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt). Details: docs/PRODUCT.md and docs/SECURITY.md Section 4.
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description; the PR's verification pass must check these edits with extra care (docs/WORKFLOW.md §3). The authoritative security-critical predicates and coding invariants: docs/SECURITY.md Section 10.
 
 ## Code Style
 
@@ -113,7 +88,6 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator. New test classes under `Tests/DeviceSecurityTests/` must join `CypherAir-UnitTests.xctestplan`'s `skippedTests`; a repo-tracked check fails CI when one is missing.
 - Docs-only PRs may use the documentation path in docs/WORKFLOW.md Section 2 instead of Rust/Xcode runs.
-- Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review gates: docs/WORKFLOW.md.
 
 ## Releases & Versioning
 
