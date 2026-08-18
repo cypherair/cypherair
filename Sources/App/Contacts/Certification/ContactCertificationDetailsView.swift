@@ -222,11 +222,25 @@ private struct ContactCertificationDetailsHostView: View {
                     value: selectedKey.shortKeyId
                 )
                 HStack {
-                    Text(String(localized: "contactcertification.summary.openpgp", defaultValue: "OpenPGP Certification"))
+                    Text(String(localized: "contacttrust.heading", defaultValue: "Trust"))
                     Spacer()
-                    ContactCertificationStatusPill(
-                        title: projectionTitle(selectedKey.certificationProjection.status),
-                        color: projectionColor(selectedKey.certificationProjection.status)
+                    CypherStatusBadge(
+                        title: selectedKey.trust.anchor.badgeTitle,
+                        systemImage: selectedKey.trust.anchor.badgeSystemImage,
+                        color: selectedKey.trust.anchor.badgeColor
+                    )
+                }
+                HStack {
+                    Text(
+                        String(
+                            localized: "contactcertification.summary.openpgp",
+                            defaultValue: "Certification Signatures"
+                        )
+                    )
+                    Spacer()
+                    CypherStatusBadge(
+                        title: selectedKey.certificationProjection.signatureState.badgeTitle,
+                        color: selectedKey.certificationProjection.signatureState.badgeColor
                     )
                 }
             }
@@ -266,7 +280,8 @@ private struct ContactCertificationDetailsHostView: View {
 
     private var savedHistorySection: some View {
         Section {
-            if model.savedArtifacts.isEmpty {
+            let savedCertifications = model.savedCertifications
+            if savedCertifications.isEmpty {
                 Label(
                     String(
                         localized: "contactcertification.history.empty",
@@ -276,14 +291,16 @@ private struct ContactCertificationDetailsHostView: View {
                 )
                 .foregroundStyle(.secondary)
             } else {
-                ForEach(model.savedArtifacts) { artifact in
+                ForEach(savedCertifications) { saved in
                     ContactCertificationArtifactRow(
-                        artifact: artifact,
-                        statusTitle: model.title(for: artifact.validationStatus),
-                        statusColor: statusColor(artifact.validationStatus),
-                        isExporting: model.activeOperation == .exportArtifact(artifact.artifactId),
+                        artifact: saved.artifact,
+                        signerRole: saved.signerRole,
+                        statusTitle: model.title(for: saved.artifact.validationStatus),
+                        statusColor: statusColor(saved.artifact.validationStatus),
+                        isExporting: model.activeOperation
+                            == .exportArtifact(saved.artifact.artifactId),
                         export: {
-                            model.exportArtifact(artifact)
+                            model.exportArtifact(saved.artifact)
                         }
                     )
                     .disabled(model.isOperationLocked)
@@ -526,44 +543,21 @@ private struct ContactCertificationDetailsHostView: View {
                     )
                 }
             }
-            if let signerIdentity = verification.signerIdentity {
-                ContactCertificationSignerIdentityView(identity: signerIdentity)
+            if let signerRole = model.verificationSignerRole {
+                ContactCertificationSignerRoleView(role: signerRole)
             }
         } header: {
             Text(String(localized: "contactcertsig.result", defaultValue: "Result"))
         }
     }
 
-    private func projectionTitle(_ status: ContactCertificationProjection.Status) -> String {
-        switch status {
-        case .notCertified:
-            String(localized: "contactcertification.projection.none", defaultValue: "Not Certified")
-        case .certified:
-            String(localized: "contactcertification.projection.certified", defaultValue: "Certified")
-        case .invalidOrStale:
-            String(localized: "contactcertification.projection.invalid", defaultValue: "Invalid or Stale")
-        case .revalidationNeeded:
-            String(localized: "contactcertification.projection.revalidation", defaultValue: "Revalidation Needed")
-        }
-    }
-
-    private func projectionColor(_ status: ContactCertificationProjection.Status) -> Color {
-        switch status {
-        case .notCertified:
-            .secondary
-        case .certified:
-            .green
-        case .invalidOrStale:
-            .red
-        case .revalidationNeeded:
-            .orange
-        }
-    }
-
+    /// A stored certification's own status is a statement about its signature, so
+    /// it gets no green: green is reserved for trust the user anchored, and a
+    /// certification that verifies is not by itself a reason to believe anything.
     private func statusColor(_ status: ContactCertificationValidationStatus) -> Color {
         switch status {
         case .valid:
-            .green
+            .secondary
         case .invalidOrStale:
             .red
         case .revalidationNeeded:
@@ -574,6 +568,7 @@ private struct ContactCertificationDetailsHostView: View {
 
 private struct ContactCertificationArtifactRow: View {
     let artifact: ContactCertificationArtifactReference
+    let signerRole: ContactCertificationSignerRole?
     let statusTitle: String
     let statusColor: Color
     let isExporting: Bool
@@ -588,15 +583,21 @@ private struct ContactCertificationArtifactRow: View {
                 ContactCertificationStatusPill(title: statusTitle, color: statusColor)
             }
 
-            if let signerPrimaryFingerprint = artifact.signerPrimaryFingerprint {
-                Text(
-                    String(
-                        localized: "contactcertification.history.signer",
-                        defaultValue: "Signer \(IdentityPresentation.shortKeyId(from: signerPrimaryFingerprint))"
+            if let signerRole {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(
+                        String(
+                            localized: "contactcertification.history.signer",
+                            defaultValue: "Signed by \(signerRole.displayName)"
+                        )
                     )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    CypherStatusBadge(
+                        title: signerRole.badgeTitle,
+                        color: signerRole.badgeColor
+                    )
+                }
             }
 
             if let digest = artifact.effectiveSignatureDigest {
@@ -657,27 +658,39 @@ private struct ContactCertificationActionLabel: View {
     }
 }
 
-private struct ContactCertificationSignerIdentityView: View {
-    let identity: CertificateSignatureSignerIdentity
+/// Who signed, and — always, for every role — what their signature is worth.
+/// The weight note is not conditional: the reading most likely to go wrong is
+/// "a valid signature exists, so this contact must be trustworthy", and the only
+/// reliable cure is to say what the signature does and does not establish every
+/// single time.
+private struct ContactCertificationSignerRoleView: View {
+    let role: ContactCertificationSignerRole
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "contactcertsig.result.signer", defaultValue: "Signer"))
-                .font(.subheadline.weight(.semibold))
-            Text(IdentityDisplayPresentation.displayName(identity.displayName))
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "contactcertsig.result.signer", defaultValue: "Signer"))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                CypherStatusBadge(title: role.badgeTitle, color: role.badgeColor)
+            }
+            Text(role.displayName)
                 .font(.headline)
-            if let secondaryText = identity.secondaryText {
+            if let secondaryText = role.secondaryText {
                 Text(secondaryText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             FingerprintView(
-                fingerprint: identity.fingerprint,
+                fingerprint: role.fingerprint,
                 font: .system(.caption, design: .monospaced),
                 foregroundColor: .secondary,
                 textSelectionEnabled: true,
                 expandsHorizontally: false
             )
+            Text(role.weightNote)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
     }

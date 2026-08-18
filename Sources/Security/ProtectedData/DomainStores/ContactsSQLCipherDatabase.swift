@@ -240,8 +240,8 @@ final class ContactsSQLCipherDatabase {
                 is_expired INTEGER NOT NULL,
                 manual_verification_state TEXT NOT NULL,
                 usage_state TEXT NOT NULL,
-                certification_projection_status TEXT NOT NULL,
-                certification_projection_last_validated_at REAL,
+                certification_signature_state TEXT NOT NULL,
+                certification_signature_last_validated_at REAL,
                 public_key_data BLOB NOT NULL,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL,
@@ -507,8 +507,8 @@ final class ContactsSQLCipherDatabase {
                 is_expired,
                 manual_verification_state,
                 usage_state,
-                certification_projection_status,
-                certification_projection_last_validated_at,
+                certification_signature_state,
+                certification_signature_last_validated_at,
                 public_key_data,
                 created_at,
                 updated_at
@@ -532,7 +532,7 @@ final class ContactsSQLCipherDatabase {
             try bindBool(keyRecord.isExpired, to: statement, at: 14)
             try bindText(keyRecord.manualVerificationState.rawValue, to: statement, at: 15)
             try bindText(keyRecord.usageState.rawValue, to: statement, at: 16)
-            try bindText(keyRecord.certificationProjection.status.rawValue, to: statement, at: 17)
+            try bindText(keyRecord.certificationProjection.signatureState.rawValue, to: statement, at: 17)
             try bindOptionalDate(keyRecord.certificationProjection.lastValidatedAt, to: statement, at: 18)
             try bindBlob(keyRecord.publicKeyData, to: statement, at: 19)
             try bindDate(keyRecord.createdAt, to: statement, at: 20)
@@ -718,8 +718,8 @@ final class ContactsSQLCipherDatabase {
                 is_expired,
                 manual_verification_state,
                 usage_state,
-                certification_projection_status,
-                certification_projection_last_validated_at,
+                certification_signature_state,
+                certification_signature_last_validated_at,
                 public_key_data,
                 created_at,
                 updated_at
@@ -749,12 +749,12 @@ final class ContactsSQLCipherDatabase {
                         "Contacts SQLCipher usage state is unsupported."
                     )
                 }
-                let projectionStatusRawValue = try columnString(statement, at: 15)
-                guard let projectionStatus = ContactCertificationProjection.Status(
-                    rawValue: projectionStatusRawValue
+                let signatureStateRawValue = try columnString(statement, at: 15)
+                guard let signatureState = ContactCertificationProjection.SignatureState(
+                    rawValue: signatureStateRawValue
                 ) else {
                     throw ProtectedDataError.invalidEnvelope(
-                        "Contacts SQLCipher certification projection status is unsupported."
+                        "Contacts SQLCipher certification signature state is unsupported."
                     )
                 }
                 let keyVersion = try columnInt(statement, at: 6)
@@ -782,7 +782,7 @@ final class ContactsSQLCipherDatabase {
                         manualVerificationState: verificationState,
                         usageState: usageState,
                         certificationProjection: ContactCertificationProjection(
-                            status: projectionStatus,
+                            signatureState: signatureState,
                             artifactIds: try loadKeyArtifactIDs(
                                 table: "contact_key_projection_artifact_ids",
                                 keyID: keyID

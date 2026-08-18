@@ -35,7 +35,6 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
 
         XCTAssertEqual(verification.status, .valid)
         XCTAssertEqual(verification.signerPrimaryFingerprint, signer.fingerprint)
-        XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore + 1)
     }
 
@@ -126,7 +125,6 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             XCTAssertEqual(verification.status, .valid)
             XCTAssertEqual(verification.signerPrimaryFingerprint, fixture.identity.fingerprint)
             XCTAssertEqual(verification.signingKeyFingerprint, nil)
-            XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
             XCTAssertEqual(validation.verification.status, .valid)
             XCTAssertEqual(fixture.identity.keyVersion, family.keyVersion)
             XCTAssertEqual(fixture.identity.keyFamily, family)

@@ -129,7 +129,7 @@ class ContactServiceTestCase: XCTestCase {
         snapshot.certificationArtifacts.append(artifact)
         snapshot.keyRecords[keyIndex].certificationArtifactIds.append(artifactId)
         snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
-            status: .revalidationNeeded,
+            signatureState: .revalidationNeeded,
             artifactIds: [artifactId],
             lastValidatedAt: nil
         )

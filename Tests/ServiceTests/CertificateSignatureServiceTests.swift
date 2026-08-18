@@ -91,7 +91,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
         XCTAssertEqual(verification.status, .valid)
         XCTAssertEqual(verification.signerPrimaryFingerprint, key.fingerprint)
-        XCTAssertEqual(verification.signerIdentity?.source, .contact)
     }
 
     func test_verifyDirectKeySignature_wrongTarget_returnsInvalid() async throws {
@@ -110,7 +109,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(verification.status, .invalid)
-        XCTAssertNil(verification.signerIdentity)
     }
 
     func test_verifyDirectKeySignature_missingSigner_returnsSignerMissing() async throws {
@@ -124,7 +122,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
         XCTAssertEqual(verification.status, .signerMissing)
         XCTAssertNil(verification.signerPrimaryFingerprint)
-        XCTAssertNil(verification.signerIdentity)
     }
 
     func test_verifyUserIdBindingSignature_fixtureFallbackSubkey_returnsContactAndSubkeyFingerprint()
@@ -151,7 +148,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(verification.status, .valid)
         XCTAssertEqual(verification.signerPrimaryFingerprint, key.fingerprint)
         XCTAssertEqual(verification.signingKeyFingerprint, expectedSubkeyFingerprint)
-        XCTAssertEqual(verification.signerIdentity?.source, .contact)
     }
 
     func test_verifyUserIdBindingSignature_duplicateOccurrence_acceptsSelectedOccurrence() async throws {
@@ -176,7 +172,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(verification.status, .valid)
-        XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
     }
 
     func test_generateUserIdCertification_roundTrip_legacy_returnsOwnKeyIdentity() async throws {
@@ -206,7 +201,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
 
         XCTAssertEqual(verification.status, .valid)
         XCTAssertEqual(verification.signerPrimaryFingerprint, signer.fingerprint)
-        XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
     }
 
     func test_generateUserIdCertification_roundTrip_modernHigh_returnsOwnKeyIdentity() async throws {
@@ -237,7 +231,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(verification.status, .valid)
         XCTAssertEqual(verification.signerPrimaryFingerprint, signer.fingerprint)
         XCTAssertEqual(verification.certificationKind, .persona)
-        XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
     }
 
     func test_generateUserIdCertification_preservesAllCertificationKinds() async throws {

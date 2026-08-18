@@ -306,17 +306,27 @@ private struct ContactDetailHostView: View {
                 )
             }
 
+            if !contact.vouchers.isEmpty {
+                HStack {
+                    Text(String(localized: "contacttrust.vouchedBy", defaultValue: "Vouched By"))
+                    Spacer()
+                    Text(contact.vouchers.map(\.displayName).formatted(.list(type: .and)))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+
             HStack {
                 Text(
                     String(
                         localized: "contactdetail.openpgpCertification",
-                        defaultValue: "OpenPGP Certification"
+                        defaultValue: "Certification Signatures"
                     )
                 )
                 Spacer()
                 CypherStatusBadge(
-                    title: certificationSummaryTitle(for: contact),
-                    color: certificationSummaryColor(for: contact)
+                    title: contact.certificationSignatureState.badgeTitle,
+                    color: contact.certificationSignatureState.badgeColor
                 )
             }
 
@@ -353,7 +363,7 @@ private struct ContactDetailHostView: View {
             Text(
                 String(
                     localized: "contactdetail.trust.footer",
-                    defaultValue: "Manual fingerprint verification and OpenPGP certification are tracked separately."
+                    defaultValue: "Verifying a fingerprint is your own check. Certifications are other people's signatures: they count only when you have verified the signer yourself, and stop counting the moment you withdraw that verification."
                 )
             )
         }
@@ -437,31 +447,4 @@ private struct ContactDetailHostView: View {
         }
     }
 
-    private func certificationSummaryTitle(for contact: ContactIdentitySummary) -> String {
-        let statuses = contact.keys.map(\.certificationProjection.status)
-        if statuses.contains(.certified) {
-            return String(localized: "contactdetail.openpgpCertification.certified", defaultValue: "Certified")
-        }
-        if statuses.contains(.invalidOrStale) {
-            return String(localized: "contactdetail.openpgpCertification.invalid", defaultValue: "Invalid or Stale")
-        }
-        if statuses.contains(.revalidationNeeded) {
-            return String(localized: "contactdetail.openpgpCertification.revalidation", defaultValue: "Revalidation Needed")
-        }
-        return String(localized: "contactdetail.openpgpCertification.none", defaultValue: "Not Certified")
-    }
-
-    private func certificationSummaryColor(for contact: ContactIdentitySummary) -> Color {
-        let statuses = contact.keys.map(\.certificationProjection.status)
-        if statuses.contains(.certified) {
-            return .green
-        }
-        if statuses.contains(.invalidOrStale) {
-            return .red
-        }
-        if statuses.contains(.revalidationNeeded) {
-            return .orange
-        }
-        return .secondary
-    }
 }

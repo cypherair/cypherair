@@ -966,13 +966,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Signer %@"
+            "value" : "Signed by %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "签名者 %@"
+            "value" : "由 %@ 签名"
           }
         }
       }
@@ -1217,70 +1217,6 @@
         }
       }
     },
-    "contactcertification.projection.certified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已认证"
-          }
-        }
-      }
-    },
-    "contactcertification.projection.invalid" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Invalid or Stale"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无效或已过期"
-          }
-        }
-      }
-    },
-    "contactcertification.projection.none" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not Certified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未认证"
-          }
-        }
-      }
-    },
-    "contactcertification.projection.revalidation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revalidation Needed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "需要重新验证"
-          }
-        }
-      }
-    },
     "contactcertification.save.invalid" : {
       "localizations" : {
         "en" : {
@@ -1325,6 +1261,262 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此认证签名属于另一个联系人密钥。"
+          }
+        }
+      }
+    },
+    "contactcertification.signatures.absent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无"
+          }
+        }
+      }
+    },
+    "contactcertification.signatures.invalid" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid or Stale"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无效或已过期"
+          }
+        }
+      }
+    },
+    "contactcertification.signatures.revalidation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revalidation Needed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要重新验证"
+          }
+        }
+      }
+    },
+    "contactcertification.signatures.valid" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signatures Valid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名有效"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.itself" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Key Itself"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥自身"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.itself.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is the key signing itself. Every OpenPGP certificate carries such a signature, and it attests nothing beyond what the certificate already claims about itself."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是密钥对自身的签名。每份 OpenPGP 证书都带有这样的签名，它无法证明证书自身声明之外的任何内容。"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.revokedContact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified Contact, Revoked Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已验证联系人，密钥已吊销"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.revokedContact.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This contact’s key has been revoked, so nothing it signed counts any more."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该联系人的密钥已被吊销，因此它签署的一切都不再计入。"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知签名者"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.unknown.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No key you hold matches this signer, so there is nothing the app can tell you about who they are."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你持有的密钥都与该签名者不匹配，因此应用无法告诉你他们是谁。"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.unverifiedContact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证联系人"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.unverifiedContact.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have not verified this contact’s fingerprint, so their certification carries no weight here."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你尚未验证该联系人的指纹，因此他们的认证在此不具任何分量。"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.verifiedContact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已验证联系人"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.verifiedContact.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You verified this contact’s fingerprint yourself, so their certification vouches for this key. Withdrawing that verification removes this vouch."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已亲自验证该联系人的指纹，因此他们的认证可为此密钥担保。一旦撤销该验证，此担保随即失效。"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.you" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密钥"
+          }
+        }
+      }
+    },
+    "contactcertification.signer.you.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You made this certification with your own key. It records what you did, not anyone else’s word about this contact."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此认证由你用自己的密钥签发。它记录的是你做过的事，而非他人对此联系人的背书。"
           }
         }
       }
@@ -1382,13 +1574,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OpenPGP Certification"
+            "value" : "Certification Signatures"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OpenPGP 认证"
+            "value" : "认证签名"
           }
         }
       }
@@ -2390,77 +2582,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OpenPGP Certification"
+            "value" : "Certification Signatures"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OpenPGP 认证"
-          }
-        }
-      }
-    },
-    "contactdetail.openpgpCertification.certified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已认证"
-          }
-        }
-      }
-    },
-    "contactdetail.openpgpCertification.invalid" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Invalid or Stale"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无效或已过期"
-          }
-        }
-      }
-    },
-    "contactdetail.openpgpCertification.none" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not Certified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未认证"
-          }
-        }
-      }
-    },
-    "contactdetail.openpgpCertification.revalidation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revalidation Needed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "需要重新验证"
+            "value" : "认证签名"
           }
         }
       }
@@ -2646,13 +2774,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Manual fingerprint verification and OpenPGP certification are tracked separately."
+            "value" : "Verifying a fingerprint is your own check. Certifications are other people’s signatures: they count only when you have verified the signer yourself, and stop counting the moment you withdraw that verification."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "手动指纹验证与 OpenPGP 认证会分别记录。"
+            "value" : "验证指纹是你自己的核对。认证则是他人的签名：只有当你亲自验证过签名者时它们才计入，而在你撤销该验证的那一刻便不再计入。"
           }
         }
       }
@@ -2662,13 +2790,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
+            "value" : "You have not verified this key. Confirm the fingerprint with its owner before relying on it."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥尚未验证。在依赖该密钥前，请先与密钥所有者核对指纹。"
+            "value" : "你尚未验证此密钥。依赖它之前，请与密钥所有者核对指纹。"
+          }
+        }
+      }
+    },
+    "contactdetail.unverified.vouched" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Someone you trust vouches for this key, but you have not checked its fingerprint yourself. Confirm it with the owner before relying on it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你信任的人为此密钥担保，但你尚未亲自核对其指纹。依赖它之前，请先与密钥所有者确认。"
           }
         }
       }
@@ -16017,6 +16161,118 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "后量子（RFC 9980）"
+          }
+        }
+      }
+    },
+    "contacttrust.anchor.unanchored" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证"
+          }
+        }
+      }
+    },
+    "contacttrust.anchor.verifiedByYou" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified by You"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已验证"
+          }
+        }
+      }
+    },
+    "contacttrust.anchor.vouched" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vouched by %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 担保"
+          }
+        }
+      }
+    },
+    "contacttrust.anchor.vouchedPlus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vouched by %1$@ +%2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %1$@ 等 %2$lld 人担保"
+          }
+        }
+      }
+    },
+    "contacttrust.heading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trust"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "信任"
+          }
+        }
+      }
+    },
+    "contacttrust.vouchedBy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vouched By"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "担保人"
+          }
+        }
+      }
+    },
+    "contacttrust.vouchedBy.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vouched for by %@, whose fingerprints you verified."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 担保，你已验证他们的指纹。"
           }
         }
       }

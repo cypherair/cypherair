@@ -1,5 +1,10 @@
 import Foundation
 
+/// The result of offering a signature to the app as a certification of a
+/// contact key: what the engine made of the signature, and — only when the
+/// signature is a certification somebody else made — the artifact that may be
+/// saved. `verification` always describes the signature and never the key's
+/// standing; a valid signature with no artifact is a normal outcome.
 struct ContactCertificationArtifactValidation: Equatable {
     let verification: CertificateSignatureVerification
     let artifact: VerifiedContactCertificationArtifact?
@@ -53,8 +58,7 @@ final class CertificateSignatureService {
         try await certificateAdapter.verifyDirectKeySignature(
             signature: signature,
             targetCert: targetCert,
-            candidateSigners: try candidateSignerCertificates(),
-            verificationContext: verificationContext()
+            candidateSigners: try candidateSignerCertificates()
         )
     }
 
@@ -72,8 +76,7 @@ final class CertificateSignatureService {
             signature: signature,
             targetCert: targetCert,
             selectedUserId: validatedUserId,
-            candidateSigners: try candidateSignerCertificates(),
-            verificationContext: verificationContext()
+            candidateSigners: try candidateSignerCertificates()
         )
     }
 
@@ -128,7 +131,7 @@ final class CertificateSignatureService {
             signature: canonicalSignature,
             targetCert: targetCert
         )
-        guard verification.status == .valid else {
+        guard isThirdPartyCertification(verification, of: targetKey) else {
             return ContactCertificationArtifactValidation(
                 verification: verification,
                 artifact: nil
@@ -163,7 +166,7 @@ final class CertificateSignatureService {
             targetCert: targetCert,
             selectedUserId: selectedUserId
         )
-        guard verification.status == .valid else {
+        guard isThirdPartyCertification(verification, of: targetKey) else {
             return ContactCertificationArtifactValidation(
                 verification: verification,
                 artifact: nil
@@ -191,6 +194,27 @@ final class CertificateSignatureService {
     func candidateSignerCertificates() throws -> [Data] {
         let contactKeys = try contactService.candidateSignerPublicKeyData()
         return contactKeys + keyManagement.keys.map(\.publicKeyData)
+    }
+
+    /// Whether the verified signature is a certification *somebody else* made
+    /// over this key, and so something the app can record as one.
+    ///
+    /// A key's own signature over its own User ID is a self-signature: it is
+    /// part of what an OpenPGP certificate is, every certificate worth importing
+    /// carries one, and it attests nothing beyond the certificate's own claim
+    /// about itself. Recording it as a certification would let any key vouch for
+    /// itself, which is how a key with nothing but self-signatures came to read
+    /// as certified. The signature is still valid and the screen still says so —
+    /// what it is not is somebody's word about the key.
+    private func isThirdPartyCertification(
+        _ verification: CertificateSignatureVerification,
+        of targetKey: ContactKeySummary
+    ) -> Bool {
+        guard verification.status == .valid else {
+            return false
+        }
+        return verification.signerPrimaryFingerprint?.lowercased()
+            != targetKey.fingerprint.lowercased()
     }
 
     private func makeCertificationArtifact(
@@ -237,13 +261,6 @@ final class CertificateSignatureService {
         return try certificateAdapter.validateUserIdSelection(
             selectedUserId,
             in: catalog
-        )
-    }
-
-    private func verificationContext() -> PGPCertificateVerificationContext {
-        PGPCertificateVerificationContext(
-            contactKeys: contactService.contactsVerificationContext().contactKeys,
-            ownKeys: keyManagement.keys
         )
     }
 }

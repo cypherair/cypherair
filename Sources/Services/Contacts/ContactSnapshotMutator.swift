@@ -679,9 +679,8 @@ struct ContactSnapshotMutator {
                     return lhs.artifactId < rhs.artifactId
                 }
             let artifactIds = artifacts.map(\.artifactId)
-            let status = certificationProjectionStatus(for: artifacts)
             let projection = ContactCertificationProjection(
-                status: status,
+                signatureState: certificationSignatureState(for: artifacts),
                 artifactIds: artifactIds,
                 lastValidatedAt: artifacts.compactMap(\.lastValidatedAt).max()
             )
@@ -1070,17 +1069,22 @@ struct ContactSnapshotMutator {
         }
     }
 
-    private func certificationProjectionStatus(
+    /// The signature state of one key's stored certifications, worst-case first
+    /// where it matters: a signature that has gone bad is reported even when
+    /// others alongside it still verify, because that is the fact the user needs
+    /// to see. Nothing here weighs *who* signed — that belongs to
+    /// `ContactCertificationTrustWeb`, which derives it live.
+    private func certificationSignatureState(
         for artifacts: [ContactCertificationArtifactReference]
-    ) -> ContactCertificationProjection.Status {
+    ) -> ContactCertificationProjection.SignatureState {
         guard !artifacts.isEmpty else {
-            return .notCertified
-        }
-        if artifacts.contains(where: { $0.validationStatus == .valid }) {
-            return .certified
+            return .absent
         }
         if artifacts.contains(where: { $0.validationStatus == .invalidOrStale }) {
             return .invalidOrStale
+        }
+        if artifacts.contains(where: { $0.validationStatus == .valid }) {
+            return .valid
         }
         return .revalidationNeeded
     }

@@ -332,10 +332,10 @@ final class ContactService: @unchecked Sendable {
     }
 
     func availableKey(keyId: String) -> ContactKeySummary? {
-        guard let keyRecord = availableContactKeyRecord(keyId: keyId) else {
+        guard let snapshot = openContactsSnapshot else {
             return nil
         }
-        return summaryProjector.keySummary(from: keyRecord)
+        return summaryProjector.keySummary(keyId: keyId, in: snapshot)
     }
 
     func availableContactKeyRecord(fingerprint: String) -> ContactKeyRecord? {

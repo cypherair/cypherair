@@ -114,7 +114,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         ]
         snapshot.keyRecords[0].certificationArtifactIds = ["artifact-1"]
         snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
-            status: .revalidationNeeded,
+            signatureState: .revalidationNeeded,
             artifactIds: ["artifact-1"],
             lastValidatedAt: nil
         )
@@ -178,7 +178,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             )
         ]
         snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
-            status: .revalidationNeeded,
+            signatureState: .revalidationNeeded,
             artifactIds: ["artifact-for-key-2"],
             lastValidatedAt: nil
         )

@@ -1,5 +1,10 @@
 import Foundation
 
+/// Turns the stored contacts domain into the summaries the UI reads.
+///
+/// Every projection derives `ContactKeyTrust` from the snapshot it is handed, so
+/// there is no way to obtain a key summary whose trust predates the anchor set
+/// it was read against — which is why no projection takes a lone key record.
 struct ContactSummaryProjector {
     func identitySummaries(
         from snapshot: ContactsDomainSnapshot
@@ -8,11 +13,12 @@ struct ContactSummaryProjector {
         let tagSummariesByID = Dictionary(
             uniqueKeysWithValues: tagSummaries(from: snapshot).map { ($0.tagId, $0) }
         )
+        let trustWeb = trustWeb(for: snapshot)
         return snapshot.identities
             .map { identity in
                 let keys = (keysByContactId[identity.contactId] ?? [])
                     .sorted(by: contactKeySort)
-                    .map(makeKeySummary)
+                    .map { makeKeySummary(from: $0, trustWeb: trustWeb) }
                 let tags = identity.tagIds.compactMap { tagSummariesByID[$0] }
                 return ContactIdentitySummary(
                     contactId: identity.contactId,
@@ -83,16 +89,36 @@ struct ContactSummaryProjector {
         fingerprint: String,
         in snapshot: ContactsDomainSnapshot
     ) -> ContactKeySummary? {
+        keySummary(in: snapshot) { $0.fingerprint == fingerprint }
+    }
+
+    func keySummary(
+        keyId: String,
+        in snapshot: ContactsDomainSnapshot
+    ) -> ContactKeySummary? {
+        keySummary(in: snapshot) { $0.keyId == keyId }
+    }
+
+    private func keySummary(
+        in snapshot: ContactsDomainSnapshot,
+        matching isMatch: (ContactKeyRecord) -> Bool
+    ) -> ContactKeySummary? {
         snapshot.keyRecords
-            .first { $0.fingerprint == fingerprint }
-            .map(makeKeySummary)
+            .first(where: isMatch)
+            .map { makeKeySummary(from: $0, trustWeb: trustWeb(for: snapshot)) }
     }
 
-    func keySummary(from keyRecord: ContactKeyRecord) -> ContactKeySummary {
-        makeKeySummary(from: keyRecord)
+    private func trustWeb(for snapshot: ContactsDomainSnapshot) -> ContactCertificationTrustWeb {
+        ContactCertificationTrustWeb(
+            keyRecords: snapshot.keyRecords,
+            certificationArtifacts: snapshot.certificationArtifacts
+        )
     }
 
-    private func makeKeySummary(from keyRecord: ContactKeyRecord) -> ContactKeySummary {
+    private func makeKeySummary(
+        from keyRecord: ContactKeyRecord,
+        trustWeb: ContactCertificationTrustWeb
+    ) -> ContactKeySummary {
         ContactKeySummary(
             keyId: keyRecord.keyId,
             contactId: keyRecord.contactId,
@@ -109,7 +135,8 @@ struct ContactSummaryProjector {
             isExpired: keyRecord.isExpired,
             manualVerificationState: keyRecord.manualVerificationState,
             usageState: keyRecord.usageState,
-            certificationProjection: keyRecord.certificationProjection
+            certificationProjection: keyRecord.certificationProjection,
+            trust: trustWeb.trust(for: keyRecord)
         )
     }
 

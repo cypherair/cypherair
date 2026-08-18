@@ -142,7 +142,7 @@ final class ContactsSQLCipherDatabaseTests: XCTestCase {
         )
         keyRecord.certificationArtifactIds = [artifact.artifactId]
         keyRecord.certificationProjection = ContactCertificationProjection(
-            status: .certified,
+            signatureState: .valid,
             artifactIds: [artifact.artifactId],
             lastValidatedAt: referenceDate
         )
