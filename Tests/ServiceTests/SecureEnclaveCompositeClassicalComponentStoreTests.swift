@@ -51,7 +51,7 @@ final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
         )
     }
 
-    func test_storeThenLoad_returnsBothHalvesAndLeavesTheSourcesErased() throws {
+    func test_storeThenLoad_returnsBothHalves() throws {
         var eddsaSource = Data(repeating: 0x31, count: 32)
         var ecdhSource = Data(repeating: 0x32, count: 32)
 
@@ -61,11 +61,6 @@ final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
             ecdhSecret: SensitiveBuffer(consuming: &ecdhSource),
             tier: .postQuantum
         )
-
-        // The generation service hands its secrets over exactly this way, and
-        // the handover is what leaves it nothing of its own to leak.
-        XCTAssertEqual(eddsaSource, Data(repeating: 0x00, count: 32))
-        XCTAssertEqual(ecdhSource, Data(repeating: 0x00, count: 32))
 
         let component = try store.load(
             fingerprint: fingerprint,

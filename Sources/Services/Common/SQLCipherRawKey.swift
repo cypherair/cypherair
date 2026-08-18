@@ -8,7 +8,10 @@ enum SQLCipherRawKeyError: Error, Equatable {
 /// digits>'`, which keys the database directly with no KDF in between.
 enum SQLCipherRawKey {
     static let rawKeyLength = 32
-    static let keySpecLength = 67
+    /// `x`, `'`, two hex digits per key byte, `'`. Derived rather than written
+    /// out: it sizes the allocation the spec is rendered into, and the render
+    /// offsets come from the key's own length.
+    static let keySpecLength = 3 + rawKeyLength * 2
 
     /// Render `rawKey` as the key-spec literal, in storage that erases itself
     /// when the caller releases it.

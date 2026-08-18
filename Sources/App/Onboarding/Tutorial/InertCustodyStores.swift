@@ -75,14 +75,14 @@ struct InertCustodyCompositeOperations: SecureEnclaveCompositeSigning, SecureEnc
     func decapsulateMlKem768(
         request: ExternalMlKem768DecapsulationRequest,
         using handle: SecureEnclaveCustodyLoadedHandle
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         throw SecureEnclaveCustodyHandleError.hardwareUnavailable
     }
 
     func decapsulateMlKem1024(
         request: ExternalMlKem1024DecapsulationRequest,
         using handle: SecureEnclaveCustodyLoadedHandle
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         throw SecureEnclaveCustodyHandleError.hardwareUnavailable
     }
 }

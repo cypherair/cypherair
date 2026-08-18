@@ -81,8 +81,8 @@ final class PrivateKeyAccessService {
     /// blocking biometric inside `reconstructKey` does not stall the main actor — see
     /// the rationale in `unwrapPrivateKey`. The `SEKeyHandle` is created and consumed
     /// here so it never crosses the actor boundary; only `Sendable` `Data` crosses.
-    /// The returned bytes are secret-certificate material and must be zeroized by the
-    /// caller (unchanged from the in-line implementation).
+    /// The returned bytes are secret-certificate material and must be zeroized by
+    /// the caller.
     @concurrent
     private static func reconstructAndUnwrapOffMainActor(
         secureEnclave: any SecureEnclaveManageable,
@@ -103,7 +103,8 @@ final class PrivateKeyAccessService {
 
         // The engine consumes secret certificates as `Data`, so the material
         // leaves this chokepoint as one, zeroized by its caller. The buffer the
-        // enclave hands back is erased when this scope ends either way.
+        // enclave hands back is a temporary of this statement, erased as soon
+        // as the copy is taken.
         var unwrapped = try secureEnclave.unwrap(
             bundle: bundle,
             using: handle,

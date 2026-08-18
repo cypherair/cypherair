@@ -29,7 +29,7 @@ protocol SecureEnclaveCompositeDecapsulating: Sendable {
     func decapsulateMlKem768(
         request: ExternalMlKem768DecapsulationRequest,
         using handle: SecureEnclaveCustodyLoadedHandle
-    ) throws -> Data
+    ) throws -> SensitiveBuffer
 
     /// Decapsulate the 1568-byte ML-KEM-1024 ciphertext into the raw 32-byte
     /// key share with the Secure Enclave-resident key-agreement component
@@ -37,7 +37,7 @@ protocol SecureEnclaveCompositeDecapsulating: Sendable {
     func decapsulateMlKem1024(
         request: ExternalMlKem1024DecapsulationRequest,
         using handle: SecureEnclaveCustodyLoadedHandle
-    ) throws -> Data
+    ) throws -> SensitiveBuffer
 }
 
 struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
@@ -82,7 +82,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
     func decapsulateMlKem768(
         request: ExternalMlKem768DecapsulationRequest,
         using handle: SecureEnclaveCustodyLoadedHandle
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         guard handle.role == .keyAgreement else {
             throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
                 expected: .keyAgreement,
@@ -106,12 +106,15 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
             throw Self.mapEnclaveOperationError(error, role: .keyAgreement)
         }
 
-        var keyShare = sharedSecret.withUnsafeBytes { Data($0) }
-        guard keyShare.count == Self.mlkem768KeyShareLength else {
-            keyShare.resetBytes(in: 0..<keyShare.count)
+        // Check the length before the share exists as bytes of ours: a wrong
+        // length is a broken enclave response, not a secret to carry onward.
+        let keyShareLength = sharedSecret.withUnsafeBytes { $0.count }
+        guard keyShareLength == Self.mlkem768KeyShareLength else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
         }
-        return keyShare
+        return SensitiveBuffer(count: keyShareLength) { destination in
+            sharedSecret.withUnsafeBytes { destination.copyMemory(from: $0) }
+        }
     }
 
     func signMlDsa87Digest(
@@ -147,7 +150,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
     func decapsulateMlKem1024(
         request: ExternalMlKem1024DecapsulationRequest,
         using handle: SecureEnclaveCustodyLoadedHandle
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         guard handle.role == .keyAgreement else {
             throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
                 expected: .keyAgreement,
@@ -171,12 +174,15 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
             throw Self.mapEnclaveOperationError(error, role: .keyAgreement)
         }
 
-        var keyShare = sharedSecret.withUnsafeBytes { Data($0) }
-        guard keyShare.count == Self.mlkem1024KeyShareLength else {
-            keyShare.resetBytes(in: 0..<keyShare.count)
+        // Check the length before the share exists as bytes of ours: a wrong
+        // length is a broken enclave response, not a secret to carry onward.
+        let keyShareLength = sharedSecret.withUnsafeBytes { $0.count }
+        guard keyShareLength == Self.mlkem1024KeyShareLength else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
         }
-        return keyShare
+        return SensitiveBuffer(count: keyShareLength) { destination in
+            sharedSecret.withUnsafeBytes { destination.copyMemory(from: $0) }
+        }
     }
 
     private static func mapEnclaveOperationError(

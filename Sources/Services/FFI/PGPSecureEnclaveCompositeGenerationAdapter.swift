@@ -1,8 +1,8 @@
 import Foundation
 
 /// Generated Device-Bound Post-Quantum material. Unlike the P-256 result this
-/// carries the freshly generated classical component secrets; the caller must
-/// seal them into the classical component store and zeroize the buffers.
+/// carries the freshly generated classical component secrets, which the caller
+/// moves into `SensitiveBuffer`s and hands to the classical component store.
 struct PGPSecureEnclaveCompositeGeneratedMaterial: Sendable {
     let publicKeyData: Data
     let revocationCert: Data

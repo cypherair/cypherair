@@ -52,11 +52,13 @@ final class TutorialSandboxContainer {
     /// Gives the container and the contacts domain-store closure one mutable
     /// holder for the tutorial's ephemeral root key.
     ///
-    /// `cleanup()` erases what the box holds. Each call of the closure vends an
-    /// independent `Data` copy the box cannot reach, so the erase covers every
-    /// byte of the key only once those copies have been released — until then
-    /// `resetBytes` copy-on-writes and clears the box's copy alone. The key is
-    /// generated per sandbox, is never persisted, and never leaves the process.
+    /// `cleanup()`'s erase is only as complete as the aliases outstanding when
+    /// it runs. Every read of `key` — through the closure, or the direct bind
+    /// in `openContactsIfNeeded` — hands out a value sharing this storage, and
+    /// `resetBytes` against a shared buffer copy-on-writes: the box is left
+    /// clear and the alias keeps the bytes, to be freed intact. The residual is
+    /// accepted here and nowhere else: this key is generated per sandbox, is
+    /// never persisted, and never leaves the process.
     private final class ContactsWrappingRootKeyBox {
         var key: Data
 
