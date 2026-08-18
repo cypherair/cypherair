@@ -9,6 +9,7 @@ $(SRCROOT)/pgp-mobile/build.rs
 $(SRCROOT)/pgp-mobile/src/armor.rs
 $(SRCROOT)/pgp-mobile/src/bounded_walk.rs
 $(SRCROOT)/pgp-mobile/src/cert_signature.rs
+$(SRCROOT)/pgp-mobile/src/classify.rs
 $(SRCROOT)/pgp-mobile/src/composite_classical.rs
 $(SRCROOT)/pgp-mobile/src/composite_kem.rs
 $(SRCROOT)/pgp-mobile/src/decrypt.rs

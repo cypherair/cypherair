@@ -22,9 +22,8 @@ struct CypherAirApp: App {
     @State private var tutorialStore: TutorialSessionStore
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
-    #if os(macOS)
-    @State private var macShellNavigationState = MacShellNavigationState()
-    #endif
+    @State private var shellNavigationState: AppShellNavigationState
+    @State private var openedDocumentHandoff: OpenedDocumentHandoff
     #if os(iOS) || os(visionOS)
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
     #endif
@@ -75,9 +74,16 @@ struct CypherAirApp: App {
             container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)
         }
         let tutorialStore = TutorialSessionStore()
+        let shellNavigationState = AppShellNavigationState()
+        let openedDocumentHandoff = OpenedDocumentHandoff()
         let incomingURLImportCoordinator = IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
-            importWorkflow: ContactImportWorkflow(contactService: container.contactService)
+            importWorkflow: ContactImportWorkflow(contactService: container.contactService),
+            openedDocumentReader: OpenedDocumentReader(
+                temporaryArtifactStore: container.temporaryArtifactStore
+            ),
+            openedDocumentHandoff: openedDocumentHandoff,
+            navigationState: shellNavigationState
         )
         let startupCoordinator = AppStartupCoordinator()
         let startupSnapshot = startupCoordinator.performPreAuthBootstrap(using: container)
@@ -243,6 +249,8 @@ struct CypherAirApp: App {
         _localDataResetRestartCoordinator = State(initialValue: LocalDataResetRestartCoordinator())
         _tutorialStore = State(initialValue: tutorialStore)
         _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
+        _shellNavigationState = State(initialValue: shellNavigationState)
+        _openedDocumentHandoff = State(initialValue: openedDocumentHandoff)
     }
 
     private static func protectedSettingsMutationRequirement(
@@ -309,12 +317,12 @@ struct CypherAirApp: App {
         .commands {
             // File > New Window stays disabled inside MacKeyboardCommands,
             // which replaces the New group with key actions.
-            MacKeyboardCommands(navigationState: macShellNavigationState)
+            MacKeyboardCommands(navigationState: shellNavigationState)
             // Restore the ⌘, Settings menu item that the standalone Settings scene used to
             // provide automatically; in the single-window design it selects the Settings tab.
             CommandGroup(replacing: .appSettings) {
                 Button(String(localized: "settings.title", defaultValue: "Settings…")) {
-                    macShellNavigationState.selectedTab = .settings
+                    shellNavigationState.selectedTab = .settings
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
@@ -339,7 +347,7 @@ struct CypherAirApp: App {
         switch launchConfiguration.root {
         case .main:
             MacAppShellView(
-                navigationState: macShellNavigationState,
+                navigationState: shellNavigationState,
                 opensAuthModeConfirmation: launchConfiguration.opensAuthModeConfirmation
             )
         case .tutorial:
@@ -349,7 +357,7 @@ struct CypherAirApp: App {
             )
         }
         #else
-        ContentView()
+        ContentView(navigationState: shellNavigationState)
         #endif
     }
 
@@ -390,6 +398,7 @@ struct CypherAirApp: App {
                     .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
                     .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
                     .environment(\.protectedSettingsHost, protectedSettingsHost)
+                    .environment(\.openedDocumentHandoff, openedDocumentHandoff)
                     .environment(tutorialStore)
                     #if os(iOS) || os(visionOS)
                     .environment(\.iosPresentationController, iosPresentationControllerValue)
@@ -628,7 +637,7 @@ private extension View {
         coordinator: IncomingURLImportCoordinator
     ) -> some View {
         alert(
-            String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),
+            String(localized: "import.tutorialBlocked.title", defaultValue: "Close the Tutorial First"),
             isPresented: Binding(
                 get: { coordinator.isTutorialImportBlocked },
                 set: { if !$0 { coordinator.dismissTutorialImportBlocked() } }
@@ -640,7 +649,7 @@ private extension View {
         } message: {
             Text(String(
                 localized: "import.tutorialBlocked.message",
-                defaultValue: "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+                defaultValue: "CypherAir X does not act on real keys, messages or files while the Guided Tutorial is open. Close the tutorial, then open the link or file again."
             ))
         }
     }

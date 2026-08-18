@@ -24,7 +24,8 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
 
         let store = CypherAir.AppTemporaryArtifactStore(
             temporaryDirectory: baseDirectory,
-            preferencesDirectory: preferencesDirectory
+            preferencesDirectory: preferencesDirectory,
+            documentInboxDirectory: baseDirectory.appendingPathComponent("Inbox", isDirectory: true)
         )
         AppStartupCoordinator().cleanupTemporaryFiles(
             temporaryArtifactStore: store
@@ -53,7 +54,8 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
 
         let store = CypherAir.AppTemporaryArtifactStore(
             temporaryDirectory: baseDirectory,
-            preferencesDirectory: preferencesDirectory
+            preferencesDirectory: preferencesDirectory,
+            documentInboxDirectory: baseDirectory.appendingPathComponent("Inbox", isDirectory: true)
         )
         AppStartupCoordinator().scheduleTemporaryFileCleanup(temporaryArtifactStore: store)
 

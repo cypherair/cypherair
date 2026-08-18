@@ -64,26 +64,7 @@ final class VerifyScreenModel {
         }
         self.detachedVerificationAction = FileOperationAction(injectedAction: detachedVerificationAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: request.originalFileURL,
-                        failure: .internalError(
-                            reason: String(
-                                localized: "verify.cannotAccessOriginal",
-                                defaultValue: "Cannot access original file"
-                            )
-                        )
-                    ),
-                    SecurityScopedAccessRequest(
-                        resource: request.signatureFileURL,
-                        failure: .internalError(
-                            reason: String(
-                                localized: "verify.cannotAccessSignature",
-                                defaultValue: "Cannot access signature file"
-                            )
-                        )
-                    )
-                ]
+                to: [request.originalFileURL, request.signatureFileURL]
             ) {
                 let signature = try readVerificationInputFile(at: request.signatureFileURL)
                 try Task.checkCancellation()
@@ -95,15 +76,7 @@ final class VerifyScreenModel {
             }
         }
         self.cleartextFileImportAction = cleartextFileImportAction ?? { url in
-            let data = try SecurityScopedFileAccess.withAccess(
-                to: url,
-                failure: .fileIoError(
-                    reason: String(
-                        localized: "verify.importCleartextReadFailed",
-                        defaultValue: "Could not read signed message file"
-                    )
-                )
-            ) {
+            let data = try SecurityScopedFileAccess.withAccess(to: url) {
                 try readVerificationInputFile(at: url)
             }
 
@@ -325,21 +298,42 @@ final class VerifyScreenModel {
         invalidateCleartextVerificationState(refreshInputSection: true)
     }
 
+    /// Take a signed message the system asked the app to open.
+    ///
+    /// The same state a chosen file produces: the message is loaded and the
+    /// reader still presses Verify. A signed message is text by construction —
+    /// the cleartext framework, or an armored one-pass-signed message — so
+    /// content that is not decodable text was misidentified, and saying so is
+    /// better than showing an empty editor.
+    func adoptOpenedSignedMessage(data: Data, fileName: String) {
+        guard let text = String(data: data, encoding: .utf8) else {
+            operation.present(error: .openedFileUnsupportedContent)
+            return
+        }
+
+        verifyMode = .cleartext
+        loadCleartext(data: data, fileName: fileName, text: text)
+    }
+
     private func importCleartextFile(from url: URL) {
         do {
             let loadedFile = try cleartextFileImportAction(url)
-            importedCleartext.setImportedFile(
+            loadCleartext(
                 data: loadedFile.data,
                 fileName: url.lastPathComponent,
                 text: loadedFile.text
             )
-            signedInput = loadedFile.text
-            invalidateCleartextVerificationState(refreshInputSection: true)
         } catch let error as CypherAirError {
             operation.present(error: error)
         } catch {
             operation.present(error: mapFileImportError(error))
         }
+    }
+
+    private func loadCleartext(data: Data, fileName: String, text: String) {
+        importedCleartext.setImportedFile(data: data, fileName: fileName, text: text)
+        signedInput = text
+        invalidateCleartextVerificationState(refreshInputSection: true)
     }
 
     private func invalidateCleartextVerificationState(refreshInputSection: Bool) {

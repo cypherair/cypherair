@@ -472,12 +472,7 @@ final class AddContactScreenModelTests: XCTestCase {
                     )
                 }
 
-                throw CypherAirError.invalidKeyData(
-                    reason: String(
-                        localized: "addcontact.file.readFailed",
-                        defaultValue: "Could not read key file"
-                    )
-                )
+                throw CypherAirError.invalidKeyData(reason: "unreadable")
             }
         )
         let fileURL = URL(fileURLWithPath: "/tmp/\(expectedFileName)")

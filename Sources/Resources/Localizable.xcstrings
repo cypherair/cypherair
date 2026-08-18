@@ -161,22 +161,6 @@
         }
       }
     },
-    "addcontact.file.readFailed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not read key file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取密钥文件"
-          }
-        }
-      }
-    },
     "addcontact.file.select" : {
       "localizations" : {
         "en" : {
@@ -1517,22 +1501,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "联系人"
-          }
-        }
-      }
-    },
-    "contactcertsig.import.failed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not read signature file."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取签名文件。"
           }
         }
       }
@@ -5349,6 +5317,54 @@
         }
       }
     },
+    "error.openedDetachedSignatureNeedsOriginal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is a detached signature. On its own it proves nothing — checking it needs the file it was made from as well. Open Verify, switch to Detached, and choose both."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是一份分离签名。单凭签名本身无法证明任何内容——校验它还需要被签名的原始文件。请打开“验证”，切换到“分离签名”，然后同时选择这两个文件。"
+          }
+        }
+      }
+    },
+    "error.openedFileTooLarge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is too large to open this way. Keys and signed messages opened from outside CypherAir X must be under %lld MB."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该文件太大，无法以这种方式打开。从 CypherAir X 之外打开的密钥和已签名消息必须小于 %lld MB。"
+          }
+        }
+      }
+    },
+    "error.openedFileUnsupportedContent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir X cannot open this file. Its contents are not a key or message this app handles, or they do not match what the file name claims."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开该文件。它的内容不是 CypherAir X 能处理的密钥或消息，或者与文件名声明的类型不符。"
+          }
+        }
+      }
+    },
     "error.ok" : {
       "localizations" : {
         "en" : {
@@ -5653,22 +5669,6 @@
         }
       }
     },
-    "fileDecrypt.cannotAccess" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannot access file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法访问文件"
-          }
-        }
-      }
-    },
     "fileDecrypt.decrypting" : {
       "localizations" : {
         "en" : {
@@ -5777,22 +5777,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "支持 .gpg、.pgp 和 .asc 文件"
-          }
-        }
-      }
-    },
-    "fileEncrypt.cannotAccess" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannot access file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法访问文件"
           }
         }
       }
@@ -8213,22 +8197,6 @@
         }
       }
     },
-    "import.file.readFailed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not read key file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取密钥文件"
-          }
-        }
-      }
-    },
     "import.fingerprint" : {
       "localizations" : {
         "en" : {
@@ -8378,13 +8346,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+            "value" : "CypherAir X does not act on real keys, messages or files while the Guided Tutorial is open. Close the tutorial, then open the link or file again."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "引导教程打开时，CypherAir X 不会导入真实联系人。请关闭教程，然后重新打开二维码链接。"
+            "value" : "引导教程打开时，CypherAir X 不会处理真实的密钥、消息或文件。请关闭教程，然后重新打开该链接或文件。"
           }
         }
       }
@@ -8394,13 +8362,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Close Tutorial to Import"
+            "value" : "Close the Tutorial First"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关闭教程后再导入"
+            "value" : "请先关闭引导教程"
           }
         }
       }
@@ -14021,22 +13989,6 @@
         }
       }
     },
-    "sign.cannotAccessFile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannot access selected file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法访问所选文件"
-          }
-        }
-      }
-    },
     "sign.detached.result" : {
       "localizations" : {
         "en" : {
@@ -15441,38 +15393,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证"
-          }
-        }
-      }
-    },
-    "verify.cannotAccessOriginal" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannot access original file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法访问原始文件"
-          }
-        }
-      }
-    },
-    "verify.cannotAccessSignature" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannot access signature file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法访问签名文件"
           }
         }
       }

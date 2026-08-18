@@ -16,11 +16,20 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
 
     private static let decryptedRootName = "decrypted"
     private static let streamingRootName = "streaming"
-    private static let operationRootNames = [decryptedRootName, streamingRootName]
+    private static let openedRootName = "opened"
+    private static let operationRootNames = [decryptedRootName, streamingRootName, openedRootName]
 
     private let fileManager: FileManager
     private let temporaryDirectory: URL
     private let preferencesDirectory: URL
+
+    /// Where the system leaves a document another app handed the app to open.
+    ///
+    /// Swept like the roots this store creates, even though it creates none of
+    /// them: it is the one place in the container that fills up without the app
+    /// asking, and an opened document left there is exactly the unmanaged copy
+    /// the open handler exists to prevent.
+    private let documentInboxDirectory: URL
 
     /// Paths this process handed out. The sweep no longer finishes before the
     /// session starts, so "present in `tmp/`" stopped meaning "abandoned" and
@@ -35,7 +44,8 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     init(
         fileManager: FileManager = .default,
         temporaryDirectory: URL? = nil,
-        preferencesDirectory: URL? = nil
+        preferencesDirectory: URL? = nil,
+        documentInboxDirectory: URL? = nil
     ) {
         self.fileManager = fileManager
         self.temporaryDirectory = (temporaryDirectory ?? fileManager.temporaryDirectory).standardizedFileURL
@@ -43,6 +53,11 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             preferencesDirectory
                 ?? fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("Preferences", isDirectory: true)
+        ).standardizedFileURL
+        self.documentInboxDirectory = (
+            documentInboxDirectory
+                ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("Inbox", isDirectory: true)
         ).standardizedFileURL
     }
 
@@ -95,6 +110,44 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         try? TemporaryArtifactEraser.erase(at: url, fileManager: fileManager)
     }
 
+    /// Move a document the system copied into the inbox under this store's
+    /// management, so a screen can keep reading it while the sweep can still
+    /// reach it.
+    ///
+    /// A move rather than a copy: the inbox copy is what must not survive, and
+    /// leaving a second one behind to erase separately is how one gets missed.
+    func adoptOpenedDocument(at url: URL) throws -> AppTemporaryArtifact {
+        let artifact = try makeOperationArtifact(
+            rootName: Self.openedRootName,
+            outputFilename: url.lastPathComponent
+        )
+        do {
+            try fileManager.moveItem(at: url, to: artifact.fileURL)
+            try applyAndVerifyCompleteProtection(to: artifact.fileURL)
+        } catch {
+            artifact.cleanup()
+            throw error
+        }
+        return artifact
+    }
+
+    /// Whether `url` names a document the system left in the inbox: a copy the
+    /// app owns outright. A document opened in place is not one — that file is
+    /// the reader's, wherever it lives.
+    func ownsOpenedDocumentCopy(at url: URL) -> Bool {
+        url.standardizedFileURL.path.hasPrefix(documentInboxDirectory.path + "/")
+    }
+
+    /// Erase the inbox copy of a document once the app is done reading it.
+    ///
+    /// Does nothing for a document opened in place. Deleting one of those would
+    /// destroy the reader's own file, so the check is the point rather than a
+    /// guard against a case that cannot happen.
+    func eraseOpenedDocumentCopy(at url: URL) {
+        guard ownsOpenedDocumentCopy(at: url) else { return }
+        try? TemporaryArtifactEraser.erase(at: url, fileManager: fileManager)
+    }
+
     func applyAndVerifyCompleteProtection(to url: URL) throws {
         let resolvedURL = url.standardizedFileURL
         guard try supportsFileProtection(for: resolvedURL) else {
@@ -139,6 +192,14 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             )
         }
 
+        // Never spared: nothing this session is using lives in the inbox. A
+        // document opened this session was either read and dropped or moved
+        // under `opened/`, so anything still here is what a previous session
+        // abandoned.
+        for url in documentInboxContents() {
+            eraseItem(url, result: &result)
+        }
+
         guard let contents = try? fileManager.contentsOfDirectory(
             at: temporaryDirectory,
             includingPropertiesForKeys: nil
@@ -161,6 +222,8 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
                 remaining.append(directoryName)
             }
         }
+
+        remaining.append(contentsOf: documentInboxContents().map(\.lastPathComponent))
 
         guard let contents = try? fileManager.contentsOfDirectory(
             at: temporaryDirectory,
@@ -250,6 +313,13 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         if (try? fileManager.contentsOfDirectory(atPath: root.path))?.isEmpty == true {
             eraseItem(root, result: &result)
         }
+    }
+
+    private func documentInboxContents() -> [URL] {
+        (try? fileManager.contentsOfDirectory(
+            at: documentInboxDirectory,
+            includingPropertiesForKeys: nil
+        )) ?? []
     }
 
     private func markLive(_ url: URL) {

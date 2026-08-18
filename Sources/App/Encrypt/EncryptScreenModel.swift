@@ -153,19 +153,7 @@ final class EncryptScreenModel {
             )
         }
         self.fileEncryptionAction = FileOperationAction(injectedAction: fileEncryptionAction) { request, progress in
-            try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: request.fileURL,
-                        failure: .corruptData(
-                            reason: String(
-                                localized: "fileEncrypt.cannotAccess",
-                                defaultValue: "Cannot access file"
-                            )
-                        )
-                    )
-                ]
-            ) {
+            try await SecurityScopedFileAccess.withAccess(to: [request.fileURL]) {
                 try await encryptionService.encryptFileStreaming(
                     inputURL: request.fileURL,
                     recipientContactIds: request.recipientContactIds,

@@ -27,6 +27,7 @@ Actions that never proceed without an explicit user step:
 
 - **Device-bound key generation** requires passing a commitment sheet (the permanence consequences, §4) before generation starts.
 - **URL-scheme key import** always requires user confirmation before a key is added; a second import while one is pending errors rather than auto-adding.
+- **Opening a key or message file** (`.asc`, `.gpg`, `.pgp`, `.sig`) always produces a visible response, and never acts on its own. What the file holds decides where it goes — a certificate to the same import confirmation a scanned QR code reaches, a secret key to Import Key, an encrypted message to Decrypt, a signed message to Verify — and importing, decrypting or verifying still waits for you to ask. A file whose content contradicts its name is refused rather than acted on, and so is a detached signature, which cannot be checked without the file it was made from. No copy of an opened document is left behind in the app, including when the file is refused.
 - **High Security Mode activation** requires a warning, a backup check over software-custody keys, and a biometric confirmation of the change.
 - **Copy actions** show a clipboard safety notice.
 
@@ -71,4 +72,3 @@ Decided but not shipped; nothing here describes current behavior:
 
 - **Unified screen lifecycle rule:** hide keeps everything and operations continue; destroy cancels and cleans; relock clears everything on every screen.
 - **Contacts redesign:** person/certificate membership model, reversible merge with undo, detachable keys, withdrawable manual verification, and lifecycle-refresh (which is what would make expiry states re-evaluated and representable). A complete Contacts backup or device migration **must** be a mandatory-encrypted export/import — never a plaintext social-graph export.
-- **Open With handler** with an explicit import confirmation, like the URL scheme's (§3).

@@ -7,6 +7,7 @@
 pub mod armor;
 mod bounded_walk;
 pub mod cert_signature;
+pub mod classify;
 mod composite_classical;
 mod composite_kem;
 pub mod decrypt;
@@ -33,6 +34,7 @@ use zeroize::Zeroizing;
 
 use crate::armor::ArmorKind;
 use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
+use crate::classify::OpenPgpDataKind;
 use crate::decrypt::MessageQuantumSafety;
 use crate::error::PgpError;
 use crate::keys::{
@@ -466,6 +468,18 @@ impl PgpEngine {
         cert_data: Vec<u8>,
     ) -> Result<PublicCertificateValidationResult, PgpError> {
         keys::validate_public_certificate(&cert_data)
+    }
+
+    // ── Content Classification ──────────────────────────────────────
+
+    /// Decide what a blob of OpenPGP bytes holds — a certificate, a secret key,
+    /// a message, a signature — from its packets.
+    ///
+    /// For input that arrives named rather than chosen, where the extension is
+    /// the producer's claim and the packets are the fact. Reads packet headers
+    /// only: nothing is decrypted, and no payload is read.
+    pub fn classify_openpgp_data(&self, data: Vec<u8>) -> Result<OpenPgpDataKind, PgpError> {
+        classify::classify_openpgp_data(&data)
     }
 
     // ── Outgoing Message Format ─────────────────────────────────────

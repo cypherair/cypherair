@@ -55,8 +55,8 @@ struct PublicKeyImportLoader {
         return try qrService.parseImportURL(url)
     }
 
-    func loadFromFile(url: URL, failure: CypherAirError) throws -> LoadedPublicKeyFile {
-        let data = try SecurityScopedFileAccess.withAccess(to: url, failure: failure) {
+    func loadFromFile(url: URL) throws -> LoadedPublicKeyFile {
+        let data = try SecurityScopedFileAccess.withAccess(to: url) {
             try Data(contentsOf: url)
         }
 

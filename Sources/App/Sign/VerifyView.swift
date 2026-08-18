@@ -180,6 +180,10 @@ private struct VerifyScreenHostView: View {
         ) { result in
             model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
+        .claimsOpenedDocument(for: .verification) { document in
+            guard let content = document.content else { return }
+            model.adoptOpenedSignedMessage(data: content, fileName: document.fileName)
+        }
         .onDisappear {
             model.handleDisappear()
         }

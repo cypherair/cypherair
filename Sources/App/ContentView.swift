@@ -3,12 +3,17 @@ import SwiftUI
 /// Root view with TabView for main navigation.
 /// Liquid Glass: TabView auto-adopts floating glass capsule — no manual styling needed.
 struct ContentView: View {
-    @State private var selectedTab: AppShellTab = .home
+    let navigationState: AppShellNavigationState
 
     var body: some View {
+        @Bindable var navigationState = navigationState
+
         SharedIOSTabShellView(
-            selectedTab: $selectedTab,
-            definitions: AppShellComposition.definitions(resolver: .production)
+            selectedTab: $navigationState.selectedTab,
+            definitions: AppShellComposition.definitions(
+                resolver: .production,
+                path: navigationState.pathBinding(for:)
+            )
         )
     }
 }
@@ -17,7 +22,7 @@ struct ContentView: View {
 struct MacAppShellView: View {
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
 
-    let navigationState: MacShellNavigationState
+    let navigationState: AppShellNavigationState
     let opensAuthModeConfirmation: Bool
 
     var body: some View {
@@ -91,19 +96,10 @@ struct MacAppShellView: View {
     @ViewBuilder
     private func detailContent(for tab: AppShellTab) -> some View {
         // Per-tab identity (.id below) gives each sidebar tab its own
-        // NavigationStack instance, and the binding ignores writes made once
-        // the tab is no longer selected — the outgoing stack clears its path
-        // during teardown, which would otherwise erase the stored per-tab
-        // navigation on every switch.
+        // NavigationStack instance.
         AppRouteHost(
             resolver: macRouteResolver(for: tab),
-            path: Binding(
-                get: { navigationState.path(for: tab) },
-                set: { newPath in
-                    guard navigationState.selectedTab == tab else { return }
-                    navigationState.setPath(newPath, for: tab)
-                }
-            )
+            path: navigationState.pathBinding(for: tab)
         ) {
             switch tab {
             case .home:

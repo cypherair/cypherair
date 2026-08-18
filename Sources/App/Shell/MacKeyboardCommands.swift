@@ -4,7 +4,7 @@ import SwiftUI
 /// macOS menu commands: the in-window About item, key actions in the Keys
 /// menu, and sidebar tab selection (⌘1–⌘8) in the View menu.
 struct MacKeyboardCommands: Commands {
-    let navigationState: MacShellNavigationState
+    let navigationState: AppShellNavigationState
 
     var body: some Commands {
         // Keep File > New Window disabled: CypherAir uses a single-window

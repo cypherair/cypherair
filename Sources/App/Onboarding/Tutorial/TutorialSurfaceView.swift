@@ -171,6 +171,10 @@ struct TutorialSurfaceView<Content: View>: View {
             #if canImport(UIKit)
             .tutorialInlineHeaderHost(context: inlineHeaderContext)
             #endif
+            // The tutorial's tools are a sandbox with rehearsal data. A document
+            // the reader opened belongs to the app they will use afterwards, so
+            // no surface in here can claim one.
+            .environment(\.openedDocumentHandoff, nil)
             .onAppear {
                 tutorialStore.noteVisibleSurface(tab: tab, route: route)
             }

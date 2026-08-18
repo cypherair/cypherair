@@ -68,19 +68,7 @@ final class SignScreenModel {
             try await signingService.signCleartext(message, signerFingerprint: signerFingerprint)
         }
         self.detachedFileSigningAction = FileOperationAction(injectedAction: detachedFileSigningAction) { request, progress in
-            try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: request.fileURL,
-                        failure: .internalError(
-                            reason: String(
-                                localized: "sign.cannotAccessFile",
-                                defaultValue: "Cannot access selected file"
-                            )
-                        )
-                    )
-                ]
-            ) {
+            try await SecurityScopedFileAccess.withAccess(to: [request.fileURL]) {
                 try await signingService.signDetachedStreaming(
                     fileURL: request.fileURL,
                     signerFingerprint: request.signerFingerprint,

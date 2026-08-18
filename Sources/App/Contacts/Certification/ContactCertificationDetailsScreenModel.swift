@@ -181,15 +181,7 @@ final class ContactCertificationDetailsScreenModel {
             try contactService.exportCertificationArtifact(artifactId: artifactId)
         }
         self.signatureFileImportAction = signatureFileImportAction ?? { url in
-            let data = try SecurityScopedFileAccess.withAccess(
-                to: url,
-                failure: .fileIoError(
-                    reason: String(
-                        localized: "contactcertsig.import.failed",
-                        defaultValue: "Could not read signature file."
-                    )
-                )
-            ) {
+            let data = try SecurityScopedFileAccess.withAccess(to: url) {
                 try Data(contentsOf: url)
             }
 

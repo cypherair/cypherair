@@ -129,6 +129,10 @@ private struct ImportKeyScreenHostView: View {
         ) { result in
             model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
+        .claimsOpenedDocument(for: .keyImport) { document in
+            guard let content = document.content else { return }
+            model.adoptOpenedKeyFile(data: content, fileName: document.fileName)
+        }
         .onDisappear {
             model.handleDisappear()
         }

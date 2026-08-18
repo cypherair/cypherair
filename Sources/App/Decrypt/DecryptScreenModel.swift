@@ -86,32 +86,12 @@ final class DecryptScreenModel {
             try await decryptionService.parseRecipients(ciphertext: ciphertext)
         }
         self.parseFileRecipientsAction = parseFileRecipientsAction ?? { fileURL in
-            try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: fileURL,
-                        failure: .corruptData(
-                            reason: String(
-                                localized: "fileDecrypt.cannotAccess",
-                                defaultValue: "Cannot access file"
-                            )
-                        )
-                    )
-                ]
-            ) {
+            try await SecurityScopedFileAccess.withAccess(to: [fileURL]) {
                 try await decryptionService.parseRecipientsFromFile(fileURL: fileURL)
             }
         }
         self.textCiphertextFileImportAction = textCiphertextFileImportAction ?? { url in
-            let data = try SecurityScopedFileAccess.withAccess(
-                to: url,
-                failure: .corruptData(
-                    reason: String(
-                        localized: "decrypt.importTextReadFailed",
-                        defaultValue: "Could not read text message file"
-                    )
-                )
-            ) {
+            let data = try SecurityScopedFileAccess.withAccess(to: url) {
                 try Data(contentsOf: url)
             }
 
@@ -127,15 +107,7 @@ final class DecryptScreenModel {
             return (data, text)
         }
         self.ciphertextFileInspectionAction = ciphertextFileInspectionAction ?? { url in
-            try SecurityScopedFileAccess.withAccess(
-                to: url,
-                failure: .corruptData(
-                    reason: String(
-                        localized: "fileDecrypt.cannotAccess",
-                        defaultValue: "Cannot access file"
-                    )
-                )
-            ) {
+            try SecurityScopedFileAccess.withAccess(to: url) {
                 let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
                 let fileSize = attributes[.size] as? NSNumber
                 let fileSizeValue = fileSize?.intValue ?? 0
@@ -157,19 +129,7 @@ final class DecryptScreenModel {
             try await decryptionService.decryptDetailed(phase1: phase1)
         }
         self.fileDecryptionAction = FileOperationAction(injectedAction: fileDecryptionAction) { request, progress in
-            try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: request.fileURL,
-                        failure: .corruptData(
-                            reason: String(
-                                localized: "fileDecrypt.cannotAccess",
-                                defaultValue: "Cannot access file"
-                            )
-                        )
-                    )
-                ]
-            ) {
+            try await SecurityScopedFileAccess.withAccess(to: [request.fileURL]) {
                 let result = try await decryptionService.decryptFileStreamingDetailed(
                     phase1: request.phase1Result,
                     progress: progress
@@ -337,6 +297,17 @@ final class DecryptScreenModel {
         case .none:
             break
         }
+    }
+
+    /// Take an encrypted file the system asked the app to open.
+    ///
+    /// Exactly what choosing the file in the picker does, down to the offer to
+    /// open a small armored message as text: opening a file from outside is the
+    /// same act as selecting it from inside, and decrypting still waits for the
+    /// reader to ask.
+    func adoptOpenedCiphertextFile(at url: URL) {
+        decryptMode = .file
+        inspectCiphertextFileSelection(url)
     }
 
     func parseRecipientsText() {

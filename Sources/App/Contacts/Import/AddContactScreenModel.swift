@@ -46,15 +46,7 @@ final class AddContactScreenModel {
             try importLoader.inspect(keyData: keyData)
         }
         self.loadFileAction = loadFileAction ?? { url in
-            try importLoader.loadFromFile(
-                url: url,
-                failure: .invalidKeyData(
-                    reason: String(
-                        localized: "addcontact.file.readFailed",
-                        defaultValue: "Could not read key file"
-                    )
-                )
-            )
+            try importLoader.loadFromFile(url: url)
         }
         self.qrPhotoKeyDataLoader = qrPhotoKeyDataLoader ?? { selection in
             try await selection.loadKeyData()

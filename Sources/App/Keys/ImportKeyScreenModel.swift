@@ -42,15 +42,7 @@ final class ImportKeyScreenModel {
             )
         }
         self.loadFileAction = loadFileAction ?? { url in
-            let data = try SecurityScopedFileAccess.withAccess(
-                to: url,
-                failure: .invalidKeyData(
-                    reason: String(
-                        localized: "import.file.readFailed",
-                        defaultValue: "Could not read key file"
-                    )
-                )
-            ) {
+            let data = try SecurityScopedFileAccess.withAccess(to: url) {
                 try Data(contentsOf: url)
             }
 
@@ -95,20 +87,36 @@ final class ImportKeyScreenModel {
 
     func loadFileContents(from url: URL) {
         do {
-            let loadedFile = try loadFileAction(url)
-
-            if let text = loadedFile.text {
-                clearImportedKeyData()
-                armoredText = text
-            } else {
-                clearImportedKeyData()
-                importedKeyData = loadedFile.data
-                importedFileName = loadedFile.fileName
-                armoredText = ""
-            }
+            adopt(try loadFileAction(url))
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
+        }
+    }
+
+    /// Take a key file the system asked the app to open.
+    ///
+    /// The same state a chosen file produces, because that is what it is: the
+    /// reader still enters the passphrase and still presses Import.
+    func adoptOpenedKeyFile(data: Data, fileName: String) {
+        adopt(
+            ImportedKeyFile(
+                data: data,
+                text: String(data: data, encoding: .utf8),
+                fileName: fileName
+            )
+        )
+    }
+
+    private func adopt(_ file: ImportedKeyFile) {
+        clearImportedKeyData()
+
+        if let text = file.text {
+            armoredText = text
+        } else {
+            importedKeyData = file.data
+            importedFileName = file.fileName
+            armoredText = ""
         }
     }
 

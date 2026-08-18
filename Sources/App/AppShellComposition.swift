@@ -128,59 +128,37 @@ enum AppShellComposition {
         }
     }
 
-    static func content(
+    private static func content(
         for tab: AppShellTab,
-        resolver: AppRouteDestinationResolver
+        resolver: AppRouteDestinationResolver,
+        path: Binding<[AppRoute]>
     ) -> AnyView {
+        AnyView(
+            AppRouteHost(resolver: resolver, path: path) {
+                root(for: tab)
+            }
+        )
+    }
+
+    @ViewBuilder
+    private static func root(for tab: AppShellTab) -> some View {
         switch tab {
         case .home:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    HomeView()
-                }
-            )
+            HomeView()
         case .keys:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    MyKeysView()
-                }
-            )
+            MyKeysView()
         case .contacts:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    ContactsView()
-                }
-            )
+            ContactsView()
         case .settings:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    MainWindowSettingsRootView()
-                }
-            )
+            MainWindowSettingsRootView()
         case .encrypt:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    EncryptView()
-                }
-            )
+            EncryptView()
         case .decrypt:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    DecryptView()
-                }
-            )
+            DecryptView()
         case .sign:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    SignView()
-                }
-            )
+            SignView()
         case .verify:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    VerifyView()
-                }
-            )
+            VerifyView()
         }
     }
 
@@ -199,12 +177,13 @@ enum AppShellComposition {
     }
 
     static func definitions(
-        resolver: AppRouteDestinationResolver
+        resolver: AppRouteDestinationResolver,
+        path: (AppShellTab) -> Binding<[AppRoute]>
     ) -> [AppShellTabDefinition] {
         AppShellTab.allCases.map { tab in
             definition(
                 for: tab,
-                content: content(for: tab, resolver: resolver)
+                content: content(for: tab, resolver: resolver, path: path(tab))
             )
         }
     }

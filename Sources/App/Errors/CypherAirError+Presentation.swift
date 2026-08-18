@@ -83,6 +83,12 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.contactImportConfirmationStale", defaultValue: "Contacts changed while this import was open. Review the key again before adding it.")
         case .contactImportConfirmationAlreadyPending:
             String(localized: "error.contactImportConfirmationAlreadyPending", defaultValue: "Finish or cancel the current contact import before opening another one.")
+        case .openedFileUnsupportedContent:
+            String(localized: "error.openedFileUnsupportedContent", defaultValue: "CypherAir X cannot open this file. Its contents are not a key or message this app handles, or they do not match what the file name claims.")
+        case .openedDetachedSignatureNeedsOriginal:
+            String(localized: "error.openedDetachedSignatureNeedsOriginal", defaultValue: "This is a detached signature. On its own it proves nothing — checking it needs the file it was made from as well. Open Verify, switch to Detached, and choose both.")
+        case .openedFileTooLarge(let maximumMB):
+            String(localized: "error.openedFileTooLarge", defaultValue: "This file is too large to open this way. Keys and signed messages opened from outside CypherAir X must be under \(maximumMB) MB.")
         }
     }
 

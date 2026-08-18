@@ -97,7 +97,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         let container = AppContainer.makeUITest()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetMissingBase-\(UUID().uuidString)", isDirectory: true)
-        let temporaryArtifactStore = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
+        let temporaryArtifactStore = CypherAir.AppTemporaryArtifactStore(
+            temporaryDirectory: temporaryDirectory,
+            documentInboxDirectory: temporaryDirectory.appendingPathComponent("Inbox", isDirectory: true)
+        )
         defer {
             try? FileManager.default.removeItem(
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
@@ -127,7 +130,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         let container = AppContainer.makeUITest()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
-        let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
+        let store = CypherAir.AppTemporaryArtifactStore(
+            temporaryDirectory: temporaryDirectory,
+            documentInboxDirectory: temporaryDirectory.appendingPathComponent("Inbox", isDirectory: true)
+        )
         let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         let unrelatedSuiteName = "com.cypherair.tests.tutorial.\(UUID().uuidString)"
         defer {

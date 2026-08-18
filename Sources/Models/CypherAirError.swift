@@ -54,6 +54,17 @@ enum CypherAirError: Error {
     case contactsUnavailable(ContactsAvailability)
     case contactImportConfirmationStale
     case contactImportConfirmationAlreadyPending
+    /// A file the app was asked to open holds nothing it can act on — bytes
+    /// that are not OpenPGP, a revocation certificate, or content its extension
+    /// does not permit. The refusals share a message because they share an
+    /// answer: this file is not one the app opens.
+    case openedFileUnsupportedContent
+    /// A file the app was asked to open is a detached signature, which proves
+    /// something about data the app was not given.
+    case openedDetachedSignatureNeedsOriginal
+    /// A file the app was asked to open is past what the receiving screen can
+    /// hold. Encrypted messages are exempt — those are read from disk.
+    case openedFileTooLarge(maximumMB: Int)
 
     /// Wrap any already-normalized app error into CypherAirError.
     /// - If it's already a CypherAirError, return as-is.

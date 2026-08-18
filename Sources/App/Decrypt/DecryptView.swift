@@ -335,6 +335,10 @@ private struct DecryptScreenHostView: View {
                 model.handleExportError(exportError)
             }
         }
+        .claimsOpenedDocument(for: .decryption) { document in
+            guard let fileURL = document.fileURL else { return }
+            model.adoptOpenedCiphertextFile(at: fileURL)
+        }
         .onDisappear {
             model.handleDisappear()
         }
