@@ -218,11 +218,48 @@ final class ContactCertificationDetailsScreenModel {
         return keys.first { $0.keyId == selectedKeyId }
     }
 
-    var savedArtifacts: [ContactCertificationArtifactReference] {
+    /// A stored certification together with who its signer is *now*.
+    struct SavedCertification: Identifiable {
+        var id: String { artifact.artifactId }
+
+        let artifact: ContactCertificationArtifactReference
+        let signerRole: ContactCertificationSignerRole?
+    }
+
+    /// The key's stored certifications, each re-attributed against the current
+    /// anchor set on every read. A certification saved months ago is described
+    /// in exactly the same words as one verified a second ago, because the
+    /// answer is recomputed rather than remembered — and it changes the instant
+    /// the user withdraws their verification of the signer.
+    var savedCertifications: [SavedCertification] {
         guard let selectedKeyId else {
             return []
         }
-        return contactService.certificationArtifacts(for: selectedKeyId)
+        let resolver = signerResolver
+        return contactService.certificationArtifacts(for: selectedKeyId).map { artifact in
+            SavedCertification(
+                artifact: artifact,
+                signerRole: resolver.role(
+                    ofSignerFingerprint: artifact.signerPrimaryFingerprint,
+                    certifying: artifact.targetKeyFingerprint
+                )
+            )
+        }
+    }
+
+    /// Who signed the signature just verified, and what their word is worth.
+    var verificationSignerRole: ContactCertificationSignerRole? {
+        signerResolver.role(
+            ofSignerFingerprint: verification?.signerPrimaryFingerprint,
+            certifying: selectedKey?.fingerprint
+        )
+    }
+
+    private var signerResolver: ContactCertificationSignerResolver {
+        ContactCertificationSignerResolver(
+            contactKeyRecords: contactService.contactsVerificationContext().contactKeys,
+            ownKeys: keyManagement.keys
+        )
     }
 
     var userIds: [UserIdSelectionOption] {

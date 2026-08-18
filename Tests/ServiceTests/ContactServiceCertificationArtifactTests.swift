@@ -35,7 +35,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
 
         XCTAssertEqual(duplicate.artifactId, saved.artifactId)
         XCTAssertEqual(service.certificationArtifacts(for: keyRecord.keyId).map(\.artifactId), [saved.artifactId])
-        XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
+        XCTAssertEqual(projectedKey.certificationProjection.signatureState, .valid)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [saved.artifactId])
         XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
         XCTAssertEqual(export.filename, "artifact-save.asc")
@@ -49,8 +49,8 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
 
         XCTAssertEqual(reopenedArtifacts.map(\.artifactId), [saved.artifactId])
         XCTAssertEqual(
-            reopened.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
-            .certified
+            reopened.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.signatureState,
+            .valid
         )
     }
 
@@ -85,7 +85,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let summary = try XCTUnwrap(service.availableKey(keyId: keyRecord.keyId))
 
         XCTAssertEqual(summary.manualVerificationState, .unverified)
-        XCTAssertEqual(summary.certificationProjection.status, .certified)
+        XCTAssertEqual(summary.certificationProjection.signatureState, .valid)
     }
 
     func test_certificationArtifactSaveRejectsStaleTargetDigest() async throws {
@@ -285,7 +285,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(normalizedArtifact.validationStatus, .invalidOrStale)
         XCTAssertEqual(normalizedArtifact.updatedAt, updatedAt)
         XCTAssertEqual(normalizedArtifact.lastValidatedAt, lastValidatedAt)
-        XCTAssertEqual(projectedKey.certificationProjection.status, .invalidOrStale)
+        XCTAssertEqual(projectedKey.certificationProjection.signatureState, .invalidOrStale)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [artifact.artifactId])
     }
 
@@ -323,7 +323,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let keyIndex = try XCTUnwrap(snapshot.keyRecords.firstIndex { $0.keyId == keyRecord.keyId })
         snapshot.keyRecords[keyIndex].certificationArtifactIds = [artifact.artifactId]
         snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
-            status: .invalidOrStale,
+            signatureState: .invalidOrStale,
             artifactIds: [artifact.artifactId],
             lastValidatedAt: lastValidatedAt
         )
@@ -377,7 +377,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         )
         XCTAssertTrue(didMutate)
         XCTAssertEqual(normalizedArtifact.validationStatus, .valid)
-        XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
+        XCTAssertEqual(projectedKey.certificationProjection.signatureState, .valid)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [artifact.artifactId])
     }
 
@@ -409,8 +409,8 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         )
         let signer = try XCTUnwrap(certificationSignerKeys.last)
         XCTAssertEqual(
-            service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
-            .certified
+            service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.signatureState,
+            .valid
         )
 
         // The signer is no longer among the keys this device holds. The vouch
@@ -423,7 +423,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             ownSignerKeys: []
         )
         XCTAssertEqual(
-            withoutSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            withoutSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.signatureState,
             .revalidationNeeded
         )
 
@@ -436,8 +436,8 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             ownSignerKeys: [signer]
         )
         XCTAssertEqual(
-            withSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
-            .certified
+            withSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.signatureState,
+            .valid
         )
 
         // The signer has been revoked since the certification was cached. The
@@ -459,7 +459,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             ownSignerKeys: [revokedSigner]
         )
         XCTAssertEqual(
-            afterRevocation.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            afterRevocation.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.signatureState,
             .invalidOrStale
         )
         let revalidatedArtifact = try XCTUnwrap(

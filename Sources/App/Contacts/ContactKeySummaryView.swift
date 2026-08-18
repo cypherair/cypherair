@@ -49,30 +49,7 @@ struct ContactKeySummaryView: View {
                     .foregroundStyle(key.canEncryptTo ? .green : .red)
             }
 
-            if !key.isVerified {
-                Label(
-                    String(
-                        localized: "contactdetail.unverified",
-                        defaultValue: "This key has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
-                    ),
-                    systemImage: "exclamationmark.triangle.fill"
-                )
-                .foregroundStyle(.orange)
-            }
-
-            HStack {
-                Text(
-                    String(
-                        localized: "contactdetail.openpgpCertification",
-                        defaultValue: "OpenPGP Certification"
-                    )
-                )
-                Spacer()
-                CypherStatusBadge(
-                    title: certificationStatusTitle,
-                    color: certificationStatusColor
-                )
-            }
+            trustSection
 
             actionButtons
         }
@@ -84,6 +61,66 @@ struct ContactKeySummaryView: View {
             title: key.usageState.contactDetailLabel,
             color: key.usageState.statusColor
         )
+    }
+
+    /// Two separate statements, kept visibly apart: what the app is willing to
+    /// vouch for about this key, and what its stored certification signatures
+    /// currently do. The second never colours the first — certifications
+    /// existing is not an endorsement of anybody.
+    @ViewBuilder
+    private var trustSection: some View {
+        let trust = key.trust
+
+        HStack {
+            Text(String(localized: "contacttrust.heading", defaultValue: "Trust"))
+            Spacer()
+            CypherStatusBadge(
+                title: trust.anchor.badgeTitle,
+                systemImage: trust.anchor.badgeSystemImage,
+                color: trust.anchor.badgeColor
+            )
+        }
+
+        if !trust.vouchers.isEmpty {
+            Text(
+                String(
+                    localized: "contacttrust.vouchedBy.detail",
+                    defaultValue: "Vouched for by \(trust.vouchersDescription), whose fingerprints you verified."
+                )
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+
+        if !trust.isVerifiedByUser {
+            Label(
+                trust.vouchers.isEmpty
+                    ? String(
+                        localized: "contactdetail.unverified",
+                        defaultValue: "You have not verified this key. Confirm the fingerprint with its owner before relying on it."
+                    )
+                    : String(
+                        localized: "contactdetail.unverified.vouched",
+                        defaultValue: "Someone you trust vouches for this key, but you have not checked its fingerprint yourself. Confirm it with the owner before relying on it."
+                    ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
+        }
+
+        HStack {
+            Text(
+                String(
+                    localized: "contactdetail.openpgpCertification",
+                    defaultValue: "Certification Signatures"
+                )
+            )
+            Spacer()
+            CypherStatusBadge(
+                title: key.certificationProjection.signatureState.badgeTitle,
+                color: key.certificationProjection.signatureState.badgeColor
+            )
+        }
     }
 
     @ViewBuilder
@@ -171,31 +208,5 @@ struct ContactKeySummaryView: View {
             }
         }
         .buttonStyle(.borderless)
-    }
-
-    private var certificationStatusTitle: String {
-        switch key.certificationProjection.status {
-        case .notCertified:
-            String(localized: "contactdetail.openpgpCertification.none", defaultValue: "Not Certified")
-        case .certified:
-            String(localized: "contactdetail.openpgpCertification.certified", defaultValue: "Certified")
-        case .invalidOrStale:
-            String(localized: "contactdetail.openpgpCertification.invalid", defaultValue: "Invalid or Stale")
-        case .revalidationNeeded:
-            String(localized: "contactdetail.openpgpCertification.revalidation", defaultValue: "Revalidation Needed")
-        }
-    }
-
-    private var certificationStatusColor: Color {
-        switch key.certificationProjection.status {
-        case .notCertified:
-            .secondary
-        case .certified:
-            .green
-        case .invalidOrStale:
-            .red
-        case .revalidationNeeded:
-            .orange
-        }
     }
 }

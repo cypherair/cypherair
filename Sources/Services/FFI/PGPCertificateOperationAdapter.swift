@@ -1,10 +1,5 @@
 import Foundation
 
-struct PGPCertificateVerificationContext {
-    let contactKeys: [ContactKeyRecord]
-    let ownKeys: [PGPKeyIdentity]
-}
-
 /// FFI-owned certificate signature, certification, and revocation operations.
 final class PGPCertificateOperationAdapter: @unchecked Sendable {
     private let engine: PgpEngine
@@ -44,8 +39,7 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
     func verifyDirectKeySignature(
         signature: Data,
         targetCert: Data,
-        candidateSigners: [Data],
-        verificationContext: PGPCertificateVerificationContext
+        candidateSigners: [Data]
     ) async throws -> CertificateSignatureVerification {
         do {
             let result = try await Self.performVerifyDirectKeySignature(
@@ -54,7 +48,7 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
                 targetCert: targetCert,
                 candidateSigners: candidateSigners
             )
-            return verification(from: result, context: verificationContext)
+            return verification(from: result)
         } catch {
             throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
         }
@@ -64,8 +58,7 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         signature: Data,
         targetCert: Data,
         selectedUserId: UserIdSelectionOption,
-        candidateSigners: [Data],
-        verificationContext: PGPCertificateVerificationContext
+        candidateSigners: [Data]
     ) async throws -> CertificateSignatureVerification {
         do {
             let result = try await PGPCertificateSelectionAdapter.verifyUserIdBindingSignature(
@@ -75,7 +68,7 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
                 selectedUserId: selectedUserId,
                 candidateSigners: candidateSigners
             )
-            return verification(from: result, context: verificationContext)
+            return verification(from: result)
         } catch {
             throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
         }
@@ -262,20 +255,17 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         }
     }
 
+    /// The engine's answer about the signature, and nothing else. Who the signer
+    /// is to the user is resolved where it can be resolved live, against the key
+    /// being certified — see `ContactCertificationSignerResolver`.
     private func verification(
-        from result: CertificateSignatureResult,
-        context: PGPCertificateVerificationContext
+        from result: CertificateSignatureResult
     ) -> CertificateSignatureVerification {
         CertificateSignatureVerification(
             status: CertificateSignatureVerificationStatus(from: result.status),
             certificationKind: result.certificationKind.map(OpenPGPCertificationKind.init(from:)),
             signerPrimaryFingerprint: result.signerPrimaryFingerprint,
-            signingKeyFingerprint: result.signingKeyFingerprint,
-            signerIdentity: CertificateSignatureSignerIdentity.resolve(
-                fingerprint: result.signerPrimaryFingerprint,
-                contactKeys: context.contactKeys,
-                ownKeys: context.ownKeys
-            )
+            signingKeyFingerprint: result.signingKeyFingerprint
         )
     }
 

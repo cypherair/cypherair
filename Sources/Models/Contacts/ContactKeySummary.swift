@@ -20,6 +20,10 @@ struct ContactKeySummary: Identifiable, Hashable, Sendable {
     let usageState: ContactKeyUsageState
     let certificationProjection: ContactCertificationProjection
 
+    /// Derived from the anchor set at the moment this summary was projected.
+    /// Summaries are projected on every read, so this is never a stale answer.
+    let trust: ContactKeyTrust
+
     var shortKeyId: String {
         IdentityPresentation.shortKeyId(from: fingerprint)
     }
