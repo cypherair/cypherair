@@ -9,6 +9,5 @@ enum PGPKeyOperationKind: String, CaseIterable, Codable, Hashable, Sendable {
     case revoke
     case modifyExpiry
     case exportPublicMaterial
-    case exportPrivateMaterial
     case exportRevocationArtifact
 }

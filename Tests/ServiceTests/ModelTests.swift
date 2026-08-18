@@ -427,7 +427,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(PGPPrivateOperationKind.revoke.requiredRole, .signing)
         XCTAssertEqual(PGPPrivateOperationKind.modifyExpiry.requiredRole, .signing)
         XCTAssertEqual(PGPPrivateOperationKind.decrypt.requiredRole, .keyAgreement)
-        XCTAssertTrue(PGPKeyOperationKind.allCases.contains(.exportPrivateMaterial))
         XCTAssertEqual(PGPKeyOperationSupport.notImplemented.rawValue, "notImplemented")
     }
 

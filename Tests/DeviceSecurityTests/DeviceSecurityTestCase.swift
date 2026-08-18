@@ -72,13 +72,11 @@ class DeviceSecurityTestCase: XCTestCase {
     final func makeAuthenticationManager(
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
-        defaults: UserDefaults = .standard,
         privateKeyControlStore: InMemoryPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
     ) -> AuthenticationManager {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults,
             authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)

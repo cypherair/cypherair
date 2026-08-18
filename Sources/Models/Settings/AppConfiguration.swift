@@ -141,8 +141,7 @@ final class AppConfiguration {
     private static var resetPersistentKeys: [String] {
         [
             appSessionAuthenticationPolicyKey,
-            pendingAppSessionAuthenticationPolicySwitchKey,
-            "com.cypherair.preference.uiTestBypassAuthentication"
+            pendingAppSessionAuthenticationPolicySwitchKey
         ]
     }
 }

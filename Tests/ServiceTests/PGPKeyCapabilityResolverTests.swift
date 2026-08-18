@@ -95,17 +95,6 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                     "Expected \(operation) supported for \(family) under production policy."
                 )
             }
-
-            // Negative: private-material export stays hard-unsupported for
-            // Secure Enclave custody regardless of policy.
-            XCTAssertEqual(
-                resolver.resolution(
-                    for: .exportPrivateMaterial,
-                    family: family,
-                    custody: .appleSecureEnclavePrivateOperations
-                ),
-                .unsupported(.operationUnsupportedForCustody)
-            )
         }
 
         // Negative: invalid configuration/custody pairs stay unsupported under
@@ -295,25 +284,9 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         )
     }
 
-    func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
+    func test_secureEnclaveMaterialExportsFollowMetadataAvailability() {
         let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
 
-        XCTAssertEqual(
-            resolver.resolution(
-                for: .exportPrivateMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unsupported(.operationUnsupportedForCustody)
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .exportPrivateMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unsupported
-        )
         XCTAssertEqual(
             resolver.support(
                 for: .exportPublicMaterial,

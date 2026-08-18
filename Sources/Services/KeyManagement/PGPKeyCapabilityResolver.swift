@@ -128,8 +128,6 @@ struct PGPKeyCapabilityResolver: Sendable {
             return resolutionForPolicySupport(policy.secureEnclaveSigningOperationSupport)
         case .decrypt:
             return resolutionForPolicySupport(policy.secureEnclaveKeyAgreementOperationSupport)
-        case .exportPrivateMaterial:
-            return .unsupported(.operationUnsupportedForCustody)
         case .exportPublicMaterial:
             return metadataAvailability.hasPublicMaterial
                 ? .supported
