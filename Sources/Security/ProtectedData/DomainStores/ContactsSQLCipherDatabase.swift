@@ -161,7 +161,10 @@ final class ContactsSQLCipherDatabase {
         do {
             keySpec = try SQLCipherRawKey.keySpec(for: domainMasterKey)
         } catch SQLCipherRawKeyError.invalidRawKeyLength(let length) {
-            throw ProtectedDataError.invalidDomainMasterKeyLength(length)
+            throw ProtectedDataError.invalidKeyMaterialLength(
+                expected: SQLCipherRawKey.rawKeyLength,
+                got: length
+            )
         }
 
         let database = try requireOpenDatabase()

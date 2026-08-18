@@ -11,12 +11,13 @@ import LocalAuthentication
 /// See docs/CUSTODY.md.
 protocol SecureEnclaveCustodyKeyStoring: Sendable {
     /// Create a fresh Secure Enclave key for the reference's tier and role and
-    /// persist its blob. Fails if a blob already exists for the reference. The
-    /// caller's authenticated context is attached to the returned key so
-    /// generation-time signing consumes the already-evaluated session.
+    /// persist its blob, under the fixed device-bound access control
+    /// (`SecureEnclaveCustodyAccessControl.deviceBound()`). Fails if a blob
+    /// already exists for the reference. The caller's authenticated context is
+    /// attached to the returned key so generation-time signing consumes the
+    /// already-evaluated session.
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle
 

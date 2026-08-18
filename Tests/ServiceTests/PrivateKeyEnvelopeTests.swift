@@ -41,9 +41,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
             expectedPayloadKind: .softwareSecretCertificate
         )
         XCTAssertEqual(decoded.magic, PrivateKeyEnvelope.magic)
-        XCTAssertEqual(decoded.formatVersion, PrivateKeyEnvelope.currentFormatVersion)
-        XCTAssertEqual(decoded.aadVersion, PrivateKeyEnvelope.currentAADVersion)
-        XCTAssertEqual(decoded.algorithmID, PrivateKeyEnvelope.algorithmID)
+        XCTAssertEqual(decoded.magic, "CAPKEV1")
         XCTAssertEqual(decoded.fingerprint, fingerprint)
         XCTAssertEqual(decoded.seKeyData, handle.dataRepresentation)
         XCTAssertEqual(decoded.hkdfSalt.count, PrivateKeyEnvelope.expectedSaltLength)
@@ -211,11 +209,9 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let envelope = try decodedSoftwareEnvelope(sealing: privateKey, using: handle)
 
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, magic: "CAPKEX6")))
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, formatVersion: 0)))
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, aadVersion: 2)))
+        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, magic: "CAPKEX1")))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, fingerprint: "NOTHEX!!")))
+        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, fingerprint: "ABCDEF01")))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, seKeyData: Data())))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, hkdfSalt: Data(repeating: 0, count: 31))))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, nonce: Data(repeating: 0, count: 11))))
@@ -369,14 +365,10 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
     }
 
     // Each field is resolved into an explicitly typed local first: as one
-    // expression, the fourteen chained `??` operators blow past the
-    // type-checker's budget.
+    // expression, the chained `??` operators blow past the type-checker's budget.
     private func replacing(
         _ envelope: PrivateKeyEnvelope,
         magic: String? = nil,
-        formatVersion: Int? = nil,
-        algorithmID: String? = nil,
-        aadVersion: Int? = nil,
         payloadKind: PrivateKeyEnvelopePayloadKind? = nil,
         fingerprint: String? = nil,
         seKeyData: Data? = nil,
@@ -388,9 +380,6 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         tag: Data? = nil
     ) -> PrivateKeyEnvelope {
         let resolvedMagic: String = magic ?? envelope.magic
-        let resolvedFormatVersion: Int = formatVersion ?? envelope.formatVersion
-        let resolvedAlgorithmID: String = algorithmID ?? envelope.algorithmID
-        let resolvedAADVersion: Int = aadVersion ?? envelope.aadVersion
         let resolvedPayloadKind: PrivateKeyEnvelopePayloadKind = payloadKind ?? envelope.payloadKind
         let resolvedFingerprint: String = fingerprint ?? envelope.fingerprint
         let resolvedSEKeyData: Data = seKeyData ?? envelope.seKeyData
@@ -403,9 +392,6 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
 
         return PrivateKeyEnvelope(
             magic: resolvedMagic,
-            formatVersion: resolvedFormatVersion,
-            algorithmID: resolvedAlgorithmID,
-            aadVersion: resolvedAADVersion,
             payloadKind: resolvedPayloadKind,
             fingerprint: resolvedFingerprint,
             seKeyData: resolvedSEKeyData,

@@ -15,7 +15,6 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     private(set) var createRequests: [
         (
             reference: SecureEnclaveCustodyHandleReference,
-            accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
             authenticationContext: LAContext?
         )
     ] = []
@@ -34,10 +33,9 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
 
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
-        createRequests.append((reference, accessPolicy, authenticationContext))
+        createRequests.append((reference, authenticationContext))
         if failCreateRole == reference.role {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
         }

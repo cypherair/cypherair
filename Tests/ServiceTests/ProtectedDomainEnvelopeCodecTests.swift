@@ -11,11 +11,7 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
         let envelope = try seal(schemaVersion: 2, generationIdentifier: 7)
 
         XCTAssertEqual(envelope.magic, ProtectedDomainEnvelope.magic)
-        XCTAssertEqual(envelope.magic, "CPDENV5")
-        XCTAssertEqual(envelope.formatVersion, ProtectedDomainEnvelope.currentFormatVersion)
-        XCTAssertEqual(envelope.formatVersion, 5)
-        XCTAssertEqual(envelope.algorithmID, ProtectedDomainEnvelope.algorithmID)
-        XCTAssertEqual(envelope.aadVersion, ProtectedDomainEnvelope.currentAADVersion)
+        XCTAssertEqual(envelope.magic, "CPDENV1")
         XCTAssertEqual(envelope.schemaVersion, 2)
         XCTAssertEqual(envelope.generationIdentifier, 7)
         XCTAssertEqual(envelope.nonce.count, ProtectedDomainEnvelope.expectedNonceLength)
@@ -90,10 +86,7 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
     func test_encode_rejectsMalformedContract() throws {
         let envelope = try seal(schemaVersion: 1, generationIdentifier: 1)
 
-        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, magic: "CPDENX5")))
-        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, formatVersion: 1)))
-        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
-        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, aadVersion: 1)))
+        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, magic: "CPDENX1")))
         XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, schemaVersion: 0)))
         XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, generationIdentifier: 0)))
         XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, nonce: Data(repeating: 0x00, count: 11))))
@@ -134,9 +127,6 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
     private func replacing(
         _ envelope: ProtectedDomainEnvelope,
         magic: String? = nil,
-        formatVersion: Int? = nil,
-        algorithmID: String? = nil,
-        aadVersion: Int? = nil,
         domainID: ProtectedDataDomainID? = nil,
         schemaVersion: Int? = nil,
         generationIdentifier: Int? = nil,
@@ -146,9 +136,6 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
     ) -> ProtectedDomainEnvelope {
         ProtectedDomainEnvelope(
             magic: magic ?? envelope.magic,
-            formatVersion: formatVersion ?? envelope.formatVersion,
-            algorithmID: algorithmID ?? envelope.algorithmID,
-            aadVersion: aadVersion ?? envelope.aadVersion,
             domainID: domainID ?? envelope.domainID,
             schemaVersion: schemaVersion ?? envelope.schemaVersion,
             generationIdentifier: generationIdentifier ?? envelope.generationIdentifier,

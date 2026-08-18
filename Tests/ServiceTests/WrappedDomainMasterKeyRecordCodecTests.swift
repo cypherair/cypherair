@@ -15,11 +15,7 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
         )
 
         XCTAssertEqual(record.magic, WrappedDomainMasterKeyRecord.magic)
-        XCTAssertEqual(record.magic, "CADMKV5")
-        XCTAssertEqual(record.formatVersion, WrappedDomainMasterKeyRecord.currentFormatVersion)
-        XCTAssertEqual(record.formatVersion, 5)
-        XCTAssertEqual(record.algorithmID, WrappedDomainMasterKeyRecord.algorithmID)
-        XCTAssertEqual(record.aadVersion, WrappedDomainMasterKeyRecord.currentAADVersion)
+        XCTAssertEqual(record.magic, "CADMKV1")
         XCTAssertEqual(record.nonce.count, WrappedDomainMasterKeyRecord.expectedNonceLength)
         XCTAssertEqual(record.ciphertext.count, WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
         XCTAssertEqual(record.tag.count, WrappedDomainMasterKeyRecord.expectedAuthenticationTagLength)
@@ -108,10 +104,7 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
             domainWrappingKey: wrappingKey
         )
 
-        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, magic: "CADMKX5")))
-        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, formatVersion: 1)))
-        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, algorithmID: "other")))
-        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, aadVersion: 1)))
+        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, magic: "CADMKX1")))
         XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, nonce: Data(repeating: 0x00, count: 11))))
         XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, ciphertext: Data(repeating: 0x00, count: 31))))
         XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, tag: Data(repeating: 0x00, count: 15))))
@@ -144,9 +137,6 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
     private func replacing(
         _ record: WrappedDomainMasterKeyRecord,
         magic: String? = nil,
-        formatVersion: Int? = nil,
-        algorithmID: String? = nil,
-        aadVersion: Int? = nil,
         domainID: ProtectedDataDomainID? = nil,
         nonce: Data? = nil,
         ciphertext: Data? = nil,
@@ -154,9 +144,6 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
     ) -> WrappedDomainMasterKeyRecord {
         WrappedDomainMasterKeyRecord(
             magic: magic ?? record.magic,
-            formatVersion: formatVersion ?? record.formatVersion,
-            algorithmID: algorithmID ?? record.algorithmID,
-            aadVersion: aadVersion ?? record.aadVersion,
             domainID: domainID ?? record.domainID,
             nonce: nonce ?? record.nonce,
             ciphertext: ciphertext ?? record.ciphertext,

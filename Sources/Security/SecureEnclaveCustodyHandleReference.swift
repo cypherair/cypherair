@@ -25,8 +25,14 @@ struct SecureEnclaveCustodyHandleReference: Hashable, Sendable {
         self.tier = tier
     }
 
+    /// The service name for one tier/role namespace — the single place it is
+    /// spelled, used for per-reference rows and namespace-wide queries alike.
+    static func serviceString(tier: SecureEnclaveCustodyTier, role: PGPPrivateOperationRole) -> String {
+        "\(servicePrefix).\(tier.serviceNamespaceSegment).\(role.rawValue)"
+    }
+
     var serviceString: String {
-        "\(Self.servicePrefix).\(tier.serviceNamespaceSegment).\(role.rawValue)"
+        Self.serviceString(tier: tier, role: role)
     }
 
     var accountString: String {
@@ -42,12 +48,9 @@ struct SecureEnclaveCustodyHandleReference: Hashable, Sendable {
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Reject: a handle-set identifier is only ever app-generated lowercase
+    /// hex, so anything else is a malformed row, never normalized.
     static func isValidHandleSetIdentifier(_ value: String) -> Bool {
-        guard !value.isEmpty, value.utf8.count <= 64 else {
-            return false
-        }
-        return value.utf8.allSatisfy { byte in
-            (byte >= 0x30 && byte <= 0x39) || (byte >= 0x61 && byte <= 0x66)
-        }
+        HexIdentifier.isValid(value, letterCase: .lowercase, maximumLength: 64)
     }
 }

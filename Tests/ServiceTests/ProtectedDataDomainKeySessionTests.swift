@@ -51,9 +51,6 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let wrappingRootKey = try keyManager.deriveWrappingRootKey(from: &rawSecret)
         let malformedRecord = ProtectedDataTestAppWrappedDomainMasterKeyRecord(
             magic: ProtectedDataTestAppWrappedDomainMasterKeyRecord.magic,
-            formatVersion: ProtectedDataTestAppWrappedDomainMasterKeyRecord.currentFormatVersion,
-            algorithmID: ProtectedDataTestAppWrappedDomainMasterKeyRecord.algorithmID,
-            aadVersion: ProtectedDataTestAppWrappedDomainMasterKeyRecord.currentAADVersion,
             domainID: "contacts",
             nonce: Data(repeating: 0x01, count: 8),
             ciphertext: Data(repeating: 0x02, count: 31),

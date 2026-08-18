@@ -29,7 +29,8 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
     }
 
     func test_validateFingerprint_mixedCaseFingerprint_isAccepted() {
-        // The private-key envelope binds the fingerprint as-is; both hex cases are valid.
+        // Both hex cases are valid input; the seal path normalizes to lowercase
+        // before binding, and the envelope contract rejects stored mixed case.
         XCTAssertNoThrow(try SEConstants.validateFingerprint("AABBCCDD"))
         XCTAssertNoThrow(try SEConstants.validateFingerprint("aabbccdd"))
     }

@@ -632,9 +632,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
     func replacing(
         _ envelope: ProtectedDataRootSecretEnvelope,
         magic: String? = nil,
-        formatVersion: Int? = nil,
-        algorithmID: String? = nil,
-        aadVersion: Int? = nil,
         sharedRightIdentifier: String? = nil,
         deviceBindingKeyIdentifier: String? = nil,
         deviceBindingKeyData: Data? = nil,
@@ -647,9 +644,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
     ) -> ProtectedDataRootSecretEnvelope {
         ProtectedDataRootSecretEnvelope(
             magic: magic ?? envelope.magic,
-            formatVersion: formatVersion ?? envelope.formatVersion,
-            algorithmID: algorithmID ?? envelope.algorithmID,
-            aadVersion: aadVersion ?? envelope.aadVersion,
             sharedRightIdentifier: sharedRightIdentifier ?? envelope.sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier ?? envelope.deviceBindingKeyIdentifier,
             deviceBindingKeyData: deviceBindingKeyData ?? envelope.deviceBindingKeyData,
@@ -675,9 +669,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
     ) throws -> Data {
         let dictionary: [String: Any] = [
             "magic": envelope.magic,
-            "formatVersion": envelope.formatVersion,
-            "algorithmID": envelope.algorithmID,
-            "aadVersion": envelope.aadVersion,
             "sharedRightIdentifier": envelope.sharedRightIdentifier,
             "deviceBindingKeyIdentifier": envelope.deviceBindingKeyIdentifier,
             "deviceBindingKeyData": envelope.deviceBindingKeyData,

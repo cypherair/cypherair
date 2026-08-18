@@ -1,6 +1,6 @@
 # Security Model
 
-*Threat model, fail-closed rules, authentication contracts, and storage invariants. What ships is stated as shipped; decided-but-unshipped work is explicitly marked **roadmap**. Custody promises: [CUSTODY.md](CUSTODY.md). Storage rows and the version map: [STORAGE.md](STORAGE.md).*
+*Threat model, fail-closed rules, authentication contracts, and storage invariants. What ships is stated as shipped; decided-but-unshipped work is explicitly marked **roadmap**. Custody promises: [CUSTODY.md](CUSTODY.md). Storage rows and the envelope magics: [STORAGE.md](STORAGE.md).*
 
 ## 1. Threat Model
 
@@ -34,11 +34,11 @@ The mechanism rests on an API in tension with itself: the shipped SDK header des
 
 ## 3. Key Custody & Storage
 
-Software-custody private keys are protected by an indirect wrapping scheme that is identical for every software-key algorithm: a per-key Secure Enclave P-256 key wraps the raw private-key bytes (ephemeral-static ECDH → HKDF-SHA256 → AES-GCM), and each key persists as a single self-contained `CAPKEV6` Keychain row with the SE key's blob folded in. The rules that are not visible in the bytes:
+Software-custody private keys are protected by an indirect wrapping scheme that is identical for every software-key algorithm: a per-key Secure Enclave P-256 key wraps the raw private-key bytes (ephemeral-static ECDH → HKDF-SHA256 → AES-GCM), and each key persists as a single self-contained `CAPKEV1` Keychain row with the SE key's blob folded in. The rules that are not visible in the bytes:
 
 - **Ordering: storage before zeroization.** The raw private key is zeroized only after the envelope write is confirmed. If storage fails or the process crashes first, the bytes are still in memory and the operation can retry; the reverse order would permanently lose the key.
 - **Binding.** The payload kind, the fingerprint, both public keys, the SE key blob hash, and the plaintext length are bound through both the HKDF `sharedInfo` and the AES-GCM AAD — no public field can be substituted without breaking authentication. The kind is what keeps the two payloads the envelope can seal — a software secret certificate and a split-custody classical component ([CUSTODY.md](CUSTODY.md) §7) — from ever being opened as one another, independently of which row either was found in.
-- **The envelope is the only supported private-key payload.** Any row that does not decode as a current `CAPKEV6` envelope of the kind the caller asked for fails closed as ordinary undecodable input. There is no legacy wrapping format and no migration path, ever.
+- **The envelope is the only supported private-key payload.** Any row that does not decode as a current `CAPKEV1` envelope of the kind the caller asked for fails closed as ordinary undecodable input. There is no legacy wrapping format and no migration path, ever.
 - **Rows carry no per-row access control.** The auth-mode policy is baked into the folded SE key at creation; device authentication triggers when the enclave reconstructs and uses that key.
 - **Secure Enclave key loss is unrecoverable except by re-import.** SE keys are destroyed by device erase, iCloud restore, or backup restore; because the SE key exists only inside the envelope it seals, a destroyed SE key can never be re-wrapped — the only recovery is re-importing the key from the user's passphrase-protected backup. No detect-and-re-wrap flow exists or can exist.
 - **A Secure Enclave route never falls back to software secret-certificate material** — every non-matching path returns a blocked resolution. The decrypt Phase 1/Phase 2 boundary is preserved: Phase 1 recipient parsing is unauthenticated and the matched-key guard runs before any private-key access.
@@ -51,7 +51,7 @@ Device-bound custody — access policy, split custody, the mode-switch exemption
 
 ### ProtectedData Device-Binding Note
 
-ProtectedData uses a separate app-data root-secret model — do not conflate it with private-key envelope wrapping. The root secret's `CAPDSEV5` Keychain row (shape: [STORAGE.md](STORAGE.md) §2) folds in a ProtectedData-only P-256 SE device-binding key (`WhenPasscodeSetThisDeviceOnly` + `[.privateKeyUsage]` — never `.userPresence`/`.biometryAny`/`.devicePasscode`, *because* the user-facing prompt remains the app-session Keychain gate), reconstructed at open time as a silent second factor. `CAPDSEV5` and `CAPKEV6` share the ECDH construction but are domain-separated by magic and HKDF/AAD prefixes, so neither blob can be misread as the other (all four envelope magics and their version map: [STORAGE.md](STORAGE.md) §5). If the enclave cannot reconstruct the folded key or its public key mismatches, ProtectedData fails closed into framework recovery — **there is no fallback that opens ProtectedData without the SE factor**.
+ProtectedData uses a separate app-data root-secret model — do not conflate it with private-key envelope wrapping. The root secret's `CAPDSEV1` Keychain row (shape: [STORAGE.md](STORAGE.md) §2) folds in a ProtectedData-only P-256 SE device-binding key (`WhenPasscodeSetThisDeviceOnly` + `[.privateKeyUsage]` — never `.userPresence`/`.biometryAny`/`.devicePasscode`, *because* the user-facing prompt remains the app-session Keychain gate), reconstructed at open time as a silent second factor. `CAPDSEV1` and `CAPKEV1` share the ECDH construction but are domain-separated by magic and HKDF/AAD prefixes, so neither blob can be misread as the other (all four envelope magics: [STORAGE.md](STORAGE.md) §5). If the enclave cannot reconstruct the folded key or its public key mismatches, ProtectedData fails closed into framework recovery — **there is no fallback that opens ProtectedData without the SE factor**.
 
 ## 4. Authentication
 

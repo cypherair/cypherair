@@ -1,6 +1,6 @@
 # Local Storage
 
-*The storage posture, the promises attached to persisted state, the documented exceptions, the envelope version map, and the storage target design. What ships is stated as shipped; decided-but-unshipped work is explicitly marked **roadmap**. Lifecycle and fail-closed invariants: [SECURITY.md](SECURITY.md) §3/§5. Row-name constants: `Sources/Security/KeychainManageable.swift`.*
+*The storage posture, the promises attached to persisted state, the documented exceptions, the envelope magics, and the storage target design. What ships is stated as shipped; decided-but-unshipped work is explicitly marked **roadmap**. Lifecycle and fail-closed invariants: [SECURITY.md](SECURITY.md) §3/§5. Row-name constants: `Sources/Security/KeychainManageable.swift`.*
 
 ## 1. Posture
 
@@ -10,8 +10,8 @@
 
 The key hierarchy, as promises:
 
-- One SE-sealed root: the ProtectedData root secret persists as a single self-contained `CAPDSEV5` Keychain row, LA-gated under the app-session policy, with the SE device-binding key folded in ([SECURITY.md](SECURITY.md) §3 note). The device-binding **key** has no row of its own — it exists only inside the envelope.
-- The raw root secret only ever derives the wrapping root key (then is zeroized); each domain has its own random master key, persisted **only** as a `CADMKV5` wrapped-DMK Keychain record under the wrapping root key. Unwrapped DMKs are memory-only, session-local.
+- One SE-sealed root: the ProtectedData root secret persists as a single self-contained `CAPDSEV1` Keychain row, LA-gated under the app-session policy, with the SE device-binding key folded in ([SECURITY.md](SECURITY.md) §3 note). The device-binding **key** has no row of its own — it exists only inside the envelope.
+- The raw root secret only ever derives the wrapping root key (then is zeroized); each domain has its own random master key, persisted **only** as a `CADMKV1` wrapped-DMK Keychain record under the wrapping root key. Unwrapped DMKs are memory-only, session-local.
 - **Domain-key rows carry no per-row biometric access control** — deliberately: unwrapping still requires the post-auth wrapping root key, and the user-facing prompt is the app-session gate.
 - **Anti-silent-wipe:** a missing registry combined with any surviving app-owned domain-key row enters framework recovery — never a bootstrap into empty state.
 
@@ -23,11 +23,11 @@ Four domains ship today: `contacts`, `key-metadata`, `protected-settings`, `priv
 
 ## 3. Keychain rows (private-key side)
 
-Everything app-owned sits under the `com.cypherair.v5.` service prefix. Reset deletion is the default-account prefix sweep **plus two dedicated paths the sweep cannot reach**: an exact delete of the root-secret row (with its own failure key) and the custody handle store's namespace cleanup — the custody rows use random handle-set accounts, which a default-account sweep structurally cannot see. The promises attached to the row families:
+Everything app-owned sits under the `com.cypherair.` service prefix — the product name plus each row family's role segment; there is no generation segment, because there is no old generation to keep apart. Reset deletion is the default-account prefix sweep **plus two dedicated paths the sweep cannot reach**: an exact delete of the root-secret row (with its own failure key) and the custody handle store's namespace cleanup — the custody rows use random handle-set accounts, which a default-account sweep structurally cannot see. The promises attached to the row families:
 
-- **`privkey-envelope.<fingerprint>`** — one self-contained `CAPKEV6` envelope per software-custody key, sealed as the `software-secret-certificate` payload kind. Nothing else lives here.
+- **`privkey-envelope.<fingerprint>`** — one self-contained `CAPKEV1` envelope per software-custody key, sealed as the `software-secret-certificate` payload kind. Nothing else lives here.
 - **`pending-privkey-envelope.<fingerprint>`** — the crash-window artifact: it exists only between mode-switch / modify-expiry phases and is owned by the interrupted-rewrap recovery coordinators; it is promoted or cleaned, never trusted over a permanent row ([SECURITY.md](SECURITY.md) §4).
-- **`split-custody-classical.<fingerprint>`** — the Device-Bound Post-Quantum classical component, a `CAPKEV6` envelope sealed as the `split-custody-classical-component` payload kind ([CUSTODY.md](CUSTODY.md) §7). Its own row family and its own payload kind: a software-custody consumer handed one of these rows fails closed rather than opening it.
+- **`split-custody-classical.<fingerprint>`** — the Device-Bound Post-Quantum classical component, a `CAPKEV1` envelope sealed as the `split-custody-classical-component` payload kind ([CUSTODY.md](CUSTODY.md) §7). Its own row family and its own payload kind: a software-custody consumer handed one of these rows fails closed rather than opening it.
 - **`secure-enclave-custody.<tier>.<role>`** — device-bound enclave-key blob rows. **The account is a random handle-set id, never a fingerprint** — a deliberate unlinkability property between Keychain rows and key identities. Handle-set ids are Security-layer-private locators: never written to `key-metadata`, logs, UI, exports, or Rust.
 - **`protected-data.shared-right`** and **`protected-data.domain-key.[staged.]<domainID>`** — the §2 hierarchy's rows.
 
@@ -42,20 +42,20 @@ The exceptions, each with the reason that keeps it outside a protected domain:
 - **Temporary artifacts** live under verified-file-protection `tmp/` paths and are swept **once per launch, and never at termination**; the sweep erases only what the running session does not own. Export handoffs are still written flat into the `tmp/` root and swept by filename prefix. **Roadmap:** bring the flat export handoffs under the owned root and sweep by ownership rather than filename.
 - **Erasing a temporary artifact is one policy** for both the files the app owns and the ones the engine owns: unlink the name, overwrite the bytes with zeros. **The overwrite is best-effort hygiene, not a guarantee that the previous bytes are gone.** What actually makes a discarded plaintext file unreadable is the file protection class it was created under, whose per-file key dies with the file, and above that, not writing plaintext to disk at all.
 
-## 5. The envelope version map
+## 5. The envelope magics
 
-The map below is **ratified**; every *Next* entry is **roadmap-class** — it lands with its named trigger, not before. The four authenticated-envelope magics and the Keychain prefix version are **separate axes** and move on their own triggers, never in lockstep:
+Every persisted format identifies itself by its magic alone, bound into the authenticated data — no separate format version, AAD version, or algorithm identifier, because there is exactly one construction per magic. The HKDF/AAD domain-separation prefixes live as named constants beside each magic. All four magics carry one generation (`V1`), refreshed together as one scheme:
 
-| Envelope | Today | Next | Trigger |
-|---|---|---|---|
-| `CAPKEV6` (private-payload envelope) | v6 — the payload kind rides in the authenticated binding, so one envelope type seals two non-interchangeable payloads (§3) | none | — |
-| `CPDENV5` (protected-domain payload envelope) | v5 | **retires — no v6** | the §6 storage move replaces the plist payload container with per-domain SQLCipher |
-| `CAPDSEV5` (root-secret envelope) | v5 | stays v5 | its bytes do not change under the §6 storage move |
-| `CADMKV5` (wrapped domain master key) | v5 | stays v5 | its bytes do not change under the §6 storage move |
+| Magic | Format |
+|---|---|
+| `CAPKEV1` | private-payload envelope — the payload kind rides in the authenticated binding, so one envelope type seals two non-interchangeable payloads (§3) |
+| `CPDENV1` | protected-domain payload envelope — **retires** with the §6 storage move, which replaces the plist payload container with per-domain SQLCipher |
+| `CAPDSEV1` | root-secret envelope |
+| `CADMKV1` | wrapped domain master key |
 
 ## 6. Storage target design (roadmap)
 
 Decided, not shipped — nothing in this section describes current behavior:
 
-- **All four protected domains move to per-domain SQLCipher databases** (the contacts model generalized, including its §2 recovery-trigger contract). The three-slot plist payload container — and `CPDENV5` with it — retires.
+- **All four protected domains move to per-domain SQLCipher databases** (the contacts model generalized, including its §2 recovery-trigger contract). The three-slot plist payload container — and `CPDENV1` with it — retires.
 - **Generation-watermark authority moves into the per-domain databases**; the anti-rollback invariant and its scope bound are unchanged ([SECURITY.md](SECURITY.md) §5).

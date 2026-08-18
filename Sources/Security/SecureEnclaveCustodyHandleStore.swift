@@ -29,9 +29,8 @@ struct SecureEnclaveCustodyHandleStore {
     }
 
     /// Create both Secure Enclave keys under the fixed device-bound access
-    /// policy. Device-bound handles use `privateKeyUsageBiometryAny` regardless
-    /// of the app authentication mode, so they are exempt from mode-switch
-    /// re-wrap.
+    /// control, which applies regardless of the app authentication mode — that
+    /// is what exempts device-bound handles from mode-switch re-wrap.
     func createLoadedHandlePair(
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandlePair {
@@ -46,17 +45,14 @@ struct SecureEnclaveCustodyHandleStore {
             role: .keyAgreement,
             tier: tier
         )
-        let policy = SecureEnclaveCustodyAccessControlPolicy.privateKeyUsageBiometryAny
 
         let signing = try keyStore.createKey(
             reference: signingReference,
-            accessPolicy: policy,
             authenticationContext: authenticationContext
         )
         do {
             let keyAgreement = try keyStore.createKey(
                 reference: keyAgreementReference,
-                accessPolicy: policy,
                 authenticationContext: authenticationContext
             )
             return try SecureEnclaveCustodyLoadedHandlePair(

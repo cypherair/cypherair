@@ -5,27 +5,26 @@ import os
 
 /// Self-describing envelope that seals a 32-byte per-domain master key under the
 /// HKDF-derived domain wrapping key (AES-256-GCM). Follows the same envelope
-/// discipline as `PrivateKeyEnvelope` / `ProtectedDataRootSecretEnvelope`: a magic,
-/// algorithm identifier, and AAD version are stored and bound into the AES-GCM AAD,
-/// and decoding rejects any unknown or missing field.
+/// discipline as `PrivateKeyEnvelope` / `ProtectedDataRootSecretEnvelope`: the
+/// magic is stored and bound into the AES-GCM AAD, and decoding rejects any
+/// unknown or missing field.
 ///
-/// Domain-separated from the ECDH envelopes by its own magic (`CADMKV5`) and AAD
-/// prefix (`CADMKAD5`) so a wrapped-DMK blob can never be misread as another format.
+/// Domain-separated from the ECDH envelopes by its own magic (`CADMKV1`) and AAD
+/// prefix (`CADMKAD1`) so a wrapped-DMK blob can never be misread as another format.
 ///
 /// See SECURITY.md Section 5.
 struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
-    static let magic = "CADMKV5"
-    static let currentFormatVersion = 5
-    static let currentAADVersion = 5
-    static let algorithmID = "aes-256-gcm-hkdf-sha256-v5"
+    static let magic = "CADMKV1"
+    /// AES-GCM AAD domain-separation prefix for this magic.
+    static let aadPrefix = "CADMKAD1"
+    /// HKDF `info` domain-separation prefix for the per-domain wrapping-key
+    /// derivation (`ProtectedDomainKeyManager`).
+    static let hkdfInfoPrefix = "CADMKKI1"
     static let expectedDomainMasterKeyLength = 32
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
 
     let magic: String
-    let formatVersion: Int
-    let algorithmID: String
-    let aadVersion: Int
     let domainID: ProtectedDataDomainID
     let nonce: Data
     let ciphertext: Data
@@ -35,23 +34,20 @@ struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
         guard magic == Self.magic else {
             throw ProtectedDataError.invalidEnvelope("Unsupported wrapped domain master key record magic.")
         }
-        guard formatVersion == Self.currentFormatVersion else {
-            throw ProtectedDataError.invalidEnvelope("Unsupported wrapped domain master key record format version \(formatVersion).")
-        }
-        guard algorithmID == Self.algorithmID else {
-            throw ProtectedDataError.invalidEnvelope("Unsupported wrapped domain master key record algorithm.")
-        }
-        guard aadVersion == Self.currentAADVersion else {
-            throw ProtectedDataError.invalidEnvelope("Unsupported wrapped domain master key record AAD version \(aadVersion).")
-        }
         guard nonce.count == Self.expectedNonceLength else {
-            throw ProtectedDataError.invalidNonceLength(nonce.count)
+            throw ProtectedDataError.invalidNonceLength(expected: Self.expectedNonceLength, got: nonce.count)
         }
         guard ciphertext.count == Self.expectedDomainMasterKeyLength else {
-            throw ProtectedDataError.invalidCiphertextLength(ciphertext.count)
+            throw ProtectedDataError.invalidCiphertextLength(
+                expected: Self.expectedDomainMasterKeyLength,
+                got: ciphertext.count
+            )
         }
         guard tag.count == Self.expectedAuthenticationTagLength else {
-            throw ProtectedDataError.invalidAuthenticationTagLength(tag.count)
+            throw ProtectedDataError.invalidAuthenticationTagLength(
+                expected: Self.expectedAuthenticationTagLength,
+                got: tag.count
+            )
         }
     }
 }
@@ -65,9 +61,6 @@ struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
 enum WrappedDomainMasterKeyRecordCodec {
     private static let allowedKeys: Set<String> = [
         "magic",
-        "formatVersion",
-        "algorithmID",
-        "aadVersion",
         "domainID",
         "nonce",
         "ciphertext",
@@ -82,7 +75,11 @@ enum WrappedDomainMasterKeyRecordCodec {
     }
 
     static func decode(_ data: Data) throws -> WrappedDomainMasterKeyRecord {
-        try validateNoUnsupportedKeys(in: data)
+        try EnvelopePlistInspector.validateTopLevelKeys(
+            in: data,
+            allowed: allowedKeys,
+            noun: "Wrapped domain master key record"
+        )
         let record = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: data)
         try record.validateContract()
         return record
@@ -94,7 +91,10 @@ enum WrappedDomainMasterKeyRecordCodec {
         domainWrappingKey: Data
     ) throws -> WrappedDomainMasterKeyRecord {
         guard domainMasterKey.count == WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength else {
-            throw ProtectedDataError.invalidDomainMasterKeyLength(domainMasterKey.count)
+            throw ProtectedDataError.invalidKeyMaterialLength(
+                expected: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength,
+                got: domainMasterKey.count
+            )
         }
 
         let nonce = try protectedDataRandomBytes(count: WrappedDomainMasterKeyRecord.expectedNonceLength)
@@ -108,9 +108,6 @@ enum WrappedDomainMasterKeyRecordCodec {
 
         let record = WrappedDomainMasterKeyRecord(
             magic: WrappedDomainMasterKeyRecord.magic,
-            formatVersion: WrappedDomainMasterKeyRecord.currentFormatVersion,
-            algorithmID: WrappedDomainMasterKeyRecord.algorithmID,
-            aadVersion: WrappedDomainMasterKeyRecord.currentAADVersion,
             domainID: domainID,
             nonce: nonce,
             ciphertext: sealedBox.ciphertext,
@@ -139,14 +136,16 @@ enum WrappedDomainMasterKeyRecordCodec {
         )
 
         guard domainMasterKey.count == WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength else {
-            throw ProtectedDataError.invalidDomainMasterKeyLength(domainMasterKey.count)
+            throw ProtectedDataError.invalidKeyMaterialLength(
+                expected: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength,
+                got: domainMasterKey.count
+            )
         }
         return domainMasterKey
     }
 
     private static func wrappedDMKAAD(domainID: ProtectedDataDomainID) throws -> Data {
         guard let magicData = WrappedDomainMasterKeyRecord.magic.data(using: .utf8),
-              let algorithmData = WrappedDomainMasterKeyRecord.algorithmID.data(using: .utf8),
               let domainIDData = domainID.rawValue.data(using: .utf8) else {
             throw ProtectedDataError.internalFailure(
                 String(
@@ -156,26 +155,13 @@ enum WrappedDomainMasterKeyRecordCodec {
             )
         }
 
-        var aad = Data("CADMKAD5".utf8)
-        aad.append(UInt8(WrappedDomainMasterKeyRecord.currentFormatVersion))
-        aad.append(UInt8(WrappedDomainMasterKeyRecord.currentAADVersion))
+        var aad = Data(WrappedDomainMasterKeyRecord.aadPrefix.utf8)
         aad.append(UInt16(magicData.count).bigEndianData)
         aad.append(magicData)
-        aad.append(UInt16(algorithmData.count).bigEndianData)
-        aad.append(algorithmData)
         aad.append(UInt16(domainIDData.count).bigEndianData)
         aad.append(domainIDData)
         aad.append(UInt8(WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength))
         return aad
-    }
-
-    private static func validateNoUnsupportedKeys(in data: Data) throws {
-        guard let keys = try EnvelopePlistInspector.topLevelKeys(in: data) else {
-            throw ProtectedDataError.invalidEnvelope("Wrapped domain master key record is not a dictionary.")
-        }
-        guard keys == allowedKeys else {
-            throw ProtectedDataError.invalidEnvelope("Wrapped domain master key record contains unsupported or missing fields.")
-        }
     }
 }
 
@@ -207,8 +193,8 @@ final class ProtectedDomainKeyManager {
 
         let key = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: SymmetricKey(data: rawSecretData),
-            salt: Data("CypherAir.AppData.WrapRoot.Salt.v5".utf8),
-            info: Data("CypherAir.AppData.WrapRoot.Info.v5".utf8),
+            salt: Data("CypherAir.AppData.WrapRoot.Salt.v1".utf8),
+            info: Data("CypherAir.AppData.WrapRoot.Info.v1".utf8),
             outputByteCount: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength
         )
 
@@ -222,7 +208,7 @@ final class ProtectedDomainKeyManager {
         let info = try wrappedDMKKeyInfo(domainID: domainID)
         let key = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: SymmetricKey(data: wrappingRootKey),
-            salt: Data("CypherAir.AppData.DomainWrap.Salt.v5".utf8),
+            salt: Data("CypherAir.AppData.DomainWrap.Salt.v1".utf8),
             info: info,
             outputByteCount: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength
         )
@@ -401,8 +387,7 @@ final class ProtectedDomainKeyManager {
             )
         }
 
-        var info = Data("CADMKKI5".utf8)
-        info.append(UInt8(WrappedDomainMasterKeyRecord.currentFormatVersion))
+        var info = Data(WrappedDomainMasterKeyRecord.hkdfInfoPrefix.utf8)
         info.append(UInt16(domainIDData.count).bigEndianData)
         info.append(domainIDData)
         return info

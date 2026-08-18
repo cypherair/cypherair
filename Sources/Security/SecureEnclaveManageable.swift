@@ -100,15 +100,13 @@ protocol SecureEnclaveManageable: Sendable {
 /// The fingerprint is bound into `PrivateKeyEnvelope` (HKDF `sharedInfo` + AES-GCM AAD)
 /// rather than concatenated into an HKDF info string.
 enum SEConstants {
-    /// Validate that a fingerprint is non-empty and contains only hex characters.
-    /// Does not enforce a specific length — v4 fingerprints are 40 hex chars,
-    /// v6 fingerprints are 64 hex chars, and future versions may differ.
+    /// Validate that a fingerprint is hex of either letter case. No length
+    /// bound: v4 fingerprints are 40 hex chars and v6 fingerprints are 64, and
+    /// both are real inputs. Callers own the case decision — the seal path
+    /// normalizes to lowercase before binding; the envelope contract rejects
+    /// anything already stored in mixed case.
     static func validateFingerprint(_ fingerprint: String) throws {
-        guard !fingerprint.isEmpty else {
-            throw SecureEnclaveError.invalidFingerprint
-        }
-        let hexCharacters = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
-        guard fingerprint.unicodeScalars.allSatisfy({ hexCharacters.contains($0) }) else {
+        guard HexIdentifier.isValid(fingerprint, letterCase: .either) else {
             throw SecureEnclaveError.invalidFingerprint
         }
     }

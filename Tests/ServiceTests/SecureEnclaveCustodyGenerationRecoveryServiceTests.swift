@@ -520,7 +520,6 @@ private final class InMemoryCompositeKeyStore: SecureEnclaveCustodyKeyStoring, @
 
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
         throw SecureEnclaveCustodyHandleError.hardwareUnavailable

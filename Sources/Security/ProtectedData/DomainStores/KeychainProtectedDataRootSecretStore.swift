@@ -2,10 +2,6 @@ import Foundation
 import LocalAuthentication
 import Security
 
-enum ProtectedDataRightIdentifiers {
-    static let productionSharedRightIdentifier = "com.cypherair.v5.protected-data.shared-right"
-}
-
 protocol ProtectedDataRootSecretStoreProtocol: AnyObject {
     func saveRootSecret(
         _ secretData: Data,

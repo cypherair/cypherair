@@ -26,7 +26,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         )
         try container.keychain.save(
             Data([0x02]),
-            service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            service: KeychainConstants.protectedDataSharedRightService,
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
@@ -70,7 +70,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 4)
         XCTAssertFalse(container.keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(
-            service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            service: KeychainConstants.protectedDataSharedRightService,
             account: KeychainConstants.defaultAccount
         ))
         XCTAssertFalse(container.keychain.exists(
@@ -288,7 +288,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedRightIdentifier: KeychainConstants.protectedDataSharedRightService,
             sharedResourceLifecycleState: .absent,
             committedMembership: [:],
             pendingMutation: .createDomain(
@@ -328,7 +328,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedRightIdentifier: KeychainConstants.protectedDataSharedRightService,
             sharedResourceLifecycleState: .absent,
             committedMembership: [:],
             pendingMutation: .createDomain(
