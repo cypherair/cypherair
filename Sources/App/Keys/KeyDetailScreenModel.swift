@@ -82,7 +82,7 @@ final class KeyDetailScreenModel {
     }
 
     var isDeviceBound: Bool {
-        key?.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
+        key?.custody == .deviceBound
     }
 
     /// Confirmation copy shown before deleting this key. Device-bound (Secure
@@ -129,7 +129,7 @@ final class KeyDetailScreenModel {
             return true
         }
         let secureEnclaveKeys = keys.filter {
-            $0.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
+            $0.custody == .deviceBound
         }
         guard let ordinal = secureEnclaveKeys.firstIndex(where: { $0.fingerprint == fingerprint }) else {
             return true

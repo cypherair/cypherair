@@ -647,7 +647,7 @@ fn test_generated_public_certificates_carry_suite_key_version() {
         );
         assert_eq!(
             keys::detect_suite(&generated.public_key_data).expect("suite should classify"),
-            suite,
+            Some(suite),
             "{suite:?} round-trip classification"
         );
     }

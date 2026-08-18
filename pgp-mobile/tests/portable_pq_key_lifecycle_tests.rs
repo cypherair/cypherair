@@ -54,11 +54,11 @@ fn test_detect_suite_classifies_post_quantum() {
     let key = generate_pq();
     assert_eq!(
         keys::detect_suite(&key.public_key_data).expect("detect"),
-        KeySuite::MlDsa65Ed25519MlKem768X25519
+        Some(KeySuite::MlDsa65Ed25519MlKem768X25519)
     );
 
     let info = keys::parse_key_info(&key.public_key_data).expect("parse_key_info");
-    assert_eq!(info.suite, KeySuite::MlDsa65Ed25519MlKem768X25519);
+    assert_eq!(info.suite, Some(KeySuite::MlDsa65Ed25519MlKem768X25519));
     assert_eq!(info.key_version, 6);
 }
 
@@ -69,7 +69,7 @@ fn test_detect_suite_classifies_foreign_pq_cert() {
     let (_tsk, pub_armored) = common::pq::generate_foreign_pq();
     assert_eq!(
         keys::detect_suite(&pub_armored).expect("detect"),
-        KeySuite::MlDsa65Ed25519MlKem768X25519
+        Some(KeySuite::MlDsa65Ed25519MlKem768X25519)
     );
 }
 
@@ -89,13 +89,14 @@ fn test_detect_suite_classifies_mldsa87_tier_as_post_quantum_high() {
     let pub_armored = cert.armored().to_vec().expect("armor");
     assert_eq!(
         keys::detect_suite(&pub_armored).expect("detect"),
-        KeySuite::MlDsa87Ed448MlKem1024X448
+        Some(KeySuite::MlDsa87Ed448MlKem1024X448)
     );
 }
 
-/// The classical fallbacks must be unchanged by the algorithm-aware rule.
+/// The classical software suites keep classifying exactly under the
+/// refusal-capable rule.
 #[test]
-fn test_detect_suite_classical_fallbacks_unchanged() {
+fn test_detect_suite_classifies_classical_suites_exactly() {
     let legacy =
         keys::generate_key_with_suite("A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("gen A");
@@ -105,11 +106,11 @@ fn test_detect_suite_classical_fallbacks_unchanged() {
 
     assert_eq!(
         keys::detect_suite(&legacy.public_key_data).expect("detect A"),
-        KeySuite::Ed25519LegacyCurve25519Legacy
+        Some(KeySuite::Ed25519LegacyCurve25519Legacy)
     );
     assert_eq!(
         keys::detect_suite(&ed448.public_key_data).expect("detect B"),
-        KeySuite::Ed448X448
+        Some(KeySuite::Ed448X448)
     );
 }
 
@@ -156,5 +157,5 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ import");
     let imported_info = keys::parse_key_info(&imported).expect("info");
     assert_eq!(imported_info.fingerprint, key.fingerprint);
-    assert_eq!(imported_info.suite, KeySuite::MlDsa65Ed25519MlKem768X25519);
+    assert_eq!(imported_info.suite, Some(KeySuite::MlDsa65Ed25519MlKem768X25519));
 }

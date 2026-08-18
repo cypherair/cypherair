@@ -29,13 +29,12 @@ final class KeyExportService {
         guard let identity = catalogStore.identity(for: fingerprint) else {
             throw CypherAirError.keyMetadataUnavailable
         }
-        guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
+        guard identity.custody == .portable else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnsupportedForCustody)
         }
-        // Software custody implies a portable family with a software suite
-        // (enforced by the key-metadata domain contract); guard before
-        // unwrapping any secret. The engine derives the export S2K mode from
-        // the certificate itself, so the suite here only has to agree with that
+        // Every portable family has a software suite; guard before unwrapping
+        // any secret. The engine derives the export S2K mode from the
+        // certificate itself, so the suite here only has to agree with that
         // classification for the memory check below to describe the real cost.
         guard let suite = identity.softwareSuite else {
             throw CypherAirError.internalError(

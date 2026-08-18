@@ -70,8 +70,7 @@ final class KeyGenerationScreenModel {
             }
             return capabilityResolver.support(
                 for: .generate,
-                family: family,
-                custody: .appleSecureEnclavePrivateOperations
+                family: family
             ) == .supported
         }
     }

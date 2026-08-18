@@ -249,7 +249,7 @@ fn test_modify_expiry_modern_high_extend() {
     assert!(!result.key_info.is_expired);
     assert!(result.key_info.expiry_timestamp.is_some());
     assert_eq!(result.key_info.key_version, 6);
-    assert_eq!(result.key_info.suite, KeySuite::Ed448X448);
+    assert_eq!(result.key_info.suite, Some(KeySuite::Ed448X448));
 
     let re_parsed = keys::parse_key_info(&result.public_key_data)
         .expect("Updated public key should be parseable");

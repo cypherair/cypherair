@@ -231,7 +231,6 @@ final class ContactsSQLCipherDatabase {
                 primary_user_id TEXT,
                 display_name TEXT NOT NULL,
                 email TEXT,
-                key_version INTEGER NOT NULL,
                 suite TEXT NOT NULL,
                 primary_algo TEXT NOT NULL,
                 subkey_algo TEXT,
@@ -498,7 +497,6 @@ final class ContactsSQLCipherDatabase {
                 primary_user_id,
                 display_name,
                 email,
-                key_version,
                 suite,
                 primary_algo,
                 subkey_algo,
@@ -512,7 +510,7 @@ final class ContactsSQLCipherDatabase {
                 public_key_data,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             operation: "insert-key-record"
         ) { statement in
@@ -523,20 +521,19 @@ final class ContactsSQLCipherDatabase {
             try bindOptionalText(keyRecord.primaryUserId, to: statement, at: 5)
             try bindText(keyRecord.displayName, to: statement, at: 6)
             try bindOptionalText(keyRecord.email, to: statement, at: 7)
-            try bindInt(Int(keyRecord.keyVersion), to: statement, at: 8)
-            try bindText(keyRecord.suite.rawValue, to: statement, at: 9)
-            try bindText(keyRecord.primaryAlgo, to: statement, at: 10)
-            try bindOptionalText(keyRecord.subkeyAlgo, to: statement, at: 11)
-            try bindBool(keyRecord.hasEncryptionSubkey, to: statement, at: 12)
-            try bindBool(keyRecord.isRevoked, to: statement, at: 13)
-            try bindBool(keyRecord.isExpired, to: statement, at: 14)
-            try bindText(keyRecord.manualVerificationState.rawValue, to: statement, at: 15)
-            try bindText(keyRecord.usageState.rawValue, to: statement, at: 16)
-            try bindText(keyRecord.certificationProjection.status.rawValue, to: statement, at: 17)
-            try bindOptionalDate(keyRecord.certificationProjection.lastValidatedAt, to: statement, at: 18)
-            try bindBlob(keyRecord.publicKeyData, to: statement, at: 19)
-            try bindDate(keyRecord.createdAt, to: statement, at: 20)
-            try bindDate(keyRecord.updatedAt, to: statement, at: 21)
+            try bindText(keyRecord.suite.rawValue, to: statement, at: 8)
+            try bindText(keyRecord.primaryAlgo, to: statement, at: 9)
+            try bindOptionalText(keyRecord.subkeyAlgo, to: statement, at: 10)
+            try bindBool(keyRecord.hasEncryptionSubkey, to: statement, at: 11)
+            try bindBool(keyRecord.isRevoked, to: statement, at: 12)
+            try bindBool(keyRecord.isExpired, to: statement, at: 13)
+            try bindText(keyRecord.manualVerificationState.rawValue, to: statement, at: 14)
+            try bindText(keyRecord.usageState.rawValue, to: statement, at: 15)
+            try bindText(keyRecord.certificationProjection.status.rawValue, to: statement, at: 16)
+            try bindOptionalDate(keyRecord.certificationProjection.lastValidatedAt, to: statement, at: 17)
+            try bindBlob(keyRecord.publicKeyData, to: statement, at: 18)
+            try bindDate(keyRecord.createdAt, to: statement, at: 19)
+            try bindDate(keyRecord.updatedAt, to: statement, at: 20)
             try stepDone(statement, operation: "insert-key-record")
         }
     }
@@ -709,7 +706,6 @@ final class ContactsSQLCipherDatabase {
                 primary_user_id,
                 display_name,
                 email,
-                key_version,
                 suite,
                 primary_algo,
                 subkey_algo,
@@ -731,36 +727,30 @@ final class ContactsSQLCipherDatabase {
             var records: [ContactKeyRecord] = []
             while try stepRow(statement, operation: "load-key-records") {
                 let keyID = try columnString(statement, at: 0)
-                let suiteRawValue = try columnString(statement, at: 7)
+                let suiteRawValue = try columnString(statement, at: 6)
                 guard let suite = PGPKeySuite(rawValue: suiteRawValue) else {
                     throw ProtectedDataError.invalidEnvelope(
                         "Contacts SQLCipher key suite is unsupported."
                     )
                 }
-                let verificationRawValue = try columnString(statement, at: 13)
+                let verificationRawValue = try columnString(statement, at: 12)
                 guard let verificationState = ContactVerificationState(rawValue: verificationRawValue) else {
                     throw ProtectedDataError.invalidEnvelope(
                         "Contacts SQLCipher verification state is unsupported."
                     )
                 }
-                let usageRawValue = try columnString(statement, at: 14)
+                let usageRawValue = try columnString(statement, at: 13)
                 guard let usageState = ContactKeyUsageState(rawValue: usageRawValue) else {
                     throw ProtectedDataError.invalidEnvelope(
                         "Contacts SQLCipher usage state is unsupported."
                     )
                 }
-                let projectionStatusRawValue = try columnString(statement, at: 15)
+                let projectionStatusRawValue = try columnString(statement, at: 14)
                 guard let projectionStatus = ContactCertificationProjection.Status(
                     rawValue: projectionStatusRawValue
                 ) else {
                     throw ProtectedDataError.invalidEnvelope(
                         "Contacts SQLCipher certification projection status is unsupported."
-                    )
-                }
-                let keyVersion = try columnInt(statement, at: 6)
-                guard keyVersion >= 0, keyVersion <= Int(UInt8.max) else {
-                    throw ProtectedDataError.invalidEnvelope(
-                        "Contacts SQLCipher key version is unsupported."
                     )
                 }
 
@@ -772,13 +762,12 @@ final class ContactsSQLCipherDatabase {
                         primaryUserId: try columnOptionalString(statement, at: 3),
                         displayName: try columnString(statement, at: 4),
                         email: try columnOptionalString(statement, at: 5),
-                        keyVersion: UInt8(keyVersion),
                         suite: suite,
-                        primaryAlgo: try columnString(statement, at: 8),
-                        subkeyAlgo: try columnOptionalString(statement, at: 9),
-                        hasEncryptionSubkey: try columnBool(statement, at: 10),
-                        isRevoked: try columnBool(statement, at: 11),
-                        isExpired: try columnBool(statement, at: 12),
+                        primaryAlgo: try columnString(statement, at: 7),
+                        subkeyAlgo: try columnOptionalString(statement, at: 8),
+                        hasEncryptionSubkey: try columnBool(statement, at: 9),
+                        isRevoked: try columnBool(statement, at: 10),
+                        isExpired: try columnBool(statement, at: 11),
                         manualVerificationState: verificationState,
                         usageState: usageState,
                         certificationProjection: ContactCertificationProjection(
@@ -787,15 +776,15 @@ final class ContactsSQLCipherDatabase {
                                 table: "contact_key_projection_artifact_ids",
                                 keyID: keyID
                             ),
-                            lastValidatedAt: try columnOptionalDate(statement, at: 16)
+                            lastValidatedAt: try columnOptionalDate(statement, at: 15)
                         ),
                         certificationArtifactIds: try loadKeyArtifactIDs(
                             table: "contact_key_certification_artifact_ids",
                             keyID: keyID
                         ),
-                        publicKeyData: try columnData(statement, at: 17),
-                        createdAt: try columnDate(statement, at: 18),
-                        updatedAt: try columnDate(statement, at: 19)
+                        publicKeyData: try columnData(statement, at: 16),
+                        createdAt: try columnDate(statement, at: 17),
+                        updatedAt: try columnDate(statement, at: 18)
                     )
                 )
             }

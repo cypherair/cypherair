@@ -51,7 +51,7 @@ fn test_generate_key_modern_high_algorithms() {
 
     let info = keys::parse_key_info(&result.cert_data).expect("Parse should succeed");
     assert_eq!(info.key_version, 6);
-    assert_eq!(info.suite, KeySuite::Ed448X448);
+    assert_eq!(info.suite, Some(KeySuite::Ed448X448));
     assert!(info.has_encryption_subkey, "Must have encryption subkey");
     assert!(!info.is_revoked);
     assert!(!info.is_expired);

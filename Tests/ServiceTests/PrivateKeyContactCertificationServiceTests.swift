@@ -130,7 +130,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             XCTAssertEqual(validation.verification.status, .valid)
             XCTAssertEqual(fixture.identity.keyVersion, family.keyVersion)
             XCTAssertEqual(fixture.identity.keyFamily, family)
-            XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+            XCTAssertEqual(fixture.identity.custody, .deviceBound)
             XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
             assertNoCatalogOrKeychainMutation(stack: stack, before: snapshot)
         }
@@ -461,7 +461,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

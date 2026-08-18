@@ -1,8 +1,10 @@
 import Foundation
 
 /// The nine key families a locally owned identity can belong to, chosen at key
-/// generation and immutable per key. The family is the app's single source of
-/// truth for key version, custody, tier, and the software generation suite.
+/// generation and immutable per key. The family records the generation choice —
+/// custody and tier, and through them the generation-target version and the
+/// software generation suite. Facts about a certificate that already exists
+/// (its parsed version, algorithms, classified suite) come from the engine.
 ///
 /// Naming rule, stated once: every token in a case name is an RFC 9580/9980
 /// registered algorithm name; unmarked names are the current v6 forms, and a
@@ -43,21 +45,12 @@ enum PGPKeyFamily: String, CaseIterable, Codable, Hashable, Sendable {
         case postQuantumHigh
     }
 
-    /// OpenPGP key version of this family's certificates.
+    /// OpenPGP key version this family generates — a generation target, not a
+    /// statement about an existing certificate (read the engine's parse for
+    /// that). The Legacy tier is exactly the v4 interop story; every other
+    /// tier generates v6.
     var keyVersion: UInt8 {
-        switch self {
-        case .portableEd25519LegacyCurve25519Legacy,
-             .deviceBoundEcdsaNistP256EcdhNistP256V4:
-            4
-        case .portableEd25519X25519,
-             .portableEd448X448,
-             .portableMlDsa65Ed25519MlKem768X25519,
-             .portableMlDsa87Ed448MlKem1024X448,
-             .deviceBoundEcdsaNistP256EcdhNistP256,
-             .deviceBoundMlDsa65Ed25519MlKem768X25519,
-             .deviceBoundMlDsa87Ed448MlKem1024X448:
-            6
-        }
+        tier == .legacy ? 4 : 6
     }
 
     /// Private-key custody model of this family.
@@ -124,8 +117,11 @@ enum PGPKeyFamily: String, CaseIterable, Codable, Hashable, Sendable {
 extension PGPKeySuite {
     /// The portable family generated from this software suite — the inverse of
     /// `PGPKeyFamily.softwareGenerationSuite`, used when an imported or
-    /// generated software certificate is admitted into the catalog.
-    var portableFamily: PGPKeyFamily {
+    /// generated software certificate is admitted into the catalog. Nil for
+    /// the NIST P-256 suites: they classify Secure Enclave custody
+    /// certificates, and no portable family builds them, so a P-256 software
+    /// secret key is not admissible as an owned identity.
+    var portableFamily: PGPKeyFamily? {
         switch self {
         case .ed25519LegacyCurve25519Legacy:
             .portableEd25519LegacyCurve25519Legacy
@@ -137,6 +133,8 @@ extension PGPKeySuite {
             .portableMlDsa65Ed25519MlKem768X25519
         case .mlDsa87Ed448MlKem1024X448:
             .portableMlDsa87Ed448MlKem1024X448
+        case .ecdsaNistP256EcdhNistP256V4, .ecdsaNistP256EcdhNistP256:
+            nil
         }
     }
 }

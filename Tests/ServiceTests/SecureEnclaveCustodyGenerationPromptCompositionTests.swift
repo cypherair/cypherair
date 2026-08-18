@@ -89,7 +89,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
 
         gate.resume()
         let identity = try await action.value
-        XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        XCTAssertEqual(identity.custody, .deviceBound)
 
         await harness.settle()
         XCTAssertEqual(
@@ -151,7 +151,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
-        XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        XCTAssertEqual(identity.custody, .deviceBound)
     }
 
     func test_secureEnclaveGeneration_custodyPreAuthenticationRunsInsideOperationPromptSession() async throws {
@@ -172,7 +172,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
-        XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        XCTAssertEqual(identity.custody, .deviceBound)
         XCTAssertEqual(observer.calls, 1)
         XCTAssertEqual(
             observer.sawOperationPromptInProgress,

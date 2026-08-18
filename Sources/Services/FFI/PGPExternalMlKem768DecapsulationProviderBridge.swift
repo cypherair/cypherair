@@ -72,8 +72,7 @@ final class PGPExternalMlKem768DecapsulationProviderBridge: ExternalMlKem768Deca
             return .externalOperationInvalidResponse
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidFamilyCustody,
-             .operationUnsupportedForCustody,
+        case .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
              .metadataAssociationMismatch,

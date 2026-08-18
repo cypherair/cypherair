@@ -43,10 +43,14 @@ pub fn export_secret_key(cert_data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
         reason: e.to_string(),
     })?;
 
-    // Classify the certificate to pick the S2K mode. Algorithm-aware: a v6
-    // RFC 9980 composite cert is a post-quantum suite, not the high classical
-    // one, so a bare version check would not be sufficient.
-    let suite = super::suite::classify_suite(&cert);
+    // Classify the certificate to pick the S2K mode. An unplaceable
+    // certificate has no S2K story here and is refused rather than exported
+    // under a guessed one; every admissible owned software key classifies.
+    let Some(suite) = super::suite::classify_suite(&cert) else {
+        return Err(PgpError::UnsupportedAlgorithm {
+            algo: cert.primary_key().key().pk_algo().to_string(),
+        });
+    };
     let uses_argon2id = super::s2k::export_uses_argon2id(suite);
 
     let password = openpgp::crypto::Password::from(passphrase);

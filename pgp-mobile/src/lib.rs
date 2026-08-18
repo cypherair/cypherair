@@ -453,11 +453,6 @@ impl PgpEngine {
         keys::discover_certificate_selectors(&cert_data)
     }
 
-    /// Detect the suite of a key based on its version and algorithms.
-    pub fn detect_suite(&self, cert_data: Vec<u8>) -> Result<KeySuite, PgpError> {
-        keys::detect_suite(&cert_data)
-    }
-
     /// Validate contact-import data as a public certificate and return normalized metadata.
     ///
     /// Secret-bearing input is rejected with `InvalidKeyData` using a stable reason token.

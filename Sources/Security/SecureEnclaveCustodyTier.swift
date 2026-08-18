@@ -46,21 +46,26 @@ enum SecureEnclaveCustodyTier: String, CaseIterable, Hashable, Sendable {
 extension PGPKeyFamily {
     /// The Secure Enclave custody tier this key family runs on, or nil for
     /// every portable family. This is the single dispatch key for routing,
-    /// generation, recovery, and deletion of device-bound keys: an exhaustive
-    /// switch, so adding a family forces the author to classify it (a missing
-    /// arm fails to compile), and the portable families deliberately map to
-    /// nil so they never reach the Secure Enclave custody paths.
+    /// generation, recovery, and deletion of device-bound keys, and it follows
+    /// from custody and tier rather than being tabulated per family: the tier
+    /// switch is exhaustive, so a new tier fails to compile until classified,
+    /// and a new family classifies itself through the tier it declares.
     var deviceBoundCustodyTier: SecureEnclaveCustodyTier? {
-        switch self {
-        case .deviceBoundEcdsaNistP256EcdhNistP256V4, .deviceBoundEcdsaNistP256EcdhNistP256:
+        guard custody == .deviceBound else {
+            return nil
+        }
+        switch tier {
+        case .legacy, .modern:
             return .classicalP256
-        case .deviceBoundMlDsa65Ed25519MlKem768X25519:
+        case .postQuantum:
             return .postQuantum
-        case .deviceBoundMlDsa87Ed448MlKem1024X448:
+        case .postQuantumHigh:
             return .postQuantumHigh
-        case .portableEd25519LegacyCurve25519Legacy, .portableEd25519X25519,
-             .portableEd448X448, .portableMlDsa65Ed25519MlKem768X25519,
-             .portableMlDsa87Ed448MlKem1024X448:
+        case .modernHigh:
+            // No Secure Enclave parameter set exists for Ed448 (CryptoKit's
+            // enclave implements no classical curve but P-256), so no
+            // device-bound Modern · High family can exist; every Secure
+            // Enclave entry point fails closed on nil.
             return nil
         }
     }

@@ -5,8 +5,9 @@ import Foundation
 /// holds only metadata and the public key data.
 ///
 /// Conforms to `Codable` for serialization into the protected key-metadata
-/// domain. All fields are strict: records must persist explicit
-/// key family and custody kind.
+/// domain. The family is the one generation-time fact; custody derives from
+/// it, and the certificate facts (version, algorithms, expiry, states) are
+/// the engine's parse of the actual certificate.
 struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Unique identifier — the full fingerprint in lowercase hex.
     var id: String { fingerprint }
@@ -17,8 +18,8 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// The authoritative key family for this identity.
     let keyFamily: PGPKeyFamily
 
-    /// Private-key custody model for this local identity.
-    let privateKeyCustodyKind: PGPPrivateKeyCustodyKind
+    /// OpenPGP key version as the engine parsed it from the certificate.
+    let keyVersion: UInt8
 
     /// Primary User ID (e.g., "Alice <alice@example.com>").
     let userId: String?
@@ -60,10 +61,10 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         IdentityPresentation.shortKeyId(from: fingerprint)
     }
 
-    /// OpenPGP key version, computed from the family (4 for the two V4-form
-    /// families, 6 for the rest).
-    var keyVersion: UInt8 {
-        keyFamily.keyVersion
+    /// Private-key custody of this identity — a property of the family, never
+    /// stored beside it.
+    var custody: PGPKeyFamily.Custody {
+        keyFamily.custody
     }
 
     /// The software suite this identity's family generates with, or nil for
@@ -83,7 +84,7 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// unrecoverable and poisons the whole mode-switch recovery.
     static func softwareCustodyFingerprints(in identities: [PGPKeyIdentity]) -> [String] {
         identities
-            .filter { $0.privateKeyCustodyKind == .softwareSecretCertificate }
+            .filter { $0.custody == .portable }
             // Normalize defensively: the downstream re-wrap keying is
             // case-sensitive and relies on the lowercase-hex fingerprint
             // invariant; lowercasing here hardens it against any future drift.
@@ -104,11 +105,11 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         subkeyAlgo: String?,
         expiryDate: Date?,
         keyFamily: PGPKeyFamily,
-        privateKeyCustodyKind: PGPPrivateKeyCustodyKind
+        keyVersion: UInt8
     ) {
         self.fingerprint = fingerprint
         self.keyFamily = keyFamily
-        self.privateKeyCustodyKind = privateKeyCustodyKind
+        self.keyVersion = keyVersion
         self.userId = userId
         self.hasEncryptionSubkey = hasEncryptionSubkey
         self.isRevoked = isRevoked

@@ -60,7 +60,7 @@ fn generates_policy_valid_v6_composite_high_certificate() {
 
     let info = keys::parse_key_info(&material.public_key_data).expect("key info parses");
     assert_eq!(info.key_version, 6);
-    assert_eq!(info.suite, KeySuite::MlDsa87Ed448MlKem1024X448);
+    assert_eq!(info.suite, Some(KeySuite::MlDsa87Ed448MlKem1024X448));
     assert!(info.has_encryption_subkey);
     assert!(!info.is_revoked);
     assert!(!info.is_expired);

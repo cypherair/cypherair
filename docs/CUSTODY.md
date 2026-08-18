@@ -4,13 +4,13 @@
 
 ## 1. The custody model
 
-Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates three concepts: OpenPGP **configuration** (version/algorithms/format), private-key **custody** (software secret certificate vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state) — validity is decided by *family*, never by suite alone.
+Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates three concepts: OpenPGP **configuration** (version/algorithms/format — the certificate's own facts, read from the engine's parse), private-key **custody** (portable software key vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state). Custody is a *property of the family*, derived wherever it is needed and never persisted beside it — an identity cannot state a custody its family does not have.
 
 All four device-bound families are production-exposed wherever Secure Enclave hardware is present — the generation surface and capability resolution gate on `SecureEnclave.isAvailable` alone; there is no per-platform guard (accepted risks: §9).
 
 ## 2. Custody promises
 
-- **Private material is never exportable in any operable form.** The enforcement is the custody-kind guard at the export service boundary, which refuses anything but software custody before touching any secret, backed by the UI never offering a backup flow for device-bound keys.
+- **Private material is never exportable in any operable form.** The enforcement is the custody guard at the export service boundary, which refuses anything but portable (software) custody before touching any secret, backed by the UI never offering a backup flow for device-bound keys.
 - **Import into the enclave is not an operation.**
 - **Existing private keys are never converted into Secure Enclave custody**, and the product must not imply otherwise.
 - **A Keychain handle, public key, or locator is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.

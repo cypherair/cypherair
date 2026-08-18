@@ -31,62 +31,6 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         XCTAssertThrowsError(try harness.store.loadAll())
     }
 
-    func test_keyMetadataDomain_v2MismatchedConfigurationCustodyRequiresRecovery() async throws {
-        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataMismatchedConfigCustody")
-        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
-        let invalidIdentity = PGPKeyIdentity(
-            fingerprint: "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
-            userId: "Invalid <invalid@example.invalid>",
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: false,
-            isBackedUp: false,
-            publicKeyData: Data([0x10, 0x11]),
-            revocationCert: Data([0x12]),
-            primaryAlgo: "P-256",
-            subkeyAlgo: "P-256",
-            expiryDate: nil,
-            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            privateKeyCustodyKind: .softwareSecretCertificate
-        )
-        try await harness.store.ensureCommittedIfNeeded(
-            wrappingRootKey: harness.wrappingRootKey
-        )
-        try writeKeyMetadataEnvelope(
-            payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload(
-                schemaVersion: 2,
-                identities: [invalidIdentity]
-            ),
-            schemaVersion: 2,
-            generationIdentifier: 2,
-            storageRoot: harness.storageRoot,
-            domainKeyManager: harness.domainKeyManager,
-            wrappingRootKey: harness.wrappingRootKey
-        )
-        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
-            storageRoot: harness.storageRoot,
-            registryStore: harness.registryStore,
-            domainKeyManager: harness.domainKeyManager,
-            currentWrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        do {
-            _ = try await reopenedStore.openDomainIfNeeded(
-                wrappingRootKey: harness.wrappingRootKey
-            )
-            XCTFail("Expected mismatched key metadata configuration and custody to require recovery.")
-        } catch {
-        }
-
-        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
-        XCTAssertNil(reopenedStore.payload)
-        XCTAssertEqual(
-            try harness.registryStore.loadRegistry().committedMembership[ProtectedDataTestAppKeyMetadataDomainStore.domainID],
-            .recoveryNeeded
-        )
-    }
-
     func test_keyMetadataDomain_corruptCurrentGenerationDoesNotFallbackToPrevious() async throws {
         let harness = try await makeKeyMetadataDomainHarness("KeyMetadataCorruptCurrentNoFallback")
         defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
@@ -99,7 +43,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try writeKeyMetadataEnvelope(
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity]),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 2,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -146,7 +90,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try writeKeyMetadataEnvelope(
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity]),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 2,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -192,7 +136,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try writeKeyMetadataEnvelope(
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity]),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 2,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -200,7 +144,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
             ProtectedDomainBootstrapMetadata(
-                schemaVersion: 2,
+                schemaVersion: 3,
                 expectedCurrentGenerationIdentifier: "3"
             ),
             for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
@@ -248,7 +192,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         try harness.store.save(identity)
         try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
             ProtectedDomainBootstrapMetadata(
-                schemaVersion: 2,
+                schemaVersion: 3,
                 expectedCurrentGenerationIdentifier: "1"
             ),
             for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
@@ -526,7 +470,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(
                 identities: [committedIdentity, pendingIdentity]
             ),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 3,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -585,7 +529,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try writeKeyMetadataEnvelope(
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity]),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 4,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -593,7 +537,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
             ProtectedDomainBootstrapMetadata(
-                schemaVersion: 2,
+                schemaVersion: 3,
                 expectedCurrentGenerationIdentifier: "2"
             ),
             for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
@@ -636,7 +580,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try writeKeyMetadataEnvelope(
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [currentIdentity]),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 2,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -644,7 +588,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
         try writeKeyMetadataPendingEnvelope(
             payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [pendingIdentity]),
-            schemaVersion: 2,
+            schemaVersion: 3,
             generationIdentifier: 3,
             storageRoot: harness.storageRoot,
             domainKeyManager: harness.domainKeyManager,
@@ -710,28 +654,6 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
             try harness.registryStore.loadRegistry().committedMembership[ProtectedDataTestAppKeyMetadataDomainStore.domainID],
             .recoveryNeeded
         )
-    }
-
-    func test_keyMetadataPayloadValidationAcceptsRepresentableSecureEnclaveP256() throws {
-        let identity = PGPKeyIdentity(
-            fingerprint: "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
-            userId: "P-256 <p256@example.invalid>",
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: false,
-            isBackedUp: false,
-            publicKeyData: Data([0x20, 0x21]),
-            revocationCert: Data([0x22]),
-            primaryAlgo: "P-256",
-            subkeyAlgo: "P-256",
-            expiryDate: nil,
-            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-        )
-        let payload = ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity])
-
-        XCTAssertNoThrow(try payload.validateContract())
     }
 
     func test_keyMetadataDomain_pendingCreateRecoveryFromJournaledCreatesEmptyPayload() async throws {

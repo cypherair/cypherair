@@ -16,7 +16,14 @@ pub fn validate_public_certificate(
 
     let public_cert_data = serialize_public_cert(&cert)?;
     let key_info = parse_key_info(&public_cert_data)?;
-    let suite = key_info.suite;
+    // An unplaceable certificate is refused, not admitted under a guessed
+    // label: a contact record derives its certificate version from the suite,
+    // so admission requires an exact classification.
+    let Some(suite) = key_info.suite else {
+        return Err(PgpError::UnsupportedAlgorithm {
+            algo: key_info.primary_algo.clone(),
+        });
+    };
 
     Ok(PublicCertificateValidationResult {
         public_cert_data,

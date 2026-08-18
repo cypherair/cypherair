@@ -27,7 +27,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
             keyFamily: .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyVersion: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.keyVersion
         )
         let router = StaticPrivateKeyOperationRouter(
             route: .softwareSecretCertificate(
@@ -295,7 +295,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

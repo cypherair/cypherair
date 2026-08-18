@@ -76,6 +76,14 @@ pub fn generate_key_with_suite(
                     reason: format!("Failed to set profile: {e}"),
                 })?;
         }
+        KeySuite::EcdsaNistP256EcdhNistP256V4 | KeySuite::EcdsaNistP256EcdhNistP256 => {
+            // The P-256 suites exist as classifications of Secure Enclave
+            // custody certificates; their private keys live in the enclave and
+            // are never software-generated.
+            return Err(PgpError::KeyGenerationFailed {
+                reason: "NIST P-256 suites are built through the Secure Enclave custody paths, not software generation".to_string(),
+            });
+        }
     }
 
     // Set expiry

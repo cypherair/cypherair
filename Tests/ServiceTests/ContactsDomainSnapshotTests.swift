@@ -241,7 +241,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             primaryUserId: "Alice <alice@example.com>",
             displayName: "Alice",
             email: "alice@example.com",
-            keyVersion: 4,
             suite: .ed25519LegacyCurve25519Legacy,
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",

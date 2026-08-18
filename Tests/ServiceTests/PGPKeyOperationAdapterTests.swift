@@ -29,7 +29,7 @@ final class PGPKeyOperationAdapterTests: XCTestCase {
     }
 
     func test_importSecretKey_zeroizesSecretCertWhenPostImportHelperThrows() async {
-        let engine = ImportedSecretKeyDetectProfileFailureEngine(noHandle: .init())
+        let engine = ImportedSecretKeyParseFailureEngine(noHandle: .init())
         let zeroizer = SpySecretDataZeroizer()
         let adapter = PGPKeyOperationAdapter(
             engine: engine,
@@ -45,7 +45,7 @@ final class PGPKeyOperationAdapterTests: XCTestCase {
             )
             XCTFail("Expected importSecretKey to throw")
         } catch {
-            // Expected: detectProfile failed after imported secret material existed.
+            // Expected: parseKeyInfo failed after imported secret material existed.
         }
 
         XCTAssertEqual(zeroizer.capturedData, [engine.secretCert])
@@ -115,7 +115,6 @@ private class GeneratedKeySuccessEngine: PgpEngine {
             publicKeyData: publicKey,
             revocationCert: revocation,
             fingerprint: "generated-fingerprint",
-            keyVersion: 4,
             suite: suite
         )
     }
@@ -147,10 +146,6 @@ private class ImportedSecretKeySuccessEngine: PgpEngine {
         keyInfo()
     }
 
-    override func detectSuite(certData: Data) throws -> KeySuite {
-        .ed25519LegacyCurve25519Legacy
-    }
-
     override func armorPublicKey(certData: Data) throws -> Data {
         Data("armored-public-key".utf8)
     }
@@ -164,9 +159,9 @@ private class ImportedSecretKeySuccessEngine: PgpEngine {
     }
 }
 
-private final class ImportedSecretKeyDetectProfileFailureEngine: ImportedSecretKeySuccessEngine {
-    override func detectSuite(certData: Data) throws -> KeySuite {
-        throw PgpError.InvalidKeyData(reason: "suite detection failed")
+private final class ImportedSecretKeyParseFailureEngine: ImportedSecretKeySuccessEngine {
+    override func parseKeyInfo(keyData: Data) throws -> KeyInfo {
+        throw PgpError.InvalidKeyData(reason: "parse failed")
     }
 }
 

@@ -60,8 +60,8 @@ struct SelfTestView: View {
                             VStack(alignment: .leading) {
                                 Text(result.name)
                                     .font(.body)
-                                if let suite = result.suite {
-                                    Text(suite.portableFamily.familyDisplayName)
+                                if let familyName = result.suite?.portableFamily?.familyDisplayName {
+                                    Text(familyName)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

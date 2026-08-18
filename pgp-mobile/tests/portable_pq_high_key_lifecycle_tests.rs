@@ -58,11 +58,11 @@ fn test_detect_suite_classifies_post_quantum_high() {
     let key = generate_pq_high();
     assert_eq!(
         keys::detect_suite(&key.public_key_data).expect("detect"),
-        KeySuite::MlDsa87Ed448MlKem1024X448
+        Some(KeySuite::MlDsa87Ed448MlKem1024X448)
     );
 
     let info = keys::parse_key_info(&key.public_key_data).expect("parse_key_info");
-    assert_eq!(info.suite, KeySuite::MlDsa87Ed448MlKem1024X448);
+    assert_eq!(info.suite, Some(KeySuite::MlDsa87Ed448MlKem1024X448));
     assert_eq!(info.key_version, 6);
 }
 
@@ -103,5 +103,5 @@ fn test_export_import_roundtrip_post_quantum_high_uses_argon2id() {
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ-High import");
     let imported_info = keys::parse_key_info(&imported).expect("info");
     assert_eq!(imported_info.fingerprint, key.fingerprint);
-    assert_eq!(imported_info.suite, KeySuite::MlDsa87Ed448MlKem1024X448);
+    assert_eq!(imported_info.suite, Some(KeySuite::MlDsa87Ed448MlKem1024X448));
 }

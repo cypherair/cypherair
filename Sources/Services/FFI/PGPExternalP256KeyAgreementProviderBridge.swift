@@ -64,8 +64,7 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
             return .handlePublicKeyBindingMismatch
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidFamilyCustody,
-             .operationUnsupportedForCustody,
+        case .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
              .classicalComponentFailed,

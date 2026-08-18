@@ -401,15 +401,15 @@ final class KeyMutationService {
             return .blocked(resolution)
         }
 
-        switch identity.privateKeyCustodyKind {
-        case .softwareSecretCertificate:
+        switch identity.custody {
+        case .portable:
             return .softwareSecretCertificate(
                 SoftwareSecretCertificateRoute(
                     identity: identity,
                     operation: .modifyExpiry
                 )
             )
-        case .appleSecureEnclavePrivateOperations:
+        case .deviceBound:
             return .blocked(.unavailable(.operationUnavailableByPolicy))
         }
     }
@@ -420,10 +420,10 @@ final class KeyMutationService {
             return
         }
 
-        switch identity.privateKeyCustodyKind {
-        case .softwareSecretCertificate:
+        switch identity.custody {
+        case .portable:
             try deleteKeychainMaterialAndMetadata(fingerprint: fingerprint)
-        case .appleSecureEnclavePrivateOperations:
+        case .deviceBound:
             try deleteSecureEnclaveCustodyKey(identity)
         }
     }
@@ -467,7 +467,7 @@ final class KeyMutationService {
             return []
         }
         guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
-            return [CypherAirError.keyOperationUnavailable(category: .invalidFamilyCustody)]
+            return [CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)]
         }
         switch tier {
         case .classicalP256:

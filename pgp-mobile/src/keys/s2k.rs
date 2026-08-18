@@ -39,10 +39,10 @@ pub(crate) fn argon2_memory_kib(encoded_m: u8) -> u64 {
 
 /// Whether exporting `suite` protects the secret material with Argon2id.
 ///
-/// Portable Legacy is the GnuPG-compatibility family, so its export keeps
+/// The v4 suites carry the GnuPG-compatibility story, so their exports keep
 /// RFC 4880 Iterated+Salted S2K; every v6 suite uses Argon2id.
 pub(crate) fn export_uses_argon2id(suite: KeySuite) -> bool {
-    suite != KeySuite::Ed25519LegacyCurve25519Legacy
+    suite.key_version() == 6
 }
 
 /// The Argon2id specifier an export writes into its secret-key packets.

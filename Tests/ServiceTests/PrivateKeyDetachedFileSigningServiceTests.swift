@@ -86,7 +86,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         let fixture = try await makeSecureEnclaveRouteFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
         XCTAssertEqual(fixture.identity.keyFamily, .deviceBoundEcdsaNistP256EcdhNistP256)
-        XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        XCTAssertEqual(fixture.identity.custody, .deviceBound)
         let input = try makeTemporaryFile(Data("secure enclave v6 detached file".utf8))
         defer { try? FileManager.default.removeItem(at: input) }
         let router = StaticDetachedPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
@@ -449,7 +449,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
             keyFamily: .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyVersion: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.keyVersion
         )
     }
 
@@ -494,7 +494,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

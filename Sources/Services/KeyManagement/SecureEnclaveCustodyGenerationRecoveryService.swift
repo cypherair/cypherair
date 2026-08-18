@@ -55,7 +55,7 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
 
         var secureEnclaveOrdinal = 0
         let assessments = identities.compactMap { identity -> SecureEnclaveCustodyGenerationRecoveryAssessment? in
-            guard identity.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations else {
+            guard identity.custody == .deviceBound else {
                 return nil
             }
             defer { secureEnclaveOrdinal += 1 }
@@ -87,9 +87,9 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             return assessment(
                 identity: identity,
                 ordinal: ordinal,
-                publicMaterialAvailability: .unavailable(.invalidFamilyCustody),
+                publicMaterialAvailability: .unavailable(.operationUnavailableByPolicy),
                 revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.invalidFamilyCustody)
+                handleAvailability: .unavailable(.operationUnavailableByPolicy)
             )
         }
         switch tier {

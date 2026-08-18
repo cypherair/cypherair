@@ -57,11 +57,11 @@ fn test_detect_suite_classifies_modern() {
     let key = generate_modern();
     assert_eq!(
         keys::detect_suite(&key.public_key_data).expect("detect"),
-        KeySuite::Ed25519X25519
+        Some(KeySuite::Ed25519X25519)
     );
 
     let info = keys::parse_key_info(&key.public_key_data).expect("parse_key_info");
-    assert_eq!(info.suite, KeySuite::Ed25519X25519);
+    assert_eq!(info.suite, Some(KeySuite::Ed25519X25519));
     assert_eq!(info.key_version, 6);
 }
 
@@ -101,5 +101,5 @@ fn test_export_import_roundtrip_modern_uses_argon2id() {
     let imported = keys::import_secret_key(&exported, "correct horse").expect("Modern import");
     let imported_info = keys::parse_key_info(&imported).expect("info");
     assert_eq!(imported_info.fingerprint, key.fingerprint);
-    assert_eq!(imported_info.suite, KeySuite::Ed25519X25519);
+    assert_eq!(imported_info.suite, Some(KeySuite::Ed25519X25519));
 }

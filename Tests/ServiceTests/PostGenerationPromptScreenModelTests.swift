@@ -132,7 +132,7 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
             subkeyAlgo: "P-256",
             expiryDate: nil,
             keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.keyVersion
         )
     }
 }

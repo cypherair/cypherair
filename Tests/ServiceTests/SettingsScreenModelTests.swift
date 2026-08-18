@@ -1704,13 +1704,13 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     func test_backupExpectation_ignoresDeviceBoundKeys() {
         let backedUpSoftware = makeCustodySettingsIdentity(
-            fingerprint: "aaaa", custody: .softwareSecretCertificate, isBackedUp: true
+            fingerprint: "aaaa", custody: .portable, isBackedUp: true
         )
         let unbackedSoftware = makeCustodySettingsIdentity(
-            fingerprint: "bbbb", custody: .softwareSecretCertificate, isBackedUp: false
+            fingerprint: "bbbb", custody: .portable, isBackedUp: false
         )
         let deviceBound = makeCustodySettingsIdentity(
-            fingerprint: "cccc", custody: .appleSecureEnclavePrivateOperations, isBackedUp: false
+            fingerprint: "cccc", custody: .deviceBound, isBackedUp: false
         )
 
         // Mixed population: software keys carry the expectation.
@@ -1731,10 +1731,10 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     func test_rewrapFingerprints_excludeDeviceBoundKeys() {
         let software = makeCustodySettingsIdentity(
-            fingerprint: "aaaa", custody: .softwareSecretCertificate, isBackedUp: true
+            fingerprint: "aaaa", custody: .portable, isBackedUp: true
         )
         let deviceBound = makeCustodySettingsIdentity(
-            fingerprint: "cccc", custody: .appleSecureEnclavePrivateOperations, isBackedUp: false
+            fingerprint: "cccc", custody: .deviceBound, isBackedUp: false
         )
 
         // Device-bound keys have no SE-wrapped software bundle: passing them
@@ -1748,10 +1748,13 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     private func makeCustodySettingsIdentity(
         fingerprint: String,
-        custody: PGPPrivateKeyCustodyKind,
+        custody: PGPKeyFamily.Custody,
         isBackedUp: Bool
     ) -> PGPKeyIdentity {
-        PGPKeyIdentity(
+        let family: PGPKeyFamily = custody == .deviceBound
+            ? .deviceBoundEcdsaNistP256EcdhNistP256V4
+            : .portableEd25519LegacyCurve25519Legacy
+        return PGPKeyIdentity(
             fingerprint: fingerprint,
             userId: nil,
             hasEncryptionSubkey: true,
@@ -1764,10 +1767,8 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             expiryDate: nil,
-            keyFamily: custody == .appleSecureEnclavePrivateOperations
-                ? .deviceBoundEcdsaNistP256EcdhNistP256V4
-                : .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: custody
+            keyFamily: family,
+            keyVersion: family.keyVersion
         )
     }
 

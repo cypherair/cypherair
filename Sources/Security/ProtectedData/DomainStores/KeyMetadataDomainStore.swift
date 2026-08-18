@@ -4,7 +4,7 @@ import Security
 
 final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockParticipant, @unchecked Sendable {
     struct Payload: Codable, Equatable {
-        static let currentSchemaVersion = 2
+        static let currentSchemaVersion = 3
 
         var schemaVersion: Int
         var identities: [PGPKeyIdentity]
@@ -27,29 +27,6 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 throw ProtectedDataError.invalidEnvelope(
                     "Key metadata payload contains duplicate fingerprints."
                 )
-            }
-            for identity in identities {
-                try Self.validateIdentityContract(identity)
-            }
-        }
-
-        private static func validateIdentityContract(_ identity: PGPKeyIdentity) throws {
-            // Custody validity comes from the family's custody axis: the
-            // composite algorithm suite is legal under both custody kinds
-            // (portable software vs device-bound split custody), so the
-            // family — not the suite — decides.
-            switch (identity.keyFamily.custody, identity.privateKeyCustodyKind) {
-            case (.deviceBound, .softwareSecretCertificate):
-                throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata cannot use software custody for a device-bound family."
-                )
-            case (.portable, .appleSecureEnclavePrivateOperations):
-                throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata cannot use Secure Enclave custody for a portable family."
-                )
-            case (.deviceBound, .appleSecureEnclavePrivateOperations),
-                 (.portable, .softwareSecretCertificate):
-                return
             }
         }
     }

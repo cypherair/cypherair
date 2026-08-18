@@ -219,15 +219,15 @@ final class SelectiveRevocationService {
             return .blocked(resolution)
         }
 
-        switch identity.privateKeyCustodyKind {
-        case .softwareSecretCertificate:
+        switch identity.custody {
+        case .portable:
             return .softwareSecretCertificate(
                 SoftwareSecretCertificateRoute(
                     identity: identity,
                     operation: .revoke
                 )
             )
-        case .appleSecureEnclavePrivateOperations:
+        case .deviceBound:
             return .blocked(.unavailable(.operationUnavailableByPolicy))
         }
     }

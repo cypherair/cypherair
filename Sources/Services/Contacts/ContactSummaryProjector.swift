@@ -100,7 +100,6 @@ struct ContactSummaryProjector {
             primaryUserId: keyRecord.primaryUserId,
             displayName: keyRecord.displayName,
             email: keyRecord.email,
-            keyVersion: keyRecord.keyVersion,
             suite: keyRecord.suite,
             primaryAlgo: keyRecord.primaryAlgo,
             subkeyAlgo: keyRecord.subkeyAlgo,

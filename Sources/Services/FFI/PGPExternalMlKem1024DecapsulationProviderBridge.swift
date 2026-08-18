@@ -72,8 +72,7 @@ final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024De
             return .externalOperationInvalidResponse
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidFamilyCustody,
-             .operationUnsupportedForCustody,
+        case .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
              .metadataAssociationMismatch,

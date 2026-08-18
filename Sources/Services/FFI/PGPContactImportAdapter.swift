@@ -3,9 +3,8 @@ import Foundation
 struct PGPValidatedPublicCertificate: Equatable, Sendable {
     let publicCertData: Data
     let metadata: PGPKeyMetadata
-    /// Contact-importable certificates are always portable software
-    /// certificates, so the engine's detected suite is guaranteed here
-    /// (unlike the optional `PGPKeyMetadata.suite`).
+    /// Non-optional because the engine refuses unplaceable certificates at
+    /// validation, so every importable contact carries an exact suite.
     let suite: PGPKeySuite
 }
 

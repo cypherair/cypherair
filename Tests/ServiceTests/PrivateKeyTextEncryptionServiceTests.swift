@@ -100,7 +100,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         let fixture = try await makeSecureEnclaveRouteFixture(family: .deviceBoundEcdsaNistP256EcdhNistP256)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
         XCTAssertEqual(fixture.identity.keyFamily, .deviceBoundEcdsaNistP256EcdhNistP256)
-        XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        XCTAssertEqual(fixture.identity.custody, .deviceBound)
         var recipient = try makeRecipient(suite: .ed448X448)
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
         let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
@@ -481,7 +481,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
             keyFamily: .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyVersion: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.keyVersion
         )
     }
 
@@ -530,7 +530,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

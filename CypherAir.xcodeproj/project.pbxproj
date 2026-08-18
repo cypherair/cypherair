@@ -282,7 +282,6 @@
 				Models/Keys/PGPKeyMetadata.swift,
 				Models/Keys/PGPKeyS2KInfo.swift,
 				Models/Keys/PGPKeySuite.swift,
-				Models/Keys/PGPPrivateKeyCustodyKind.swift,
 				Models/Keys/PGPPrivateOperationKind.swift,
 				Models/Keys/PGPPrivateOperationRole.swift,
 				Models/Keys/SubkeySelectionOption.swift,

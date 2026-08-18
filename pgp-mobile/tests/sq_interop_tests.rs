@@ -131,7 +131,7 @@ fn assert_sq_cert_classifies(suite: &SqSuite) {
     let info = keys::parse_key_info(&pubkey).expect("sq public cert should parse");
 
     assert_eq!(info.key_version, suite.key_version, "key version");
-    assert_eq!(info.suite, suite.profile, "profile classification");
+    assert_eq!(info.suite, Some(suite.profile), "profile classification");
     assert!(info.has_encryption_subkey, "must have encryption subkey");
     assert!(!info.is_revoked);
     assert!(!info.is_expired);
@@ -139,7 +139,7 @@ fn assert_sq_cert_classifies(suite: &SqSuite) {
 
     assert_eq!(
         keys::detect_suite(&pubkey).expect("detect_suite"),
-        suite.profile
+        Some(suite.profile)
     );
 }
 

@@ -34,8 +34,8 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
             XCTAssertEqual(identity.keyFamily, family)
             XCTAssertEqual(
-                identity.privateKeyCustodyKind,
-                PGPPrivateKeyCustodyKind.appleSecureEnclavePrivateOperations
+                identity.custody,
+                PGPKeyFamily.Custody.deviceBound
             )
             XCTAssertEqual(identity.keyVersion, family.keyVersion)
             XCTAssertFalse(identity.publicKeyData.isEmpty)
@@ -468,7 +468,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 hasEncryptionSubkey: true,
                 isRevoked: false,
                 isExpired: false,
-                suite: keyVersion == 4 ? .ed25519LegacyCurve25519Legacy : .ed448X448,
+                suite: keyVersion == 4 ? .ecdsaNistP256EcdhNistP256V4 : .ecdsaNistP256EcdhNistP256,
                 primaryAlgo: "ECDSA P-256",
                 subkeyAlgo: "ECDH P-256",
                 expiryTimestamp: nil
@@ -496,7 +496,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
     }
 }

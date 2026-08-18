@@ -9,7 +9,6 @@ struct ContactKeySummary: Identifiable, Hashable, Sendable {
     let primaryUserId: String?
     let displayName: String
     let email: String?
-    let keyVersion: UInt8
     let suite: PGPKeySuite
     let primaryAlgo: String
     let subkeyAlgo: String?

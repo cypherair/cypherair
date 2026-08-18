@@ -487,7 +487,7 @@ final class SettingsScreenModel {
     /// satisfied rather than permanently nagged with an unsatisfiable task).
     nonisolated static func backupExpectationSatisfied(keys: [PGPKeyIdentity]) -> Bool {
         let softwareKeys = keys.filter {
-            $0.privateKeyCustodyKind == .softwareSecretCertificate
+            $0.custody == .portable
         }
         guard !softwareKeys.isEmpty else {
             return true

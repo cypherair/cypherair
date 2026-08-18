@@ -489,7 +489,7 @@ func makeKeyRouteTestIdentity(fingerprint: String) -> PGPKeyIdentity {
         subkeyAlgo: "X448",
         expiryDate: nil,
         keyFamily: .portableEd448X448,
-        privateKeyCustodyKind: .softwareSecretCertificate
+        keyVersion: PGPKeyFamily.portableEd448X448.keyVersion
     )
 }
 

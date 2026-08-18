@@ -15,18 +15,29 @@ use zeroize::Zeroizing;
 use crate::armor;
 use crate::error::PgpError;
 
-/// Software key-generation suite, named by its RFC 9580/9980 registered
-/// signing + encryption algorithms and ordered by ascending security tier.
-/// Suites map 1:1 onto the portable key families; device-bound custody
-/// certificates are built through the Secure Enclave paths instead.
+/// Certificate suite vocabulary, named by RFC 9580/9980 registered signing +
+/// encryption algorithms and ordered by ascending security tier.
+///
+/// Classification (`KeyInfo::suite`) places a certificate here from its
+/// primary-key algorithm, curve, and certificate version together, and refuses
+/// a certificate it cannot place — so every suite implies its certificate
+/// version exactly (`key_version`). Five suites are software-generatable; the
+/// two NIST P-256 suites are only ever built through the Secure Enclave
+/// custody paths and are refused by software generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum KeySuite {
     /// v4 Ed25519Legacy (EdDSALegacy, 22) + Curve25519Legacy (ECDH, 18) under
     /// RFC 4880. SEIPDv1, Iterated+Salted S2K, GnuPG compatible.
     Ed25519LegacyCurve25519Legacy,
+    /// v4 ECDSA NIST P-256 (19) + ECDH NIST P-256 (18) under RFC 4880 — the
+    /// Device-Bound Legacy certificate shape. Secure Enclave custody only.
+    EcdsaNistP256EcdhNistP256V4,
     /// v6 Ed25519 (27) + X25519 (25) under RFC 9580 — the baseline v6
     /// classical suite. SEIPDv2 AEAD OCB, Argon2id S2K.
     Ed25519X25519,
+    /// v6 ECDSA NIST P-256 (19) + ECDH NIST P-256 (18) under RFC 9580 — the
+    /// Device-Bound Modern certificate shape. Secure Enclave custody only.
+    EcdsaNistP256EcdhNistP256,
     /// v6 Ed448 (28) + X448 (26) under RFC 9580. SEIPDv2 AEAD OCB, Argon2id S2K.
     Ed448X448,
     /// v6 RFC 9980 composite ML-DSA-65+Ed25519 (30) signing +
@@ -35,6 +46,22 @@ pub enum KeySuite {
     /// v6 RFC 9980 composite ML-DSA-87+Ed448 (31) signing +
     /// ML-KEM-1024+X448 (36) encryption (NIST level 5). SEIPDv2, Argon2id S2K.
     MlDsa87Ed448MlKem1024X448,
+}
+
+impl KeySuite {
+    /// The OpenPGP certificate version this suite implies. Exact, not a
+    /// default: classification consults the certificate version, so a
+    /// classified certificate carries precisely this version.
+    pub fn key_version(self) -> u8 {
+        match self {
+            KeySuite::Ed25519LegacyCurve25519Legacy | KeySuite::EcdsaNistP256EcdhNistP256V4 => 4,
+            KeySuite::Ed25519X25519
+            | KeySuite::EcdsaNistP256EcdhNistP256
+            | KeySuite::Ed448X448
+            | KeySuite::MlDsa65Ed25519MlKem768X25519
+            | KeySuite::MlDsa87Ed448MlKem1024X448 => 6,
+        }
+    }
 }
 
 /// Result of key generation, containing the key pair and revocation certificate.
@@ -715,8 +742,10 @@ pub struct KeyInfo {
     pub is_revoked: bool,
     /// Whether the key has expired.
     pub is_expired: bool,
-    /// Detected suite based on key version and algorithms.
-    pub suite: KeySuite,
+    /// Classified suite, or `None` when the certificate cannot be placed —
+    /// its algorithm, curve, and version match no suite exactly. A refusal
+    /// is a report, not an error: the rest of the parse stands.
+    pub suite: Option<KeySuite>,
     /// Primary key algorithm name (e.g., "Ed25519", "Ed448").
     pub primary_algo: String,
     /// Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
@@ -787,7 +816,9 @@ pub struct PublicCertificateValidationResult {
     pub public_cert_data: Vec<u8>,
     /// Parsed key metadata for the validated public certificate.
     pub key_info: KeyInfo,
-    /// Detected suite of the validated public certificate.
+    /// Classified suite of the validated certificate — non-optional because
+    /// validation refuses unplaceable certificates before constructing this
+    /// result, so an importable contact always has an exact suite.
     pub suite: KeySuite,
 }
 

@@ -196,41 +196,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_invalidFamilyCustodyPairBlocksBeforeInspection() async throws {
-        let identity = PGPKeyIdentity(
-            fingerprint: "3333333333333333333333333333333333333333",
-            userId: "Invalid <invalid@example.invalid>",
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: false,
-            isBackedUp: false,
-            publicKeyData: Data([0x33]),
-            revocationCert: Data([0x34]),
-            primaryAlgo: "ECDSA P-256",
-            subkeyAlgo: "ECDH P-256",
-            expiryDate: nil,
-            keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            privateKeyCustodyKind: .softwareSecretCertificate
-        )
-        let inspector = RecordingPublicBindingInspector()
-        let router = try makeRouter(
-            identities: [identity],
-            policy: .testSecureEnclaveSigningRoutes,
-            inspector: inspector,
-            keyStore: MockSecureEnclaveCustodyKeyStore()
-        )
-
-        assertBlocked(
-            await router.route(for: PrivateKeyOperationRequest(
-                fingerprint: identity.fingerprint,
-                operation: .sign
-            )),
-            .unsupported(.invalidFamilyCustody)
-        )
-        XCTAssertEqual(inspector.inspectCallCount, 0)
-    }
-
     func test_publicCertificateInspectionFailureMapsToSanitizedCategory() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
@@ -920,7 +885,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             subkeyAlgo: "ML-KEM-768+X25519",
             expiryDate: nil,
             keyFamily: .deviceBoundMlDsa65Ed25519MlKem768X25519,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: PGPKeyFamily.deviceBoundMlDsa65Ed25519MlKem768X25519.keyVersion
         )
     }
 
@@ -939,7 +904,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             subkeyAlgo: "X25519",
             expiryDate: nil,
             keyFamily: .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyVersion: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.keyVersion
         )
     }
 
@@ -958,7 +923,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
             keyFamily: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4.keyVersion
         )
     }
 

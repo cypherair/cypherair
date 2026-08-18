@@ -62,8 +62,7 @@ final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvi
             return .classicalComponentFailed
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidFamilyCustody,
-             .operationUnsupportedForCustody,
+        case .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
              .metadataAssociationMismatch,

@@ -114,7 +114,7 @@ struct HomeView: View {
                                 expandsHorizontally: false
                             )
 
-                            if defaultKey.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations {
+                            if defaultKey.custody == .deviceBound {
                                 KeyCustodyBadge(style: .badge)
                             } else {
                                 KeyBackupStatusBadge(isBackedUp: defaultKey.isBackedUp, style: .badge)

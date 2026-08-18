@@ -887,7 +887,7 @@ class KeyManagementServiceTestCase: XCTestCase {
                 hasEncryptionSubkey: true,
                 isRevoked: false,
                 isExpired: false,
-                suite: keyVersion == 4 ? .ed25519LegacyCurve25519Legacy : .ed448X448,
+                suite: keyVersion == 4 ? .ecdsaNistP256EcdhNistP256V4 : .ecdsaNistP256EcdhNistP256,
                 primaryAlgo: "ECDSA P-256",
                 subkeyAlgo: "ECDH P-256",
                 expiryTimestamp: nil
@@ -918,7 +918,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: nil,
             keyFamily: keyVersion == 4 ? .deviceBoundEcdsaNistP256EcdhNistP256V4 : .deviceBoundEcdsaNistP256EcdhNistP256,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: keyVersion
         )
     }
 
@@ -959,7 +959,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: metadata.keyVersion
         )
         return HiddenCustodyExportFixture(
             identity: identity,
@@ -975,7 +975,7 @@ class KeyManagementServiceTestCase: XCTestCase {
         }
     ) -> SecureEnclaveCustodyGenerationRecoveryReport {
         let assessments = identities
-            .filter { $0.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations }
+            .filter { $0.custody == .deviceBound }
             .enumerated()
             .map { ordinal, identity in
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
@@ -1023,8 +1023,8 @@ class KeyManagementServiceTestCase: XCTestCase {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            keyFamily: try XCTUnwrap(metadata.suite).portableFamily,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyFamily: try XCTUnwrap(XCTUnwrap(metadata.suite).portableFamily),
+            keyVersion: metadata.keyVersion
         )
         try storeIdentity(identity)
         return identity

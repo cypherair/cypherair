@@ -119,8 +119,6 @@ extension CypherAirError: LocalizedError {
         for category: PGPKeyOperationFailureCategory
     ) -> String {
         switch category {
-        case .invalidFamilyCustody:
-            String(localized: "error.keyOperationUnavailable.invalidFamilyCustody", defaultValue: "This key's family and custody settings don't match, so the operation is unavailable.")
         case .operationUnsupportedForCustody:
             String(localized: "error.keyOperationUnavailable.operationUnsupportedForCustody", defaultValue: "This operation is not supported for this key's custody model.")
         case .operationNotImplementedForCustody:

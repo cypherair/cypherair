@@ -233,8 +233,8 @@ enum TestHelpers {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            keyFamily: try XCTUnwrap(metadata.suite).portableFamily,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyFamily: try XCTUnwrap(XCTUnwrap(metadata.suite).portableFamily),
+            keyVersion: metadata.keyVersion
         )
 
         try metadataPersistence.save(identity)

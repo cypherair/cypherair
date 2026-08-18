@@ -4,11 +4,11 @@ import XCTest
 @testable import CypherAir
 
 final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
-    // Device-Bound Post-Quantum (composite split custody) shares the
-    // `.appleSecureEnclavePrivateOperations` custody kind with P-256 but carries
-    // an ML-DSA/ML-KEM suite. Before the composite-aware recovery branch, every
-    // healthy composite key was misclassified `.invalidFamilyCustody`
-    // (audit #661 C5). These two tests lock the correct routing.
+    // Device-Bound Post-Quantum (composite split custody) shares device-bound
+    // custody with P-256 but carries an ML-DSA/ML-KEM suite. Before the
+    // composite-aware recovery branch, every healthy composite key was
+    // misclassified as an invalid family/custody state (audit #661 C5). These
+    // two tests lock the correct routing.
     fileprivate static let compositeSigningPublicKey = Data(repeating: 0xA1, count: 1952)
     fileprivate static let compositeKeyAgreementPublicKey = Data(repeating: 0xB2, count: 1184)
     // PQ-High tier component lengths (ML-DSA-87 / ML-KEM-1024).
@@ -419,7 +419,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             subkeyAlgo: "ECDH P-256",
             expiryDate: nil,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
     }
 

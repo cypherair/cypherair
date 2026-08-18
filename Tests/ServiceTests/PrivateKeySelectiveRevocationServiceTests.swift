@@ -84,7 +84,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
             try assertArmoredSignature(userIdRevocation)
             XCTAssertEqual(fixture.identity.keyVersion, family.keyVersion)
             XCTAssertEqual(fixture.identity.keyFamily, family)
-            XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+            XCTAssertEqual(fixture.identity.custody, .deviceBound)
             XCTAssertEqual(keyManagement.keys.map(\.fingerprint), [fixture.identity.fingerprint])
             XCTAssertEqual(mockSE.unwrapCallCount, 0)
             assertNoCatalogOrKeychainMutation(
@@ -459,7 +459,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

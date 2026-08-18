@@ -760,8 +760,8 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            keyFamily: suite.portableFamily,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyFamily: suite.portableFamily!,
+            keyVersion: keyInfo.keyVersion
         )
     }
 
@@ -796,7 +796,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

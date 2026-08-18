@@ -11,30 +11,58 @@ pub fn get_key_version(cert_data: &[u8]) -> Result<u8, PgpError> {
     Ok(cert.primary_key().key().version())
 }
 
-/// Classify a parsed certificate into its key suite.
+/// Classify a parsed certificate into its key suite, or refuse.
 ///
-/// Classification is by primary-key algorithm, because a bare key version is
-/// ambiguous: v6 carries the baseline classical (Ed25519), the high classical
-/// (Ed448), and both RFC 9980 composite tiers. The composite primaries
-/// (ML-DSA-65+Ed25519, ML-DSA-87+Ed448) only exist on v6 and each map to
-/// their own post-quantum tier. v4 Curve25519 signs with EdDSALegacy and
-/// falls through to the legacy suite.
-pub(crate) fn classify_suite(cert: &openpgp::Cert) -> KeySuite {
-    use openpgp::types::PublicKeyAlgorithm;
-    match cert.primary_key().key().pk_algo() {
-        PublicKeyAlgorithm::MLDSA65_Ed25519 => KeySuite::MlDsa65Ed25519MlKem768X25519,
-        PublicKeyAlgorithm::MLDSA87_Ed448 => KeySuite::MlDsa87Ed448MlKem1024X448,
-        PublicKeyAlgorithm::Ed25519 => KeySuite::Ed25519X25519,
-        PublicKeyAlgorithm::Ed448 => KeySuite::Ed448X448,
-        // Defensive: any other v6 primary is treated as the high classical
-        // tier; anything else (v4 EdDSALegacy, etc.) is the legacy suite.
-        _ if cert.primary_key().key().version() >= 6 => KeySuite::Ed448X448,
-        _ => KeySuite::Ed25519LegacyCurve25519Legacy,
+/// The certificate is the only authority on what it is: the primary-key
+/// algorithm, its curve, and the certificate version must all agree with
+/// exactly one suite, and a certificate that matches none — an algorithm
+/// outside the vocabulary, a curve the named algorithm does not pin, or an
+/// algorithm on a certificate version it does not belong to — is `None`,
+/// never approximated to a nearby suite. NIST P-256 is why the version is
+/// consulted for recognised algorithms too: ECDSA/ECDH keep their algorithm
+/// ids across certificate versions, so only the version separates the v4 and
+/// v6 P-256 suites.
+pub(crate) fn classify_suite(cert: &openpgp::Cert) -> Option<KeySuite> {
+    use openpgp::crypto::mpi::PublicKey;
+    use openpgp::types::{Curve, PublicKeyAlgorithm};
+
+    let key = cert.primary_key().key();
+    match (key.pk_algo(), key.version()) {
+        (PublicKeyAlgorithm::MLDSA65_Ed25519, 6) => Some(KeySuite::MlDsa65Ed25519MlKem768X25519),
+        (PublicKeyAlgorithm::MLDSA87_Ed448, 6) => Some(KeySuite::MlDsa87Ed448MlKem1024X448),
+        (PublicKeyAlgorithm::Ed25519, 6) => Some(KeySuite::Ed25519X25519),
+        (PublicKeyAlgorithm::Ed448, 6) => Some(KeySuite::Ed448X448),
+        (PublicKeyAlgorithm::EdDSA, 4) => match key.mpis() {
+            PublicKey::EdDSA {
+                curve: Curve::Ed25519,
+                ..
+            } => Some(KeySuite::Ed25519LegacyCurve25519Legacy),
+            _ => None,
+        },
+        (PublicKeyAlgorithm::ECDSA, 4) => match key.mpis() {
+            PublicKey::ECDSA {
+                curve: Curve::NistP256,
+                ..
+            } => Some(KeySuite::EcdsaNistP256EcdhNistP256V4),
+            _ => None,
+        },
+        (PublicKeyAlgorithm::ECDSA, 6) => match key.mpis() {
+            PublicKey::ECDSA {
+                curve: Curve::NistP256,
+                ..
+            } => Some(KeySuite::EcdsaNistP256EcdhNistP256),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
-/// Detect the suite of a key based on its version and algorithms.
-pub fn detect_suite(cert_data: &[u8]) -> Result<KeySuite, PgpError> {
+/// Classify binary certificate data into its suite, or `None` when the
+/// certificate cannot be placed.
+///
+/// Not FFI-exported: production callers read `KeyInfo::suite`; crate tests
+/// use this as the classification oracle beside `get_key_version`.
+pub fn detect_suite(cert_data: &[u8]) -> Result<Option<KeySuite>, PgpError> {
     let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
         reason: e.to_string(),
     })?;

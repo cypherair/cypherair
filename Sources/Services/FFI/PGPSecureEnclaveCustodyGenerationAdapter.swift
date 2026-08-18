@@ -64,29 +64,18 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
         keyAgreementPublicKeyX963: Data,
         signingProvider: ExternalP256SigningProvider
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
-        let version: SecureEnclaveCertificateVersion
-        switch family {
-        case .deviceBoundEcdsaNistP256EcdhNistP256V4:
-            version = .v4
-        case .deviceBoundEcdsaNistP256EcdhNistP256:
-            version = .v6
-        case .portableEd25519LegacyCurve25519Legacy,
-             .portableEd25519X25519,
-             .portableEd448X448,
-             .portableMlDsa65Ed25519MlKem768X25519,
-             .portableMlDsa87Ed448MlKem1024X448,
-             .deviceBoundMlDsa65Ed25519MlKem768X25519,
-             .deviceBoundMlDsa87Ed448MlKem1024X448:
+        // The family answers only what it alone knows: whether this is a
+        // P-256 key, and which certificate version it generates.
+        guard family.deviceBoundCustodyTier == .classicalP256 else {
             throw CypherAirError.invalidKeyData(
                 reason: "Secure Enclave custody generation requires a P-256 family."
             )
         }
-
         let input = SecureEnclavePublicCertificateInput(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
-            version: version,
+            version: family.keyVersion == 4 ? .v4 : .v6,
             signingPublicKeyX963: signingPublicKeyX963,
             keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
         )
@@ -95,11 +84,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
             signer: signingProvider
         )
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-        // P-256 Secure Enclave certificates have no software suite classification.
-        let metadata = PGPKeyMetadataAdapter.metadata(
-            from: keyInfo,
-            suite: nil
-        )
+        let metadata = PGPKeyMetadataAdapter.metadata(from: keyInfo)
 
         return PGPSecureEnclaveCustodyGeneratedMaterial(
             publicKeyData: generated.publicKeyData,

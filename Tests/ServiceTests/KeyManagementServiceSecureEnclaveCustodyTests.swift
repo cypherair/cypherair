@@ -600,7 +600,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             subkeyAlgo: base.subkeyAlgo,
             expiryDate: base.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: base.privateKeyCustodyKind
+            keyVersion: base.keyVersion
         )
     }
 

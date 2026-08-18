@@ -258,7 +258,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             subkeyAlgo: "X25519",
             expiryDate: nil,
             keyFamily: .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyVersion: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.keyVersion
         )
     }
 

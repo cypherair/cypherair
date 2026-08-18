@@ -52,7 +52,7 @@ fn test_generate_key_legacy_algorithms() {
 
     let info = keys::parse_key_info(&result.cert_data).expect("Parse should succeed");
     assert_eq!(info.key_version, 4);
-    assert_eq!(info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
+    assert_eq!(info.suite, Some(KeySuite::Ed25519LegacyCurve25519Legacy));
     assert!(info.has_encryption_subkey, "Must have encryption subkey");
     assert!(!info.is_revoked);
     assert!(!info.is_expired);

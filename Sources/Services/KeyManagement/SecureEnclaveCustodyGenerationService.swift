@@ -106,8 +106,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     ) async throws -> PGPKeyIdentity {
         let resolution = resolver.resolution(
             for: .generate,
-            family: family,
-            custody: .appleSecureEnclavePrivateOperations
+            family: family
         )
         guard resolution.support == .supported else {
             throw CypherAirError.keyOperationUnavailable(
@@ -168,7 +167,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                         subkeyAlgo: generated.metadata.subkeyAlgo,
                         expiryDate: generated.metadata.expiryDate,
                         keyFamily: family,
-                        privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+                        keyVersion: generated.metadata.keyVersion
                     )
                     try catalogStore.storeNewIdentity(identity)
                     storedFingerprint = identity.fingerprint
@@ -245,8 +244,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         }
         let resolution = resolver.resolution(
             for: .generate,
-            family: family,
-            custody: .appleSecureEnclavePrivateOperations
+            family: family
         )
         guard resolution.support == .supported else {
             throw CypherAirError.keyOperationUnavailable(
@@ -321,7 +319,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                         subkeyAlgo: generated.metadata.subkeyAlgo,
                         expiryDate: generated.metadata.expiryDate,
                         keyFamily: family,
-                        privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+                        keyVersion: generated.metadata.keyVersion
                     )
                     try catalogStore.storeNewIdentity(identity)
                     storedFingerprint = identity.fingerprint

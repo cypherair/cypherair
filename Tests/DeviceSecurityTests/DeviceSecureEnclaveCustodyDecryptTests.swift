@@ -230,7 +230,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: configuration,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: material.metadata.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)
             .inspectPublicBindings(publicKeyData: material.publicKeyData)

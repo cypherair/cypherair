@@ -241,11 +241,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         }
 
         let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
-        let suite = try engine.detectSuite(certData: secretKeyData)
-        let metadata = PGPKeyMetadataAdapter.metadata(
-            from: keyInfo,
-            suite: suite
-        )
+        let metadata = PGPKeyMetadataAdapter.metadata(from: keyInfo)
         let armoredPublicKey = try engine.armorPublicKey(certData: secretKeyData)
         let publicKeyData = try engine.dearmor(armored: armoredPublicKey)
         let revocationCert = try engine.generateKeyRevocation(secretCert: secretKeyData)

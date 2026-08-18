@@ -51,7 +51,7 @@ final class BackupKeyScreenModel {
     /// not captured at init, so late key loads cannot read as software custody.
     var isDeviceBound: Bool {
         keyManagement.keys.first { $0.fingerprint == fingerprint }?
-            .privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
+            .custody == .deviceBound
     }
 
     var exportButtonDisabled: Bool {

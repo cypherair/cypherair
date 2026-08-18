@@ -1,7 +1,7 @@
 import Foundation
 
 struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
-    static let currentSchemaVersion = 2
+    static let currentSchemaVersion = 3
 
     var schemaVersion: Int
     var identities: [ContactIdentity]

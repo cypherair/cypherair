@@ -359,7 +359,7 @@ fn test_modify_expiry_legacy_extend() {
         "Should have an expiry timestamp"
     );
     assert_eq!(result.key_info.key_version, 4);
-    assert_eq!(result.key_info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
+    assert_eq!(result.key_info.suite, Some(KeySuite::Ed25519LegacyCurve25519Legacy));
 
     let re_parsed = keys::parse_key_info(&result.public_key_data)
         .expect("Updated public key should be parseable");

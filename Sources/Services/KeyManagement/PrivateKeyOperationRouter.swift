@@ -83,15 +83,15 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             return .blocked(resolution)
         }
 
-        switch identity.privateKeyCustodyKind {
-        case .softwareSecretCertificate:
+        switch identity.custody {
+        case .portable:
             return .softwareSecretCertificate(
                 SoftwareSecretCertificateRoute(
                     identity: identity,
                     operation: request.operation
                 )
             )
-        case .appleSecureEnclavePrivateOperations:
+        case .deviceBound:
             return await routeSecureEnclaveOperation(
                 request: request,
                 identity: identity
@@ -104,7 +104,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         identity: PGPKeyIdentity
     ) async -> PrivateKeyOperationRoute {
         guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
-            return .blocked(.unsupported(.invalidFamilyCustody))
+            return .blocked(.unavailable(.operationUnavailableByPolicy))
         }
         switch tier {
         case .classicalP256:

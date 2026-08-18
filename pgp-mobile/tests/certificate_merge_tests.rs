@@ -153,7 +153,7 @@ fn test_merge_public_certificate_duplicate_no_op_modern_high() {
     assert_eq!(result.outcome, CertificateMergeOutcome::NoOp);
     let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
-    assert_eq!(info.suite, KeySuite::Ed448X448);
+    assert_eq!(info.suite, Some(KeySuite::Ed448X448));
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn test_merge_public_certificate_expiry_refresh_modern_high() {
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
     let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
-    assert_eq!(info.suite, KeySuite::Ed448X448);
+    assert_eq!(info.suite, Some(KeySuite::Ed448X448));
     assert_eq!(info.expiry_timestamp, refreshed.key_info.expiry_timestamp);
 }
 
@@ -314,7 +314,7 @@ fn test_merge_public_certificate_absorbs_revocation_update_legacy_fixture() {
     let info = keys::parse_key_info(&result.merged_cert_data)
         .expect("merged legacy revocation cert should parse");
     assert!(info.is_revoked);
-    assert_eq!(info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
+    assert_eq!(info.suite, Some(KeySuite::Ed25519LegacyCurve25519Legacy));
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn test_merge_public_certificate_absorbs_revocation_update_modern_high_fixture()
     let info = keys::parse_key_info(&result.merged_cert_data)
         .expect("merged modern high revocation cert should parse");
     assert!(info.is_revoked);
-    assert_eq!(info.suite, KeySuite::Ed448X448);
+    assert_eq!(info.suite, Some(KeySuite::Ed448X448));
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn test_merge_public_certificate_adds_encryption_subkey_legacy_fixture() {
     let merged_info =
         keys::parse_key_info(&result.merged_cert_data).expect("legacy merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
-    assert_eq!(merged_info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
+    assert_eq!(merged_info.suite, Some(KeySuite::Ed25519LegacyCurve25519Legacy));
 }
 
 #[test]
@@ -365,7 +365,7 @@ fn test_merge_public_certificate_adds_encryption_subkey_modern_high_fixture() {
     let merged_info =
         keys::parse_key_info(&result.merged_cert_data).expect("modern high merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
-    assert_eq!(merged_info.suite, KeySuite::Ed448X448);
+    assert_eq!(merged_info.suite, Some(KeySuite::Ed448X448));
 }
 
 #[test]

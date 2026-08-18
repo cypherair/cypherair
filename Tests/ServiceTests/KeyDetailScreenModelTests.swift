@@ -350,13 +350,13 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     func test_deviceBoundDegradedMapping_usesOrdinalAmongSecureEnclaveKeysOnly() {
         let softwareKey = makeCustodyMappingIdentity(
-            fingerprint: "aaaa", custody: .softwareSecretCertificate
+            fingerprint: "aaaa", custody: .portable
         )
         let firstSecureEnclaveKey = makeCustodyMappingIdentity(
-            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+            fingerprint: "bbbb", custody: .deviceBound
         )
         let secondSecureEnclaveKey = makeCustodyMappingIdentity(
-            fingerprint: "cccc", custody: .appleSecureEnclavePrivateOperations
+            fingerprint: "cccc", custody: .deviceBound
         )
         let keys = [softwareKey, firstSecureEnclaveKey, secondSecureEnclaveKey]
         let report = SecureEnclaveCustodyGenerationRecoveryReport(
@@ -380,7 +380,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     func test_deviceBoundDegradedMapping_failsVisibleForMissingAssessmentAndInventoryFailure() {
         let secureEnclaveKey = makeCustodyMappingIdentity(
-            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+            fingerprint: "bbbb", custody: .deviceBound
         )
 
         // No assessment row for an SE key: degraded, never silently healthy.
@@ -405,7 +405,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     func test_deviceBoundDegradedMapping_flagsUnavailablePublicAndRevocationMaterial() {
         let secureEnclaveKey = makeCustodyMappingIdentity(
-            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+            fingerprint: "bbbb", custody: .deviceBound
         )
 
         // Each material disjunct must degrade on its own.
@@ -448,7 +448,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     func test_deviceBoundDegradedMapping_flagsMissingSplitCustodyClassicalComponent() {
         let secureEnclaveKey = makeCustodyMappingIdentity(
-            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+            fingerprint: "bbbb", custody: .deviceBound
         )
 
         // Everything else healthy: only the sealed classical component is gone,
@@ -487,9 +487,12 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     private func makeCustodyMappingIdentity(
         fingerprint: String,
-        custody: PGPPrivateKeyCustodyKind
+        custody: PGPKeyFamily.Custody
     ) -> PGPKeyIdentity {
-        PGPKeyIdentity(
+        let family: PGPKeyFamily = custody == .deviceBound
+            ? .deviceBoundEcdsaNistP256EcdhNistP256V4
+            : .portableEd25519LegacyCurve25519Legacy
+        return PGPKeyIdentity(
             fingerprint: fingerprint,
             userId: nil,
             hasEncryptionSubkey: true,
@@ -502,10 +505,8 @@ final class KeyDetailScreenModelTests: XCTestCase {
             primaryAlgo: "P-256",
             subkeyAlgo: "P-256",
             expiryDate: nil,
-            keyFamily: custody == .appleSecureEnclavePrivateOperations
-                ? .deviceBoundEcdsaNistP256EcdhNistP256V4
-                : .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: custody
+            keyFamily: family,
+            keyVersion: family.keyVersion
         )
     }
 

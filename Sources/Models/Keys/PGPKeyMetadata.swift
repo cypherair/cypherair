@@ -5,7 +5,7 @@ struct PGPKeyMetadata: Equatable, Hashable, Sendable {
     /// Key fingerprint as lowercase hex string.
     let fingerprint: String
 
-    /// Key version (4 for the v4 Legacy family, 6 for the v6 families).
+    /// Key version as parsed from the certificate.
     let keyVersion: UInt8
 
     /// Policy-selected primary User ID string for display and identity matching.
@@ -20,8 +20,8 @@ struct PGPKeyMetadata: Equatable, Hashable, Sendable {
     /// Whether the key has expired.
     let isExpired: Bool
 
-    /// Detected software suite, or nil when the certificate has no software
-    /// suite classification (P-256 Secure Enclave custody certificates).
+    /// The engine's classified suite, or nil when the certificate is
+    /// unplaceable — its algorithm, curve, and version match no suite.
     let suite: PGPKeySuite?
 
     /// Primary key algorithm name.

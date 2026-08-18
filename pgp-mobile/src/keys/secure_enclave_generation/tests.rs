@@ -337,6 +337,32 @@ fn test_secure_enclave_public_certificate_generation_v4_v6() {
     }
 }
 
+/// The engine's own P-256 custody certificates classify to the exact P-256
+/// suite for their certificate version — the one algorithm pair where
+/// classification must consult the version, because ECDSA/ECDH keep their
+/// algorithm ids across certificate versions.
+#[test]
+fn test_secure_enclave_p256_certificates_classify_by_version() {
+    for (version, expected) in [
+        (
+            SecureEnclaveCertificateVersion::V4,
+            KeySuite::EcdsaNistP256EcdhNistP256V4,
+        ),
+        (
+            SecureEnclaveCertificateVersion::V6,
+            KeySuite::EcdsaNistP256EcdhNistP256,
+        ),
+    ] {
+        let material = public_material(version).expect("material should generate");
+        let input = input_for(version, &material);
+        let result = generate_secure_enclave_public_certificate(input, provider_for(material))
+            .expect("certificate should generate");
+        let info = parse_key_info(&result.public_key_data).expect("parse");
+        assert_eq!(info.suite, Some(expected));
+        assert_eq!(info.key_version, expected.key_version());
+    }
+}
+
 /// Without these subpackets a correspondent falls back to the RFC defaults
 /// (TripleDES, SHA-1) when sending to a device-bound certificate.
 #[test]

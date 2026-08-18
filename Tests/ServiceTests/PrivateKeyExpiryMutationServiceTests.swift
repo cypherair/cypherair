@@ -78,7 +78,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             XCTAssertEqual(updated.fingerprint, fixture.identity.fingerprint)
             XCTAssertEqual(updated.keyVersion, family.keyVersion)
             XCTAssertEqual(updated.keyFamily, family)
-            XCTAssertEqual(updated.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+            XCTAssertEqual(updated.custody, .deviceBound)
             XCTAssertFalse(updated.isExpired)
             XCTAssertNotNil(updated.expiryDate)
             XCTAssertNotEqual(updated.publicKeyData, fixture.identity.publicKeyData)
@@ -609,7 +609,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
             keyFamily: family,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            keyVersion: family.keyVersion
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine

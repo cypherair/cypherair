@@ -103,6 +103,11 @@ final class KeyProvisioningService {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
+        guard let family = suite.portableFamily else {
+            throw CypherAirError.invalidKeyData(
+                reason: "Software generation requires a portable-family suite."
+            )
+        }
         let fingerprint = generated.metadata.fingerprint
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
@@ -117,8 +122,8 @@ final class KeyProvisioningService {
             primaryAlgo: generated.metadata.primaryAlgo,
             subkeyAlgo: generated.metadata.subkeyAlgo,
             expiryDate: generated.metadata.expiryDate,
-            keyFamily: suite.portableFamily,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyFamily: family,
+            keyVersion: generated.metadata.keyVersion
         )
 
         try await commitIdentity(identity, bundle: bundle, token: token)
@@ -186,14 +191,14 @@ final class KeyProvisioningService {
         try invalidationGate.checkValid(token)
 
         let fingerprint = imported.metadata.fingerprint
-        // Imports are always portable software certificates, so the engine's
-        // detected suite must be present; its absence means the certificate
-        // has no software suite classification and cannot become an owned
-        // software key.
-        guard let detectedSuite = imported.metadata.suite else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Imported certificate has no software suite classification."
-            )
+        // An imported secret key becomes a portable software identity, so the
+        // engine's classification must name a suite with a portable family.
+        // An unplaceable certificate, or a P-256 one (whose only families are
+        // Secure Enclave custody), is refused rather than admitted under a
+        // family it does not have.
+        guard let detectedSuite = imported.metadata.suite,
+              let family = detectedSuite.portableFamily else {
+            throw CypherAirError.unsupportedAlgorithm(algo: imported.metadata.primaryAlgo)
         }
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
@@ -208,8 +213,8 @@ final class KeyProvisioningService {
             primaryAlgo: imported.metadata.primaryAlgo,
             subkeyAlgo: imported.metadata.subkeyAlgo,
             expiryDate: imported.metadata.expiryDate,
-            keyFamily: detectedSuite.portableFamily,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyFamily: family,
+            keyVersion: imported.metadata.keyVersion
         )
 
         try await commitIdentity(identity, bundle: bundle, token: token)

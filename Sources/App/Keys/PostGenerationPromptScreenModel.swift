@@ -30,7 +30,7 @@ final class PostGenerationPromptScreenModel {
     }
 
     var isDeviceBound: Bool {
-        identity.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
+        identity.custody == .deviceBound
     }
 
     func exportRevocationCertificate() {

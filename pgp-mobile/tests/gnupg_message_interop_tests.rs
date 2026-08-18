@@ -39,7 +39,7 @@ fn test_import_gpg_pubkey() {
     let info = keys::parse_key_info(&gpg_pubkey).expect("Should parse GnuPG public key");
 
     assert_eq!(info.key_version, 4, "GnuPG key must be v4");
-    assert_eq!(info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
+    assert_eq!(info.suite, Some(KeySuite::Ed25519LegacyCurve25519Legacy));
     assert!(
         info.has_encryption_subkey,
         "Must have Cv25519 encryption subkey"
@@ -398,7 +398,7 @@ fn test_modern_high_key_is_v6_gnupg_incompatible() {
     let info =
         keys::parse_key_info(&key_b.public_key_data).expect("Should parse Modern High public key");
     assert_eq!(info.key_version, 6);
-    assert_eq!(info.suite, KeySuite::Ed448X448);
+    assert_eq!(info.suite, Some(KeySuite::Ed448X448));
 
     // v6 keys use a different packet format that GnuPG 2.4.x cannot parse.
     // GnuPG will report: "gpg: no valid OpenPGP data found" or similar.

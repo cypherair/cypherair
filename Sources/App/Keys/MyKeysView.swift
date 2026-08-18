@@ -172,7 +172,7 @@ private struct KeyRowView: View {
                         color: .accentColor
                     )
                 }
-                if key.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations {
+                if key.custody == .deviceBound {
                     KeyCustodyBadge(style: .compact)
                 } else {
                     KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .compact)

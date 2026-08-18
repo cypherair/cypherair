@@ -9,7 +9,6 @@ struct ContactKeyRecord: Codable, Equatable, Identifiable, Sendable {
     var primaryUserId: String?
     var displayName: String
     var email: String?
-    var keyVersion: UInt8
     var suite: PGPKeySuite
     var primaryAlgo: String
     var subkeyAlgo: String?

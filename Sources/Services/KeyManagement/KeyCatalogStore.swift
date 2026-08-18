@@ -77,7 +77,7 @@ final class KeyCatalogStore {
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
             keyFamily: current.keyFamily,
-            privateKeyCustodyKind: current.privateKeyCustodyKind
+            keyVersion: metadata.keyVersion
         )
 
         try metadataStore.update(updated)

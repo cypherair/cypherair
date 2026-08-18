@@ -1,6 +1,8 @@
 import Foundation
 
-/// Pure policy resolver for key-family, custody, and operation support.
+/// Pure policy resolver for key-family operation support. Custody is a
+/// property of the family, so the family alone determines which policy axis
+/// answers.
 struct PGPKeyCapabilityResolver: Sendable {
     struct Policy: Equatable, Sendable {
         var secureEnclaveGenerationSupport: PGPKeyOperationSupport
@@ -34,13 +36,11 @@ struct PGPKeyCapabilityResolver: Sendable {
 
     func support(
         for operation: PGPKeyOperationKind,
-        family: PGPKeyFamily,
-        custody: PGPPrivateKeyCustodyKind
+        family: PGPKeyFamily
     ) -> PGPKeyOperationSupport {
         resolution(
             for: operation,
-            family: family,
-            custody: custody
+            family: family
         ).support
     }
 
@@ -50,47 +50,19 @@ struct PGPKeyCapabilityResolver: Sendable {
     ) -> PGPKeyOperationResolution {
         resolution(
             for: operation,
-            family: identity.keyFamily,
-            custody: identity.privateKeyCustodyKind
+            family: identity.keyFamily
         )
     }
 
     func resolution(
         for operation: PGPKeyOperationKind,
-        family: PGPKeyFamily,
-        custody: PGPPrivateKeyCustodyKind
+        family: PGPKeyFamily
     ) -> PGPKeyOperationResolution {
-        guard isValidFamilyCustodyPair(
-            family: family,
-            custody: custody
-        ) else {
-            return .unsupported(.invalidFamilyCustody)
-        }
-
-        switch custody {
-        case .softwareSecretCertificate:
+        switch family.custody {
+        case .portable:
             return .supported
-        case .appleSecureEnclavePrivateOperations:
+        case .deviceBound:
             return resolutionForSecureEnclaveCustody(operation: operation)
-        }
-    }
-
-    /// A family and a custody kind pair validly exactly when they agree on the
-    /// family's custody axis. The composite algorithm suite is the only one
-    /// legal under BOTH custody kinds (portable Post-Quantum software keys and
-    /// device-bound split custody), which is why validity is decided by the
-    /// family — never by the algorithm suite.
-    func isValidFamilyCustodyPair(
-        family: PGPKeyFamily,
-        custody: PGPPrivateKeyCustodyKind
-    ) -> Bool {
-        switch (family.custody, custody) {
-        case (.portable, .softwareSecretCertificate),
-             (.deviceBound, .appleSecureEnclavePrivateOperations):
-            return true
-        case (.portable, .appleSecureEnclavePrivateOperations),
-             (.deviceBound, .softwareSecretCertificate):
-            return false
         }
     }
 

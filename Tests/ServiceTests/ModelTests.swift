@@ -432,7 +432,6 @@ final class ModelTests: XCTestCase {
 
     func test_pgpKeyOperationFailureCategory_rawValuesCoverSecureEnclaveTaxonomy() throws {
         let expected: [PGPKeyOperationFailureCategory] = [
-            .invalidFamilyCustody,
             .operationUnsupportedForCustody,
             .operationNotImplementedForCustody,
             .operationUnavailableByPolicy,
@@ -464,7 +463,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(
             expected.map(\.rawValue),
             [
-                "invalidFamilyCustody",
                 "operationUnsupportedForCustody",
                 "operationNotImplementedForCustody",
                 "operationUnavailableByPolicy",
@@ -503,9 +501,9 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(supported.support, .supported)
         XCTAssertNil(supported.failureCategory)
 
-        let unsupported = PGPKeyOperationResolution.unsupported(.invalidFamilyCustody)
+        let unsupported = PGPKeyOperationResolution.unsupported(.operationUnsupportedForCustody)
         XCTAssertEqual(unsupported.support, .unsupported)
-        XCTAssertEqual(unsupported.failureCategory, .invalidFamilyCustody)
+        XCTAssertEqual(unsupported.failureCategory, .operationUnsupportedForCustody)
 
         let notImplemented = PGPKeyOperationResolution.notImplemented(.operationNotImplementedForCustody)
         XCTAssertEqual(notImplemented.support, .notImplemented)
@@ -536,7 +534,7 @@ final class ModelTests: XCTestCase {
             """
             {
               "support": "supported",
-              "failureCategory": "invalidFamilyCustody"
+              "failureCategory": "operationUnavailableByPolicy"
             }
             """.utf8
         )
@@ -969,7 +967,6 @@ final class ModelTests: XCTestCase {
             primaryUserId: userId,
             displayName: IdentityPresentation.parsedDisplayName(from: userId) ?? "",
             email: IdentityPresentation.email(from: userId),
-            keyVersion: 4,
             suite: .ed25519LegacyCurve25519Legacy,
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
@@ -1003,7 +1000,7 @@ final class ModelTests: XCTestCase {
             subkeyAlgo: "X25519",
             expiryDate: nil,
             keyFamily: .portableEd25519LegacyCurve25519Legacy,
-            privateKeyCustodyKind: .softwareSecretCertificate
+            keyVersion: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.keyVersion
         )
     }
 
@@ -1081,11 +1078,21 @@ final class ModelTests: XCTestCase {
             XCTAssertNil(family.softwareGenerationSuite)
         }
 
-        // The inverse mapping round-trips through the suite's portable family.
+        // The inverse mapping round-trips through the suite's portable
+        // family; exactly the two P-256 suites have none, and their versions
+        // are the pair the shared ECDSA/ECDH algorithm ids cannot separate.
         for suite in PGPKeySuite.allCases {
-            XCTAssertEqual(suite.portableFamily.softwareGenerationSuite, suite)
-            XCTAssertEqual(suite.portableFamily.custody, .portable)
-            XCTAssertEqual(suite.keyVersion, suite.portableFamily.keyVersion)
+            guard let family = suite.portableFamily else {
+                XCTAssertTrue(
+                    [.ecdsaNistP256EcdhNistP256V4, .ecdsaNistP256EcdhNistP256].contains(suite),
+                    "\(suite)"
+                )
+                XCTAssertEqual(suite.keyVersion, suite == .ecdsaNistP256EcdhNistP256V4 ? 4 : 6)
+                continue
+            }
+            XCTAssertEqual(family.softwareGenerationSuite, suite)
+            XCTAssertEqual(family.custody, .portable)
+            XCTAssertEqual(suite.keyVersion, family.keyVersion)
         }
     }
 
@@ -1109,7 +1116,7 @@ final class ModelTests: XCTestCase {
         )
     }
 
-    func test_keyFamily_custodyAxisMatchesResolverValidity() {
+    func test_keyFamily_custodyAxis() {
         XCTAssertEqual(PGPKeyFamily.portableEd25519LegacyCurve25519Legacy.custody, .portable)
         XCTAssertEqual(PGPKeyFamily.portableEd25519X25519.custody, .portable)
         XCTAssertEqual(PGPKeyFamily.portableEd448X448.custody, .portable)
@@ -1119,24 +1126,22 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256.custody, .deviceBound)
         XCTAssertEqual(PGPKeyFamily.deviceBoundMlDsa65Ed25519MlKem768X25519.custody, .deviceBound)
         XCTAssertEqual(PGPKeyFamily.deviceBoundMlDsa87Ed448MlKem1024X448.custody, .deviceBound)
+    }
 
-        // The custody axis agrees with the resolver's valid family/custody pairs.
-        let resolver = PGPKeyCapabilityResolver()
+    func test_keyFamily_secureEnclaveTierFollowsFromCustodyAndTier() {
         for family in PGPKeyFamily.allCases {
-            XCTAssertEqual(
-                resolver.isValidFamilyCustodyPair(
-                    family: family,
-                    custody: .appleSecureEnclavePrivateOperations
-                ),
-                family.custody == .deviceBound
-            )
-            XCTAssertEqual(
-                resolver.isValidFamilyCustodyPair(
-                    family: family,
-                    custody: .softwareSecretCertificate
-                ),
-                family.custody == .portable
-            )
+            switch (family.custody, family.tier) {
+            case (.portable, _):
+                XCTAssertNil(family.deviceBoundCustodyTier, "\(family)")
+            case (.deviceBound, .legacy), (.deviceBound, .modern):
+                XCTAssertEqual(family.deviceBoundCustodyTier, .classicalP256, "\(family)")
+            case (.deviceBound, .postQuantum):
+                XCTAssertEqual(family.deviceBoundCustodyTier, .postQuantum, "\(family)")
+            case (.deviceBound, .postQuantumHigh):
+                XCTAssertEqual(family.deviceBoundCustodyTier, .postQuantumHigh, "\(family)")
+            case (.deviceBound, .modernHigh):
+                XCTFail("No device-bound Modern · High family can exist: \(family)")
+            }
         }
     }
 

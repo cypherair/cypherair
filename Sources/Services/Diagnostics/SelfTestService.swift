@@ -63,7 +63,10 @@ final class SelfTestService {
         let selfTestAdapter = self.selfTestAdapter
         let messageAdapter = self.messageAdapter
         var results: [TestResult] = []
-        let suites = PGPKeySuite.allCases
+        // The self-test drives the software generation path, so it covers
+        // exactly the suites that have a portable family; the P-256 suites
+        // classify Secure Enclave custody certificates and have none.
+        let suites = PGPKeySuite.allCases.filter { $0.portableFamily != nil }
         let totalTests = suites.count * 5 + 1 // 5 tests per suite + 1 QR test
         var completedTests = 0
 
@@ -440,8 +443,9 @@ final class SelfTestService {
     }
 
     private static func localizedSuiteName(for suite: PGPKeySuite) -> String {
-        // Derive from the family vocabulary so new suites are covered
-        // automatically and the report name never drifts from the picker.
-        suite.portableFamily.familyDisplayName
+        // Derive from the family vocabulary so the report name never drifts
+        // from the picker. Self-test suites always have a portable family;
+        // the raw value is a compile-required fallback, not a reachable one.
+        suite.portableFamily?.familyDisplayName ?? suite.rawValue
     }
 }
