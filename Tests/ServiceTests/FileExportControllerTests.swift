@@ -42,18 +42,32 @@ final class FileExportControllerTests: XCTestCase {
         XCTAssertNotNil(UUID(uuidString: String(payload.url.lastPathComponent.dropFirst("export-".count))))
     }
 
-    func test_fileExportController_prepareFileExport_doesNotOwnSourceFile() throws {
+    /// The offered name and the file are taken from the artifact together, so
+    /// the picker's two questions — the transferable item and the default
+    /// filename — read one stored pair rather than two arguments a caller
+    /// matched up by hand.
+    func test_fileExportController_prepareFileExport_pairsTheArtifactsFileAndName() throws {
         let controller = FileExportController()
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirFileExportSource-\(UUID().uuidString).asc")
         try Data("source".utf8).write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
+        let output = AppTemporaryArtifact(
+            fileURL: url,
+            exportFilename: ExportFilename("source.asc")
+        ).temporaryFileOutput
 
-        controller.prepareFileExport(fileURL: url, filename: ExportFilename("source.asc"))
+        controller.prepareFileExport(output)
 
         XCTAssertEqual(controller.payload?.url, url)
+        XCTAssertEqual(controller.payload?.filename.value, "source.asc")
+        XCTAssertTrue(controller.isPresented)
+
+        // The controller does not own an artifact it was merely handed.
         controller.finish()
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertNil(controller.payload)
+        XCTAssertFalse(controller.isPresented)
     }
 
     private func assertCompleteFileProtection(

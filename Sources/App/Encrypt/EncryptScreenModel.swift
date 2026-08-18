@@ -86,7 +86,7 @@ final class EncryptScreenModel {
     /// The encrypted file the last run produced, carrying both where it is and
     /// the name saving it offers. The output is the stored fact; there is no
     /// second place to put a URL that would then need a name derived for it.
-    private(set) var encryptedFileOutput: TemporaryFileOutput?
+    private var encryptedFileOutput: TemporaryFileOutput?
 
     var encryptedFileURL: URL? { encryptedFileOutput?.fileURL }
     var showUnverifiedRecipientsWarning = false
@@ -755,10 +755,7 @@ final class EncryptScreenModel {
             output.exportFilename,
             .ciphertext
         ) != true {
-            exportController.prepareFileExport(
-                fileURL: url,
-                filename: output.exportFilename
-            )
+            exportController.prepareFileExport(output)
         }
     }
 

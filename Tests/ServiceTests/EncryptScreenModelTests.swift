@@ -1532,13 +1532,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let model = makeModel(
             configuration: configuration,
             fileEncryptionAction: { request in
-                TemporaryFileOutput(
+                AppTemporaryArtifact(
                     fileURL: outputURL,
                     exportFilename: ExportFilename(
                         base: request.fileURL.lastPathComponent,
                         pathExtension: "gpg"
                     )
-                )
+                ).temporaryFileOutput
             }
         )
         model.encryptMode = .file
@@ -1595,10 +1595,10 @@ final class EncryptScreenModelTests: XCTestCase {
                 _ = capturedProgress?.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
-                return TemporaryFileOutput(
+                return AppTemporaryArtifact(
                     fileURL: inputURL,
                     exportFilename: ExportFilename(base: inputURL.lastPathComponent, pathExtension: "gpg")
-                )
+                ).temporaryFileOutput
             }
         )
         model.encryptMode = .file
@@ -1659,10 +1659,10 @@ final class EncryptScreenModelTests: XCTestCase {
             operation: operation,
             fileEncryptionAction: { _ in
                 operation.cancel()
-                return TemporaryFileOutput(
+                return AppTemporaryArtifact(
                     fileURL: outputURL,
                     exportFilename: ExportFilename(outputURL.lastPathComponent)
-                )
+                ).temporaryFileOutput
             }
         )
         model.encryptMode = .file
@@ -1750,10 +1750,10 @@ final class EncryptScreenModelTests: XCTestCase {
         let model = makeModel(
             configuration: configuration,
             fileEncryptionAction: { _ in
-                TemporaryFileOutput(
+                AppTemporaryArtifact(
                     fileURL: outputURL,
                     exportFilename: ExportFilename(outputURL.lastPathComponent)
-                )
+                ).temporaryFileOutput
             }
         )
 

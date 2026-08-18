@@ -3,6 +3,7 @@ import SwiftUI
 /// One-tap self-diagnostic view.
 struct SelfTestView: View {
     @Environment(SelfTestService.self) private var selfTestService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @State private var exportController = FileExportController()
     @State private var exportError: CypherAirError?
 
@@ -126,6 +127,16 @@ struct SelfTestView: View {
             }
         } message: { error in
             Text(error.localizedDescription)
+        }
+        // A staged report is a file in `tmp/`, so it closes out with the screen
+        // and with a content clear, the way every other export surface does —
+        // not merely when the picker happens to come back.
+        .onDisappear {
+            exportController.finish()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            exportController.finish()
+            exportError = nil
         }
     }
 

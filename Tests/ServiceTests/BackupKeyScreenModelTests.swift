@@ -236,6 +236,39 @@ final class BackupKeyScreenModelTests: XCTestCase {
         XCTAssertFalse(makeModel().isDeviceBound)
     }
 
+    /// The backup is the most sensitive thing the app writes to `tmp/`, and this
+    /// PR is what put it there: staging must be protected, must be named after
+    /// nothing, and must not outlive a content clear that never saved it.
+    func test_presentFileExporter_stagesUnderProtectionAndContentClearErasesIt() async throws {
+        let model = makeModel(exportBackupAction: { _, _ in Data("backup".utf8) })
+        model.passphrase = Self.exportablePassphrase
+        model.passphraseConfirm = Self.exportablePassphrase
+
+        model.exportBackup()
+
+        await waitUntilKeyRoute("backup data to be ready") {
+            model.exportedData != nil
+        }
+
+        model.presentFileExporter()
+
+        let payload = try XCTUnwrap(model.exportController.payload)
+        XCTAssertEqual(payload.filename.value, "\(fingerprint.prefix(16)).asc")
+        XCTAssertTrue(payload.url.lastPathComponent.hasPrefix("export-"))
+        XCTAssertFalse(payload.url.lastPathComponent.contains(fingerprint.prefix(16)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: payload.url.path))
+        XCTAssertEqual(
+            try FileManager.default.attributesOfItem(atPath: payload.url.path)[.protectionKey] as? FileProtectionType,
+            .complete
+        )
+
+        model.handleContentClearGenerationChange()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: payload.url.path))
+        XCTAssertNil(model.exportController.payload)
+        XCTAssertNil(model.exportedData)
+    }
+
     private func makeModel(
         configuration: BackupKeyView.Configuration = .default,
         confirmBackupExportedAction: BackupKeyScreenModel.ConfirmBackupExportedAction? = nil,

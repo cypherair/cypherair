@@ -429,13 +429,13 @@ final class DecryptScreenModel {
             return
         }
 
-        let filename = fileDecryptionResult.output.exportFilename
+        let output = fileDecryptionResult.output
         if configuration.outputInterceptionPolicy.interceptFileExport?(
             decryptedFileURL,
-            filename,
+            output.exportFilename,
             .generic
         ) != true {
-            exportController.prepareFileExport(fileURL: decryptedFileURL, filename: filename)
+            exportController.prepareFileExport(output)
         }
     }
 

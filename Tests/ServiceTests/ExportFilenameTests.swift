@@ -37,6 +37,35 @@ final class ExportFilenameTests: XCTestCase {
         XCTAssertEqual(ExportFilename("re\u{0000}po\nrt.asc").value, "report.asc")
     }
 
+    /// The extension is the position that matters most and is easiest to miss:
+    /// the name it comes from is the ciphertext's, which whoever sent the file
+    /// chose. `invoice.pd<U+00AD>f` reads as `invoice.pdf` and is not.
+    func test_exportFilename_sanitisesTheExtensionPositionToo() {
+        XCTAssertEqual(ExportFilename("report.p\ndf").value, "report.pdf")
+        XCTAssertEqual(ExportFilename("statement.t\u{007F}xt").value, "statement.txt")
+        XCTAssertEqual(ExportFilename("invoice.pd\u{00AD}f").value, "invoice.pdf")
+        XCTAssertEqual(ExportFilename("notes.\u{200B}txt").value, "notes.txt")
+        XCTAssertEqual(ExportFilename(base: "notes", pathExtension: "t\u{FEFF}xt").value, "notes.txt")
+        // An extension that is nothing but invisible scalars is no extension.
+        XCTAssertEqual(ExportFilename("archive.\u{FEFF}").value, "archive")
+    }
+
+    /// Sweeps the whole Cc block plus the invisible Cf scalars, in the position
+    /// the base-only sanitiser used to miss.
+    func test_exportFilename_admitsNoControlOrInvisibleScalarInAnyPosition() {
+        let suspects = Array(0x00...0x1F) + Array(0x7F...0x9F) + [0x00AD, 0x200B, 0x200E, 0x202E, 0xFEFF]
+
+        for scalarValue in suspects {
+            guard let scalar = Unicode.Scalar(scalarValue) else { continue }
+            let hostile = "doc\(Character(scalar))ument.p\(Character(scalar))df"
+
+            XCTAssertFalse(
+                ExportFilename(hostile).value.unicodeScalars.contains(scalar),
+                String(format: "U+%04X survived sanitising", scalarValue)
+            )
+        }
+    }
+
     /// A 255-byte name is what the file system already allows, so appending an
     /// extension to one must not produce a name that cannot be written.
     func test_exportFilename_staysWritableWhenTheBaseIsAlreadyAtTheLimit() {
@@ -46,12 +75,26 @@ final class ExportFilenameTests: XCTestCase {
         XCTAssertTrue(filename.value.hasSuffix(".gpg"))
     }
 
+    /// Trimming has to come out of the stem. Taking it off the end instead eats
+    /// the extension the user's file carried — breaking the round-trip PRODUCT
+    /// §5 promises — and leaves a bare `..` where it used to be.
+    func test_exportFilename_truncatesTheStemAndKeepsBothExtensions() {
+        let filename = ExportFilename(
+            base: String(repeating: "a", count: 250) + ".jpg",
+            pathExtension: "gpg"
+        )
+
+        XCTAssertEqual(filename.value.utf8.count, 255)
+        XCTAssertTrue(filename.value.hasSuffix(".jpg.gpg"))
+        XCTAssertFalse(filename.value.contains(".."))
+    }
+
     func test_exportFilename_countsBytesRatherThanCharacters() {
-        // Four bytes per emoji, so 64 of them plus ".gpg" is exactly the limit.
+        // Four bytes each, and whole Characters come off, so the last one that
+        // fits under 255 with ".gpg" is the 62nd.
         let filename = ExportFilename(base: String(repeating: "🔐", count: 80), pathExtension: "gpg")
 
-        XCTAssertLessThanOrEqual(filename.value.utf8.count, 255)
-        XCTAssertTrue(filename.value.hasSuffix(".gpg"))
-        XCTAssertTrue(filename.value.hasPrefix("🔐"))
+        XCTAssertEqual(filename.value, String(repeating: "🔐", count: 62) + ".gpg")
+        XCTAssertEqual(filename.value.utf8.count, 252)
     }
 }

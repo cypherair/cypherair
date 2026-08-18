@@ -17,10 +17,6 @@ struct TemporaryFileOutput {
         self.artifact = artifact
     }
 
-    init(fileURL: URL, exportFilename: ExportFilename) {
-        self.init(AppTemporaryArtifact(fileURL: fileURL, exportFilename: exportFilename))
-    }
-
     func cleanup() {
         artifact.cleanup()
     }

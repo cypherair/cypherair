@@ -205,7 +205,11 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     /// suffix rather than the ciphertext's own name, which would propose
     /// overwriting the file being decrypted.
     private static func decryptedExportFilename(for inputFilename: String) -> ExportFilename {
+        // Trimmed before the extension is read, not after: Foundation refuses an
+        // extension containing a space, so `report.pdf.gpg ` would otherwise
+        // read as carrying no OpenPGP extension at all.
         let component = (inputFilename as NSString).lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let pathExtension = (component as NSString).pathExtension.lowercased()
         guard ["gpg", "pgp", "asc"].contains(pathExtension) else {
             return ExportFilename(base: component, pathExtension: "decrypted")

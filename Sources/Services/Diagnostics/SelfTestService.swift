@@ -25,7 +25,8 @@ final class SelfTestService {
         case failed(error: Error)
     }
 
-    /// In-memory report prepared for explicit user export.
+    /// Report held in process memory, prepared for explicit user export. Saving
+    /// one stages it through the shared export path like any other artifact.
     struct SelfTestReport: Equatable {
         let data: Data
         let exportFilename: ExportFilename

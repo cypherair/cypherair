@@ -31,7 +31,7 @@ final class FileExportController {
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     private(set) var payload: ExportPayload?
-    var isPresented = false
+    private(set) var isPresented = false
 
     private var ownedTemporaryFile: URL?
 
@@ -54,9 +54,13 @@ final class FileExportController {
 
     /// Offer a file the controller does not own — an operation artifact whose
     /// lifetime belongs to the workflow that produced it.
-    func prepareFileExport(fileURL: URL, filename: ExportFilename) {
+    ///
+    /// Takes the output whole rather than a URL and a name: the artifact already
+    /// pairs them, and splitting the pair at this door would be the one place a
+    /// caller could still put the wrong name on a file.
+    func prepareFileExport(_ output: TemporaryFileOutput) {
         cleanupOwnedTemporaryFile()
-        present(ExportPayload(url: fileURL, filename: filename))
+        present(ExportPayload(url: output.fileURL, filename: output.exportFilename))
     }
 
     func finish() {

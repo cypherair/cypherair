@@ -581,10 +581,10 @@ final class DecryptScreenModelTests: XCTestCase {
                     // Deliberately unlike anything derivable from the selected
                     // ciphertext, so the assertion below can only hold if the
                     // screen offers the name decryption gave the artifact.
-                    output: TemporaryFileOutput(
+                    output: AppTemporaryArtifact(
                         fileURL: outputURL,
                         exportFilename: ExportFilename("recovered-plaintext.pdf")
-                    ),
+                    ).temporaryFileOutput,
                     verification: detailedVerification
                 )
             }
@@ -645,10 +645,10 @@ final class DecryptScreenModelTests: XCTestCase {
                 await gate.suspend()
                 try Task.checkCancellation()
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(
+                    output: AppTemporaryArtifact(
                         fileURL: inputURL,
                         exportFilename: ExportFilename(inputURL.lastPathComponent)
-                    ),
+                    ).temporaryFileOutput,
                     verification: self.makeDetailedVerification(verificationState: .verified)
                 )
             }
@@ -711,10 +711,10 @@ final class DecryptScreenModelTests: XCTestCase {
             fileDecryptionAction: { _ in
                 operation.cancel()
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(
+                    output: AppTemporaryArtifact(
                         fileURL: outputURL,
                         exportFilename: ExportFilename(outputURL.lastPathComponent)
-                    ),
+                    ).temporaryFileOutput,
                     verification: self.makeDetailedVerification(verificationState: .verified)
                 )
             }
@@ -763,10 +763,10 @@ final class DecryptScreenModelTests: XCTestCase {
             fileDecryptionAction: { _ in
                 await gate.suspend()
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(
+                    output: AppTemporaryArtifact(
                         fileURL: outputURL,
                         exportFilename: ExportFilename(outputURL.lastPathComponent)
-                    ),
+                    ).temporaryFileOutput,
                     verification: self.makeDetailedVerification(verificationState: .verified)
                 )
             }
@@ -1066,10 +1066,10 @@ final class DecryptScreenModelTests: XCTestCase {
         signerFingerprint: String? = nil
     ) -> DecryptScreenModel.FileDecryptionResult {
         DecryptScreenModel.FileDecryptionResult(
-            output: TemporaryFileOutput(
+            output: AppTemporaryArtifact(
                 fileURL: outputURL,
                 exportFilename: ExportFilename(outputURL.lastPathComponent)
-            ),
+            ).temporaryFileOutput,
             verification: makeDetailedVerification(
                 verificationState: verificationState,
                 signerFingerprint: signerFingerprint

@@ -37,7 +37,11 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
             ("notes.txt.asc", "notes.txt"),
             ("archive.PGP", "archive"),
             ("message", "message.decrypted"),
-            ("blob.bin", "blob.bin.decrypted")
+            ("blob.bin", "blob.bin.decrypted"),
+            // Foundation refuses an extension containing a space, so a name that
+            // arrived from another OS with one has to be trimmed before the
+            // OpenPGP extension is read, not after.
+            ("report.pdf.gpg ", "report.pdf")
         ]
 
         for (input, expected) in cases {
