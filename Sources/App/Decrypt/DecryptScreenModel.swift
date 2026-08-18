@@ -18,13 +18,17 @@ final class DecryptScreenModel {
         let verification: DetailedSignatureVerification
     }
 
-    typealias ParseTextRecipientsAction = @MainActor (Data) async throws -> DecryptionPhase1Result
+    typealias InspectTextMessageAction = @MainActor (Data) async throws -> DecryptionPhase1Result
     typealias ParseFileRecipientsAction = @MainActor (URL) async throws -> FileDecryptionPhase1Result
     typealias TextCiphertextFileImportAction = @MainActor (URL) throws -> (data: Data, text: String)
     typealias CiphertextFileInspectionAction = @MainActor (URL) throws -> (data: Data, text: String)?
     typealias TextDecryptionAction = @MainActor (
         DecryptionPhase1Result
     ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification)
+    typealias PasswordDecryptionAction = @MainActor (
+        DecryptionPhase1Result,
+        String
+    ) async throws -> PasswordMessageDetailedDecryptOutcome
     typealias FileDecryptionAction = @MainActor (
         FileDecryptionRequest
     ) async throws -> FileDecryptionResult
@@ -33,11 +37,12 @@ final class DecryptScreenModel {
     let operation: OperationController
     let exportController: FileExportController
 
-    private let parseTextRecipientsAction: ParseTextRecipientsAction
+    private let inspectTextMessageAction: InspectTextMessageAction
     private let parseFileRecipientsAction: ParseFileRecipientsAction
     private let textCiphertextFileImportAction: TextCiphertextFileImportAction
     private let ciphertextFileInspectionAction: CiphertextFileInspectionAction
     private let textDecryptionAction: TextDecryptionAction
+    private let passwordDecryptionAction: PasswordDecryptionAction
     private let fileDecryptionAction: FileOperationAction<FileDecryptionRequest, FileDecryptionResult>
     private var fileImportRequestGate = FileImportRequestGate()
 
@@ -50,6 +55,11 @@ final class DecryptScreenModel {
 
     var decryptMode: DecryptView.DecryptMode = .text
     var ciphertextInput = ""
+    /// What the reader typed to open a password-protected message. Never gated
+    /// on `PassphraseRequirements`: whoever wrote the message fixed its
+    /// protection, and refusing a weak one here would only lock the reader out
+    /// of a message they are entitled to read.
+    var password = ""
     var textDecryptionResult: TextDecryptionResult?
     var fileDecryptionResult: FileDecryptionResult? {
         didSet {
@@ -72,18 +82,19 @@ final class DecryptScreenModel {
         configuration: DecryptView.Configuration,
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
-        parseTextRecipientsAction: ParseTextRecipientsAction? = nil,
+        inspectTextMessageAction: InspectTextMessageAction? = nil,
         parseFileRecipientsAction: ParseFileRecipientsAction? = nil,
         textCiphertextFileImportAction: TextCiphertextFileImportAction? = nil,
         ciphertextFileInspectionAction: CiphertextFileInspectionAction? = nil,
         textDecryptionAction: TextDecryptionAction? = nil,
+        passwordDecryptionAction: PasswordDecryptionAction? = nil,
         fileDecryptionAction: FileDecryptionAction? = nil
     ) {
         self.configuration = configuration
         self.operation = operation
         self.exportController = exportController
-        self.parseTextRecipientsAction = parseTextRecipientsAction ?? { ciphertext in
-            try await decryptionService.parseRecipients(ciphertext: ciphertext)
+        self.inspectTextMessageAction = inspectTextMessageAction ?? { ciphertext in
+            try await decryptionService.inspectMessage(ciphertext: ciphertext)
         }
         self.parseFileRecipientsAction = parseFileRecipientsAction ?? { fileURL in
             try await SecurityScopedFileAccess.withAccess(
@@ -156,6 +167,12 @@ final class DecryptScreenModel {
         self.textDecryptionAction = textDecryptionAction ?? { phase1 in
             try await decryptionService.decryptDetailed(phase1: phase1)
         }
+        self.passwordDecryptionAction = passwordDecryptionAction ?? { phase1, password in
+            try await decryptionService.decryptDetailedWithPassword(
+                phase1: phase1,
+                password: password
+            )
+        }
         self.fileDecryptionAction = FileOperationAction(injectedAction: fileDecryptionAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
@@ -189,6 +206,20 @@ final class DecryptScreenModel {
         case .file:
             filePhase1Result?.matchedKey
         }
+    }
+
+    /// The inspected message can only be opened with a password. A message that
+    /// also matches a local key is not offered this route: the key is the
+    /// stronger of the two and needs nothing typed.
+    var asksForPassword: Bool {
+        guard decryptMode == .text, let phase1Result else {
+            return false
+        }
+        return phase1Result.matchedKey == nil && phase1Result.acceptsPassword
+    }
+
+    var passwordDecryptButtonDisabled: Bool {
+        operation.isRunning || password.isEmpty
     }
 
     var hasPhase1Result: Bool {
@@ -255,6 +286,7 @@ final class DecryptScreenModel {
         clearFileDecryptionResult()
         phase1Result = nil
         filePhase1Result = nil
+        password = ""
         importedCiphertext.clear()
         pendingTextModeImport = nil
         fileImportRequestGate.invalidate()
@@ -268,6 +300,7 @@ final class DecryptScreenModel {
 
     func clearTransientInput() {
         ciphertextInput = ""
+        password = ""
         clearTextDecryptionResult()
         clearFileDecryptionResult()
         phase1Result = nil
@@ -339,13 +372,13 @@ final class DecryptScreenModel {
         }
     }
 
-    func parseRecipientsText() {
+    func inspectTextMessage() {
         let inputData = importedCiphertext.rawData ?? Data(ciphertextInput.utf8)
         clearTextDecryptionResult()
         let onParsed = configuration.onParsed
 
         operation.run(mapError: mapDecryptError) { [self] in
-            let result = try await self.parseTextRecipientsAction(inputData)
+            let result = try await self.inspectTextMessageAction(inputData)
             try Task.checkCancellation()
             self.phase1Result = result
             self.textInputSectionEpoch &+= 1
@@ -383,6 +416,46 @@ final class DecryptScreenModel {
                 )
             }
             onDecrypted?(plaintext, verification)
+        }
+    }
+
+    /// Open a password-protected message. No key is used and no authentication
+    /// prompt is raised; the engine refuses an Argon2 cost this device cannot
+    /// afford before it derives anything.
+    func decryptTextWithPassword() {
+        guard let phase1Result, !password.isEmpty else { return }
+        let passwordSnapshot = password
+        let onDecrypted = configuration.onDecrypted
+
+        operation.run(mapError: mapDecryptError) { [self] in
+            let outcome = try await self.passwordDecryptionAction(phase1Result, passwordSnapshot)
+            try Task.checkCancellation()
+
+            switch outcome {
+            case .decrypted(var plaintext, let verification):
+                defer {
+                    plaintext.resetBytes(in: 0..<plaintext.count)
+                }
+                if let text = String(data: plaintext, encoding: .utf8) {
+                    self.textDecryptionResult = TextDecryptionResult(
+                        plaintext: text,
+                        verification: verification
+                    )
+                }
+                // The password worked, so it has no further job. Holding it
+                // would only widen the window in which it can be read back off
+                // the screen.
+                self.password = ""
+                onDecrypted?(plaintext, verification)
+
+            case .passwordRejected:
+                throw CypherAirError.wrongMessagePassword
+
+            case .noSkesk:
+                // Phase 1 said this message carries a password slot, so it does.
+                // Reaching here means the two disagree about the same bytes.
+                throw CypherAirError.noMatchingKey
+            }
         }
     }
 
@@ -553,6 +626,8 @@ final class DecryptScreenModel {
     private func invalidateTextInputState(refreshInputSection: Bool) {
         clearTextDecryptionResult()
         phase1Result = nil
+        // The password belonged to the message that just went away.
+        password = ""
         if refreshInputSection {
             textInputSectionEpoch &+= 1
         }
@@ -606,13 +681,13 @@ final class DecryptScreenModel {
 }
 
 private struct Phase1Seed: Equatable {
-    let recipientKeyIds: [String]
     let matchedKeyFingerprint: String?
+    let acceptsPassword: Bool
     let ciphertext: Data
 
     init(_ result: DecryptionPhase1Result) {
-        recipientKeyIds = result.recipientKeyIds
         matchedKeyFingerprint = result.matchedKey?.fingerprint
+        acceptsPassword = result.acceptsPassword
         ciphertext = result.ciphertext
     }
 }

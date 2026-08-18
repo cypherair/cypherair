@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The app's one way of asking someone to choose a passphrase: generation
-/// offered before the field, the requirements shown while typing, and the
-/// confirmation alongside — so no screen invents its own idea of what a
-/// passphrase has to be.
+/// The app's one way of asking someone to choose a secret: generation offered
+/// before the field, the requirements shown while typing, and the confirmation
+/// alongside — so no screen invents its own idea of what an acceptable secret
+/// is.
 ///
 /// Emits form rows; drop it inside a `Section`. The caller keeps the two
 /// strings and decides what an unsatisfied requirement means for its own
@@ -15,6 +15,18 @@ struct CypherPassphraseEntry: View {
         case confirmation
     }
 
+    /// Which secret is being chosen, and so which word the surface uses for it.
+    ///
+    /// The rules, the generator and the layout are identical across purposes —
+    /// only the vocabulary and the one sentence about what to do with the
+    /// result differ. A key backup is kept; a message password is passed on to
+    /// somebody else, and the copy has to say so.
+    enum Purpose {
+        case keyBackup
+        case messagePassword
+    }
+
+    let purpose: Purpose
     @Binding var passphrase: String
     @Binding var confirmation: String
     @FocusState.Binding var focus: Field?
@@ -27,7 +39,7 @@ struct CypherPassphraseEntry: View {
     }
 
     /// Everything the field itself writes is a user edit, which is what makes
-    /// the generated-passphrase note disappear. `generate()` writes the binding
+    /// the generated-secret note disappear. `generate()` writes the binding
     /// directly and so keeps the flag.
     private var typedPassphrase: Binding<String> {
         Binding(
@@ -41,16 +53,14 @@ struct CypherPassphraseEntry: View {
 
     var body: some View {
         Button(action: generate) {
-            Label(
-                String(localized: "passphrase.generate", defaultValue: "Generate a Strong Passphrase"),
-                systemImage: "wand.and.sparkles"
-            )
+            Label(generateTitle, systemImage: "wand.and.sparkles")
         }
+        .accessibilityIdentifier("passphrase.generate")
 
         VStack(alignment: .leading, spacing: CypherSpacing.compact) {
             HStack(spacing: CypherSpacing.compact) {
                 CypherSecureTextField(
-                    String(localized: "passphrase.field", defaultValue: "Passphrase"),
+                    fieldTitle,
                     text: typedPassphrase,
                     isRevealed: isRevealed,
                     submitLabel: .next,
@@ -81,13 +91,10 @@ struct CypherPassphraseEntry: View {
                 }
 
                 if isGenerated {
-                    Text(String(
-                        localized: "passphrase.generated.note",
-                        defaultValue: "Write it down and keep it somewhere safe. It is stored nowhere, and no one can recover it for you."
-                    ))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(generatedNote)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -98,7 +105,7 @@ struct CypherPassphraseEntry: View {
         }
 
         CypherSecureTextField(
-            String(localized: "passphrase.confirm", defaultValue: "Confirm Passphrase"),
+            confirmationTitle,
             text: $confirmation,
             isRevealed: isRevealed,
             submitLabel: .done,
@@ -108,7 +115,7 @@ struct CypherPassphraseEntry: View {
         .focused($focus, equals: .confirmation)
 
         if !passphrase.isEmpty, !confirmation.isEmpty, passphrase != confirmation {
-            Text(String(localized: "passphrase.mismatch", defaultValue: "Passphrases do not match."))
+            Text(mismatchNote)
                 .font(.footnote)
                 .foregroundStyle(.red)
         }
@@ -121,17 +128,13 @@ struct CypherPassphraseEntry: View {
             Image(systemName: isRevealed ? "eye.slash" : "eye")
         }
         .buttonStyle(.borderless)
-        .accessibilityLabel(
-            isRevealed
-                ? String(localized: "passphrase.hide", defaultValue: "Hide Passphrase")
-                : String(localized: "passphrase.show", defaultValue: "Show Passphrase")
-        )
+        .accessibilityLabel(isRevealed ? hideTitle : showTitle)
     }
 
-    /// Fills both fields: a passphrase nobody chose is a passphrase nobody can
-    /// mistype, so asking for it twice would only be ceremony. It is revealed
-    /// because a value the user has never seen has to be written down before it
-    /// protects anything.
+    /// Fills both fields: a secret nobody chose is a secret nobody can mistype,
+    /// so asking for it twice would only be ceremony. It is revealed because a
+    /// value the user has never seen has to be written down before it protects
+    /// anything.
     private func generate() {
         guard let generated = try? PassphraseGenerator.generate() else {
             // The system random source reported failure. Nothing weaker is an
@@ -144,11 +147,82 @@ struct CypherPassphraseEntry: View {
         isRevealed = true
         isGenerated = true
     }
+
+    // MARK: Vocabulary
+
+    private var generateTitle: String {
+        switch purpose {
+        case .keyBackup:
+            String(localized: "passphrase.generate", defaultValue: "Generate a Strong Passphrase")
+        case .messagePassword:
+            String(localized: "password.generate", defaultValue: "Generate a Strong Password")
+        }
+    }
+
+    private var fieldTitle: String {
+        switch purpose {
+        case .keyBackup:
+            String(localized: "passphrase.field", defaultValue: "Passphrase")
+        case .messagePassword:
+            String(localized: "password.field", defaultValue: "Password")
+        }
+    }
+
+    private var confirmationTitle: String {
+        switch purpose {
+        case .keyBackup:
+            String(localized: "passphrase.confirm", defaultValue: "Confirm Passphrase")
+        case .messagePassword:
+            String(localized: "password.confirm", defaultValue: "Confirm Password")
+        }
+    }
+
+    private var generatedNote: String {
+        switch purpose {
+        case .keyBackup:
+            String(
+                localized: "passphrase.generated.note",
+                defaultValue: "Write it down and keep it somewhere safe. It is stored nowhere, and no one can recover it for you."
+            )
+        case .messagePassword:
+            String(
+                localized: "password.generated.note",
+                defaultValue: "Write it down before you send the message. It is stored nowhere, and the message cannot be opened without it."
+            )
+        }
+    }
+
+    private var mismatchNote: String {
+        switch purpose {
+        case .keyBackup:
+            String(localized: "passphrase.mismatch", defaultValue: "Passphrases do not match.")
+        case .messagePassword:
+            String(localized: "password.mismatch", defaultValue: "Passwords do not match.")
+        }
+    }
+
+    private var showTitle: String {
+        switch purpose {
+        case .keyBackup:
+            String(localized: "passphrase.show", defaultValue: "Show Passphrase")
+        case .messagePassword:
+            String(localized: "password.show", defaultValue: "Show Password")
+        }
+    }
+
+    private var hideTitle: String {
+        switch purpose {
+        case .keyBackup:
+            String(localized: "passphrase.hide", defaultValue: "Hide Passphrase")
+        case .messagePassword:
+            String(localized: "password.hide", defaultValue: "Hide Password")
+        }
+    }
 }
 
-/// One requirement and whether the passphrase has reached it yet. Unmet reads
-/// as "not there yet" rather than as an error: nothing here is a mistake the
-/// user has already made.
+/// One requirement and whether the secret has reached it yet. Unmet reads as
+/// "not there yet" rather than as an error: nothing here is a mistake the user
+/// has already made.
 private struct PassphraseRequirementRow: View {
     let text: String
     let isMet: Bool

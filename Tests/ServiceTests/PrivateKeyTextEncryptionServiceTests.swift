@@ -157,6 +157,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         let encryptionService = EncryptionService(
             keyManagement: keyManagement,
             contactService: contactService,
+            messageAdapter: messageAdapter,
             textEncryptor: textEncryptor,
             fileEncryptor: TestHelpers.makeFileEncryptor(
                 engine: engine,

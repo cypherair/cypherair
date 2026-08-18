@@ -4,6 +4,8 @@ struct EncryptScreenFormView: View {
     let model: EncryptScreenModel
     var showsModePicker = true
 
+    @FocusState private var passwordFocus: CypherPassphraseEntry.Field?
+
     var body: some View {
         @Bindable var model = model
         let operation = model.operation
@@ -27,15 +29,22 @@ struct EncryptScreenFormView: View {
                     .disabled(operation.isRunning)
             }
 
-            EncryptRecipientsSection(model: model)
+            EncryptProtectionSection(model: model, passwordFocus: $passwordFocus)
                 .disabled(operation.isRunning)
 
-            EncryptOptionsSection(model: model)
-                .disabled(operation.isRunning)
+            // Signing and the self copy are done with the sender's own keys, so
+            // they have nothing to say about a message protected by a password.
+            if model.activeProtection == .recipientKeys {
+                EncryptOptionsSection(model: model)
+                    .disabled(operation.isRunning)
+            }
 
             EncryptActionSections(model: model)
         } output: {
             EncryptResultSections(model: model)
+        }
+        .onChange(of: model.activeProtection) {
+            passwordFocus = nil
         }
         .screenReady("encrypt.ready")
     }

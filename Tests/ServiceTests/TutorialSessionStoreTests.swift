@@ -347,7 +347,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         store.noteEncrypted(ciphertext)
         XCTAssertTrue(store.isCompleted(.encryptDemoMessage))
 
-        let phase1 = try await container.decryptionService.parseRecipients(ciphertext: ciphertext)
+        let phase1 = try await container.decryptionService.inspectMessage(ciphertext: ciphertext)
         store.noteParsed(phase1)
         XCTAssertFalse(store.isCompleted(.decryptAndVerify))
         XCTAssertEqual(store.session.artifacts.parseResult?.matchedKey?.fingerprint, store.session.artifacts.bobIdentity?.fingerprint)
@@ -713,7 +713,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         )
         store.noteEncrypted(ciphertext)
 
-        let phase1 = try await container.decryptionService.parseRecipients(ciphertext: ciphertext)
+        let phase1 = try await container.decryptionService.inspectMessage(ciphertext: ciphertext)
         store.noteParsed(phase1)
 
         let inactiveKey = DecryptView.RuntimeSyncKey(
@@ -1203,7 +1203,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
 
     private func makePhase1Result() -> DecryptionPhase1Result {
         DecryptionPhase1Result(
-            recipientKeyIds: ["ABCD1234"],
+            acceptsPassword: false,
             matchedKey: nil,
             ciphertext: Data("ciphertext".utf8)
         )

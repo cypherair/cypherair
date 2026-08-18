@@ -285,6 +285,7 @@ enum TestHelpers {
         let encryptionSvc = EncryptionService(
             keyManagement: keyMgmt,
             contactService: contactSvc,
+            messageAdapter: messageAdapter,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
             temporaryArtifactStore: temporaryArtifactStore
@@ -341,6 +342,7 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             metadataPersistence: metadataPersistence,
             contactService: contactSvc,
+            messageAdapter: messageAdapter,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
             encryptionService: encryptionSvc,
@@ -359,6 +361,7 @@ enum TestHelpers {
         let keyManagement: KeyManagementService
         let metadataPersistence: any KeyMetadataPersistence
         let contactService: ContactService
+        let messageAdapter: PGPMessageOperationAdapter
         let textEncryptor: any TextMessageEncrypting
         let fileEncryptor: any StreamingFileEncrypting
         let encryptionService: EncryptionService

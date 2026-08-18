@@ -145,9 +145,9 @@ fn test_unicode_user_id_modern_high() {
     assert!(info.user_id.unwrap().contains("李四"));
 }
 
-/// match_recipients: Modern High (v6 key, SEIPDv2) returns primary fingerprint.
+/// inspect_message_protection: Modern High (v6 key, SEIPDv2) returns primary fingerprint.
 #[test]
-fn test_match_recipients_modern_high_returns_primary_fingerprint() {
+fn test_inspect_message_protection_modern_high_returns_primary_fingerprint() {
     let key = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
         .expect("Key gen should succeed");
 
@@ -159,16 +159,17 @@ fn test_match_recipients_modern_high_returns_primary_fingerprint() {
     )
     .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(&ciphertext, &[key.public_key_data.clone()])
-        .expect("match_recipients should succeed for Modern High");
+    let matched = decrypt::inspect_message_protection(&ciphertext, &[key.public_key_data.clone()])
+        .expect("inspect_message_protection should succeed for Modern High")
+        .matched_certificate_fingerprints;
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], key.fingerprint);
 }
 
-/// match_recipients: Modern High wrong key → NoMatchingKey.
+/// inspect_message_protection: Modern High wrong key → no match, no password slot.
 #[test]
-fn test_match_recipients_modern_high_wrong_key_returns_error() {
+fn test_inspect_message_protection_modern_high_wrong_key_finds_no_way_in() {
     let alice =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
@@ -184,17 +185,25 @@ fn test_match_recipients_modern_high_wrong_key_returns_error() {
     )
     .expect("Encryption should succeed");
 
-    let result = decrypt::match_recipients(&ciphertext, &[bob.public_key_data.clone()]);
+    let inspection =
+        decrypt::inspect_message_protection(&ciphertext, &[bob.public_key_data.clone()])
+            .expect("inspect_message_protection should succeed");
+
     assert!(
-        matches!(result, Err(pgp_mobile::error::PgpError::NoMatchingKey)),
-        "Should return NoMatchingKey for wrong cert, got: {result:?}"
+        inspection.matched_certificate_fingerprints.is_empty(),
+        "Wrong cert should match nothing, got: {:?}",
+        inspection.matched_certificate_fingerprints
+    );
+    assert!(
+        !inspection.accepts_password,
+        "A recipient-key message carries no password slot"
     );
 }
 
-/// match_recipients: encrypt-to-self includes sender in match (Modern High).
-/// Complements test_match_recipients_legacy_encrypt_to_self (Legacy).
+/// inspect_message_protection: encrypt-to-self includes sender in match (Modern High).
+/// Complements test_inspect_message_protection_legacy_encrypt_to_self (Legacy).
 #[test]
-fn test_match_recipients_modern_high_encrypt_to_self() {
+fn test_inspect_message_protection_modern_high_encrypt_to_self() {
     let sender =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
@@ -211,18 +220,19 @@ fn test_match_recipients_modern_high_encrypt_to_self() {
     )
     .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(
+    let matched = decrypt::inspect_message_protection(
         &ciphertext,
         &[
             sender.public_key_data.clone(),
             recipient.public_key_data.clone(),
         ],
     )
-    .expect("match_recipients should find sender via encrypt-to-self");
+    .expect("inspect_message_protection should find sender via encrypt-to-self")
+        .matched_certificate_fingerprints;
 
     assert!(
         matched.len() >= 2,
-        "match_recipients should find both sender (encrypt-to-self) and recipient, got {}",
+        "inspect_message_protection should find both sender (encrypt-to-self) and recipient, got {}",
         matched.len()
     );
     assert!(matched.contains(&sender.fingerprint));

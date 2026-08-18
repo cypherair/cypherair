@@ -372,6 +372,7 @@ fn password_message_twins_round_trip_with_verified_signature() {
             ciphertext,
             "correct horse battery staple".to_string(),
             vec![material.public_key_data.clone()],
+            u64::MAX,
         )
         .expect("password decrypt succeeds");
     assert_eq!(result.plaintext.as_deref(), Some(PLAINTEXT));

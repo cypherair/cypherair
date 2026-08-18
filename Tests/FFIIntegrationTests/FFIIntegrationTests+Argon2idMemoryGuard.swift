@@ -203,4 +203,46 @@ extension FFIIntegrationTests {
         XCTAssertEqual(mockMemory.callCount, 1,
                        "Guard should query memory provider exactly once")
     }
+
+    // MARK: - The budget the message path sends into the engine
+
+    /// The password-message path cannot hand the guard a requirement to check —
+    /// the requirement is the sender's, one per password slot — so it takes the
+    /// budget instead and lets the engine apply it. The budget has to be the
+    /// same 75% rule the key paths refuse by, or the two would disagree about
+    /// what this device can afford.
+    func test_argon2idGuard_affordableMemory_isTheSameThresholdValidateRefusesBy() {
+        let mockMemory = MockMemoryInfo()
+        mockMemory.availableBytes = 8 * 1024 * 1024 * 1024
+        let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
+
+        let affordableKib = memoryGuard.affordableMemoryKib()
+        XCTAssertEqual(affordableKib, 6 * 1024 * 1024, "75% of 8 GB, in KiB")
+
+        XCTAssertNoThrow(
+            try memoryGuard.validate(
+                protectionInfo: PGPKeyS2KInfo(
+                    S2kInfo(s2kType: .argon2id, memoryKib: affordableKib)
+                )
+            ),
+            "A cost exactly at the budget is affordable"
+        )
+        XCTAssertThrowsError(
+            try memoryGuard.validate(
+                protectionInfo: PGPKeyS2KInfo(
+                    S2kInfo(s2kType: .argon2id, memoryKib: affordableKib + 1)
+                )
+            ),
+            "One KiB past the budget is not"
+        )
+    }
+
+    /// A process already over its limit reports no headroom, which has to read
+    /// as "afford nothing" rather than as an unbounded budget — the engine
+    /// treats a large budget as no device constraint at all.
+    func test_argon2idGuard_affordableMemory_isZeroWhenTheProcessHasNoHeadroom() {
+        let mockMemory = MockMemoryInfo()
+        mockMemory.availableBytes = 0
+        XCTAssertEqual(Argon2idMemoryGuard(memoryInfo: mockMemory).affordableMemoryKib(), 0)
+    }
 }

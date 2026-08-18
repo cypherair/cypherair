@@ -116,43 +116,57 @@ pub fn message_quantum_safety(ciphertext: &[u8]) -> Result<MessageQuantumSafety,
     })
 }
 
-/// Match PKESK recipients in ciphertext against provided local certificates.
-/// Returns the primary fingerprints of certificates that have a matching encryption subkey.
-/// This is Phase 1 of the two-phase decryption protocol — no secret keys needed.
+/// What an encrypted message offers as a way in, judged from its session-key
+/// packets alone.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MessageProtectionInspection {
+    /// Primary fingerprints (lowercase hex, deduplicated) of the supplied
+    /// certificates the message is addressed to. Empty when none of them are.
+    pub matched_certificate_fingerprints: Vec<String>,
+    /// The message carries at least one password slot (SKESK), so a password
+    /// can open it even when no local certificate matches.
+    pub accepts_password: bool,
+}
+
+/// Inspect how an encrypted message can be opened, without a secret key, a
+/// password, or any derivation. This is Phase 1 of the two-phase decryption
+/// protocol.
 ///
-/// PKESK packets contain encryption *subkey* identifiers (Key IDs for v4, fingerprints for v6),
-/// not primary key fingerprints. This function uses Sequoia's `key_handles()` to correctly
-/// match subkey identifiers against certificates, then returns the primary fingerprint of
-/// each matched certificate.
+/// PKESK packets carry encryption *subkey* identifiers (Key IDs for v4,
+/// fingerprints for v6), not primary key fingerprints, so matching goes through
+/// Sequoia's `key_handles()` and reports the primary fingerprint of each matched
+/// certificate.
+///
+/// Finding no way in is an answer, not a failure: a message addressed to nobody
+/// local and carrying no password slot comes back with an empty match list and
+/// `accepts_password: false`, and the caller decides what to tell the user. Only
+/// a message that cannot be parsed at all is an error.
 ///
 /// Parameters:
 /// - `ciphertext`: The encrypted message (binary, not armored).
 /// - `local_certs_data`: Public key certificates (binary) to match against.
-///
-/// Returns: Deduplicated list of matched primary key fingerprints (lowercase hex).
-/// Returns `PgpError::NoMatchingKey` if no certificates match.
-pub fn match_recipients(
+pub fn inspect_message_protection(
     ciphertext: &[u8],
     local_certs_data: &[Vec<u8>],
-) -> Result<Vec<String>, PgpError> {
+) -> Result<MessageProtectionInspection, PgpError> {
     let policy = StandardPolicy::new();
 
-    // Parse PKESK recipients as KeyHandle values (not strings).
+    // Parse PKESK recipients as KeyHandle values (not strings), and note
+    // whether any password slot is present, in one walk.
     let mut pkesk_recipients: Vec<openpgp::KeyHandle> = Vec::new();
+    let mut accepts_password = false;
     bounded_walk::walk_message_prefix_bytes(ciphertext, |packet| {
-        if let openpgp::Packet::PKESK(pkesk) = packet {
-            if let Some(rid) = pkesk.recipient() {
-                pkesk_recipients.push(rid.clone());
+        match packet {
+            openpgp::Packet::PKESK(pkesk) => {
+                if let Some(rid) = pkesk.recipient() {
+                    pkesk_recipients.push(rid.clone());
+                }
             }
+            openpgp::Packet::SKESK(_) => accepts_password = true,
+            _ => {}
         }
         Ok(())
     })?;
-
-    if pkesk_recipients.is_empty() {
-        return Err(PgpError::CorruptData {
-            reason: "No recipients found in message".to_string(),
-        });
-    }
 
     // Parse local certificates (silently skip unparseable ones).
     let mut local_certs = Vec::new();
@@ -188,11 +202,10 @@ pub fn match_recipients(
         }
     }
 
-    if matched_fingerprints.is_empty() {
-        return Err(PgpError::NoMatchingKey);
-    }
-
-    Ok(matched_fingerprints)
+    Ok(MessageProtectionInspection {
+        matched_certificate_fingerprints: matched_fingerprints,
+        accepts_password,
+    })
 }
 
 /// Decrypt a message and preserve detailed per-signature results.

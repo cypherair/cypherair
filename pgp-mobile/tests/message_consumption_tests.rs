@@ -260,7 +260,7 @@ fn nested_compressed_layers_do_not_expand_in_phase_one() {
         Err(PgpError::MessageLimitsExceeded { .. })
     ));
     assert!(matches!(
-        decrypt::match_recipients(&bomb, &[key.public_key_data.clone()]),
+        decrypt::inspect_message_protection(&bomb, &[key.public_key_data.clone()]),
         Err(PgpError::MessageLimitsExceeded { .. })
     ));
     assert!(matches!(
@@ -268,7 +268,7 @@ fn nested_compressed_layers_do_not_expand_in_phase_one() {
         Err(PgpError::MessageLimitsExceeded { .. })
     ));
     assert!(matches!(
-        password::decrypt(&bomb, &openpgp::crypto::Password::from("secret"), &[]),
+        password::decrypt(&bomb, &openpgp::crypto::Password::from("secret"), &[], u64::MAX),
         Err(PgpError::MessageLimitsExceeded { .. })
     ));
 
@@ -481,8 +481,9 @@ fn an_encrypted_message_inside_a_compressed_one_still_resolves() {
 
     let recipients = decrypt::parse_recipients(&wrapped).expect("recipients should be found");
     assert_eq!(recipients.len(), 1);
-    let matched = decrypt::match_recipients(&wrapped, &[key.public_key_data.clone()])
-        .expect("the local certificate should match");
+    let matched = decrypt::inspect_message_protection(&wrapped, &[key.public_key_data.clone()])
+        .expect("the local certificate should match")
+        .matched_certificate_fingerprints;
     assert_eq!(matched.len(), 1);
 
     let result = decrypt::decrypt_detailed(&wrapped, &[key.cert_data.clone()], &[])

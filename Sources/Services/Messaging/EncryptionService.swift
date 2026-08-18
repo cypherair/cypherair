@@ -1,17 +1,20 @@
 import Foundation
 
-/// Orchestrates text and file encryption with recipient selection,
-/// encrypt-to-self, and optional signing.
+/// Orchestrates outgoing encryption: to recipient keys, with encrypt-to-self and
+/// optional signing, or to a password alone.
 ///
-/// The message format is the engine's: it selects SEIPDv2 (AEAD OCB) when every
-/// recipient certificate advertises that capability and SEIPDv1 (MDC) otherwise,
-/// and nothing here passes a format in. `PGPMessageFormatAdapter` states the same
-/// answer before sending.
+/// The message format is never chosen here. For a key-encrypted message it is
+/// the engine's answer — SEIPDv2 (AEAD OCB) when every recipient certificate
+/// advertises that capability, SEIPDv1 (MDC) otherwise — and
+/// `PGPMessageFormatAdapter` states that same answer before sending. A password
+/// message has no certificate to advertise anything, so it takes the container
+/// every OpenPGP tool can open (docs/PRODUCT.md §5).
 @Observable
 final class EncryptionService {
 
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let messageAdapter: PGPMessageOperationAdapter
     private let textEncryptor: any TextMessageEncrypting
     private let fileEncryptor: any StreamingFileEncrypting
     private let diskSpaceChecker: DiskSpaceChecker
@@ -20,6 +23,7 @@ final class EncryptionService {
     init(
         keyManagement: KeyManagementService,
         contactService: ContactService,
+        messageAdapter: PGPMessageOperationAdapter,
         textEncryptor: any TextMessageEncrypting,
         fileEncryptor: any StreamingFileEncrypting,
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
@@ -27,6 +31,7 @@ final class EncryptionService {
     ) {
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.messageAdapter = messageAdapter
         self.textEncryptor = textEncryptor
         self.fileEncryptor = fileEncryptor
         self.diskSpaceChecker = diskSpaceChecker
@@ -58,6 +63,33 @@ final class EncryptionService {
             signWithFingerprint: signWithFingerprint,
             encryptToSelf: encryptToSelf,
             encryptToSelfFingerprint: encryptToSelfFingerprint
+        )
+    }
+
+    // MARK: - Password Encryption
+
+    /// Encrypt text under a password alone. Returns ASCII-armored ciphertext.
+    ///
+    /// None of the sender's keys are involved: the message is not signed, and no
+    /// copy is made for the sender. Anyone holding the password can read it, so
+    /// the strength of the password is the strength of the message — the screen
+    /// refuses one that does not meet `PassphraseRequirements`.
+    func encryptTextWithPassword(
+        _ plaintext: String,
+        password: String
+    ) async throws -> Data {
+        guard PassphraseRequirements(of: password).isSatisfied else {
+            throw CypherAirError.encryptionFailed(
+                reason: String(
+                    localized: "encrypt.password.tooWeak",
+                    defaultValue: "This password does not meet the requirements."
+                )
+            )
+        }
+
+        return try await messageAdapter.encryptWithPassword(
+            plaintext: Data(plaintext.utf8),
+            password: password
         )
     }
 

@@ -26,15 +26,23 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
-    func matchRecipients(
+    /// Phase 1: how this message can be opened — which of `localCerts` it is
+    /// addressed to, and whether a password can open it. No secret key, no
+    /// password, and no key derivation; an empty match with
+    /// `acceptsPassword == false` is an answer, not an error.
+    func inspectMessageProtection(
         ciphertext: Data,
         localCerts: [Data]
-    ) async throws -> [String] {
+    ) async throws -> (matchedFingerprints: [String], acceptsPassword: Bool) {
         do {
-            return try await Self.performMatchRecipients(
+            let inspection = try await Self.performInspectMessageProtection(
                 engine: engine,
                 ciphertext: ciphertext,
                 localCerts: localCerts
+            )
+            return (
+                inspection.matchedCertificateFingerprints,
+                inspection.acceptsPassword
             )
         } catch {
             throw PGPErrorMapper.mapRecipientMatching(error)
@@ -254,55 +262,39 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    /// Encrypt text under a password alone, ASCII-armored.
+    ///
+    /// The envelope is SEIPDv1 and is not a choice. Every other message takes
+    /// the format its recipient certificates advertise; a password message has
+    /// no certificate to advertise anything, so it gets the container every
+    /// OpenPGP tool can open — which is the point of sending one
+    /// (docs/PRODUCT.md §5). No signing key is threaded through: a password
+    /// message involves none of the sender's keys.
     func encryptWithPassword(
         plaintext: Data,
-        password: String,
-        format: PasswordMessageEnvelopeFormat,
-        signingKey: Data?,
-        binary: Bool
+        password: String
     ) async throws -> Data {
         do {
             return try await Self.performEncryptWithPassword(
                 engine: engine,
                 plaintext: plaintext,
-                password: password,
-                format: format.ffiValue,
-                signingKey: signingKey,
-                binary: binary
+                password: password
             )
         } catch {
             throw PGPErrorMapper.map(error) { .encryptionFailed(reason: $0) }
         }
     }
 
-    func encryptWithPasswordAndExternalP256Signer(
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageEnvelopeFormat,
-        signingPublicCert: Data,
-        signingKeyFingerprint: String,
-        signingProvider: ExternalP256SigningProvider,
-        binary: Bool
-    ) async throws -> Data {
-        do {
-            return try await Self.performEncryptWithPasswordAndExternalP256Signer(
-                engine: engine,
-                plaintext: plaintext,
-                password: password,
-                format: format.ffiValue,
-                signingPublicCert: signingPublicCert,
-                signingKeyFingerprint: signingKeyFingerprint,
-                signingProvider: signingProvider,
-                binary: binary
-            )
-        } catch {
-            throw PGPErrorMapper.mapExternalP256Signing(error)
-        }
-    }
-
+    /// Open a password-encrypted message.
+    ///
+    /// `affordableMemoryKib` bounds the Argon2 cost the engine will derive
+    /// under, per password slot and before any derivation runs — the sender
+    /// chose those parameters, so they are untrusted input
+    /// (`Argon2idMemoryGuard`, docs/SECURITY.md §7).
     func decryptWithPassword(
         ciphertext: Data,
         password: String,
+        affordableMemoryKib: UInt64,
         verificationContext: PGPMessageVerificationContext
     ) async throws -> PasswordMessageDetailedDecryptOutcome {
         do {
@@ -310,7 +302,8 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
                 engine: engine,
                 ciphertext: ciphertext,
                 password: password,
-                verificationKeys: verificationContext.verificationKeys
+                verificationKeys: verificationContext.verificationKeys,
+                affordableMemoryKib: affordableMemoryKib
             )
             return try PGPMessageResultMapper.passwordDecryptResult(
                 result,
@@ -444,12 +437,12 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
     }
 
     @concurrent
-    private static func performMatchRecipients(
+    private static func performInspectMessageProtection(
         engine: PgpEngine,
         ciphertext: Data,
         localCerts: [Data]
-    ) async throws -> [String] {
-        try engine.matchRecipients(ciphertext: ciphertext, localCerts: localCerts)
+    ) async throws -> MessageProtectionInspection {
+        try engine.inspectMessageProtection(ciphertext: ciphertext, localCerts: localCerts)
     }
 
     @concurrent
@@ -626,55 +619,13 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
     private static func performEncryptWithPassword(
         engine: PgpEngine,
         plaintext: Data,
-        password: String,
-        format: PasswordMessageFormat,
-        signingKey: Data?,
-        binary: Bool
+        password: String
     ) async throws -> Data {
-        if binary {
-            return try engine.encryptBinaryWithPassword(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingKey: signingKey
-            )
-        }
-        return try engine.encryptWithPassword(
+        try engine.encryptWithPassword(
             plaintext: plaintext,
             password: password,
-            format: format,
-            signingKey: signingKey
-        )
-    }
-
-    @concurrent
-    private static func performEncryptWithPasswordAndExternalP256Signer(
-        engine: PgpEngine,
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageFormat,
-        signingPublicCert: Data,
-        signingKeyFingerprint: String,
-        signingProvider: ExternalP256SigningProvider,
-        binary: Bool
-    ) async throws -> Data {
-        if binary {
-            return try engine.encryptBinaryWithPasswordAndExternalP256Signer(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingPublicCert: signingPublicCert,
-                signingKeyFingerprint: signingKeyFingerprint,
-                signer: signingProvider
-            )
-        }
-        return try engine.encryptWithPasswordAndExternalP256Signer(
-            plaintext: plaintext,
-            password: password,
-            format: format,
-            signingPublicCert: signingPublicCert,
-            signingKeyFingerprint: signingKeyFingerprint,
-            signer: signingProvider
+            format: .seipdv1,
+            signingKey: nil
         )
     }
 
@@ -839,33 +790,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
-    func encryptWithPasswordAndExternalCompositeSigner(
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageEnvelopeFormat,
-        signingPublicCert: Data,
-        signingKeyFingerprint: String,
-        classicalEddsaSecret: Data,
-        signingProvider: ExternalMlDsa65SigningProvider,
-        binary: Bool
-    ) async throws -> Data {
-        do {
-            return try await Self.performEncryptWithPasswordAndExternalCompositeSigner(
-                engine: engine,
-                plaintext: plaintext,
-                password: password,
-                format: format.ffiValue,
-                signingPublicCert: signingPublicCert,
-                signingKeyFingerprint: signingKeyFingerprint,
-                classicalEddsaSecret: classicalEddsaSecret,
-                signingProvider: signingProvider,
-                binary: binary
-            )
-        } catch {
-            throw PGPErrorMapper.mapExternalCompositeSigning(error)
-        }
-    }
-
     @concurrent
     private static func performEncryptWithExternalCompositeSigner(
         engine: PgpEngine,
@@ -993,40 +917,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
             classicalEddsaSecret: classicalEddsaSecret,
             signer: signingProvider,
             progress: progress
-        )
-    }
-
-    @concurrent
-    private static func performEncryptWithPasswordAndExternalCompositeSigner(
-        engine: PgpEngine,
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageFormat,
-        signingPublicCert: Data,
-        signingKeyFingerprint: String,
-        classicalEddsaSecret: Data,
-        signingProvider: ExternalMlDsa65SigningProvider,
-        binary: Bool
-    ) async throws -> Data {
-        if binary {
-            return try engine.encryptBinaryWithPasswordAndExternalCompositeSigner(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingPublicCert: signingPublicCert,
-                signingKeyFingerprint: signingKeyFingerprint,
-                classicalEddsaSecret: classicalEddsaSecret,
-                signer: signingProvider
-            )
-        }
-        return try engine.encryptWithPasswordAndExternalCompositeSigner(
-            plaintext: plaintext,
-            password: password,
-            format: format,
-            signingPublicCert: signingPublicCert,
-            signingKeyFingerprint: signingKeyFingerprint,
-            classicalEddsaSecret: classicalEddsaSecret,
-            signer: signingProvider
         )
     }
 
@@ -1191,33 +1081,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
-    func encryptWithPasswordAndExternalCompositeHighSigner(
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageEnvelopeFormat,
-        signingPublicCert: Data,
-        signingKeyFingerprint: String,
-        classicalEddsaSecret: Data,
-        signingProvider: ExternalMlDsa87SigningProvider,
-        binary: Bool
-    ) async throws -> Data {
-        do {
-            return try await Self.performEncryptWithPasswordAndExternalCompositeHighSigner(
-                engine: engine,
-                plaintext: plaintext,
-                password: password,
-                format: format.ffiValue,
-                signingPublicCert: signingPublicCert,
-                signingKeyFingerprint: signingKeyFingerprint,
-                classicalEddsaSecret: classicalEddsaSecret,
-                signingProvider: signingProvider,
-                binary: binary
-            )
-        } catch {
-            throw PGPErrorMapper.mapExternalCompositeSigning(error)
-        }
-    }
-
     @concurrent
     private static func performEncryptWithExternalCompositeHighSigner(
         engine: PgpEngine,
@@ -1349,50 +1212,18 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
     }
 
     @concurrent
-    private static func performEncryptWithPasswordAndExternalCompositeHighSigner(
-        engine: PgpEngine,
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageFormat,
-        signingPublicCert: Data,
-        signingKeyFingerprint: String,
-        classicalEddsaSecret: Data,
-        signingProvider: ExternalMlDsa87SigningProvider,
-        binary: Bool
-    ) async throws -> Data {
-        if binary {
-            return try engine.encryptBinaryWithPasswordAndExternalCompositeHighSigner(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingPublicCert: signingPublicCert,
-                signingKeyFingerprint: signingKeyFingerprint,
-                classicalEddsaSecret: classicalEddsaSecret,
-                signer: signingProvider
-            )
-        }
-        return try engine.encryptWithPasswordAndExternalCompositeHighSigner(
-            plaintext: plaintext,
-            password: password,
-            format: format,
-            signingPublicCert: signingPublicCert,
-            signingKeyFingerprint: signingKeyFingerprint,
-            classicalEddsaSecret: classicalEddsaSecret,
-            signer: signingProvider
-        )
-    }
-
-    @concurrent
     private static func performDecryptWithPassword(
         engine: PgpEngine,
         ciphertext: Data,
         password: String,
-        verificationKeys: [Data]
+        verificationKeys: [Data],
+        affordableMemoryKib: UInt64
     ) async throws -> PasswordDecryptResult {
         try engine.decryptWithPassword(
             ciphertext: ciphertext,
             password: password,
-            verificationKeys: verificationKeys
+            verificationKeys: verificationKeys,
+            affordableMemoryKib: affordableMemoryKib
         )
     }
 
@@ -1491,16 +1322,5 @@ private final class PGPProgressReporterBridge: StreamingProgressReporter, @unche
 
     func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool {
         reporter.onProgress(bytesProcessed: bytesProcessed, totalBytes: totalBytes)
-    }
-}
-
-private extension PasswordMessageEnvelopeFormat {
-    var ffiValue: PasswordMessageFormat {
-        switch self {
-        case .seipdv1:
-            return .seipdv1
-        case .seipdv2:
-            return .seipdv2
-        }
     }
 }

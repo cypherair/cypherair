@@ -63,7 +63,11 @@ struct EncryptScreenHostView: View {
                 }
             }
         }
+        // The search field belongs to the recipient chooser and searches
+        // nothing else, so it goes away with it rather than sitting over a
+        // password form offering to find contacts.
         .cypherSearchable(
+            when: model.activeProtection == .recipientKeys,
             text: $model.recipientSearchText,
             prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")
         )

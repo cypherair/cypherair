@@ -3457,6 +3457,38 @@
         }
       }
     },
+    "decrypt.inspect.button" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check Message"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查消息"
+          }
+        }
+      }
+    },
+    "decrypt.inspect.checking" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking message..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查消息..."
+          }
+        }
+      }
+    },
     "decrypt.matchedKey" : {
       "localizations" : {
         "en" : {
@@ -3617,34 +3649,66 @@
         }
       }
     },
-    "decrypt.parse.button" : {
+    "decrypt.password.button" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check Recipients"
+            "value" : "Decrypt with Password"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查收件人"
+            "value" : "用密码解密"
           }
         }
       }
     },
-    "decrypt.parse.checking" : {
+    "decrypt.password.explanation" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Checking recipients..."
+            "value" : "This message is not addressed to any of your keys. It is protected by a password, which the sender has to give you separately."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在检查收件人..."
+            "value" : "这条消息不是加密给你的任何密钥的。它由密码保护，发件人需要通过其他方式把密码告诉你。"
+          }
+        }
+      }
+    },
+    "decrypt.password.field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
+    },
+    "decrypt.password.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
           }
         }
       }
@@ -3889,6 +3953,54 @@
         }
       }
     },
+    "encrypt.password.noKeysUsed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None of your keys are used: the message is not signed, and no copy is encrypted to you."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会用到你的任何密钥：消息不会被签名，也不会为你加密一份副本。"
+          }
+        }
+      }
+    },
+    "encrypt.password.stake" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A password message is exactly as strong as its password. Anyone who gets the message can keep guessing at it offline, for as long as they like — so unless the password is strong, this protects the message less than encrypting to a key does. Send the password by a different route than the message."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码消息的强度完全等同于它的密码。任何人拿到这条消息，都可以离线地、不限时地反复猜测——所以除非密码足够强，否则它对消息的保护不如加密给密钥。请通过与消息不同的渠道发送密码。"
+          }
+        }
+      }
+    },
+    "encrypt.password.tooWeak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This password does not meet the requirements."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密码不符合要求。"
+          }
+        }
+      }
+    },
     "encrypt.plaintext" : {
       "localizations" : {
         "en" : {
@@ -3917,6 +4029,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "偏好设置已锁定。请重新验证身份后再使用应用默认加密设置。"
+          }
+        }
+      }
+    },
+    "encrypt.protection" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protect With"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保护方式"
+          }
+        }
+      }
+    },
+    "encrypt.protection.password" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
+    },
+    "encrypt.protection.recipientKeys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recipient Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收件人密钥"
           }
         }
       }
@@ -4314,13 +4474,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Passphrase protection for this key needs %@ of memory, which isn't available right now. Try again after freeing some up."
+            "value" : "Unlocking this needs %@ of memory, which isn't available right now. Try again after freeing some up."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥的密码短语保护需要 %@ 内存，目前无法提供。请释放部分内存后重试。"
+            "value" : "解锁这项操作需要 %@ 内存，目前无法提供。请释放部分内存后重试。"
           }
         }
       }
@@ -5605,6 +5765,22 @@
         }
       }
     },
+    "error.wrongMessagePassword" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That password did not open this message. Check it with whoever sent it and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该密码无法打开这条消息。请与发送者核对后重试。"
+          }
+        }
+      }
+    },
     "error.wrongPassphrase" : {
       "localizations" : {
         "en" : {
@@ -6298,13 +6474,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check the recipients first and make sure the message matches your sandbox key."
+            "value" : "Check the message first and make sure it matches your sandbox key."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先检查收件人，并确认这条消息匹配到你的沙箱密钥。"
+            "value" : "先检查这条消息，并确认它匹配到你的沙箱密钥。"
           }
         }
       }
@@ -11745,6 +11921,118 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示密码短语"
+          }
+        }
+      }
+    },
+    "password.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认密码"
+          }
+        }
+      }
+    },
+    "password.field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
+    },
+    "password.generate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate a Strong Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成强密码"
+          }
+        }
+      }
+    },
+    "password.generated.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write it down before you send the message. It is stored nowhere, and the message cannot be opened without it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送消息前请先记下它。它不会保存在任何地方，没有它就无法打开这条消息。"
+          }
+        }
+      }
+    },
+    "password.hide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏密码"
+          }
+        }
+      }
+    },
+    "password.mismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passwords do not match."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两次输入的密码不一致。"
+          }
+        }
+      }
+    },
+    "password.show" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示密码"
           }
         }
       }

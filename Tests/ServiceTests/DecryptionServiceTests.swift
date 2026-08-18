@@ -60,13 +60,9 @@ final class DecryptionServiceTests: XCTestCase {
         } else {
             binaryCiphertext = armoredCiphertext
         }
-
-        // Get recipient key IDs from the engine
-        let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
-
         // Construct DecryptionPhase1Result with the correct matched key
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: recipientKeyIds,
+            acceptsPassword: false,
             matchedKey: identity,
             ciphertext: binaryCiphertext
         )
@@ -130,7 +126,7 @@ final class DecryptionServiceTests: XCTestCase {
         try stack.keyManagement.deleteKey(fingerprint: identity.fingerprint)
 
         do {
-            _ = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+            _ = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
             XCTFail("Expected noMatchingKey error")
         } catch let error as CypherAirError {
             if case .noMatchingKey = error {
@@ -148,7 +144,7 @@ final class DecryptionServiceTests: XCTestCase {
         let garbageData = Data("this is not an OpenPGP message".utf8)
 
         do {
-            _ = try await stack.decryptionService.parseRecipients(ciphertext: garbageData)
+            _ = try await stack.decryptionService.inspectMessage(ciphertext: garbageData)
             XCTFail("Expected corruptData error")
         } catch let error as CypherAirError {
             if case .corruptData = error {
@@ -194,6 +190,99 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Password-protected messages
+
+    /// The whole vertical in one pass: a password message the app wrote is
+    /// recognised as password-protected without a key, and opened with the
+    /// password — never touching the enclave in either phase. The unwrap count
+    /// is the assertion that matters: reading a password message must raise no
+    /// authentication, because it uses no private key at all.
+    func test_passwordMessage_isRecognisedAndOpened_withoutTouchingTheEnclave() async throws {
+        // A key exists and is a contact, so any accidental recipient matching
+        // would have something to find.
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
+
+        let password = try PassphraseGenerator.generate()
+        let ciphertext = try await stack.encryptionService.encryptTextWithPassword(
+            "opened by password",
+            password: password
+        )
+
+        let unwrapCountBefore = stack.mockSE.unwrapCallCount
+
+        let phase1 = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
+        XCTAssertNil(phase1.matchedKey, "A password message is addressed to no key")
+        XCTAssertTrue(phase1.acceptsPassword)
+
+        let outcome = try await stack.decryptionService.decryptDetailedWithPassword(
+            phase1: phase1,
+            password: password
+        )
+        guard case .decrypted(let plaintext, let verification) = outcome else {
+            return XCTFail("Expected a decrypted outcome, got \(outcome)")
+        }
+        XCTAssertEqual(String(data: plaintext, encoding: .utf8), "opened by password")
+        XCTAssertEqual(verification.summaryState, .notSigned, "A password message carries no signature")
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore,
+                       "Opening a password message must never unwrap a private key")
+    }
+
+    func test_passwordMessage_wrongPassword_isRejectedRatherThanReturningPlaintext() async throws {
+        let ciphertext = try await stack.encryptionService.encryptTextWithPassword(
+            "secret",
+            password: try PassphraseGenerator.generate()
+        )
+        let phase1 = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
+
+        let outcome = try await stack.decryptionService.decryptDetailedWithPassword(
+            phase1: phase1,
+            password: try PassphraseGenerator.generate()
+        )
+        XCTAssertEqual(outcome, .passwordRejected)
+    }
+
+    /// The password route is not reachable for a message that never offered
+    /// one, even by calling the service directly.
+    func test_decryptWithPassword_refusesAMessageThatOffersNoPasswordRoute() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "key protected",
+            recipientContactIds: [try contactId(for: identity)],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+        let phase1 = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
+        XCTAssertFalse(phase1.acceptsPassword)
+
+        do {
+            _ = try await stack.decryptionService.decryptDetailedWithPassword(
+                phase1: phase1,
+                password: try PassphraseGenerator.generate()
+            )
+            XCTFail("Expected the password route to be refused")
+        } catch let error as CypherAirError {
+            guard case .noMatchingKey = error else {
+                return XCTFail("Expected noMatchingKey, got \(error)")
+            }
+        }
+    }
+
+    /// The strength gate lives in the service too, not only at the button: a
+    /// weak password cannot produce a message however the caller got there.
+    func test_encryptTextWithPassword_refusesAPasswordBelowTheRequirements() async throws {
+        do {
+            _ = try await stack.encryptionService.encryptTextWithPassword("hi", password: "short")
+            XCTFail("Expected a weak password to be refused")
+        } catch let error as CypherAirError {
+            guard case .encryptionFailed = error else {
+                return XCTFail("Expected encryptionFailed, got \(error)")
+            }
+        }
+    }
+
     func test_parseRecipients_doesNotTriggerSeUnwrap() async throws {
         let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -208,7 +297,7 @@ final class DecryptionServiceTests: XCTestCase {
         let unwrapCountBefore = stack.mockSE.unwrapCallCount
 
         // Phase 1 should succeed AND should NOT trigger SE unwrap
-        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+        let phase1 = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
 
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore,
                        "Phase 1 must NOT trigger SE unwrap — no authentication should occur")
@@ -268,7 +357,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decrypt_phase2_noMatchedKey_throwsError() async throws {
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: ["unknown"],
+            acceptsPassword: false,
             matchedKey: nil,
             ciphertext: Data()
         )
@@ -298,9 +387,8 @@ final class DecryptionServiceTests: XCTestCase {
         tampered[midpoint] ^= 0x01
 
         // Construct DecryptionPhase1Result with tampered data
-        let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: recipientKeyIds,
+            acceptsPassword: false,
             matchedKey: identity,
             ciphertext: tampered
         )
@@ -342,9 +430,8 @@ final class DecryptionServiceTests: XCTestCase {
         tampered[midpoint] ^= 0x01
 
         // Construct DecryptionPhase1Result with tampered data
-        let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: recipientKeyIds,
+            acceptsPassword: false,
             matchedKey: identity,
             ciphertext: tampered
         )
@@ -475,12 +562,12 @@ final class DecryptionServiceTests: XCTestCase {
             encryptToSelf: false
         )
 
-        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+        let phase1 = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
 
         XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
                        "Should match the correct Legacy key")
-        XCTAssertFalse(phase1.recipientKeyIds.isEmpty,
-                       "Should return matched fingerprints")
+        XCTAssertFalse(phase1.acceptsPassword,
+                       "A recipient-key message offers no password route")
     }
 
     func test_parseRecipients_modernHigh_matchesCorrectKey() async throws {
@@ -494,7 +581,7 @@ final class DecryptionServiceTests: XCTestCase {
             encryptToSelf: false
         )
 
-        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+        let phase1 = try await stack.decryptionService.inspectMessage(ciphertext: ciphertext)
 
         XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
                        "Should match the correct Modern High key")
@@ -661,7 +748,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decryptDetailed_noMatchedKey_throwsNoMatchingKeyWithoutUnwrap() async throws {
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: ["unknown"],
+            acceptsPassword: false,
             matchedKey: nil,
             ciphertext: Data()
         )
@@ -686,7 +773,7 @@ final class DecryptionServiceTests: XCTestCase {
         var tampered = binaryCiphertext
         tampered[tampered.count / 2] ^= 0x01
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
+            acceptsPassword: false,
             matchedKey: identity,
             ciphertext: tampered
         )
@@ -721,7 +808,7 @@ final class DecryptionServiceTests: XCTestCase {
             acceptedErrors: [.IntegrityCheckFailed]
         )
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
+            acceptsPassword: false,
             matchedKey: identity,
             ciphertext: tampered
         )
@@ -746,7 +833,7 @@ final class DecryptionServiceTests: XCTestCase {
         var tampered = binaryCiphertext
         tampered[tampered.count / 2] ^= 0x01
         let phase1 = DecryptionPhase1Result(
-            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
+            acceptsPassword: false,
             matchedKey: identity,
             ciphertext: tampered
         )
@@ -1205,7 +1292,7 @@ final class DecryptionServiceTests: XCTestCase {
         ciphertext: Data
     ) throws -> DecryptionPhase1Result {
         DecryptionPhase1Result(
-            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: ciphertext),
+            acceptsPassword: false,
             matchedKey: matchedKey,
             ciphertext: ciphertext
         )

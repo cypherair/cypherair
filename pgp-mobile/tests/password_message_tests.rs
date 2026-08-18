@@ -272,7 +272,7 @@ fn find_auth_failure_tamper(ciphertext: &[u8], password: &Password) -> Vec<u8> {
         let mut tampered = ciphertext.to_vec();
         tampered[pos] ^= 0x01;
 
-        let result = password::decrypt(&tampered, password, &[]);
+        let result = password::decrypt(&tampered, password, &[], u64::MAX);
         if matches!(
             result,
             Err(PgpError::AeadAuthenticationFailed) | Err(PgpError::IntegrityCheckFailed)
@@ -297,7 +297,8 @@ fn test_password_encrypt_decrypt_armored_seipdv1_round_trip_unsigned() {
     assert!(!has_v2);
 
     let result =
-        password::decrypt(&ciphertext, &password, &[]).expect("password decryption should succeed");
+        password::decrypt(&ciphertext, &password, &[], u64::MAX)
+            .expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
@@ -322,7 +323,12 @@ fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
     assert!(!has_v1);
     assert!(has_v2);
 
-    let result = password::decrypt(&ciphertext, &password, &[signer.public_key_data.clone()])
+    let result = password::decrypt(
+        &ciphertext,
+        &password,
+        &[signer.public_key_data.clone()],
+        u64::MAX,
+    )
         .expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -354,7 +360,8 @@ fn test_password_decrypt_signed_without_verification_cert_reports_missing_certif
     .expect("password encryption should succeed");
 
     let result =
-        password::decrypt(&ciphertext, &password, &[]).expect("password decryption should succeed");
+        password::decrypt(&ciphertext, &password, &[], u64::MAX)
+            .expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(
@@ -383,7 +390,12 @@ fn test_password_encrypt_decrypt_binary_seipdv1_round_trip_signed() {
     )
     .expect("password encryption should succeed");
 
-    let result = password::decrypt(&ciphertext, &password, &[signer.public_key_data.clone()])
+    let result = password::decrypt(
+        &ciphertext,
+        &password,
+        &[signer.public_key_data.clone()],
+        u64::MAX,
+    )
         .expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -405,7 +417,8 @@ fn test_password_encrypt_decrypt_binary_seipdv2_round_trip_unsigned() {
             .expect("password encryption should succeed");
 
     let result =
-        password::decrypt(&ciphertext, &password, &[]).expect("password decryption should succeed");
+        password::decrypt(&ciphertext, &password, &[], u64::MAX)
+            .expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
@@ -477,7 +490,7 @@ fn test_password_decrypt_no_skesk_returns_status() {
     )
     .expect("recipient encryption should succeed");
 
-    let result = password::decrypt(&ciphertext, &Password::from("password"), &[])
+    let result = password::decrypt(&ciphertext, &Password::from("password"), &[], u64::MAX)
         .expect("password decrypt should return status");
     assert_eq!(result.status, PasswordDecryptStatus::NoSkesk);
     assert_eq!(result.plaintext, None);
@@ -493,7 +506,7 @@ fn test_password_decrypt_password_rejected_is_deterministic_for_skesk6() {
     )
     .expect("password encryption should succeed");
 
-    let result = password::decrypt(&ciphertext, &Password::from("wrong-password"), &[])
+    let result = password::decrypt(&ciphertext, &Password::from("wrong-password"), &[], u64::MAX)
         .expect("wrong password should return family-local status for SKESK6");
     assert_eq!(result.status, PasswordDecryptStatus::PasswordRejected);
     assert_eq!(result.plaintext, None);
@@ -513,7 +526,7 @@ fn test_password_decrypt_multi_password_message_accepts_second_password() {
     assert!(matches!(&packets[0], openpgp::Packet::SKESK(SKESK::V4(_))));
     assert!(matches!(&packets[1], openpgp::Packet::SKESK(SKESK::V4(_))));
 
-    let result = password::decrypt(&ciphertext, &passwords[1], &[])
+    let result = password::decrypt(&ciphertext, &passwords[1], &[], u64::MAX)
         .expect("second password should decrypt multi-password message");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -526,7 +539,7 @@ fn test_password_decrypt_mixed_pkesk_skesk_message_succeeds() {
     let plaintext = b"mixed password + recipient message";
 
     let ciphertext = encrypt_mixed_message(plaintext, &password, &recipient.public_key_data);
-    let result = password::decrypt(&ciphertext, &password, &[])
+    let result = password::decrypt(&ciphertext, &password, &[], u64::MAX)
         .expect("password path should decrypt mixed message");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -544,7 +557,7 @@ fn test_password_decrypt_tampered_seipdv1_tail_returns_integrity_error() {
     .expect("password encryption should succeed");
 
     let tampered = find_auth_failure_tamper(&ciphertext, &password);
-    let result = password::decrypt(&tampered, &password, &[]);
+    let result = password::decrypt(&tampered, &password, &[], u64::MAX);
     assert!(matches!(result, Err(PgpError::IntegrityCheckFailed)));
 }
 
@@ -564,7 +577,7 @@ fn test_password_decrypt_multi_skesk4_inner_unsupported_algo_can_fall_through_to
         SymmetricAlgorithm::Private(100),
     );
 
-    let result = password::decrypt(&mutated, &shared_password, &[])
+    let result = password::decrypt(&mutated, &shared_password, &[], u64::MAX)
         .expect("later SKESK4 candidate should still decrypt");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -581,7 +594,7 @@ fn test_password_decrypt_multi_skesk6_auth_failure_can_fall_through_to_later_can
     );
     let mutated = mutate_nth_skesk6_with_wrong_session_key(&ciphertext, 0, &shared_password);
 
-    let result = password::decrypt(&mutated, &shared_password, &[])
+    let result = password::decrypt(&mutated, &shared_password, &[], u64::MAX)
         .expect("later SKESK6 candidate should still decrypt");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -599,7 +612,7 @@ fn test_password_decrypt_multi_skesk_outer_unsupported_algo_can_fall_through_to_
     let mutated =
         mutate_nth_skesk4_symmetric_algo(&ciphertext, 0, SymmetricAlgorithm::Private(100));
 
-    let result = password::decrypt(&mutated, &shared_password, &[])
+    let result = password::decrypt(&mutated, &shared_password, &[], u64::MAX)
         .expect("later SKESK candidate should still decrypt");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
@@ -617,7 +630,7 @@ fn test_password_decrypt_tampered_seipdv2_tail_returns_auth_or_integrity_error()
     .expect("password encryption should succeed");
 
     let tampered = find_auth_failure_tamper(&ciphertext, &password);
-    let result = password::decrypt(&tampered, &password, &[]);
+    let result = password::decrypt(&tampered, &password, &[], u64::MAX);
     assert!(matches!(
         result,
         Err(PgpError::AeadAuthenticationFailed) | Err(PgpError::IntegrityCheckFailed)
@@ -626,7 +639,8 @@ fn test_password_decrypt_tampered_seipdv2_tail_returns_auth_or_integrity_error()
 
 #[test]
 fn test_password_decrypt_malformed_input_returns_corrupt_data() {
-    let result = password::decrypt(b"not a valid OpenPGP message", &Password::from("pw"), &[]);
+    let result =
+        password::decrypt(b"not a valid OpenPGP message", &Password::from("pw"), &[], u64::MAX);
     assert!(matches!(result, Err(PgpError::CorruptData { .. })));
 }
 
@@ -645,7 +659,7 @@ fn test_password_decrypt_single_skesk4_inner_unsupported_algo_returns_error() {
         SymmetricAlgorithm::Private(100),
     );
 
-    let result = password::decrypt(&mutated, &password, &[]);
+    let result = password::decrypt(&mutated, &password, &[], u64::MAX);
     assert!(matches!(result, Err(PgpError::UnsupportedAlgorithm { .. })));
 }
 
@@ -660,7 +674,7 @@ fn test_password_decrypt_seipdv1_unsupported_algorithm_returns_error() {
     .expect("password encryption should succeed");
 
     let mutated = mutate_skesk4_symmetric_algo(&ciphertext, SymmetricAlgorithm::Private(100));
-    let result = password::decrypt(&mutated, &Password::from("pw"), &[]);
+    let result = password::decrypt(&mutated, &Password::from("pw"), &[], u64::MAX);
     assert!(matches!(result, Err(PgpError::UnsupportedAlgorithm { .. })));
 }
 
@@ -675,6 +689,6 @@ fn test_password_decrypt_seipdv2_unsupported_algorithm_returns_error() {
     .expect("password encryption should succeed");
 
     let mutated = mutate_seip2_aead_algo(&ciphertext, AEADAlgorithm::Private(100));
-    let result = password::decrypt(&mutated, &Password::from("pw"), &[]);
+    let result = password::decrypt(&mutated, &Password::from("pw"), &[], u64::MAX);
     assert!(matches!(result, Err(PgpError::UnsupportedAlgorithm { .. })));
 }

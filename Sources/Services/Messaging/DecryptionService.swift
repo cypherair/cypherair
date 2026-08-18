@@ -3,9 +3,10 @@ import Foundation
 /// Two-phase decryption service.
 ///
 /// SECURITY-CRITICAL: The Phase 1 / Phase 2 boundary must never be bypassed.
-/// Phase 1 (parseRecipients) runs WITHOUT authentication — it only determines
-/// which key is needed. Phase 2 (decrypt) triggers device authentication via
-/// SE unwrap before accessing the private key.
+/// Phase 1 (inspectMessage) runs WITHOUT authentication — it only determines how
+/// the message can be opened. Phase 2 triggers device authentication via SE
+/// unwrap before accessing a private key, or takes a password and touches no key
+/// at all.
 @Observable
 final class DecryptionService {
     private let messageAdapter: PGPMessageOperationAdapter
@@ -15,6 +16,7 @@ final class DecryptionService {
     private let fileDecryptor: any StreamingFileDecrypting
     private let diskSpaceChecker: DiskSpaceChecker
     private let temporaryArtifactStore: AppTemporaryArtifactStore
+    private let argon2idMemoryGuard: Argon2idMemoryGuard
 
     init(
         messageAdapter: PGPMessageOperationAdapter,
@@ -23,7 +25,8 @@ final class DecryptionService {
         messageDecryptor: any RecipientMessageDecrypting,
         fileDecryptor: any StreamingFileDecrypting,
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
-        temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
+        temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
+        argon2idMemoryGuard: Argon2idMemoryGuard = Argon2idMemoryGuard()
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
@@ -32,40 +35,42 @@ final class DecryptionService {
         self.fileDecryptor = fileDecryptor
         self.diskSpaceChecker = diskSpaceChecker
         self.temporaryArtifactStore = temporaryArtifactStore
+        self.argon2idMemoryGuard = argon2idMemoryGuard
     }
 
-    // MARK: - Phase 1: Parse Recipients (No Authentication)
+    // MARK: - Phase 1: Inspect the message (No Authentication)
 
-    /// Parse the ciphertext header and match against local keys.
-    /// This phase does NOT require authentication — no private key is accessed.
+    /// Read the message's session-key packets to learn how it can be opened:
+    /// which local key it is addressed to, and whether a password would work.
+    /// This phase does NOT require authentication — no private key is accessed,
+    /// and no key derivation runs.
     ///
     /// - Parameter ciphertext: The encrypted message (armored or binary).
-    /// - Returns: DecryptionPhase1Result with matched key info.
-    /// - Throws: CypherAirError.noMatchingKey if no local key matches.
-    func parseRecipients(ciphertext: Data) async throws -> DecryptionPhase1Result {
+    /// - Throws: `CypherAirError.noMatchingKey` when the message offers this
+    ///   device no way in at all.
+    func inspectMessage(ciphertext: Data) async throws -> DecryptionPhase1Result {
         let binaryData = try await messageAdapter.dearmorIfNeeded(ciphertext)
 
-        // Match PKESK recipients against local certificates.
-        // Uses Rust-side Sequoia key_handles() for correct subkey-to-cert matching,
-        // returning primary fingerprints of matched certificates.
+        // Recipient matching runs Sequoia's key_handles() on the Rust side, so a
+        // PKESK naming an encryption subkey resolves to its certificate's
+        // primary fingerprint.
         let localCerts = keyManagement.keys.map { $0.publicKeyData }
-        let matchedFingerprints = try await messageAdapter.matchRecipients(
+        let inspection = try await messageAdapter.inspectMessageProtection(
             ciphertext: binaryData,
             localCerts: localCerts
         )
 
-        // Look up the matched key identity by primary fingerprint
         let matchedKey = keyManagement.keys.first { identity in
-            matchedFingerprints.contains(identity.fingerprint)
+            inspection.matchedFingerprints.contains(identity.fingerprint)
         }
 
-        guard matchedKey != nil else {
+        guard matchedKey != nil || inspection.acceptsPassword else {
             throw CypherAirError.noMatchingKey
         }
 
         return DecryptionPhase1Result(
-            recipientKeyIds: matchedFingerprints,
             matchedKey: matchedKey,
+            acceptsPassword: inspection.acceptsPassword,
             ciphertext: binaryData
         )
     }
@@ -129,6 +134,33 @@ final class DecryptionService {
             ciphertext: phase1.ciphertext,
             recipientFingerprint: matchedKey.fingerprint,
             verificationContext: context
+        )
+    }
+
+    // MARK: - Phase 2: Decrypt with a password (No key, no authentication)
+
+    /// Open a password-protected message. No private key is touched and no
+    /// authentication prompt is raised — the password is the whole of the
+    /// message's protection.
+    ///
+    /// The Argon2 parameters belong to whoever wrote the message, so the cost
+    /// this device can afford is measured now and travels with the call; the
+    /// engine refuses a slot beyond it before deriving anything
+    /// (docs/SECURITY.md §7). Signatures are still reported: a password message
+    /// can carry one, and the app grades it exactly as it grades any other.
+    func decryptDetailedWithPassword(
+        phase1: DecryptionPhase1Result,
+        password: String
+    ) async throws -> PasswordMessageDetailedDecryptOutcome {
+        guard phase1.acceptsPassword else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        return try await messageAdapter.decryptWithPassword(
+            ciphertext: phase1.ciphertext,
+            password: password,
+            affordableMemoryKib: argon2idMemoryGuard.affordableMemoryKib(),
+            verificationContext: verificationContext()
         )
     }
 

@@ -449,6 +449,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let encryptionService = EncryptionService(
             keyManagement: stack.keyManagement,
             contactService: opened.service,
+            messageAdapter: stack.messageAdapter,
             textEncryptor: stack.textEncryptor,
             fileEncryptor: stack.fileEncryptor
         )
@@ -1744,12 +1745,143 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertNil(model.selectedFileName)
     }
 
+    // MARK: - Password protection
+
+    /// The exclusive choice, stated as the model sees it: choosing Password
+    /// makes recipients irrelevant, and the encrypt that runs is the password
+    /// one — no recipient list, no signer, no self copy can reach the message.
+    @MainActor
+    func test_passwordProtection_encryptsWithoutRecipientsSignerOrSelfCopy() async throws {
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
+            service: stack.keyManagement,
+            name: "Ignored Recipient"
+        )
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
+
+        var recipientEncryptCalls = 0
+        var passwordSeen: String?
+        let model = makeModel(
+            textEncryptionAction: { _, _, _, _, _ in
+                recipientEncryptCalls += 1
+                return Data()
+            },
+            passwordEncryptionAction: { _, password in
+                passwordSeen = password
+                return Data("password-ciphertext".utf8)
+            }
+        )
+        model.handleAppear()
+        // A selection left over from the other branch must not travel with the
+        // message: choosing Password is what decides, not what is selected.
+        model.selectedRecipients = [recipientContactId]
+        model.plaintext = "Secret"
+        model.protection = .password
+        model.password = try PassphraseGenerator.generate()
+        model.passwordConfirmation = model.password
+
+        XCTAssertFalse(model.encryptButtonDisabled)
+        model.requestEncrypt()
+        await waitUntil("password encryption to finish") { model.ciphertext != nil }
+
+        XCTAssertEqual(passwordSeen, model.password)
+        XCTAssertEqual(recipientEncryptCalls, 0, "The recipient-key path must not run")
+        XCTAssertNil(model.resultQuantumSafety, "A password message makes no quantum-safety claim")
+    }
+
+    /// The strength gate, in the model rather than at the button.
+    @MainActor
+    func test_passwordProtection_refusesAWeakPasswordAndAcceptsAGeneratedOne() async throws {
+        var encryptCalls = 0
+        let model = makeModel(passwordEncryptionAction: { _, _ in
+            encryptCalls += 1
+            return Data("password-ciphertext".utf8)
+        })
+        model.handleAppear()
+        model.plaintext = "Secret"
+        model.protection = .password
+
+        model.password = "short"
+        model.passwordConfirmation = "short"
+        XCTAssertFalse(model.passwordProtectsMessage)
+        XCTAssertTrue(model.encryptButtonDisabled)
+        model.requestEncrypt()
+        await settleAsyncWork()
+        XCTAssertEqual(encryptCalls, 0, "A refused password must not reach the engine")
+        XCTAssertNil(model.ciphertext)
+
+        // Long enough, but one character held down.
+        model.password = String(repeating: "a", count: 20)
+        model.passwordConfirmation = model.password
+        XCTAssertFalse(model.passwordProtectsMessage)
+        model.requestEncrypt()
+        await settleAsyncWork()
+        XCTAssertEqual(encryptCalls, 0)
+
+        model.password = try PassphraseGenerator.generate()
+        model.passwordConfirmation = model.password
+        XCTAssertTrue(model.passwordProtectsMessage)
+        model.requestEncrypt()
+        await waitUntil("password encryption to finish") { model.ciphertext != nil }
+        XCTAssertEqual(encryptCalls, 1)
+    }
+
+    @MainActor
+    func test_passwordProtection_refusesAnAcceptablePasswordMistypedInConfirmation() async throws {
+        var encryptCalls = 0
+        let model = makeModel(passwordEncryptionAction: { _, _ in
+            encryptCalls += 1
+            return Data()
+        })
+        model.handleAppear()
+        model.plaintext = "Secret"
+        model.protection = .password
+        model.password = try PassphraseGenerator.generate()
+        model.passwordConfirmation = try PassphraseGenerator.generate()
+
+        XCTAssertFalse(model.passwordProtectsMessage)
+        XCTAssertTrue(model.encryptButtonDisabled)
+        model.requestEncrypt()
+        await settleAsyncWork()
+        XCTAssertEqual(encryptCalls, 0)
+    }
+
+    /// File mode has no password route, so a preference carried over from Text
+    /// mode must not silently apply to a file — and must not be erased either.
+    @MainActor
+    func test_passwordProtection_doesNotApplyInFileMode_butSurvivesTheRoundTrip() async throws {
+        let model = makeModel()
+        model.handleAppear()
+        model.protection = .password
+        XCTAssertEqual(model.activeProtection, .password)
+
+        model.encryptMode = .file
+        XCTAssertFalse(model.isPasswordProtectionAvailable)
+        XCTAssertEqual(model.activeProtection, .recipientKeys)
+
+        model.encryptMode = .text
+        XCTAssertEqual(model.activeProtection, .password, "The user's choice is still theirs")
+    }
+
+    @MainActor
+    func test_passwordProtection_isWithheldWhenTheHostDisallowsIt() async throws {
+        var configuration = EncryptView.Configuration()
+        configuration.allowsPasswordProtection = false
+
+        let model = makeModel(configuration: configuration)
+        model.handleAppear()
+        model.protection = .password
+
+        XCTAssertFalse(model.isPasswordProtectionAvailable)
+        XCTAssertEqual(model.activeProtection, .recipientKeys)
+    }
+
     @MainActor
     private func makeModel(
         contactService: ContactService? = nil,
         configuration: EncryptView.Configuration = .default,
         operation: OperationController = OperationController(),
         textEncryptionAction: EncryptScreenModel.TextEncryptionAction? = nil,
+        passwordEncryptionAction: EncryptScreenModel.PasswordEncryptionAction? = nil,
         fileEncryptionAction: EncryptScreenModel.FileEncryptionAction? = nil,
         clipboardNoticeDecision: EncryptScreenModel.ClipboardNoticeDecision? = nil,
         clipboardWriter: EncryptScreenModel.ClipboardWriter? = nil
@@ -1759,6 +1891,7 @@ final class EncryptScreenModelTests: XCTestCase {
             EncryptionService(
                 keyManagement: stack.keyManagement,
                 contactService: $0,
+                messageAdapter: stack.messageAdapter,
                 textEncryptor: stack.textEncryptor,
                 fileEncryptor: stack.fileEncryptor
             )
@@ -1772,6 +1905,7 @@ final class EncryptScreenModelTests: XCTestCase {
             configuration: configuration,
             operation: operation,
             textEncryptionAction: textEncryptionAction,
+            passwordEncryptionAction: passwordEncryptionAction,
             fileEncryptionAction: fileEncryptionAction,
             clipboardNoticeDecision: clipboardNoticeDecision,
             clipboardWriter: clipboardWriter

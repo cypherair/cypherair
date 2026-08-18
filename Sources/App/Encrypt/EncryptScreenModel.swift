@@ -41,6 +41,7 @@ final class EncryptScreenModel {
     typealias FileEncryptionAction = @MainActor (
         EncryptFileRequest
     ) async throws -> TemporaryFileOutput
+    typealias PasswordEncryptionAction = @MainActor (String, String) async throws -> Data
     typealias ClipboardNoticeDecision = @MainActor () async -> Bool
     typealias ClipboardWriter = @MainActor (String, Bool) -> Void
     typealias MessageQuantumSafetyAction = @MainActor (Data) throws -> MessageQuantumSafety
@@ -55,6 +56,7 @@ final class EncryptScreenModel {
     private let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
+    private let passwordEncryptionAction: PasswordEncryptionAction
     private let messageQuantumSafetyAction: MessageQuantumSafetyAction
     private let fileEncryptionAction: FileOperationAction<EncryptFileRequest, TemporaryFileOutput>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
@@ -72,6 +74,13 @@ final class EncryptScreenModel {
     private var fileImportRequestGate = FileImportRequestGate()
 
     var encryptMode: EncryptView.EncryptMode = .text
+    /// The user's protection preference. What actually applies is
+    /// `activeProtection`, which is this unless password protection is not on
+    /// offer — switching to File mode and back must not silently rewrite what
+    /// the user chose.
+    var protection: EncryptView.Protection = .recipientKeys
+    var password = ""
+    var passwordConfirmation = ""
     var plaintext = ""
     var recipientSearchText = ""
     var selectedRecipients: Set<String> = []
@@ -113,6 +122,7 @@ final class EncryptScreenModel {
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
         textEncryptionAction: TextEncryptionAction? = nil,
+        passwordEncryptionAction: PasswordEncryptionAction? = nil,
         fileEncryptionAction: FileEncryptionAction? = nil,
         clipboardNoticeDecision: ClipboardNoticeDecision? = nil,
         clipboardWriter: ClipboardWriter? = nil,
@@ -151,6 +161,9 @@ final class EncryptScreenModel {
                 encryptToSelf: encryptToSelf,
                 encryptToSelfFingerprint: encryptToSelfFingerprint
             )
+        }
+        self.passwordEncryptionAction = passwordEncryptionAction ?? { plaintext, password in
+            try await encryptionService.encryptTextWithPassword(plaintext, password: password)
         }
         self.fileEncryptionAction = FileOperationAction(injectedAction: fileEncryptionAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
@@ -359,10 +372,38 @@ final class EncryptScreenModel {
         }
     }
 
+    /// Password protection is a text-message affordance: the engine encrypts a
+    /// whole message under a password in memory and has no streaming form of
+    /// it, so File mode stays recipient-key only rather than offering a choice
+    /// that would fail on a large file.
+    var isPasswordProtectionAvailable: Bool {
+        configuration.allowsPasswordProtection && encryptMode == .text
+    }
+
+    /// The protection this message will actually get.
+    var activeProtection: EncryptView.Protection {
+        isPasswordProtectionAvailable ? protection : .recipientKeys
+    }
+
+    /// The password is the whole of a password message's protection, so a weak
+    /// one is refused rather than warned about — the same rule, and the same
+    /// definition of acceptable, as the private-key backup passphrase.
+    var passwordProtectsMessage: Bool {
+        password == passwordConfirmation && PassphraseRequirements(of: password).isSatisfied
+    }
+
     var encryptButtonDisabled: Bool {
         if operation.isRunning {
             return true
         }
+
+        switch activeProtection {
+        case .password:
+            return !passwordProtectsMessage || plaintext.isEmpty
+        case .recipientKeys:
+            break
+        }
+
         if effectiveRecipientContactIds.isEmpty {
             return true
         }
@@ -556,6 +597,11 @@ final class EncryptScreenModel {
     }
 
     func requestEncrypt() {
+        if activeProtection == .password {
+            encryptTextWithPassword()
+            return
+        }
+
         guard contactsAvailability.isAvailable else {
             operation.present(error: .contactsUnavailable(contactsAvailability))
             return
@@ -627,6 +673,34 @@ final class EncryptScreenModel {
             try Task.checkCancellation()
             self.ciphertext = result
             self.resultQuantumSafety = try? self.messageQuantumSafetyAction(result)
+            self.textInputSectionEpoch &+= 1
+            onEncrypted?(result)
+        }
+    }
+
+    /// Encrypt the message under the password alone.
+    ///
+    /// Nothing about the sender's keys is read here — no signer, no self copy,
+    /// no recipient selection — because a password message carries none of
+    /// them. The gate is re-asked in the model rather than trusted from the
+    /// disabled button, which is presentation.
+    func encryptTextWithPassword() {
+        guard passwordProtectsMessage else {
+            return
+        }
+        let text = plaintext
+        let passwordSnapshot = password
+        let onEncrypted = configuration.onEncrypted
+
+        ciphertext = nil
+        // A message with no session-key packet targeting any key has nothing to
+        // say about quantum safety, so it says nothing.
+        resultQuantumSafety = nil
+
+        operation.run(mapError: mapEncryptionError) { [self] in
+            let result = try await self.passwordEncryptionAction(text, passwordSnapshot)
+            try Task.checkCancellation()
+            self.ciphertext = result
             self.textInputSectionEpoch &+= 1
             onEncrypted?(result)
         }
@@ -807,6 +881,8 @@ final class EncryptScreenModel {
     func clearTransientInput() {
         fileImportRequestGate.invalidate()
         plaintext = ""
+        password = ""
+        passwordConfirmation = ""
         recipientSearchText = ""
         selectedRecipients.removeAll()
         recipientTagFilterState.clear()

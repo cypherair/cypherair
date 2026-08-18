@@ -141,7 +141,7 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_parseRecipientsText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
+    func test_inspectTextMessage_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
         let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
@@ -161,14 +161,14 @@ final class DecryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            parseTextRecipientsAction: { _ in
+            inspectTextMessageAction: { _ in
                 await gate.suspend()
                 return phase1Result
             }
         )
         model.ciphertextInput = "ciphertext"
 
-        model.parseRecipientsText()
+        model.inspectTextMessage()
 
         await waitUntil("text parse to suspend") {
             guard model.operation.isRunning else {
@@ -263,14 +263,14 @@ final class DecryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            parseTextRecipientsAction: { _ in
+            inspectTextMessageAction: { _ in
                 await gate.suspend()
                 return phase1Result
             }
         )
         model.ciphertextInput = "ciphertext"
 
-        model.parseRecipientsText()
+        model.inspectTextMessage()
 
         await waitUntil("text parse to suspend for content clear") {
             guard model.operation.isRunning else {
@@ -498,7 +498,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            parseTextRecipientsAction: { ciphertext in
+            inspectTextMessageAction: { ciphertext in
                 XCTAssertEqual(ciphertext, Data("ciphertext".utf8))
                 return phase1Result
             },
@@ -509,7 +509,7 @@ final class DecryptScreenModelTests: XCTestCase {
         )
         model.ciphertextInput = "ciphertext"
 
-        model.parseRecipientsText()
+        model.inspectTextMessage()
 
         await waitUntil("text parse to finish") {
             model.operation.isRunning == false
@@ -939,9 +939,9 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_parseRecipientsText_clearsDetailedVerificationBeforePublishingPhase1() async throws {
+    func test_inspectTextMessage_clearsDetailedVerificationBeforePublishingPhase1() async throws {
         let model = makeModel(
-            parseTextRecipientsAction: { _ in
+            inspectTextMessageAction: { _ in
                 self.makePhase1Result()
             }
         )
@@ -951,7 +951,7 @@ final class DecryptScreenModelTests: XCTestCase {
             verificationState: .verified
         )
 
-        model.parseRecipientsText()
+        model.inspectTextMessage()
 
         await waitUntil("text parse to finish") {
             model.operation.isRunning == false
@@ -1001,26 +1001,104 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.filePhase1Result?.inputPath, inputURL.path)
     }
 
+    // MARK: - Password-protected messages
+
+    /// The password route is offered exactly when the message has no other way
+    /// in. A message that also matches a local key takes the key.
+    @MainActor
+    func test_asksForPassword_onlyWhenNoLocalKeyOpensTheMessage() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let model = makeModel()
+
+        model.phase1Result = makePhase1Result(matchedKey: nil, acceptsPassword: true)
+        XCTAssertTrue(model.asksForPassword)
+
+        model.phase1Result = makePhase1Result(matchedKey: identity, acceptsPassword: true)
+        XCTAssertFalse(model.asksForPassword, "A key opens it; nothing needs typing")
+
+        model.phase1Result = makePhase1Result(matchedKey: identity, acceptsPassword: false)
+        XCTAssertFalse(model.asksForPassword)
+
+        model.phase1Result = nil
+        XCTAssertFalse(model.asksForPassword, "Nothing is asked before the message is inspected")
+    }
+
+    @MainActor
+    func test_decryptTextWithPassword_publishesPlaintextAndForgetsThePassword() async throws {
+        let model = makeModel(passwordDecryptionAction: { _, _ in
+            .decrypted(
+                plaintext: Data("opened".utf8),
+                verification: DetailedSignatureVerification(
+                    summaryState: .notSigned,
+                    signatures: []
+                )
+            )
+        })
+        model.phase1Result = makePhase1Result(matchedKey: nil, acceptsPassword: true)
+        model.password = "whatever the sender chose"
+
+        model.decryptTextWithPassword()
+        await waitUntil("password decryption to finish") { model.textDecryptionResult != nil }
+
+        XCTAssertEqual(model.textDecryptionResult?.plaintext, "opened")
+        XCTAssertTrue(model.password.isEmpty, "A spent password should not linger in the field")
+    }
+
+    @MainActor
+    func test_decryptTextWithPassword_reportsAWrongPasswordAsItsOwnError() async throws {
+        let model = makeModel(passwordDecryptionAction: { _, _ in .passwordRejected })
+        model.phase1Result = makePhase1Result(matchedKey: nil, acceptsPassword: true)
+        model.password = "wrong"
+
+        model.decryptTextWithPassword()
+        await waitUntil("the refusal to surface") { model.operation.error != nil }
+
+        guard case .wrongMessagePassword = try XCTUnwrap(model.operation.error) else {
+            return XCTFail("Expected wrongMessagePassword, got \(String(describing: model.operation.error))")
+        }
+        XCTAssertNil(model.textDecryptionResult)
+        XCTAssertEqual(model.password, "wrong", "A rejected password stays for correction")
+    }
+
+    /// Editing the ciphertext throws away the message that was inspected, and
+    /// the password belonged to that message.
+    @MainActor
+    func test_editingTheCiphertext_clearsTheEnteredPassword() async throws {
+        let model = makeModel()
+        model.phase1Result = makePhase1Result(matchedKey: nil, acceptsPassword: true)
+        model.password = "for the old message"
+
+        model.setCiphertextInput("a different message")
+
+        XCTAssertNil(model.phase1Result)
+        XCTAssertTrue(model.password.isEmpty)
+    }
+
     @MainActor
     private func makeModel(
         configuration: DecryptView.Configuration = .default,
         operation: OperationController = OperationController(),
-        parseTextRecipientsAction: DecryptScreenModel.ParseTextRecipientsAction? = nil,
+        inspectTextMessageAction: DecryptScreenModel.InspectTextMessageAction? = nil,
         parseFileRecipientsAction: DecryptScreenModel.ParseFileRecipientsAction? = nil,
         textCiphertextFileImportAction: DecryptScreenModel.TextCiphertextFileImportAction? = nil,
         ciphertextFileInspectionAction: DecryptScreenModel.CiphertextFileInspectionAction? = nil,
         textDecryptionAction: DecryptScreenModel.TextDecryptionAction? = nil,
+        passwordDecryptionAction: DecryptScreenModel.PasswordDecryptionAction? = nil,
         fileDecryptionAction: DecryptScreenModel.FileDecryptionAction? = nil
     ) -> DecryptScreenModel {
         DecryptScreenModel(
             decryptionService: stack.decryptionService,
             configuration: configuration,
             operation: operation,
-            parseTextRecipientsAction: parseTextRecipientsAction,
+            inspectTextMessageAction: inspectTextMessageAction,
             parseFileRecipientsAction: parseFileRecipientsAction,
             textCiphertextFileImportAction: textCiphertextFileImportAction,
             ciphertextFileInspectionAction: ciphertextFileInspectionAction,
             textDecryptionAction: textDecryptionAction,
+            passwordDecryptionAction: passwordDecryptionAction,
             fileDecryptionAction: fileDecryptionAction
         )
     }
@@ -1062,10 +1140,11 @@ final class DecryptScreenModelTests: XCTestCase {
 
     private func makePhase1Result(
         matchedKey: PGPKeyIdentity? = nil,
+        acceptsPassword: Bool = false,
         ciphertext: Data = Data("ciphertext".utf8)
     ) -> DecryptionPhase1Result {
         DecryptionPhase1Result(
-            recipientKeyIds: ["ABCD1234"],
+            acceptsPassword: acceptsPassword,
             matchedKey: matchedKey,
             ciphertext: ciphertext
         )

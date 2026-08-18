@@ -509,12 +509,12 @@ fn test_revocation_cert_cross_suite_mismatch() {
     );
 }
 
-// ── match_recipients cross-suite tests ────────────────────────────
+// ── inspect_message_protection cross-suite tests ────────────────────────────
 
-/// match_recipients: cross-suite — Modern High sender encrypts to Legacy recipient.
-/// Message format is SEIPDv1 (mixed/v4 recipient). match_recipients should still find the match.
+/// inspect_message_protection: cross-suite — Modern High sender encrypts to Legacy recipient.
+/// Message format is SEIPDv1 (mixed/v4 recipient). inspect_message_protection should still find the match.
 #[test]
-fn test_match_recipients_cross_modern_high_sender_a_recipient() {
+fn test_inspect_message_protection_cross_modern_high_sender_a_recipient() {
     let sender_b =
         keys::generate_key_with_suite("Sender B".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Key gen should succeed");
@@ -535,17 +535,18 @@ fn test_match_recipients_cross_modern_high_sender_a_recipient() {
     )
     .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(&ciphertext, &[recipient_a.public_key_data.clone()])
-        .expect("match_recipients should work cross-suite");
+    let matched = decrypt::inspect_message_protection(&ciphertext, &[recipient_a.public_key_data.clone()])
+        .expect("inspect_message_protection should work cross-suite")
+        .matched_certificate_fingerprints;
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], recipient_a.fingerprint);
 }
 
-/// match_recipients: cross-suite — Legacy sender encrypts to Modern High recipient.
-/// Message format is SEIPDv2 (v6 recipient). match_recipients should find the match.
+/// inspect_message_protection: cross-suite — Legacy sender encrypts to Modern High recipient.
+/// Message format is SEIPDv2 (v6 recipient). inspect_message_protection should find the match.
 #[test]
-fn test_match_recipients_cross_legacy_sender_b_recipient() {
+fn test_inspect_message_protection_cross_legacy_sender_b_recipient() {
     let sender_a =
         keys::generate_key_with_suite("Sender A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
@@ -566,8 +567,9 @@ fn test_match_recipients_cross_legacy_sender_b_recipient() {
     )
     .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(&ciphertext, &[recipient_b.public_key_data.clone()])
-        .expect("match_recipients should work cross-suite");
+    let matched = decrypt::inspect_message_protection(&ciphertext, &[recipient_b.public_key_data.clone()])
+        .expect("inspect_message_protection should work cross-suite")
+        .matched_certificate_fingerprints;
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], recipient_b.fingerprint);

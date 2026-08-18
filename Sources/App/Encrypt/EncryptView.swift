@@ -33,6 +33,10 @@ struct EncryptView: View {
         var initialSignerFingerprint: String?
         var signingPolicy: TogglePolicy = .appDefault
         var encryptToSelfPolicy: TogglePolicy = .appDefault
+        /// Whether the protection choice is offered at all. A host that exists
+        /// to teach recipient-key encryption (the tutorial) turns it off, and
+        /// the screen is then exactly what it was before passwords existed.
+        var allowsPasswordProtection = true
         var allowsClipboardWrite = true
         var allowsResultExport = true
         var allowsFileInput = true
@@ -50,6 +54,7 @@ struct EncryptView: View {
         let initialSignerFingerprint: String?
         let signingPolicy: Configuration.TogglePolicy
         let encryptToSelfPolicy: Configuration.TogglePolicy
+        let allowsPasswordProtection: Bool
         let allowsClipboardWrite: Bool
         let allowsResultExport: Bool
         let allowsFileInput: Bool
@@ -68,6 +73,7 @@ struct EncryptView: View {
             initialSignerFingerprint = configuration.initialSignerFingerprint
             signingPolicy = configuration.signingPolicy
             encryptToSelfPolicy = configuration.encryptToSelfPolicy
+            allowsPasswordProtection = configuration.allowsPasswordProtection
             allowsClipboardWrite = configuration.allowsClipboardWrite
             allowsResultExport = configuration.allowsResultExport
             allowsFileInput = configuration.allowsFileInput
@@ -93,6 +99,23 @@ struct EncryptView: View {
                 String(localized: "encrypt.mode.text", defaultValue: "Text")
             case .file:
                 String(localized: "encrypt.mode.file", defaultValue: "File")
+            }
+        }
+    }
+
+    /// What holds the message shut. Exactly one of these, always — the two are
+    /// alternatives rather than options, and a message protected by both is not
+    /// expressible here by design.
+    enum Protection: String, CaseIterable {
+        case recipientKeys
+        case password
+
+        var label: String {
+            switch self {
+            case .recipientKeys:
+                String(localized: "encrypt.protection.recipientKeys", defaultValue: "Recipient Keys")
+            case .password:
+                String(localized: "encrypt.protection.password", defaultValue: "Password")
             }
         }
     }

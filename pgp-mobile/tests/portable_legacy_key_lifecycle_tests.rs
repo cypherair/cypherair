@@ -225,10 +225,10 @@ fn test_expired_key_detected_legacy() {
     );
 }
 
-/// match_recipients: encrypt to a Legacy key, match against its public cert.
+/// inspect_message_protection: encrypt to a Legacy key, match against its public cert.
 /// Verifies the returned fingerprint is the primary key fingerprint (not the subkey ID).
 #[test]
-fn test_match_recipients_legacy_returns_primary_fingerprint() {
+fn test_inspect_message_protection_legacy_returns_primary_fingerprint() {
     let key =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
@@ -237,8 +237,9 @@ fn test_match_recipients_legacy_returns_primary_fingerprint() {
         encrypt::encrypt_binary(b"test message", &[key.public_key_data.clone()], None, None)
             .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(&ciphertext, &[key.public_key_data.clone()])
-        .expect("match_recipients should succeed");
+    let matched = decrypt::inspect_message_protection(&ciphertext, &[key.public_key_data.clone()])
+        .expect("inspect_message_protection should succeed")
+        .matched_certificate_fingerprints;
 
     assert_eq!(matched.len(), 1, "Should match exactly one certificate");
     assert_eq!(
@@ -247,9 +248,10 @@ fn test_match_recipients_legacy_returns_primary_fingerprint() {
     );
 }
 
-/// match_recipients: encrypt to key A, match against key B → NoMatchingKey.
+/// inspect_message_protection: encrypt to key A, inspect against key B → no match,
+/// and no password slot either, so the message offers this device no way in.
 #[test]
-fn test_match_recipients_legacy_wrong_key_returns_error() {
+fn test_inspect_message_protection_legacy_wrong_key_finds_no_way_in() {
     let alice =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
@@ -265,16 +267,24 @@ fn test_match_recipients_legacy_wrong_key_returns_error() {
     )
     .expect("Encryption should succeed");
 
-    let result = decrypt::match_recipients(&ciphertext, &[bob.public_key_data.clone()]);
+    let inspection =
+        decrypt::inspect_message_protection(&ciphertext, &[bob.public_key_data.clone()])
+            .expect("inspect_message_protection should succeed");
+
     assert!(
-        matches!(result, Err(pgp_mobile::error::PgpError::NoMatchingKey)),
-        "Should return NoMatchingKey for wrong cert, got: {result:?}"
+        inspection.matched_certificate_fingerprints.is_empty(),
+        "Wrong cert should match nothing, got: {:?}",
+        inspection.matched_certificate_fingerprints
+    );
+    assert!(
+        !inspection.accepts_password,
+        "A recipient-key message carries no password slot"
     );
 }
 
-/// match_recipients: multi-recipient message matches both certs.
+/// inspect_message_protection: multi-recipient message matches both certs.
 #[test]
-fn test_match_recipients_legacy_multi_recipient() {
+fn test_inspect_message_protection_legacy_multi_recipient() {
     let alice =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
@@ -290,20 +300,21 @@ fn test_match_recipients_legacy_multi_recipient() {
     )
     .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(
+    let matched = decrypt::inspect_message_protection(
         &ciphertext,
         &[alice.public_key_data.clone(), bob.public_key_data.clone()],
     )
-    .expect("match_recipients should succeed");
+    .expect("inspect_message_protection should succeed")
+        .matched_certificate_fingerprints;
 
     assert_eq!(matched.len(), 2, "Should match both certificates");
     assert!(matched.contains(&alice.fingerprint));
     assert!(matched.contains(&bob.fingerprint));
 }
 
-/// match_recipients: encrypt-to-self includes sender in match.
+/// inspect_message_protection: encrypt-to-self includes sender in match.
 #[test]
-fn test_match_recipients_legacy_encrypt_to_self() {
+fn test_inspect_message_protection_legacy_encrypt_to_self() {
     let sender =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Key gen should succeed");
@@ -320,8 +331,9 @@ fn test_match_recipients_legacy_encrypt_to_self() {
     )
     .expect("Encryption should succeed");
 
-    let matched = decrypt::match_recipients(&ciphertext, &[sender.public_key_data.clone()])
-        .expect("match_recipients should find sender via encrypt-to-self");
+    let matched = decrypt::inspect_message_protection(&ciphertext, &[sender.public_key_data.clone()])
+        .expect("inspect_message_protection should find sender via encrypt-to-self")
+        .matched_certificate_fingerprints;
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], sender.fingerprint);

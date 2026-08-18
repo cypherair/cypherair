@@ -33,7 +33,7 @@ use zeroize::Zeroizing;
 
 use crate::armor::ArmorKind;
 use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
-use crate::decrypt::MessageQuantumSafety;
+use crate::decrypt::{MessageProtectionInspection, MessageQuantumSafety};
 use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, ExternalMlDsa65SigningProvider,
@@ -777,7 +777,8 @@ impl PgpEngine {
     /// Returns recipient key IDs as hex strings.
     ///
     /// NOTE: These are encryption *subkey* identifiers from PKESK packets, not primary
-    /// key fingerprints. For matching against local keys, use `match_recipients` instead.
+    /// key fingerprints. For matching against local keys, use
+    /// `inspect_message_protection` instead.
     pub fn parse_recipients(&self, ciphertext: Vec<u8>) -> Result<Vec<String>, PgpError> {
         decrypt::parse_recipients(&ciphertext)
     }
@@ -792,19 +793,20 @@ impl PgpEngine {
         decrypt::message_quantum_safety(&ciphertext)
     }
 
-    /// Match PKESK recipients against local certificates (Phase 1 — no auth needed).
-    /// Returns primary fingerprints of matching certificates (lowercase hex).
+    /// Inspect how an encrypted message can be opened (Phase 1 — no auth needed):
+    /// which of the supplied certificates it is addressed to, and whether it also
+    /// carries a password slot. Only public key data is needed — no secret keys,
+    /// no password, and no key derivation.
     ///
-    /// PKESK packets contain encryption subkey identifiers, not primary key fingerprints.
-    /// This function uses Sequoia's key_handles() to correctly match subkey IDs against
-    /// certificates, then returns the primary fingerprint of each matched certificate.
-    /// Only public key data is needed — no secret keys, no authentication.
-    pub fn match_recipients(
+    /// PKESK packets contain encryption subkey identifiers, not primary key
+    /// fingerprints, so Sequoia's key_handles() does the matching and the primary
+    /// fingerprint of each matched certificate is what comes back.
+    pub fn inspect_message_protection(
         &self,
         ciphertext: Vec<u8>,
         local_certs: Vec<Vec<u8>>,
-    ) -> Result<Vec<String>, PgpError> {
-        decrypt::match_recipients(&ciphertext, &local_certs)
+    ) -> Result<MessageProtectionInspection, PgpError> {
+        decrypt::inspect_message_protection(&ciphertext, &local_certs)
     }
 
     /// Decrypt a message and preserve per-signature detailed results.
@@ -865,15 +867,28 @@ impl PgpEngine {
         )
     }
 
-    /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
+    /// Decrypt a password-encrypted message without falling back to recipient-key
+    /// decryption.
+    ///
+    /// `affordable_memory_kib` is the Argon2 memory this process can afford to
+    /// dirty right now; the host reads it, because only the host can. A slot
+    /// declaring more than that — or more than the format ceiling, whichever is
+    /// lower — is refused before its KDF runs. Pass `u64::MAX` when the device is
+    /// not the constraint.
     pub fn decrypt_with_password(
         &self,
         ciphertext: Vec<u8>,
         password: String,
         verification_keys: Vec<Vec<u8>>,
+        affordable_memory_kib: u64,
     ) -> Result<PasswordDecryptResult, PgpError> {
         let password = Password::from(password);
-        password::decrypt(&ciphertext, &password, &verification_keys)
+        password::decrypt(
+            &ciphertext,
+            &password,
+            &verification_keys,
+            affordable_memory_kib,
+        )
     }
 
     // ── Signing ─────────────────────────────────────────────────────

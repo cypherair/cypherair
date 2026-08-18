@@ -151,10 +151,19 @@ pub fn encrypt_binary_with_external_composite_signer(
 }
 
 /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
+///
+/// `affordable_memory_kib` is what the calling process can afford to dirty right
+/// now — a platform figure only the host can read (see the Swift
+/// `Argon2idMemoryGuard`). It narrows, and never widens, the format ceiling in
+/// `MAX_MESSAGE_ARGON2_MEMORY_KIB`: pass `u64::MAX` to mean "the device is not
+/// the constraint" and still get the format bound. The check is applied per
+/// candidate, so a message carrying one unaffordable slot alongside an
+/// affordable one still opens through the latter.
 pub fn decrypt(
     encrypted_message: &[u8],
     password: &Password,
     verification_keys: &[Vec<u8>],
+    affordable_memory_kib: u64,
 ) -> Result<PasswordDecryptResult, PgpError> {
     let normalized = normalize_message_bytes(encrypted_message)?;
     let skesks = collect_message_skesks(&normalized)?;
@@ -172,19 +181,20 @@ pub fn decrypt(
     let mut deferred_candidate_error: Option<PgpError> = None;
 
     for skesk in &skesks {
-        let (session_key_algo, session_key) = match derive_candidate(skesk, password) {
-            CandidateOutcome::Candidate {
-                session_key_algo,
-                session_key,
-            } => (session_key_algo, session_key),
-            CandidateOutcome::Reject => continue,
-            CandidateOutcome::DeferredError(error) => {
-                if deferred_candidate_error.is_none() {
-                    deferred_candidate_error = Some(error);
+        let (session_key_algo, session_key) =
+            match derive_candidate(skesk, password, affordable_memory_kib) {
+                CandidateOutcome::Candidate {
+                    session_key_algo,
+                    session_key,
+                } => (session_key_algo, session_key),
+                CandidateOutcome::Reject => continue,
+                CandidateOutcome::DeferredError(error) => {
+                    if deferred_candidate_error.is_none() {
+                        deferred_candidate_error = Some(error);
+                    }
+                    continue;
                 }
-                continue;
-            }
-        };
+            };
 
         match decrypt::decrypt_with_fixed_session_key_detailed(
             &normalized,
@@ -528,10 +538,13 @@ fn collect_message_skesks(ciphertext: &[u8]) -> Result<Vec<SKESK>, PgpError> {
 /// memory and Jetsam-kills the app on a decrypt attempt, before any authentication
 /// runs. Our own traffic is unaffected: message encryption uses Sequoia's default
 /// Iterated+Salted S2K (no Argon2), and the highest Argon2 cost we ever emit is the
-/// 2 GiB key export. Mirrors the Swift-side `Argon2idMemoryGuard`, which guards the
-/// passphrase-protected key import and export paths. 2 GiB is RFC 9106's primary
-/// recommendation — the ceiling admits it exactly and rejects the OOM-DoS range
-/// above it on the 8 GB minimum device.
+/// 2 GiB key export. 2 GiB is RFC 9106's primary recommendation — the ceiling
+/// admits it exactly and rejects the OOM-DoS range above it on the 8 GB minimum
+/// device.
+///
+/// This is what the *format* may ask for. What *this device, right now* can
+/// afford is a separate and smaller question, which only the host can answer;
+/// it arrives as `affordable_memory_kib` and narrows this bound per call.
 const MAX_MESSAGE_ARGON2_MEMORY_KIB: u64 = 2 * 1024 * 1024; // 2 GiB
 
 /// Reject an Argon2 S2K whose time cost (passes) is implausibly high. Total KDF
@@ -548,7 +561,7 @@ const MAX_MESSAGE_ARGON2_PASSES: u8 = 16;
 /// constructions.
 const MAX_MESSAGE_SKESK_PACKETS: usize = 16;
 
-fn validate_skesk(skesk: &SKESK) -> Result<(), PgpError> {
+fn validate_skesk(skesk: &SKESK, affordable_memory_kib: u64) -> Result<(), PgpError> {
     let s2k = match skesk {
         SKESK::V4(skesk_v4) => {
             if !skesk_v4.symmetric_algo().is_supported() {
@@ -578,15 +591,19 @@ fn validate_skesk(skesk: &SKESK) -> Result<(), PgpError> {
         }
     };
 
-    validate_s2k_memory(s2k)
+    validate_s2k_memory(s2k, affordable_memory_kib)
 }
 
-/// Reject an S2K whose Argon2 memory cost exceeds `MAX_MESSAGE_ARGON2_MEMORY_KIB`.
-/// Runs before `skesk.decrypt`, so the KDF never executes with an OOM parameter.
-fn validate_s2k_memory(s2k: &openpgp::crypto::S2K) -> Result<(), PgpError> {
+/// Reject an S2K whose Argon2 memory cost exceeds what either the format or this
+/// device permits. Runs before `skesk.decrypt`, so the KDF never executes with a
+/// parameter that would exhaust memory part-way through.
+fn validate_s2k_memory(
+    s2k: &openpgp::crypto::S2K,
+    affordable_memory_kib: u64,
+) -> Result<(), PgpError> {
     if let openpgp::crypto::S2K::Argon2 { m, t, .. } = s2k {
         let memory_kib = crate::keys::argon2_memory_kib(*m);
-        if memory_kib > MAX_MESSAGE_ARGON2_MEMORY_KIB {
+        if memory_kib > MAX_MESSAGE_ARGON2_MEMORY_KIB.min(affordable_memory_kib) {
             return Err(PgpError::Argon2idMemoryExceeded {
                 required_mb: memory_kib / 1024,
             });
@@ -603,8 +620,12 @@ fn validate_s2k_memory(s2k: &openpgp::crypto::S2K) -> Result<(), PgpError> {
     Ok(())
 }
 
-fn derive_candidate(skesk: &SKESK, password: &Password) -> CandidateOutcome {
-    if let Err(error) = validate_skesk(skesk) {
+fn derive_candidate(
+    skesk: &SKESK,
+    password: &Password,
+    affordable_memory_kib: u64,
+) -> CandidateOutcome {
+    if let Err(error) = validate_skesk(skesk, affordable_memory_kib) {
         return CandidateOutcome::DeferredError(error);
     }
 
@@ -671,7 +692,82 @@ fn classify_candidate_error(error: openpgp::anyhow::Error) -> CandidateOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use openpgp::packet::skesk::SKESK4;
+    use openpgp::serialize::Serialize;
     use sequoia_openpgp::crypto::{Password, S2K};
+
+    /// Memory exponent the fixture packet is actually built at. Constructing a
+    /// SKESK runs the KDF, so a hostile exponent cannot be requested from the
+    /// constructor — it would exhaust the machine running the test rather than
+    /// the code under test. Build affordably, then rewrite the exponent on the
+    /// wire, which is exactly the shape a hostile message arrives in.
+    const FIXTURE_BUILD_MEMORY_EXPONENT: u8 = 16; // 64 MiB
+    const FIXTURE_SALT: [u8; 16] = [7u8; 16];
+    const ARGON2_FIXTURE_PLAINTEXT: &[u8] = b"payload";
+
+    /// A minimal password message whose single SKESK declares Argon2 at `2^m`
+    /// KiB. Sequoia only ever emits the default Iterated+Salted S2K for our own
+    /// traffic, so an Argon2-protected message has to be built by hand.
+    fn password_message_with_argon2_skesk(m: u8, password: &Password) -> Vec<u8> {
+        let session_key = openpgp::crypto::SessionKey::new(32).expect("session key");
+        let skesk = SKESK4::with_password(
+            SymmetricAlgorithm::AES256,
+            SymmetricAlgorithm::AES256,
+            S2K::Argon2 {
+                salt: FIXTURE_SALT,
+                t: 1,
+                p: 1,
+                m: FIXTURE_BUILD_MEMORY_EXPONENT,
+            },
+            &session_key,
+            password,
+        )
+        .expect("build Argon2 SKESK");
+
+        let mut sink = Vec::new();
+        openpgp::Packet::from(skesk)
+            .serialize(&mut sink)
+            .expect("serialize SKESK");
+        if m != FIXTURE_BUILD_MEMORY_EXPONENT {
+            rewrite_argon2_memory_exponent(&mut sink, m);
+        }
+
+        // The container the SKESK's session key opens.
+        let mut container = Vec::new();
+        {
+            let message = Message::new(&mut container);
+            let encryptor = Encryptor::with_session_key(
+                message,
+                SymmetricAlgorithm::AES256,
+                session_key.clone(),
+            )
+            .expect("session-key encryptor");
+            let message = encryptor.build().expect("build container");
+            let mut literal = openpgp::serialize::stream::LiteralWriter::new(message)
+                .build()
+                .expect("build literal");
+            std::io::Write::write_all(&mut literal, ARGON2_FIXTURE_PLAINTEXT)
+                .expect("write payload");
+            literal.finalize().expect("finalize container");
+        }
+        sink.extend_from_slice(&container);
+        sink
+    }
+
+    /// Rewrite the memory exponent of the serialized Argon2 S2K in place. An
+    /// Argon2 S2K spec is `[0x04][salt: 16][t][p][m]`, and the fixture's salt
+    /// makes the needle unique within the packet.
+    fn rewrite_argon2_memory_exponent(skesk_packet: &mut [u8], m: u8) {
+        let mut needle = vec![0x04u8];
+        needle.extend_from_slice(&FIXTURE_SALT);
+        needle.extend_from_slice(&[1, 1, FIXTURE_BUILD_MEMORY_EXPONENT]);
+
+        let start = skesk_packet
+            .windows(needle.len())
+            .position(|window| window == needle)
+            .expect("serialized Argon2 S2K spec should be present");
+        skesk_packet[start + needle.len() - 1] = m;
+    }
 
     #[test]
     fn validate_s2k_memory_rejects_oversized_argon2() {
@@ -684,9 +780,54 @@ mod tests {
             m: 30,
         };
         assert!(matches!(
-            validate_s2k_memory(&s2k),
+            validate_s2k_memory(&s2k, u64::MAX),
             Err(PgpError::Argon2idMemoryExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn decrypt_refuses_a_message_beyond_the_format_ceiling() {
+        // The whole packet path, not just the predicate: a real SKESK at 1 TiB
+        // must come back refused rather than derived, however much memory the
+        // device claims to have.
+        let password = Password::from("irrelevant");
+        let message = password_message_with_argon2_skesk(30, &password);
+
+        match decrypt(&message, &password, &[], u64::MAX) {
+            Err(PgpError::Argon2idMemoryExceeded { required_mb }) => {
+                assert_eq!(required_mb, 1024 * 1024, "1 TiB expressed in MiB");
+            }
+            other => panic!("expected Argon2idMemoryExceeded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decrypt_refuses_a_cost_this_device_cannot_afford() {
+        // 64 MiB is far inside the format ceiling, so only the device budget can
+        // refuse it — and it must, before the KDF runs.
+        let password = Password::from("irrelevant");
+        let message = password_message_with_argon2_skesk(16, &password);
+
+        match decrypt(&message, &password, &[], 32 * 1024) {
+            Err(PgpError::Argon2idMemoryExceeded { required_mb }) => {
+                assert_eq!(required_mb, 64);
+            }
+            other => panic!("expected Argon2idMemoryExceeded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decrypt_derives_a_cost_this_device_can_afford() {
+        // The same message under a budget that admits it opens normally, which
+        // is what makes the refusal above the budget talking rather than the
+        // packet being rejected for some other reason.
+        let password = Password::from("irrelevant");
+        let message = password_message_with_argon2_skesk(16, &password);
+
+        let result =
+            decrypt(&message, &password, &[], 128 * 1024).expect("an affordable cost must run");
+        assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+        assert_eq!(result.plaintext.as_deref(), Some(ARGON2_FIXTURE_PLAINTEXT));
     }
 
     #[test]
@@ -713,7 +854,7 @@ mod tests {
             m: 19,
         };
         assert!(matches!(
-            validate_s2k_memory(&s2k),
+            validate_s2k_memory(&s2k, u64::MAX),
             Err(PgpError::CorruptData { .. })
         ));
     }
@@ -726,7 +867,7 @@ mod tests {
             p: 1,
             m: 19,
         };
-        assert!(validate_s2k_memory(&s2k).is_ok());
+        assert!(validate_s2k_memory(&s2k, u64::MAX).is_ok());
     }
 
     #[test]
@@ -736,7 +877,8 @@ mod tests {
         let password = Password::from("correct horse battery staple");
         let ciphertext = encrypt(b"hello", &password, PasswordMessageFormat::Seipdv2, None)
             .expect("encrypt password message");
-        let result = decrypt(&ciphertext, &password, &[]).expect("decrypt password message");
+        let result =
+            decrypt(&ciphertext, &password, &[], u64::MAX).expect("decrypt password message");
         assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
         assert_eq!(result.plaintext.as_deref(), Some(&b"hello"[..]));
     }

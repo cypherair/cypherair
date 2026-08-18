@@ -364,6 +364,7 @@ final class StreamingServiceTests: XCTestCase {
         let encService = EncryptionService(
             keyManagement: stack.keyManagement,
             contactService: stack.contactService,
+            messageAdapter: stack.messageAdapter,
             textEncryptor: stack.textEncryptor,
             fileEncryptor: stack.fileEncryptor,
             diskSpaceChecker: diskChecker
@@ -652,6 +653,7 @@ final class StreamingServiceTests: XCTestCase {
         EncryptionService(
             keyManagement: stack.keyManagement,
             contactService: stack.contactService,
+            messageAdapter: stack.messageAdapter,
             textEncryptor: stack.textEncryptor,
             fileEncryptor: fileEncryptor,
             diskSpaceChecker: DiskSpaceChecker(diskSpace: diskSpace),

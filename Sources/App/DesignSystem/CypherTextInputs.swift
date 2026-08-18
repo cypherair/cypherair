@@ -85,6 +85,23 @@ extension View {
         self.searchable(text: text, prompt: prompt)
             .cypherOpaqueTextTraits()
     }
+
+    /// A search field only where there is something to search. `.searchable`
+    /// has no "absent" state to bind to, so the modifier is applied or not —
+    /// which does change view identity, and is why the caller should be a
+    /// screen whose content is changing wholesale anyway.
+    @ViewBuilder
+    func cypherSearchable(
+        when isSearchable: Bool,
+        text: Binding<String>,
+        prompt: String
+    ) -> some View {
+        if isSearchable {
+            cypherSearchable(text: text, prompt: prompt)
+        } else {
+            self
+        }
+    }
 }
 
 private extension View {

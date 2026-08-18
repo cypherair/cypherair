@@ -193,6 +193,7 @@ final class TutorialSandboxContainer {
         self.encryptionService = EncryptionService(
             keyManagement: keyManagement,
             contactService: contactService,
+            messageAdapter: messageAdapter,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
             temporaryArtifactStore: temporaryArtifactStore

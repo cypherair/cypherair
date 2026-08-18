@@ -205,6 +205,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         let encryptionService = EncryptionService(
             keyManagement: keyManagement,
             contactService: contactService,
+            messageAdapter: messageAdapter,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
             temporaryArtifactStore: artifactStore
@@ -519,6 +520,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         let encryptionService = EncryptionService(
             keyManagement: keyManagement,
             contactService: contactService,
+            messageAdapter: messageAdapter,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
             temporaryArtifactStore: artifactStore

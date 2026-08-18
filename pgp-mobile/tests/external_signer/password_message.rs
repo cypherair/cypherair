@@ -42,8 +42,9 @@ fn test_external_signer_runtime_password_encrypt_decrypts_and_verifies_for_v4_an
 
                 assert_password_message_format(&ciphertext, format, binary);
 
+                let verification_certs = [material.public_cert.clone()];
                 let result =
-                    password::decrypt(&ciphertext, &passphrase, &[material.public_cert.clone()])
+                    password::decrypt(&ciphertext, &passphrase, &verification_certs, u64::MAX)
                         .expect("password message should decrypt and verify");
                 assert_eq!(result.status, password::PasswordDecryptStatus::Decrypted);
                 assert_eq!(result.plaintext.as_deref(), Some(plaintext.as_bytes()));

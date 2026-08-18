@@ -25,7 +25,8 @@ extension FFIIntegrationTests {
                 _ = try engine.decryptWithPassword(
                     ciphertext: tampered,
                     password: password,
-                    verificationKeys: []
+                    verificationKeys: [],
+                    affordableMemoryKib: .max
                 )
             } catch let error as PgpError where acceptedErrors.contains(error) {
                 return tampered
@@ -53,7 +54,8 @@ extension FFIIntegrationTests {
         let result = try engine.decryptWithPassword(
             ciphertext: ciphertext,
             password: "ffi-password-v1",
-            verificationKeys: []
+            verificationKeys: [],
+            affordableMemoryKib: .max
         )
 
         XCTAssertEqual(result.status, .decrypted)
@@ -80,7 +82,8 @@ extension FFIIntegrationTests {
         let result = try engine.decryptWithPassword(
             ciphertext: ciphertext,
             password: "ffi-password-v2",
-            verificationKeys: [signer.publicKeyData]
+            verificationKeys: [signer.publicKeyData],
+            affordableMemoryKib: .max
         )
 
         XCTAssertEqual(result.status, .decrypted)
@@ -88,6 +91,31 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.summaryState, .verified)
         XCTAssertEqual(result.summaryEntryIndex, 0)
         XCTAssertEqual(result.signatures.first?.signerPrimaryFingerprint, signer.fingerprint)
+    }
+
+    /// The app's own password messages carry no Argon2 S2K at all, so the
+    /// device memory budget never touches them — the tightest possible budget
+    /// still opens one. This is what lets a password message be sent to someone
+    /// whose device or tool we know nothing about (docs/SECURITY.md §7).
+    func test_passwordRoundTrip_ownMessage_opensUnderTheTightestMemoryBudget() throws {
+        let plaintext = Data("no Argon2 in our own password messages".utf8)
+
+        let ciphertext = try engine.encryptWithPassword(
+            plaintext: plaintext,
+            password: "ffi-password-budget",
+            format: .seipdv1,
+            signingKey: nil
+        )
+
+        let result = try engine.decryptWithPassword(
+            ciphertext: ciphertext,
+            password: "ffi-password-budget",
+            verificationKeys: [],
+            affordableMemoryKib: 0
+        )
+
+        XCTAssertEqual(result.status, .decrypted)
+        XCTAssertEqual(result.plaintext, plaintext)
     }
 
     func test_passwordDecrypt_noSkesk_returnsStatus() throws {
@@ -108,7 +136,8 @@ extension FFIIntegrationTests {
         let result = try engine.decryptWithPassword(
             ciphertext: ciphertext,
             password: "irrelevant-password",
-            verificationKeys: []
+            verificationKeys: [],
+            affordableMemoryKib: .max
         )
 
         XCTAssertEqual(result.status, .noSkesk)
@@ -126,7 +155,8 @@ extension FFIIntegrationTests {
         let result = try engine.decryptWithPassword(
             ciphertext: ciphertext,
             password: "wrong-ffi-password",
-            verificationKeys: []
+            verificationKeys: [],
+            affordableMemoryKib: .max
         )
 
         XCTAssertEqual(result.status, .passwordRejected)
@@ -150,7 +180,8 @@ extension FFIIntegrationTests {
             try engine.decryptWithPassword(
                 ciphertext: tampered,
                 password: "tamper-ffi-v1",
-                verificationKeys: []
+                verificationKeys: [],
+                affordableMemoryKib: .max
             )
         ) { error in
             guard let pgpError = error as? PgpError else {
@@ -177,7 +208,8 @@ extension FFIIntegrationTests {
             try engine.decryptWithPassword(
                 ciphertext: tampered,
                 password: "tamper-ffi-v2",
-                verificationKeys: []
+                verificationKeys: [],
+                affordableMemoryKib: .max
             )
         ) { error in
             guard let pgpError = error as? PgpError else {

@@ -60,6 +60,10 @@ struct TutorialConfigurationFactory {
         var configuration = EncryptView.Configuration(
             signingPolicy: .fixed(true),
             encryptToSelfPolicy: .fixed(false),
+            // The tutorial teaches encrypting to Bob's key and walks the user
+            // through picking him as a recipient; offering a protection that
+            // has no recipients would strand that walkthrough.
+            allowsPasswordProtection: false,
             allowsClipboardWrite: false,
             allowsResultExport: false,
             allowsFileInput: false,

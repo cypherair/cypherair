@@ -23,13 +23,13 @@ struct DecryptView: View {
 
     struct RuntimeSyncKey: Equatable {
         struct InitialPhase1Seed: Equatable {
-            let recipientKeyIds: [String]
             let matchedKeyFingerprint: String?
+            let acceptsPassword: Bool
             let ciphertext: Data
 
             init(_ result: DecryptionPhase1Result) {
-                recipientKeyIds = result.recipientKeyIds
                 matchedKeyFingerprint = result.matchedKey?.fingerprint
+                acceptsPassword = result.acceptsPassword
                 ciphertext = result.ciphertext
             }
         }
@@ -105,6 +105,8 @@ private struct DecryptScreenHostView: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: DecryptScreenModel
+    @State private var isPasswordRevealed = false
+    @FocusState private var passwordFieldFocused: Bool
 
     init(
         decryptionService: DecryptionService,
@@ -158,14 +160,16 @@ private struct DecryptScreenHostView: View {
             Section {
                 Button {
                     if model.decryptMode == .text {
-                        model.parseRecipientsText()
+                        model.inspectTextMessage()
                     } else {
                         model.parseRecipientsFile()
                     }
                 } label: {
+                    // "Check Message", not "Check Recipients": the answer may be
+                    // that it has none and wants a password instead.
                     CypherOperationButtonLabel(
-                        idleTitle: String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"),
-                        runningTitle: String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."),
+                        idleTitle: String(localized: "decrypt.inspect.button", defaultValue: "Check Message"),
+                        runningTitle: String(localized: "decrypt.inspect.checking", defaultValue: "Checking message..."),
                         isRunning: operation.isRunning && !model.hasPhase1Result,
                         isCancelling: operation.isCancelling,
                         progressFraction: nil
@@ -174,6 +178,10 @@ private struct DecryptScreenHostView: View {
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.decryptButtonDisabled || model.hasPhase1Result)
+            }
+
+            if model.asksForPassword {
+                passwordContent
             }
 
             if let matchedKey = model.activeMatchedKey {
@@ -336,10 +344,19 @@ private struct DecryptScreenHostView: View {
             }
         }
         .onDisappear {
+            passwordFieldFocused = false
+            isPasswordRevealed = false
             model.handleDisappear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            passwordFieldFocused = false
+            isPasswordRevealed = false
             model.handleContentClearGenerationChange()
+        }
+        .onChange(of: model.asksForPassword) { _, asksForPassword in
+            if !asksForPassword {
+                isPasswordRevealed = false
+            }
         }
         .onChange(of: runtimeSyncKey) { _, _ in
             model.updateConfiguration(configuration)
@@ -347,6 +364,73 @@ private struct DecryptScreenHostView: View {
         .onAppear {
             model.handleAppear()
         }
+    }
+
+    /// The password branch of Phase 2. It appears only once the message has said
+    /// it is password-protected, so nobody is asked for a password speculatively
+    /// — and the field is not gated on the app's passphrase requirements, since
+    /// whoever wrote the message already fixed its protection.
+    @ViewBuilder
+    private var passwordContent: some View {
+        @Bindable var model = model
+        let operation = model.operation
+
+        Section {
+            HStack(spacing: CypherSpacing.compact) {
+                CypherSecureTextField(
+                    String(localized: "decrypt.password.field", defaultValue: "Password"),
+                    text: $model.password,
+                    isRevealed: isPasswordRevealed,
+                    submitLabel: .go,
+                    onSubmit: {
+                        passwordFieldFocused = false
+                        if !model.passwordDecryptButtonDisabled {
+                            model.decryptTextWithPassword()
+                        }
+                    }
+                )
+                .font(isPasswordRevealed ? .system(.body, design: .monospaced) : .body)
+                .focused($passwordFieldFocused)
+                .accessibilityIdentifier("decrypt.password.field")
+
+                Button {
+                    isPasswordRevealed.toggle()
+                } label: {
+                    Image(systemName: isPasswordRevealed ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(
+                    isPasswordRevealed
+                        ? String(localized: "password.hide", defaultValue: "Hide Password")
+                        : String(localized: "password.show", defaultValue: "Show Password")
+                )
+            }
+
+            Button {
+                passwordFieldFocused = false
+                model.decryptTextWithPassword()
+            } label: {
+                CypherOperationButtonLabel(
+                    idleTitle: String(localized: "decrypt.password.button", defaultValue: "Decrypt with Password"),
+                    runningTitle: String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."),
+                    isRunning: operation.isRunning,
+                    isCancelling: operation.isCancelling,
+                    progressFraction: nil,
+                    minWidth: 240
+                )
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(model.passwordDecryptButtonDisabled)
+        } header: {
+            Text(String(localized: "decrypt.password.header", defaultValue: "Password"))
+        } footer: {
+            Text(String(
+                localized: "decrypt.password.explanation",
+                defaultValue: "This message is not addressed to any of your keys. It is protected by a password, which the sender has to give you separately."
+            ))
+        }
+        .disabled(operation.isRunning)
     }
 
     @ViewBuilder

@@ -19,6 +19,10 @@ enum CypherAirError: Error {
     /// here says the message is damaged, and resending it would not help.
     case messageLimitsExceeded(reason: String)
     case wrongPassphrase
+    /// The password given for a password-protected message did not open it.
+    /// Distinct from `wrongPassphrase`, which is about a key artifact: the two
+    /// reach the user in different places and cannot share one sentence.
+    case wrongMessagePassword
     case invalidKeyData(reason: String)
     case encryptionFailed(reason: String)
     case signingFailed(reason: String)

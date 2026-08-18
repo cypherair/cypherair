@@ -25,6 +25,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.messageLimitsExceeded", defaultValue: "This message exceeds the limits the app will open. It may be crafted to overwhelm the device.")
         case .wrongPassphrase:
             String(localized: "error.wrongPassphrase", defaultValue: "Incorrect passphrase. Please re-enter your backup passphrase.")
+        case .wrongMessagePassword:
+            String(localized: "error.wrongMessagePassword", defaultValue: "That password did not open this message. Check it with whoever sent it and try again.")
         case .invalidKeyData:
             String(localized: "error.invalidKeyData", defaultValue: "The key data is invalid or corrupt.")
         case .encryptionFailed(let reason):
@@ -36,7 +38,10 @@ extension CypherAirError: LocalizedError {
         case .integrityCheckFailed:
             String(localized: "error.integrityCheck", defaultValue: "Message integrity check failed. The content may have been tampered with.")
         case .argon2idMemoryExceeded(let requiredMb):
-            String(localized: "error.argon2idMemory", defaultValue: "Passphrase protection for this key needs \(Self.memorySize(megabytes: requiredMb)) of memory, which isn't available right now. Try again after freeing some up.")
+            // Reached from key backup and restore, where the parameters are the
+            // app's, and from opening a password message, where they are the
+            // sender's — so the sentence names neither.
+            String(localized: "error.argon2idMemory", defaultValue: "Unlocking this needs \(Self.memorySize(megabytes: requiredMb)) of memory, which isn't available right now. Try again after freeing some up.")
         case .revocationError:
             String(localized: "error.revocation", defaultValue: "Invalid revocation certificate.")
         case .keyGenerationFailed:
