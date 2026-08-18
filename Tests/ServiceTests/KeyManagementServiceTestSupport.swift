@@ -433,7 +433,7 @@ final class HiddenGenerationTestCertificateBuilder: SecureEnclaveCustodyCertific
     func generatePublicCertificate(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
@@ -939,7 +939,7 @@ class KeyManagementServiceTestCase: XCTestCase {
         let material = try await adapter.generatePublicCertificate(
             name: "Hidden Export \(family.rawValue)",
             email: "hidden-export@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

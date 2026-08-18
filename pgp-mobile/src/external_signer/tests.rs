@@ -8,6 +8,7 @@ use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
 use crate::keys::ExternalP256SigningFailureCategory;
+use crate::keys::KeyValidity;
 use crate::signature_details::SignatureVerificationState;
 use crate::{sign, streaming};
 use tempfile::NamedTempFile;
@@ -38,12 +39,12 @@ struct CandidateMaterial {
 }
 
 fn build_candidate(version: CandidateVersion) -> openpgp::Result<CandidateMaterial> {
-    build_candidate_with_expiry(version, None)
+    build_candidate_with_validity(version, KeyValidity::Never)
 }
 
-fn build_candidate_with_expiry(
+fn build_candidate_with_validity(
     version: CandidateVersion,
-    expiry_seconds: Option<u64>,
+    validity: KeyValidity,
 ) -> openpgp::Result<CandidateMaterial> {
     let primary: Key<key::SecretParts, key::PrimaryRole> = match version {
         CandidateVersion::V4 => key::Key4::generate_ecc(true, Curve::NistP256)?.into(),
@@ -71,7 +72,7 @@ fn build_candidate_with_expiry(
         signature::SignatureBuilder::new(SignatureType::PositiveCertification)
             .set_hash_algo(HashAlgorithm::SHA256)
             .set_key_flags(KeyFlags::empty().set_certification().set_signing())?;
-    let validity = expiry_seconds.map(std::time::Duration::from_secs);
+    let validity = validity.period();
     user_id_builder = user_id_builder.set_key_validity_period(validity)?;
     if matches!(version, CandidateVersion::V4) {
         user_id_builder = user_id_builder.set_features(Features::empty().set_seipdv1())?;

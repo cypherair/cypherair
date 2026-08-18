@@ -4,7 +4,7 @@ use pgp_mobile::armor::{self, ArmorKind};
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 
 /// Armor round-trip preserves the correct kind for all known types.
 #[test]
@@ -53,7 +53,7 @@ fn test_armor_decode_known_kinds_not_unknown() {
     let key = keys::generate_key_with_suite(
         "Armor Test".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -81,8 +81,13 @@ fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
         (KeySuite::Ed25519LegacyCurve25519Legacy, "Legacy"),
         (KeySuite::Ed448X448, "Modern High"),
     ] {
-        let key = keys::generate_key_with_suite("Unicode Test".to_string(), None, None, profile)
-            .expect("Key gen should succeed");
+        let key = keys::generate_key_with_suite(
+            "Unicode Test".to_string(),
+            None,
+            KeyValidity::Never,
+            profile,
+        )
+        .expect("Key gen should succeed");
 
         let ciphertext =
             encrypt::encrypt(plaintext_bytes, &[key.public_key_data.clone()], None, None)
@@ -111,7 +116,7 @@ fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
     let key = keys::generate_key_with_suite(
         "Expiry Test".to_string(),
         None,
-        Some(1),
+        KeyValidity::ExpiresIn { seconds: 1 },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -133,10 +138,10 @@ fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
 /// have to agree, or the app offers a recipient it then hard-fails on.
 #[test]
 fn test_parse_key_info_reports_expired_encryption_subkey_as_unusable() {
-    use sequoia_openpgp as openpgp;
     use openpgp::cert::prelude::CertBuilder;
     use openpgp::serialize::Serialize;
     use openpgp::types::KeyFlags;
+    use sequoia_openpgp as openpgp;
 
     let (cert, _) = CertBuilder::new()
         .add_userid("Expiring Subkey <expiring-subkey@example.com>")

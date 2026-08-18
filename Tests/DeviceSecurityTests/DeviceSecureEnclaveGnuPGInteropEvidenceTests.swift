@@ -66,7 +66,7 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
             .generatePublicCertificate(
                 name: "Device Secure Enclave Interop",
                 email: "device-se-interop@example.invalid",
-                expirySeconds: 3600,
+                validity: .expiresIn(seconds: 3600),
                 family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
                 handlePair: loadedPair,
                 digestSigner: SystemSecureEnclaveCustodyDigestSigner()

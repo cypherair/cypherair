@@ -65,7 +65,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             try await service.generateSecureEnclaveCustodyKey(
                 name: "SE Custody Composition",
                 email: nil,
-                expirySeconds: nil,
+                validity: .never,
                 family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
         }
@@ -114,7 +114,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             try await service.generateSecureEnclaveCustodyKey(
                 name: "SE Custody Outside Prompt",
                 email: nil,
-                expirySeconds: nil,
+                validity: .never,
                 family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
         }
@@ -147,7 +147,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "SE Custody Plain",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
@@ -168,7 +168,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "SE Custody",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 

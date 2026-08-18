@@ -15,7 +15,7 @@ use openpgp::parse::stream::{
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::{PublicKeyAlgorithm, SymmetricAlgorithm};
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{decrypt, encrypt, sign, verify};
 use sequoia_openpgp as openpgp;
@@ -23,7 +23,7 @@ use sequoia_openpgp as openpgp;
 const PLAINTEXT: &[u8] = b"portable post-quantum message";
 
 fn gen(profile: KeySuite, name: &str) -> keys::GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), None, None, profile)
+    keys::generate_key_with_suite(name.to_string(), None, KeyValidity::Never, profile)
         .expect("key gen should succeed")
 }
 

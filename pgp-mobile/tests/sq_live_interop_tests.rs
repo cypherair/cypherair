@@ -20,7 +20,7 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, GeneratedKey, KeySuite};
+use pgp_mobile::keys::{self, GeneratedKey, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 
 mod common;
@@ -32,7 +32,9 @@ use common::sq::{
 /// classical profiles only need sq present.
 fn sq_for(profile: &KeySuite) -> Option<std::path::PathBuf> {
     match profile {
-        KeySuite::MlDsa65Ed25519MlKem768X25519 | KeySuite::MlDsa87Ed448MlKem1024X448 => require_pq_capable_sq_or_skip(),
+        KeySuite::MlDsa65Ed25519MlKem768X25519 | KeySuite::MlDsa87Ed448MlKem1024X448 => {
+            require_pq_capable_sq_or_skip()
+        }
         _ => require_sq_or_skip(),
     }
 }
@@ -44,7 +46,7 @@ fn generate_engine_key(profile: KeySuite, label: &str) -> GeneratedKey {
             "cypherair-{}-live@example.com",
             label.to_lowercase()
         )),
-        None,
+        KeyValidity::Never,
         profile,
     )
     .expect("engine key generation should succeed")

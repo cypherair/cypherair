@@ -8,12 +8,12 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Merge A",
             email: "merge-a@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
-            newExpirySeconds: 60 * 60 * 24 * 365
+            newValidity: .expiresIn(seconds: 60 * 60 * 24 * 365)
         )
 
         let result = try engine.mergePublicCertificateUpdate(
@@ -31,12 +31,12 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Merge B",
             email: "merge-b@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         let refreshed = try engine.modifyExpiry(
             certData: generated.certData,
-            newExpirySeconds: 60 * 60 * 24 * 365
+            newValidity: .expiresIn(seconds: 60 * 60 * 24 * 365)
         )
 
         let result = try engine.mergePublicCertificateUpdate(
@@ -55,7 +55,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Merge Duplicate",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -154,7 +154,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Validate Public",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -184,7 +184,7 @@ extension FFIIntegrationTests {
             let generated = try engine.generateKey(
                 name: "Selector \(suite)",
                 email: "selector-\(suite)-ffi@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: suite
             )
 
@@ -273,7 +273,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Validate Secret",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 

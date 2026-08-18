@@ -59,7 +59,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite
     ) async throws -> PGPGeneratedKeyMaterial {
         do {
@@ -67,7 +67,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
                 engine: engine,
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 suite: suite,
                 zeroizeSecretData: zeroizeSecretData
             )
@@ -131,13 +131,13 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
 
     func modifyExpiry(
         certData: Data,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPModifiedExpiryKeyMaterial {
         do {
             return try await Self.performModifyExpiry(
                 engine: engine,
                 certData: certData,
-                newExpirySeconds: newExpirySeconds,
+                newValidity: newValidity,
                 zeroizeSecretData: zeroizeSecretData
             )
         } catch {
@@ -149,7 +149,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         publicCert: Data,
         signingKeyFingerprint: String,
         signingProvider: ExternalP256SigningProvider,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         do {
             return try await Self.performModifyExpiryWithExternalP256Signer(
@@ -157,7 +157,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
                 publicCert: publicCert,
                 signingKeyFingerprint: signingKeyFingerprint,
                 signingProvider: signingProvider,
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
         } catch {
             throw PGPErrorMapper.mapExternalP256Signing(error)
@@ -169,7 +169,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         signingKeyFingerprint: String,
         classicalEddsaSecret: Data,
         signingProvider: ExternalMlDsa65SigningProvider,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         do {
             return try await Self.performModifyExpiryWithExternalCompositeSigner(
@@ -178,7 +178,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
                 signingKeyFingerprint: signingKeyFingerprint,
                 classicalEddsaSecret: classicalEddsaSecret,
                 signingProvider: signingProvider,
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
         } catch {
             throw PGPErrorMapper.mapExternalCompositeSigning(error)
@@ -190,14 +190,14 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         engine: PgpEngine,
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite,
         zeroizeSecretData: PGPSecretDataZeroizer
     ) async throws -> PGPGeneratedKeyMaterial {
         var generated = try engine.generateKey(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity.ffiValue,
             suite: suite.ffiValue
         )
         var shouldZeroizeSecret = true
@@ -275,12 +275,12 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
     private static func performModifyExpiry(
         engine: PgpEngine,
         certData: Data,
-        newExpirySeconds: UInt64?,
+        newValidity: PGPKeyValidity,
         zeroizeSecretData: PGPSecretDataZeroizer
     ) async throws -> PGPModifiedExpiryKeyMaterial {
         var result = try engine.modifyExpiry(
             certData: certData,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity.ffiValue
         )
         var shouldZeroizeSecret = true
         defer {
@@ -304,13 +304,13 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         publicCert: Data,
         signingKeyFingerprint: String,
         signingProvider: ExternalP256SigningProvider,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         let result = try engine.modifyExpiryWithExternalP256Signer(
             publicCertData: publicCert,
             signingKeyFingerprint: signingKeyFingerprint,
             signer: signingProvider,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity.ffiValue
         )
         return PGPPublicModifiedExpiryKeyMaterial(
             publicKeyData: result.publicKeyData,
@@ -325,14 +325,14 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         signingKeyFingerprint: String,
         classicalEddsaSecret: Data,
         signingProvider: ExternalMlDsa65SigningProvider,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         let result = try engine.modifyExpiryWithExternalCompositeSigner(
             publicCertData: publicCert,
             signingKeyFingerprint: signingKeyFingerprint,
             classicalEddsaSecret: classicalEddsaSecret,
             signer: signingProvider,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity.ffiValue
         )
         return PGPPublicModifiedExpiryKeyMaterial(
             publicKeyData: result.publicKeyData,
@@ -347,7 +347,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         signingKeyFingerprint: String,
         classicalEddsaSecret: Data,
         signingProvider: ExternalMlDsa87SigningProvider,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         do {
             return try await Self.performModifyExpiryWithExternalCompositeHighSigner(
@@ -356,7 +356,7 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
                 signingKeyFingerprint: signingKeyFingerprint,
                 classicalEddsaSecret: classicalEddsaSecret,
                 signingProvider: signingProvider,
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
         } catch {
             throw PGPErrorMapper.mapExternalCompositeSigning(error)
@@ -370,14 +370,14 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         signingKeyFingerprint: String,
         classicalEddsaSecret: Data,
         signingProvider: ExternalMlDsa87SigningProvider,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         let result = try engine.modifyExpiryWithExternalCompositeHighSigner(
             publicCertData: publicCert,
             signingKeyFingerprint: signingKeyFingerprint,
             classicalEddsaSecret: classicalEddsaSecret,
             signer: signingProvider,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity.ffiValue
         )
         return PGPPublicModifiedExpiryKeyMaterial(
             publicKeyData: result.publicKeyData,

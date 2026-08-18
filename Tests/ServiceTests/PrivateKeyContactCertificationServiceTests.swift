@@ -352,7 +352,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         try engine.generateKey(
             name: "Certification Target",
             email: "certification-target@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: suite
         )
     }
@@ -442,7 +442,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Contact Certification",
             email: "secure-contact-certification@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

@@ -1,11 +1,11 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite, CONTACT_IMPORT_PUBLIC_ONLY_REASON};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity, CONTACT_IMPORT_PUBLIC_ONLY_REASON};
 
 fn generate_key(suite: KeySuite, name: &str) -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
-        None,
+        KeyValidity::Never,
         suite,
     )
     .expect("key generation should succeed")

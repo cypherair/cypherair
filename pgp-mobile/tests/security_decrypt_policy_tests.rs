@@ -4,15 +4,19 @@ mod common;
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 
 /// Verify that tampered Legacy (SEIPDv1) ciphertext produces an integrity-related
 /// error, not a generic CorruptData. Exercises the case-insensitive error classification.
 #[test]
 fn test_error_classification_tampered_legacy() {
-    let key =
-        keys::generate_key_with_suite("Audit".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Audit".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"error classification test",
@@ -38,9 +42,13 @@ fn test_error_classification_tampered_legacy() {
 /// AEAD-related error. Exercises the case-insensitive error classification.
 #[test]
 fn test_error_classification_tampered_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Audit".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Audit".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"error classification test",
@@ -66,12 +74,21 @@ fn test_error_classification_tampered_modern_high() {
 /// Verifies the hard-fail security invariant.
 #[test]
 fn test_decrypt_wrong_key_no_plaintext_leak() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt(
         b"secret for alice only",
@@ -94,9 +111,13 @@ fn test_decrypt_wrong_key_no_plaintext_leak() {
 /// (read-support contract), this is rejected per security policy.
 #[test]
 fn test_decrypt_legacy_seipd_no_mdc_rejected() {
-    let key =
-        keys::generate_key_with_suite("Legacy".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Legacy".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"legacy seipd rejection test",
@@ -162,12 +183,21 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
 /// Complements test_decrypt_wrong_key_no_plaintext_leak (Legacy only).
 #[test]
 fn test_decrypt_wrong_key_no_plaintext_leak_modern_high() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt(
         b"secret for alice only (AEAD)",

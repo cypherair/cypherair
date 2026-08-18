@@ -32,7 +32,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         var signer = try engine.generateKey(
             name: "Software Signer",
             email: "software@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         defer { signer.certData.resetBytes(in: 0..<signer.certData.count) }
@@ -460,7 +460,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         try engine.generateKey(
             name: name,
             email: "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: suite
         )
     }
@@ -511,7 +511,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Text Encrypt \(label)",
             email: "secure-text-encrypt-\(label)@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

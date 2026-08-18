@@ -11,7 +11,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Certified Contact",
             email: "certified@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -63,7 +63,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Manual Separate",
             email: "manual@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(
@@ -97,7 +97,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Stale Digest",
             email: "stale-digest@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -135,7 +135,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Backfill Digest",
             email: "backfill@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -175,7 +175,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Dedupe Refresh",
             email: "dedupe@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -247,7 +247,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Recompute Stale Digest",
             email: "recompute-stale@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -298,7 +298,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Recompute Artifact Only",
             email: "recompute-artifact@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -349,7 +349,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Recompute Valid Digest",
             email: "recompute-valid@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -392,7 +392,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Revalidated Contact",
             email: "revalidated@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)

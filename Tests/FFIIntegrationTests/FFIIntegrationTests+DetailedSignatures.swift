@@ -198,7 +198,7 @@ extension FFIIntegrationTests {
         let recipient = try engine.generateKey(
             name: "FFI Detailed Recipient",
             email: "ffi-detailed@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -223,13 +223,13 @@ extension FFIIntegrationTests {
         let signer = try engine.generateKey(
             name: "FFI Detailed Modern High Signer",
             email: "ffi-detailed-b@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         let recipient = try engine.generateKey(
             name: "FFI Detailed Modern High Recipient",
             email: "ffi-detailed-b-recipient@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 

@@ -26,7 +26,7 @@ use openpgp::types::CompressionAlgorithm;
 use sequoia_openpgp as openpgp;
 
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, GeneratedKey, KeySuite};
+use pgp_mobile::keys::{self, GeneratedKey, KeySuite, KeyValidity};
 use pgp_mobile::{decrypt, encrypt, password, streaming, verify};
 
 /// A key generation cheap enough to run once per test.
@@ -34,7 +34,7 @@ fn test_key() -> GeneratedKey {
     keys::generate_key_with_suite(
         "Consumption".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("key generation should succeed")

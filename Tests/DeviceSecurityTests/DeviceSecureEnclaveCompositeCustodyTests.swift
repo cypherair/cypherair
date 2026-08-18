@@ -58,7 +58,7 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
         var material = try await adapter.generateCompositeCertificate(
             name: "Device Composite Evidence",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             handlePair: loadedPair,
             compositeSigner: operations
         )
@@ -175,7 +175,7 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
         var material = try await adapter.generateCompositeCertificate(
             name: "Device Composite High Evidence",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             handlePair: loadedPair,
             compositeSigner: operations
         )

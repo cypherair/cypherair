@@ -10,7 +10,7 @@ use openpgp::types::{Curve, HashAlgorithm};
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
     self, ExternalP256SigningError, ExternalP256SigningFailureCategory,
-    ExternalP256SigningProvider, P256EcdsaSignature, SecureEnclaveCertificateVersion,
+    ExternalP256SigningProvider, KeyValidity, P256EcdsaSignature, SecureEnclaveCertificateVersion,
     SecureEnclavePublicCertificateInput,
 };
 use pgp_mobile::password;
@@ -70,12 +70,12 @@ impl CandidateMaterial {
 }
 
 fn build_candidate(version: CandidateVersion) -> Result<CandidateMaterial, PgpError> {
-    build_candidate_with_expiry(version, None)
+    build_candidate_with_validity(version, KeyValidity::Never)
 }
 
-fn build_candidate_with_expiry(
+fn build_candidate_with_validity(
     version: CandidateVersion,
-    expiry_seconds: Option<u64>,
+    validity: KeyValidity,
 ) -> Result<CandidateMaterial, PgpError> {
     let signing_key: Key<key::SecretParts, key::PrimaryRole> = match version {
         CandidateVersion::V4 => key::Key4::generate_ecc(true, Curve::NistP256)
@@ -115,7 +115,7 @@ fn build_candidate_with_expiry(
         SecureEnclavePublicCertificateInput {
             name: format!("SE {}", version.label()),
             email: Some(format!("se-{}@example.test", version.label())),
-            expiry_seconds,
+            validity,
             version: version.secure_enclave_version(),
             signing_public_key_x963,
             key_agreement_public_key_x963,

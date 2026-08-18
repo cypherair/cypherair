@@ -27,7 +27,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             let identity = try await service.generateKey(
                 name: "Secure Enclave",
                 email: "se@example.test",
-                expirySeconds: 3600,
+                validity: .expiresIn(seconds: 3600),
                 family: family,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -60,7 +60,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await blockedPolicyService.generateKey(
                 name: "Secure Enclave",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -76,7 +76,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await invalidConfigurationService.generateKey(
                 name: "Software",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.portableEd25519LegacyCurve25519Legacy,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -95,7 +95,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await builderFailureService.generateKey(
                 name: "Builder Failure",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -120,7 +120,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await duplicateService.generateKey(
                 name: "Duplicate",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -145,7 +145,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await service.generateKey(
                 name: "Save Failure",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -172,7 +172,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await service.generateKey(
                 name: "Post Commit",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -203,7 +203,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await service.generateKey(
                 name: "Rollback Failure",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -285,7 +285,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         _ = try await service.generateKey(
             name: "Success",
             email: Optional<String>.none,
-            expirySeconds: Optional<UInt64>.none,
+            validity: .never,
             family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
             invalidationToken: KeyProvisioningInvalidationGate().makeToken()
         )
@@ -317,7 +317,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await service.generateKey(
                 name: "Cancel",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -349,7 +349,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await service.generateKey(
                 name: "Lockout",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -381,7 +381,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             _ = try await service.generateKey(
                 name: "Rollback",
                 email: Optional<String>.none,
-                expirySeconds: Optional<UInt64>.none,
+                validity: .never,
                 family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
@@ -403,7 +403,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         _ = try await service.generateKey(
             name: "Nil",
             email: Optional<String>.none,
-            expirySeconds: Optional<UInt64>.none,
+            validity: .never,
             family: PGPKeyFamily.deviceBoundEcdsaNistP256EcdhNistP256V4,
             invalidationToken: KeyProvisioningInvalidationGate().makeToken()
         )
@@ -522,7 +522,7 @@ private final class MockSecureEnclaveCustodyCertificateBuilder: SecureEnclaveCus
     func generatePublicCertificate(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning

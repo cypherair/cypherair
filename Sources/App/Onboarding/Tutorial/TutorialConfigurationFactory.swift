@@ -13,7 +13,7 @@ struct TutorialConfigurationFactory {
             prefilledEmail: "alice@demo.invalid",
             // The tutorial demo identity uses the Modern (Ed25519+X25519) family.
             lockedFamily: .portableEd25519X25519,
-            lockedExpiryMonths: 24,
+            lockedExpiryTerm: KeyExpiryPolicy.defaultTerm,
             postGenerationBehavior: .suppressPrompt
         )
 

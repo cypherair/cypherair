@@ -12,13 +12,13 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
         let work = try engine.generateKey(
             name: "Work Person",
             email: "work-person@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let personal = try engine.generateKey(
             name: "Personal Person",
             email: "personal-person@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -58,7 +58,7 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Filter Person",
             email: "filter-person@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -86,7 +86,7 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Tagged Person",
             email: "tagged-person@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -124,7 +124,7 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Searchable Person",
             email: "searchable-person@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 

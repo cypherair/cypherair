@@ -1,4 +1,5 @@
 use super::*;
+use pgp_mobile::keys::KeyValidity;
 
 #[test]
 fn test_external_signer_runtime_password_encrypt_decrypts_and_verifies_for_v4_and_v6() {
@@ -174,7 +175,7 @@ fn test_external_signer_runtime_password_rejects_secret_non_p256_and_wrong_role_
     let secret = keys::generate_key_with_suite(
         "Software Secret".to_string(),
         Some("software-secret@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");

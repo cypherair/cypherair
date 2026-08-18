@@ -12,7 +12,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         // Modify expiry to 1 year (31536000 seconds)
         let updated = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 31_536_000,
+            newValidity: .expiresIn(seconds: 31_536_000),
             authMode: .standard
         )
 
@@ -27,7 +27,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
 
         let updated = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 31_536_000,
+            newValidity: .expiresIn(seconds: 31_536_000),
             authMode: .standard
         )
 
@@ -43,7 +43,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
 
         _ = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 31_536_000,
+            newValidity: .expiresIn(seconds: 31_536_000),
             authMode: .standard
         )
 
@@ -69,7 +69,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         do {
             _ = try await localService.modifyExpiry(
                 fingerprint: identity.fingerprint,
-                newExpirySeconds: 31_536_000,
+                newValidity: .expiresIn(seconds: 31_536_000),
                 authMode: .standard
             )
             XCTFail("Expected beginModifyExpiry failure to be surfaced.")
@@ -109,7 +109,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         do {
             _ = try await localService.modifyExpiry(
                 fingerprint: identity.fingerprint,
-                newExpirySeconds: 31_536_000,
+                newValidity: .expiresIn(seconds: 31_536_000),
                 authMode: .standard
             )
             XCTFail("Expected clearModifyExpiryJournal failure to be surfaced.")

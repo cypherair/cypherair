@@ -27,7 +27,7 @@ final class QRServiceTests: XCTestCase {
         // Generate a Legacy key and encode it as a QR URL
         let generated = try engine.generateKey(
             name: "Alice", email: "alice@example.com",
-            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let urlString = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
         let url = try XCTUnwrap(URL(string: urlString))
@@ -46,7 +46,7 @@ final class QRServiceTests: XCTestCase {
     func test_parseImportURL_validV1URL_modernHigh_returnsPublicKeyData() throws {
         let generated = try engine.generateKey(
             name: "Bob", email: "bob@example.com",
-            expirySeconds: nil, suite: .ed448X448
+            validity: .never, suite: .ed448X448
         )
         let urlString = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
         let url = try XCTUnwrap(URL(string: urlString))
@@ -61,7 +61,7 @@ final class QRServiceTests: XCTestCase {
     func test_parseImportURL_roundTrip_fingerprintMatches() throws {
         let generated = try engine.generateKey(
             name: "Carol", email: "carol@example.com",
-            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
 
@@ -78,7 +78,7 @@ final class QRServiceTests: XCTestCase {
     func test_parseImportURL_roundTrip_modernHigh_fingerprintMatches() throws {
         let generated = try engine.generateKey(
             name: "Dave", email: "dave@example.com",
-            expirySeconds: nil, suite: .ed448X448
+            validity: .never, suite: .ed448X448
         )
         let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
 
@@ -95,7 +95,7 @@ final class QRServiceTests: XCTestCase {
         let generated = try engine.generateKey(
             name: "Import Display",
             email: "display@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
@@ -234,7 +234,7 @@ final class QRServiceTests: XCTestCase {
         // but we verify that parsing rejects secret key material if somehow encoded.
         let generated = try engine.generateKey(
             name: "Mallory", email: nil,
-            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Try encoding cert data (contains secret key) — the Rust engine should reject this
@@ -247,7 +247,7 @@ final class QRServiceTests: XCTestCase {
         let generated = try engine.generateKey(
             name: "Import Secret Reject",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -310,7 +310,7 @@ final class QRServiceTests: XCTestCase {
     func test_generateQRCode_validPublicKey_returnsCIImage() throws {
         let generated = try engine.generateKey(
             name: "QR Test", email: nil,
-            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let image = try qrService.generateQRCode(for: generated.publicKeyData)
@@ -328,7 +328,7 @@ final class QRServiceTests: XCTestCase {
     func test_qrCodeRoundTrip_generateThenDecode_recoversPublicKey() async throws {
         let generated = try engine.generateKey(
             name: "QR Round-Trip", email: nil,
-            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Generate QR code image

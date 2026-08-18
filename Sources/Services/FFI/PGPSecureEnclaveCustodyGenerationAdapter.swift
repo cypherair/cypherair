@@ -12,7 +12,7 @@ protocol SecureEnclaveCustodyCertificateBuilding: Sendable {
     func generatePublicCertificate(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
@@ -29,7 +29,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
     func generatePublicCertificate(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
@@ -39,7 +39,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
                 engine: engine,
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 signingPublicKeyX963: handlePair.signing.binding.publicKeyRaw,
                 keyAgreementPublicKeyX963: handlePair.keyAgreement.binding.publicKeyRaw,
@@ -58,7 +58,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
         engine: PgpEngine,
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         signingPublicKeyX963: Data,
         keyAgreementPublicKeyX963: Data,
@@ -85,7 +85,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
         let input = SecureEnclavePublicCertificateInput(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity.ffiValue,
             version: version,
             signingPublicKeyX963: signingPublicKeyX963,
             keyAgreementPublicKeyX963: keyAgreementPublicKeyX963

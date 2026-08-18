@@ -45,6 +45,15 @@ extension PGPKeySuite {
     }
 }
 
+extension PGPKeyValidity {
+    var ffiValue: KeyValidity {
+        switch self {
+        case .never: .never
+        case .expiresIn(let seconds): .expiresIn(seconds: seconds)
+        }
+    }
+}
+
 extension KeySuite {
     var appSuite: PGPKeySuite {
         switch self {

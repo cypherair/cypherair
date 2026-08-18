@@ -5,7 +5,7 @@
 use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
@@ -25,7 +25,7 @@ fn test_generate_key_modern_high_produces_v6() {
     let result = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
@@ -44,7 +44,7 @@ fn test_generate_key_modern_high_algorithms() {
     let result = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
@@ -75,9 +75,13 @@ fn test_generate_key_modern_high_algorithms() {
 /// Sign + verify text (Modern High).
 #[test]
 fn test_sign_verify_text_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key generation should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key generation should succeed");
 
     let text = b"Hello from Modern High!";
 
@@ -100,9 +104,13 @@ fn test_sign_verify_text_modern_high() {
 /// Encrypt + decrypt text (SEIPDv2 AEAD OCB).
 #[test]
 fn test_encrypt_decrypt_text_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key generation should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key generation should succeed");
 
     let plaintext = b"Secret message for Modern High with AEAD.";
 
@@ -118,13 +126,21 @@ fn test_encrypt_decrypt_text_modern_high() {
 /// (extended): Encrypt + decrypt with signature.
 #[test]
 fn test_encrypt_decrypt_signed_modern_high() {
-    let sender =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Sender key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Recipient key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"Signed and encrypted Modern High message.";
 
@@ -150,13 +166,21 @@ fn test_encrypt_decrypt_signed_modern_high() {
 /// Encrypt-to-self (Modern High).
 #[test]
 fn test_encrypt_to_self_modern_high() {
-    let sender =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let recipient =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Modern High with encrypt-to-self.";
 
@@ -182,9 +206,13 @@ fn test_encrypt_to_self_modern_high() {
 /// File encrypt/decrypt 1 MB (Modern High).
 #[test]
 fn test_file_encrypt_decrypt_1mb_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext: Vec<u8> = (0..1_000_000).map(|i| (i % 256) as u8).collect();
 
@@ -201,9 +229,13 @@ fn test_file_encrypt_decrypt_1mb_modern_high() {
 /// File encrypt/decrypt 10 MB (Modern High).
 #[test]
 fn test_file_encrypt_decrypt_10mb_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext: Vec<u8> = (0..10_000_000).map(|i| (i % 256) as u8).collect();
 
@@ -224,9 +256,13 @@ fn test_file_encrypt_decrypt_10mb_modern_high() {
 /// Tests multiple tamper positions to exercise different code paths.
 #[test]
 fn test_tamper_detection_aead_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"AEAD-protected secret.";
 
@@ -280,9 +316,13 @@ fn test_tamper_detection_aead_modern_high() {
 /// Detached signature (Modern High).
 #[test]
 fn test_detached_signature_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let data = b"File content for Modern High.";
 
@@ -305,9 +345,13 @@ fn test_detached_signature_modern_high() {
 /// Empty plaintext encrypt/decrypt round-trip (Modern High).
 #[test]
 fn test_encrypt_decrypt_empty_plaintext_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"";
     let ciphertext = encrypt::encrypt(plaintext, &[key.public_key_data.clone()], None, None)
@@ -326,12 +370,21 @@ fn test_encrypt_decrypt_empty_plaintext_modern_high() {
 /// Concurrent encrypt + decrypt on separate key pairs (Modern High).
 #[test]
 fn test_concurrent_encrypt_decrypt_modern_high() {
-    let key1 =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key1 = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let key2 = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let key2 = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let k1_pub = key1.public_key_data.clone();
     let k2_pub = key2.public_key_data.clone();
@@ -364,12 +417,21 @@ fn test_concurrent_encrypt_decrypt_modern_high() {
 /// Ensures the full AEAD decrypt path fails correctly with wrong key.
 #[test]
 fn test_decrypt_wrong_key_modern_high() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Only for Alice (Modern High).";
 
@@ -390,12 +452,21 @@ fn test_decrypt_wrong_key_modern_high() {
 /// Encrypt to multiple v6 recipients → each can independently decrypt.
 #[test]
 fn test_multi_recipient_encrypt_decrypt_modern_high() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Message for both Alice and Bob (Modern High).";
 
@@ -421,9 +492,13 @@ fn test_multi_recipient_encrypt_decrypt_modern_high() {
 /// Armor round-trip: Modern High public key → armor → dearmor → identical.
 #[test]
 fn test_armor_roundtrip_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let armored = armor::armor_public_key(&key.public_key_data).expect("Armor should succeed");
 

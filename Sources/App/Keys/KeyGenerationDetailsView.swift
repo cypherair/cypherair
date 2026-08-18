@@ -46,14 +46,13 @@ struct KeyGenerationDetailsView: View {
             Section {
                 Picker(
                     String(localized: "keygen.expiry", defaultValue: "Expires After"),
-                    selection: $model.expiryMonths
+                    selection: $model.expiryTerm
                 ) {
-                    ForEach(model.expiryOptions, id: \.self) { months in
-                        Text(String(localized: "keygen.expiry.months", defaultValue: "\(months) months"))
-                            .tag(months)
+                    ForEach(model.expiryTerms, id: \.self) { term in
+                        Text(Self.label(for: term)).tag(term)
                     }
                 }
-                .disabled(model.configuration.lockedExpiryMonths != nil)
+                .disabled(model.configuration.lockedExpiryTerm != nil)
             } header: {
                 Text(String(localized: "keygen.expiry.header", defaultValue: "Validity"))
             }
@@ -166,5 +165,14 @@ struct KeyGenerationDetailsView: View {
         .buttonStyle(.borderedProminent)
         .disabled(model.generateButtonDisabled)
         .accessibilityIdentifier("keygen.generate")
+    }
+
+    private static func label(for term: KeyExpiryTerm) -> String {
+        switch term {
+        case .never:
+            String(localized: "keygen.expiry.never", defaultValue: "Never")
+        case .years(let years):
+            String(localized: "keygen.expiry.years", defaultValue: "\(years) years")
+        }
     }
 }

@@ -424,13 +424,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let preferred = try stack.engine.generateKey(
             name: "Preferred Recipient",
             email: "preferred-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let historical = try stack.engine.generateKey(
             name: "Historical Recipient",
             email: "historical-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: preferred.publicKeyData, verificationState: .verified)
@@ -492,13 +492,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let first = try stack.engine.generateKey(
             name: "Tag First",
             email: "encrypt-tag-first@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try stack.engine.generateKey(
             name: "Tag Second",
             email: "encrypt-tag-second@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
@@ -559,13 +559,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let selectable = try stack.engine.generateKey(
             name: "Selectable Tag Member",
             email: "selectable-tag-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let missingPreferred = try stack.engine.generateKey(
             name: "Missing Preferred Tag Member",
             email: "missing-preferred-tag@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: selectable.publicKeyData, verificationState: .verified)
@@ -610,13 +610,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let tagged = try stack.engine.generateKey(
             name: "Tagged Member",
             email: "filter-tagged@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let untagged = try stack.engine.generateKey(
             name: "Untagged Member",
             email: "filter-untagged@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: tagged.publicKeyData, verificationState: .verified)
@@ -657,7 +657,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let member = try stack.engine.generateKey(
             name: "Filter Member",
             email: "filter-toggle-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: member.publicKeyData, verificationState: .verified)
@@ -695,13 +695,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let first = try stack.engine.generateKey(
             name: "Summary First",
             email: "summary-first@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try stack.engine.generateKey(
             name: "Summary Second",
             email: "summary-second@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
@@ -738,13 +738,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let pqOne = try stack.engine.generateKey(
             name: "PQ One",
             email: "pq-one@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .mlDsa65Ed25519MlKem768X25519
         )
         let classical = try stack.engine.generateKey(
             name: "Classic Recipient",
             email: "classic-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: pqOne.publicKeyData, verificationState: .verified)
@@ -841,13 +841,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let legacyRecipient = try stack.engine.generateKey(
             name: "Legacy Recipient",
             email: "legacy-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let modernRecipient = try stack.engine.generateKey(
             name: "Modern Recipient",
             email: "modern-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         try stack.contactService.importContact(publicKeyData: legacyRecipient.publicKeyData)
@@ -953,7 +953,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let valid = try stack.engine.generateKey(
             name: "Available Recipient",
             email: "available-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: valid.publicKeyData, verificationState: .verified)
@@ -989,7 +989,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let valid = try stack.engine.generateKey(
             name: "Valid Recipient",
             email: "valid-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: valid.publicKeyData, verificationState: .verified)
@@ -1027,19 +1027,19 @@ final class EncryptScreenModelTests: XCTestCase {
         let alpha = try stack.engine.generateKey(
             name: "Stable Alpha",
             email: "stable-alpha@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let bravo = try stack.engine.generateKey(
             name: "Stable Bravo",
             email: "stable-bravo@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let charlie = try stack.engine.generateKey(
             name: "Stable Charlie",
             email: "stable-charlie@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         for key in [alpha, bravo, charlie] {
@@ -1073,13 +1073,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let encryptable = try stack.engine.generateKey(
             name: "Active Member",
             email: "active-tag-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let nonEncryptable = try stack.engine.generateKey(
             name: "Inactive Member",
             email: "inactive-tag-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: encryptable.publicKeyData, verificationState: .verified)
@@ -1124,7 +1124,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let only = try stack.engine.generateKey(
             name: "Solo Recipient",
             email: "solo-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: only.publicKeyData, verificationState: .verified)
@@ -1150,13 +1150,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let shown = try stack.engine.generateKey(
             name: "Shown Recipient",
             email: "shown-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let hidden = try stack.engine.generateKey(
             name: "Other Recipient",
             email: "other-recipient@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: shown.publicKeyData, verificationState: .verified)
@@ -1206,7 +1206,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let member = try stack.engine.generateKey(
             name: "Prune Member",
             email: "prune-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: member.publicKeyData, verificationState: .verified)
@@ -1237,13 +1237,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let visible = try stack.engine.generateKey(
             name: "Visible Alpha",
             email: "visible-alpha@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let hidden = try stack.engine.generateKey(
             name: "Hidden Beta",
             email: "hidden-beta@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: visible.publicKeyData, verificationState: .verified)
@@ -1279,13 +1279,13 @@ final class EncryptScreenModelTests: XCTestCase {
         let retained = try stack.engine.generateKey(
             name: "Retained Direct Recipient",
             email: "retained-direct@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let removed = try stack.engine.generateKey(
             name: "Removed Direct Recipient",
             email: "removed-direct@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         try opened.service.importContact(publicKeyData: retained.publicKeyData, verificationState: .verified)
@@ -1325,7 +1325,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let unverified = try stack.engine.generateKey(
             name: "Unverified Tag Member",
             email: "unverified-tag-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
@@ -1364,7 +1364,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let unverified = try stack.engine.generateKey(
             name: "Warning Removed Tag Member",
             email: "warning-removed-tag-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try opened.service.importContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)

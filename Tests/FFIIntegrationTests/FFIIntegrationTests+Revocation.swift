@@ -9,7 +9,7 @@ extension FFIIntegrationTests {
         let key = try engine.generateKey(
             name: "Generated Revocation",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -115,7 +115,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Selector Revocation",
             email: "selector-revocation@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
@@ -137,7 +137,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Selector Revocation Range",
             email: "selector-revocation-range@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
@@ -161,7 +161,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Selector Revocation Mismatch",
             email: "selector-revocation-mismatch@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)

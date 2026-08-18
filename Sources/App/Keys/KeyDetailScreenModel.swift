@@ -35,7 +35,6 @@ final class KeyDetailScreenModel {
     var showError = false
     var isPreparingRevocationExport = false
     var localModifyExpiryRequest: ModifyExpiryRequest?
-    var suggestedExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
 
     init(
         fingerprint: String,
@@ -295,10 +294,7 @@ final class KeyDetailScreenModel {
     }
 
     private func makeModifyExpiryRequest() -> ModifyExpiryRequest {
-        ModifyExpiryRequest(
-            fingerprint: fingerprint,
-            initialDate: suggestedExpiryDate
-        ) { [weak self] in
+        ModifyExpiryRequest(fingerprint: fingerprint) { [weak self] in
             self?.reloadPublicKey()
             self?.localModifyExpiryRequest = nil
         }

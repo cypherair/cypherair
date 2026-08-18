@@ -5,14 +5,14 @@
 mod common;
 
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use std::fs;
 
 /// Helper to generate a key pair for testing.
 fn gen_key(name: &str, suite: KeySuite) -> keys::GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), None, None, suite)
+    keys::generate_key_with_suite(name.to_string(), None, KeyValidity::Never, suite)
         .expect("Key generation should succeed")
 }
 

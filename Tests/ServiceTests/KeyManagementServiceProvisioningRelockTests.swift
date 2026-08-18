@@ -17,7 +17,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Reset Race",
                 email: "reset-race@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -58,7 +58,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Relock Before Auth Mode",
                 email: "relock-before-auth-mode@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -99,7 +99,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Relock Race",
                 email: "relock-race@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -139,7 +139,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Cancelled After Commit",
                 email: "cancelled-after-commit@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -175,7 +175,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Relock During Bundle Commit",
                 email: "relock-during-bundle-commit@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -426,7 +426,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             _ = try await target.service.generateKey(
                 name: "Save Failure",
                 email: "save-failure@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
             XCTFail("Expected metadata save failure")
@@ -471,7 +471,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Cancelled After Metadata",
                 email: "cancelled-after-metadata@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -550,7 +550,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await targetService.generateKey(
                 name: "Discard Failure",
                 email: "discard-failure@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -622,7 +622,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
             try await keyManagement.generateKey(
                 name: "Protected Relock Race",
                 email: "protected-relock-race@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }

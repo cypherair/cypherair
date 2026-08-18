@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::streaming::{self, StreamingProgressReporter};
 
 /// Test progress reporter that records callback data.
@@ -58,7 +58,7 @@ impl StreamingProgressReporter for TestProgressReporter {
 }
 
 fn gen_key(name: &str, profile: KeySuite) -> keys::GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), None, None, profile)
+    keys::generate_key_with_suite(name.to_string(), None, KeyValidity::Never, profile)
         .expect("Key generation should succeed")
 }
 

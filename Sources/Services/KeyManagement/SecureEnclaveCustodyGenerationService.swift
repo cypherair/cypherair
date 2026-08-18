@@ -63,7 +63,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -77,7 +77,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             return try await performGenerateClassicalKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 invalidationToken: token
             )
@@ -85,7 +85,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             return try await performGenerateCompositeKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 tier: tier,
                 invalidationToken: token
@@ -100,7 +100,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private func performGenerateClassicalKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -138,7 +138,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             let generated = try await certificateBuilder.generatePublicCertificate(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 handlePair: loadedPair,
                 digestSigner: digestSigner
@@ -216,7 +216,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private func performGenerateCompositeKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         tier: SecureEnclaveCustodyTier,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
@@ -276,7 +276,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             var generated = try await compositeCertificateBuilder.generateCompositeCertificate(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 handlePair: handlePair,
                 compositeSigner: compositeSigner
             )

@@ -17,7 +17,7 @@ protocol SecureEnclaveCompositeCertificateBuilding: Sendable {
     func generateCompositeCertificate(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial
@@ -38,7 +38,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
     func generateCompositeCertificate(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         handlePair: SecureEnclaveCustodyLoadedHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
@@ -53,7 +53,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
                     engine: engine,
                     name: name,
                     email: email,
-                    expirySeconds: expirySeconds,
+                    validity: validity,
                     mldsa65SigningPublicKey: handlePair.signing.binding.publicKeyRaw,
                     mlkem768KeyAgreementPublicKey: handlePair.keyAgreement.binding.publicKeyRaw,
                     signingProvider: PGPExternalMlDsa65SigningProviderBridge(
@@ -66,7 +66,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
                     engine: engine,
                     name: name,
                     email: email,
-                    expirySeconds: expirySeconds,
+                    validity: validity,
                     mldsa87SigningPublicKey: handlePair.signing.binding.publicKeyRaw,
                     mlkem1024KeyAgreementPublicKey: handlePair.keyAgreement.binding.publicKeyRaw,
                     signingProvider: PGPExternalMlDsa87SigningProviderBridge(
@@ -85,7 +85,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         engine: PgpEngine,
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         mldsa65SigningPublicKey: Data,
         mlkem768KeyAgreementPublicKey: Data,
         signingProvider: ExternalMlDsa65SigningProvider
@@ -93,7 +93,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         let input = SecureEnclaveCompositePublicCertificateInput(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity.ffiValue,
             mldsa65SigningPublicKey: mldsa65SigningPublicKey,
             mlkem768KeyAgreementPublicKey: mlkem768KeyAgreementPublicKey
         )
@@ -109,7 +109,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         engine: PgpEngine,
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         mldsa87SigningPublicKey: Data,
         mlkem1024KeyAgreementPublicKey: Data,
         signingProvider: ExternalMlDsa87SigningProvider
@@ -117,7 +117,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         let input = SecureEnclaveCompositeHighPublicCertificateInput(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity.ffiValue,
             mldsa87SigningPublicKey: mldsa87SigningPublicKey,
             mlkem1024KeyAgreementPublicKey: mlkem1024KeyAgreementPublicKey
         )

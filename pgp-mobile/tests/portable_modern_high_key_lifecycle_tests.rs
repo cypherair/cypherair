@@ -4,14 +4,18 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 
 /// Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     // parse_revocation_cert internally requires a KeyRevocation signature and
     // cryptographically verifies it against the source cert, so a successful
@@ -23,13 +27,21 @@ fn test_revocation_cert_modern_high() {
 /// Revocation cert for key A should not verify against key B.
 #[test]
 fn test_revocation_cert_wrong_key_modern_high() {
-    let key_a =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key A gen should succeed");
+    let key_a = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key A gen should succeed");
 
-    let key_b =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key B gen should succeed");
+    let key_b = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key B gen should succeed");
 
     let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
     assert!(
@@ -47,14 +59,18 @@ fn test_export_modern_high_uses_argon2id() {
     use sequoia_openpgp::packet::key::SecretKeyMaterial;
     use sequoia_openpgp::parse::Parse;
 
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let passphrase = "s2k-verification-test";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
 
     let s2k_info = keys::parse_s2k_params(&exported).expect("S2K params should parse");
 
@@ -91,12 +107,10 @@ fn test_export_modern_high_uses_argon2id() {
 /// cannot afford — the exact failure the guard exists to prevent.
 #[test]
 fn test_export_s2k_params_matches_what_export_emits() {
-    for suite in [
-        KeySuite::Ed25519LegacyCurve25519Legacy,
-        KeySuite::Ed448X448,
-    ] {
-        let key = keys::generate_key_with_suite("Alice".to_string(), None, None, suite)
-            .expect("Key gen should succeed");
+    for suite in [KeySuite::Ed25519LegacyCurve25519Legacy, KeySuite::Ed448X448] {
+        let key =
+            keys::generate_key_with_suite("Alice".to_string(), None, KeyValidity::Never, suite)
+                .expect("Key gen should succeed");
         let exported = keys::export_secret_key(&key.cert_data, "s2k-prediction-test")
             .expect("Export should succeed");
         let emitted = keys::parse_s2k_params(&exported).expect("S2K params should parse");
@@ -116,9 +130,13 @@ fn test_export_s2k_params_matches_what_export_emits() {
 /// Expired Modern High key detected.
 #[test]
 fn test_expired_key_detected_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, Some(1), KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::ExpiresIn { seconds: 1 },
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
@@ -136,7 +154,7 @@ fn test_unicode_user_id_modern_high() {
     let key = keys::generate_key_with_suite(
         "李四 🛡️".to_string(),
         Some("lisi@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen with Unicode should succeed");
@@ -148,8 +166,13 @@ fn test_unicode_user_id_modern_high() {
 /// match_recipients: Modern High (v6 key, SEIPDv2) returns primary fingerprint.
 #[test]
 fn test_match_recipients_modern_high_returns_primary_fingerprint() {
-    let key = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"modern high test",
@@ -169,12 +192,21 @@ fn test_match_recipients_modern_high_returns_primary_fingerprint() {
 /// match_recipients: Modern High wrong key → NoMatchingKey.
 #[test]
 fn test_match_recipients_modern_high_wrong_key_returns_error() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"for alice only",
@@ -195,13 +227,21 @@ fn test_match_recipients_modern_high_wrong_key_returns_error() {
 /// Complements test_match_recipients_legacy_encrypt_to_self (Legacy).
 #[test]
 fn test_match_recipients_modern_high_encrypt_to_self() {
-    let sender =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let recipient =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"encrypt-to-self test",
@@ -236,13 +276,20 @@ fn test_modify_expiry_modern_high_extend() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
 
-    let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
-        .expect("modify_expiry should succeed for Modern High");
+    let result = keys::modify_expiry(
+        &generated.cert_data,
+        KeyValidity::ExpiresIn {
+            seconds: 3 * 365 * 24 * 3600,
+        },
+    )
+    .expect("modify_expiry should succeed for Modern High");
 
     assert!(!result.cert_data.is_empty());
     assert!(!result.public_key_data.is_empty());
@@ -264,7 +311,9 @@ fn test_modify_expiry_modern_high_remove() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
@@ -273,7 +322,7 @@ fn test_modify_expiry_modern_high_remove() {
         keys::parse_key_info(&generated.public_key_data).expect("Parse should succeed");
     assert!(info_before.expiry_timestamp.is_some());
 
-    let result = keys::modify_expiry(&generated.cert_data, None)
+    let result = keys::modify_expiry(&generated.cert_data, KeyValidity::Never)
         .expect("modify_expiry with None should succeed");
 
     assert!(!result.key_info.is_expired);
@@ -284,12 +333,16 @@ fn test_modify_expiry_modern_high_remove() {
 /// Pass: key is expired.
 #[test]
 fn test_modify_expiry_modern_high_to_past() {
-    let generated =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key generation should succeed");
+    let generated = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key generation should succeed");
 
-    let result =
-        keys::modify_expiry(&generated.cert_data, Some(1)).expect("modify_expiry should succeed");
+    let result = keys::modify_expiry(&generated.cert_data, KeyValidity::ExpiresIn { seconds: 1 })
+        .expect("modify_expiry should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(2));
 
@@ -306,13 +359,20 @@ fn test_modify_expiry_modern_high_roundtrip_encrypt_decrypt() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
 
-    let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
-        .expect("modify_expiry should succeed");
+    let result = keys::modify_expiry(
+        &generated.cert_data,
+        KeyValidity::ExpiresIn {
+            seconds: 3 * 365 * 24 * 3600,
+        },
+    )
+    .expect("modify_expiry should succeed");
 
     let plaintext = b"Hello after expiry modification (Modern High)!";
     let ciphertext = encrypt::encrypt(plaintext, &[result.public_key_data.clone()], None, None)

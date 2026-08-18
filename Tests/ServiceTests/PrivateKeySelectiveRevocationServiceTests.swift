@@ -440,7 +440,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Selective Revocation",
             email: "secure-selective-revocation@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
