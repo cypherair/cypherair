@@ -4,6 +4,7 @@ struct ProtectedOrdinarySettingsSnapshot: Codable, Equatable, Sendable {
     var gracePeriod: Int
     var hasCompletedOnboarding: Bool
     var encryptToSelf: Bool
+    var signMessages: Bool
     var hasCompletedGuidedTutorial: Bool
 
     static var firstRunDefaults: ProtectedOrdinarySettingsSnapshot {
@@ -11,6 +12,7 @@ struct ProtectedOrdinarySettingsSnapshot: Codable, Equatable, Sendable {
             gracePeriod: AuthPreferences.defaultGracePeriod,
             hasCompletedOnboarding: false,
             encryptToSelf: true,
+            signMessages: true,
             hasCompletedGuidedTutorial: false
         )
     }

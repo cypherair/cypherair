@@ -30,11 +30,14 @@ struct EncryptOptionsSection: View {
 
             Toggle(
                 String(localized: "encrypt.sign", defaultValue: "Sign Message"),
-                isOn: $model.signMessage
+                isOn: Binding(
+                    get: { model.signMessageToggleValue },
+                    set: { model.signMessage = $0 }
+                )
             )
-            .disabled(model.configuration.signingPolicy.isLocked)
+            .disabled(!model.isSignMessageControlEnabled)
 
-            if model.signMessage && model.ownKeys.count > 1 {
+            if model.signMessageToggleValue && model.ownKeys.count > 1 {
                 Picker(
                     String(localized: "encrypt.signingKey", defaultValue: "Signing Key"),
                     selection: $model.signerFingerprint

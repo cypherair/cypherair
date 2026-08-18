@@ -769,6 +769,7 @@ final class ModelTests: XCTestCase {
                 gracePeriod: 300,
                 hasCompletedOnboarding: true,
                 encryptToSelf: false,
+                signMessages: false,
                 hasCompletedGuidedTutorial: true
             )
         )
@@ -810,6 +811,7 @@ final class ModelTests: XCTestCase {
                 gracePeriod: 300,
                 hasCompletedOnboarding: true,
                 encryptToSelf: false,
+                signMessages: false,
                 hasCompletedGuidedTutorial: true
             )
         )

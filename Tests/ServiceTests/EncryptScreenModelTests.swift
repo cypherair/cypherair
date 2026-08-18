@@ -192,7 +192,7 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedRecipients, [recipientContactId])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
-        XCTAssertFalse(model.signMessage)
+        XCTAssertEqual(model.signMessage, false)
         XCTAssertEqual(model.encryptToSelf, true)
 
         model.plaintext = "User edited plaintext"
@@ -208,7 +208,7 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedRecipients, ["override"])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
-        XCTAssertFalse(model.signMessage)
+        XCTAssertEqual(model.signMessage, false)
         XCTAssertEqual(model.encryptToSelf, true)
     }
 
@@ -246,7 +246,7 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedRecipients, [recipientContactId])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
-        XCTAssertFalse(model.signMessage)
+        XCTAssertEqual(model.signMessage, false)
         XCTAssertEqual(model.encryptToSelf, true)
         XCTAssertFalse(model.configuration.allowsResultExport)
     }
@@ -1662,6 +1662,51 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertNil(model.encryptedFileURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
         XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    /// Both message-composition toggles read the same protected domain, and a
+    /// host is free to pin either one. A refresh that gated both assignments on
+    /// one policy would let a pinned toggle suppress the other's app default, so
+    /// the toggle the host left free would never see the domain unlock.
+    @MainActor
+    func test_refreshProtectedOrdinarySettings_appliesEachPolicyIndependently() {
+        protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
+            persistence: InMemoryOrdinarySettingsStore(
+                snapshot: ProtectedOrdinarySettingsSnapshot(
+                    gracePeriod: AuthPreferences.defaultGracePeriod,
+                    hasCompletedOnboarding: true,
+                    encryptToSelf: false,
+                    signMessages: false,
+                    hasCompletedGuidedTutorial: true
+                )
+            )
+        )
+
+        var pinnedEncryptToSelf = EncryptView.Configuration()
+        pinnedEncryptToSelf.encryptToSelfPolicy = .fixed(true)
+        let freeSigning = makeModel(configuration: pinnedEncryptToSelf)
+        freeSigning.handleAppear()
+
+        var pinnedSigning = EncryptView.Configuration()
+        pinnedSigning.signingPolicy = .fixed(true)
+        let freeEncryptToSelf = makeModel(configuration: pinnedSigning)
+        freeEncryptToSelf.handleAppear()
+
+        // While the domain is locked the unpinned toggle has no value to state,
+        // and encryption is blocked rather than run against a guess.
+        XCTAssertNil(freeSigning.resolvedSignMessage)
+        XCTAssertNil(freeEncryptToSelf.resolvedEncryptToSelf)
+
+        protectedOrdinarySettings.loadFromUngatedEphemeralPersistence()
+        freeSigning.refreshProtectedOrdinarySettings()
+        freeEncryptToSelf.refreshProtectedOrdinarySettings()
+
+        // The unlock reaches the unpinned toggle in both directions; the pinned
+        // one keeps the value its host fixed.
+        XCTAssertEqual(freeSigning.signMessage, false)
+        XCTAssertEqual(freeSigning.encryptToSelf, true)
+        XCTAssertEqual(freeEncryptToSelf.encryptToSelf, false)
+        XCTAssertEqual(freeEncryptToSelf.signMessage, true)
     }
 
     @MainActor

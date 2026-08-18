@@ -13973,6 +13973,38 @@
         }
       }
     },
+    "settings.signMessages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign Messages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名消息"
+          }
+        }
+      }
+    },
+    "settings.signMessages.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing proves a message came from you and ties it to your key. These are the defaults for new messages; each message can still be changed before you encrypt it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名可证明消息出自您本人，并将其与您的密钥关联。以上为新消息的默认设置，每条消息在加密前仍可单独调整。"
+          }
+        }
+      }
+    },
     "settings.title" : {
       "localizations" : {
         "en" : {
