@@ -72,7 +72,7 @@ final class PrivateKeyAccessServiceTests: XCTestCase {
     ) throws -> (fingerprint: String, privateKey: Data) {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: privateKey,
+            privateKey: SensitiveBuffer(copying: privateKey),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate

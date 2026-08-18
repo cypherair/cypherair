@@ -57,7 +57,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0xAB, count: 32)
 
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         XCTAssertFalse(bundle.envelope.isEmpty)
         let decoded = try PrivateKeyEnvelopeCodec.decode(bundle.envelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
@@ -66,7 +66,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         XCTAssertEqual(decoded.ephemeralPublicKeyX963.count, 65, "Ephemeral key must be a P-256 X9.63 point")
         XCTAssertEqual(decoded.seKeyPublicKeyX963.count, 65, "SE public key must be a P-256 X9.63 point")
 
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
         XCTAssertEqual(unwrapped, fakePrivateKey, "Unwrapped key must match original")
     }
 
@@ -78,9 +78,9 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0xCD, count: 57)
 
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
         XCTAssertEqual(unwrapped, fakePrivateKey, "Ed448-size key must survive wrap/unwrap")
     }
 
@@ -92,10 +92,10 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0xEF, count: 32)
 
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprintA, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprintA, payloadKind: .softwareSecretCertificate)
 
         // Unwrap with a different fingerprint → HKDF derives a different key → AES-GCM open fails.
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprintB, payloadKind: .softwareSecretCertificate),
             "Unwrap with wrong fingerprint must fail (HKDF domain separation)"
         )
@@ -109,13 +109,13 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
         // Generate and wrap.
         let originalHandle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: originalHandle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: fakePrivateKey), using: originalHandle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         // Reconstruct SE key from dataRepresentation (simulates app restart).
         let reconstructedHandle = try secureEnclave.reconstructKey(from: originalHandle.dataRepresentation, authenticationContext: nil)
 
         // Unwrap using reconstructed handle.
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: reconstructedHandle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: reconstructedHandle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
         XCTAssertEqual(unwrapped, fakePrivateKey, "Reconstructed SE key must unwrap correctly")
     }
 
@@ -130,11 +130,11 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let handle1 = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let handle2 = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
 
-        let bundle1 = try secureEnclave.wrap(privateKey: key1, using: handle1, fingerprint: fp1, payloadKind: .softwareSecretCertificate)
-        let bundle2 = try secureEnclave.wrap(privateKey: key2, using: handle2, fingerprint: fp2, payloadKind: .softwareSecretCertificate)
+        let bundle1 = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: key1), using: handle1, fingerprint: fp1, payloadKind: .softwareSecretCertificate)
+        let bundle2 = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: key2), using: handle2, fingerprint: fp2, payloadKind: .softwareSecretCertificate)
 
-        let unwrapped1 = try secureEnclave.unwrap(bundle: bundle1, using: handle1, fingerprint: fp1, payloadKind: .softwareSecretCertificate)
-        let unwrapped2 = try secureEnclave.unwrap(bundle: bundle2, using: handle2, fingerprint: fp2, payloadKind: .softwareSecretCertificate)
+        let unwrapped1 = try secureEnclave.unwrap(bundle: bundle1, using: handle1, fingerprint: fp1, payloadKind: .softwareSecretCertificate).copiedBytes()
+        let unwrapped2 = try secureEnclave.unwrap(bundle: bundle2, using: handle2, fingerprint: fp2, payloadKind: .softwareSecretCertificate).copiedBytes()
 
         XCTAssertEqual(unwrapped1, key1)
         XCTAssertEqual(unwrapped2, key2)
@@ -153,8 +153,8 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         XCTAssertEqual(status, errSecSuccess, "SecRandomCopyBytes must succeed")
 
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: randomKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: randomKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
         XCTAssertEqual(unwrapped, randomKey, "Random key data must survive wrap/unwrap")
     }
@@ -250,7 +250,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
         // 1. Generate SE key and wrap.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         // 2. Store the single envelope row in the real Keychain.
         try keychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
@@ -262,7 +262,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
         let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
         let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
-        let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
         XCTAssertEqual(unwrapped, fakePrivateKey, "Full Keychain round-trip must preserve key data")
     }
@@ -295,7 +295,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // 3. SE wrap the certData (full cert with private key).
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: generated.certData,
+            privateKey: SensitiveBuffer(copying: generated.certData),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
@@ -315,7 +315,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
         let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let recoveredCertData = try secureEnclave.unwrap(
-            bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
         // 6. Decrypt using the recovered certData via FFI.
         let result = try engine.decryptDetailed(
@@ -356,7 +356,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // 3. SE wrap the certData.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: generated.certData,
+            privateKey: SensitiveBuffer(copying: generated.certData),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
@@ -376,7 +376,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
         let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let recoveredCertData = try secureEnclave.unwrap(
-            bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
         // 6. Decrypt using the recovered certData via FFI.
         let result = try engine.decryptDetailed(
@@ -406,7 +406,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // 1. Generate SE key, wrap, store the envelope row in the Keychain.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         try keychain.save(bundle.envelope,
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
@@ -451,7 +451,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // 1. Generate SE key, wrap, store the envelope row.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
         try keychain.save(bundle.envelope,
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
@@ -471,7 +471,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let loadedEnvelope = try keychain.load(
             service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account)
-        XCTAssertThrowsError(
+        assertThrowsError(
             try {
                 let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
                 let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
@@ -501,7 +501,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
             // Generate SE key and wrap
             let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-            let bundle = try secureEnclave.wrap(privateKey: fakeKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: fakeKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
 
             // Store the single envelope row
             try keychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
@@ -512,7 +512,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint, expectedPayloadKind: .softwareSecretCertificate)
             let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
             let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
-            let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
             XCTAssertEqual(unwrapped, fakeKey, "Iteration \(i): unwrapped key must match original")
 

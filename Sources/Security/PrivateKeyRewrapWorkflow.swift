@@ -114,16 +114,12 @@ final class PrivateKeyRewrapWorkflow {
                 authenticationContext: authenticationContext
             )
 
-            var rawKeyBytes = try secureEnclave.unwrap(
+            let rawKeyBytes = try secureEnclave.unwrap(
                 bundle: existingBundle,
                 using: existingHandle,
                 fingerprint: fingerprint,
                 payloadKind: .softwareSecretCertificate
             )
-
-            defer {
-                rawKeyBytes.resetBytes(in: rawKeyBytes.startIndex..<rawKeyBytes.endIndex)
-            }
 
             let newHandle = try secureEnclave.generateWrappingKey(
                 accessControl: newAccessControl,

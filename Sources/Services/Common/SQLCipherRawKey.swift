@@ -4,46 +4,34 @@ enum SQLCipherRawKeyError: Error, Equatable {
     case invalidRawKeyLength(Int)
 }
 
+/// The raw-key literal SQLCipher takes in place of a passphrase: `x'<64 hex
+/// digits>'`, which keys the database directly with no KDF in between.
 enum SQLCipherRawKey {
     static let rawKeyLength = 32
     static let keySpecLength = 67
 
-    static func keySpecBytes(for rawKey: Data) throws -> [UInt8] {
-        var keyBytes = [UInt8](rawKey)
-        defer {
-            zeroize(&keyBytes)
-        }
-        return try keySpecBytes(for: keyBytes)
-    }
-
-    static func keySpecBytes(for rawKey: [UInt8]) throws -> [UInt8] {
+    /// Render `rawKey` as the key-spec literal, in storage that erases itself
+    /// when the caller releases it.
+    ///
+    /// The literal is as secret as the key it spells out — it is the key, hex
+    /// encoded — so it is built straight into a `SensitiveBuffer` rather than
+    /// through an intermediate array the caller would have to remember to
+    /// scrub.
+    static func keySpec(for rawKey: Data) throws -> SensitiveBuffer {
         guard rawKey.count == rawKeyLength else {
             throw SQLCipherRawKeyError.invalidRawKeyLength(rawKey.count)
         }
 
         let hexDigits = Array("0123456789abcdef".utf8)
-        var keySpec = [UInt8]()
-        keySpec.reserveCapacity(keySpecLength)
-        keySpec.append(UInt8(ascii: "x"))
-        keySpec.append(UInt8(ascii: "'"))
-        for byte in rawKey {
-            keySpec.append(hexDigits[Int(byte >> 4)])
-            keySpec.append(hexDigits[Int(byte & 0x0f)])
-        }
-        keySpec.append(UInt8(ascii: "'"))
-        return keySpec
-    }
-
-    static func zeroize(_ bytes: inout [UInt8]) {
-        guard !bytes.isEmpty else { return }
-        bytes.withUnsafeMutableBufferPointer { buffer in
-            guard let base = buffer.baseAddress else { return }
-            opaqueZero(base, buffer.count)
+        return SensitiveBuffer(count: keySpecLength) { destination in
+            destination[0] = UInt8(ascii: "x")
+            destination[1] = UInt8(ascii: "'")
+            // `enumerated` counts from zero whatever `rawKey`'s own indices are.
+            for (offset, byte) in rawKey.enumerated() {
+                destination[2 + offset * 2] = hexDigits[Int(byte >> 4)]
+                destination[3 + offset * 2] = hexDigits[Int(byte & 0x0f)]
+            }
+            destination[keySpecLength - 1] = UInt8(ascii: "'")
         }
     }
-}
-
-@_optimize(none)
-private func opaqueZero(_ ptr: UnsafeMutablePointer<UInt8>, _ count: Int) {
-    ptr.initialize(repeating: 0, count: count)
 }

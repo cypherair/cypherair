@@ -101,12 +101,15 @@ final class PrivateKeyAccessService {
             authenticationContext: authenticationContext.context
         )
 
+        // The engine consumes secret certificates as `Data`, so the material
+        // leaves this chokepoint as one, zeroized by its caller. The buffer the
+        // enclave hands back is erased when this scope ends either way.
         var unwrapped = try secureEnclave.unwrap(
             bundle: bundle,
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
-        )
+        ).withUnsafeBytes { Data($0) }
 
         // Custody-integrity gate: the envelope's AES-GCM tag and device binding
         // prove the wrapped bytes were sealed by this device, but NOT that they

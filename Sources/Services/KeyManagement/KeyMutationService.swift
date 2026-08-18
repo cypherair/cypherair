@@ -233,9 +233,9 @@ final class KeyMutationService {
             certData: secretKey,
             newExpirySeconds: newExpirySeconds
         )
-        defer {
-            result.certData.resetBytes(in: 0..<result.certData.count)
-        }
+        // Nothing below reads the mutated certificate except the re-wrap, so it
+        // moves into a buffer that erases it however this function leaves.
+        let mutatedCertificate = SensitiveBuffer(consuming: &result.certData)
 
         guard catalogStore.containsKey(fingerprint: fingerprint) else {
             // Not a decrypt-recipient mismatch: the key vanished from the catalog
@@ -246,7 +246,7 @@ final class KeyMutationService {
         }
 
         let bundle = try await rewrapModifiedExpiryResult(
-            certData: result.certData,
+            certData: mutatedCertificate,
             fingerprint: fingerprint,
             accessControl: accessControl,
             authenticationContext: authenticationContext
@@ -323,7 +323,7 @@ final class KeyMutationService {
     }
 
     private func rewrapModifiedExpiryResult(
-        certData: Data,
+        certData: borrowing SensitiveBuffer,
         fingerprint: String,
         accessControl: SecAccessControl,
         authenticationContext: LAContext?

@@ -23,8 +23,10 @@ import Security
 /// envelope binding, so a software-custody consumer handed one of these rows
 /// fails closed instead of opening it (docs/CUSTODY.md §7).
 ///
-/// SECURITY-CRITICAL: raw component secrets are handled here. All plaintext
-/// buffers are zeroized after use.
+/// SECURITY-CRITICAL: raw component secrets pass through here. Every plaintext
+/// this store holds — the two halves on the way in, the concatenation either
+/// way — is a `SensitiveBuffer` erased when it is destroyed, so no exit path
+/// from either entry point can free one intact.
 struct SecureEnclaveCompositeClassicalComponentStore {
     private static let payloadKind = PrivateKeyEnvelopePayloadKind.splitCustodyClassicalComponent
 
@@ -41,17 +43,15 @@ struct SecureEnclaveCompositeClassicalComponentStore {
 
     /// Seal `eddsaSecret || ecdhSecret` under a fresh fixed-access Secure
     /// Enclave wrapping key and persist the envelope for `fingerprint`.
-    /// Both input buffers are zeroized before returning.
+    ///
+    /// Both secrets are consumed: whichever way this call returns, they are
+    /// erased with it, and the caller has no way to reach them afterwards.
     func store(
         fingerprint: String,
-        eddsaSecret: inout Data,
-        ecdhSecret: inout Data,
+        eddsaSecret: consuming SensitiveBuffer,
+        ecdhSecret: consuming SensitiveBuffer,
         tier: SecureEnclaveCustodyTier
     ) throws {
-        defer {
-            eddsaSecret.resetBytes(in: 0..<eddsaSecret.count)
-            ecdhSecret.resetBytes(in: 0..<ecdhSecret.count)
-        }
         guard let lengths = tier.splitCustodyClassicalSecretLengths,
               eddsaSecret.count == lengths.signing,
               ecdhSecret.count == lengths.keyAgreement else {
@@ -60,11 +60,16 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             )
         }
 
-        var concatenated = Data()
-        concatenated.reserveCapacity(lengths.signing + lengths.keyAgreement)
-        concatenated.append(eddsaSecret)
-        concatenated.append(ecdhSecret)
-        defer { concatenated.resetBytes(in: 0..<concatenated.count) }
+        let concatenated = eddsaSecret.withUnsafeBytes { eddsa in
+            ecdhSecret.withUnsafeBytes { ecdh in
+                SensitiveBuffer(count: eddsa.count + ecdh.count) { destination in
+                    UnsafeMutableRawBufferPointer(rebasing: destination[..<eddsa.count])
+                        .copyMemory(from: eddsa)
+                    UnsafeMutableRawBufferPointer(rebasing: destination[eddsa.count...])
+                        .copyMemory(from: ecdh)
+                }
+            }
+        }
 
         let accessControl = try Self.makeFixedAccessControl()
         let handle = try secureEnclave.generateWrappingKey(
@@ -87,7 +92,6 @@ struct SecureEnclaveCompositeClassicalComponentStore {
 
     /// Unwrap and return the classical component for `fingerprint`. Triggers a
     /// Secure Enclave biometric unless `authenticationContext` is pre-authenticated.
-    /// The caller MUST zeroize both returned buffers after use.
     func load(
         fingerprint: String,
         authenticationContext: LAContext?,
@@ -113,39 +117,26 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             from: seKeyData,
             authenticationContext: authenticationContext
         )
-        var concatenated = try secureEnclave.unwrap(
+        let concatenated = try secureEnclave.unwrap(
             bundle: bundle,
             using: handle,
             fingerprint: fingerprint,
             payloadKind: Self.payloadKind
         )
-        defer { concatenated.resetBytes(in: 0..<concatenated.count) }
         let eddsaLength = lengths.signing
-        let ecdhLength = lengths.keyAgreement
-        let concatenatedLength = eddsaLength + ecdhLength
+        let concatenatedLength = eddsaLength + lengths.keyAgreement
         guard concatenated.count == concatenatedLength else {
             throw CypherAirError.invalidKeyData(
                 reason: "Composite classical component envelope has an unexpected length."
             )
         }
 
-        // Copy each half into freshly allocated storage that does not alias
-        // `concatenated`, so the `defer` above zeroizes the real plaintext
-        // buffer in place instead of copy-on-writing a fresh copy and leaving
-        // the original intact.
-        var eddsaSecret = Data(count: eddsaLength)
-        var ecdhSecret = Data(count: ecdhLength)
-        concatenated.withUnsafeBytes { raw in
-            eddsaSecret.withUnsafeMutableBytes { destination in
-                destination.copyBytes(from: raw[0..<eddsaLength])
-            }
-            ecdhSecret.withUnsafeMutableBytes { destination in
-                destination.copyBytes(
-                    from: raw[eddsaLength..<concatenatedLength]
-                )
-            }
+        return concatenated.withUnsafeBytes { raw in
+            ClassicalComponent(
+                eddsaSecret: Data(UnsafeRawBufferPointer(rebasing: raw[..<eddsaLength])),
+                ecdhSecret: Data(UnsafeRawBufferPointer(rebasing: raw[eddsaLength...]))
+            )
         }
-        return ClassicalComponent(eddsaSecret: eddsaSecret, ecdhSecret: ecdhSecret)
     }
 
     /// Whether a committed component exists for `fingerprint`. Non-prompting:

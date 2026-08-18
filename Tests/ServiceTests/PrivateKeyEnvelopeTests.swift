@@ -29,7 +29,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let privateKey = Data(repeating: 0xAB, count: 57) // Ed448-size secret material
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: privateKey,
+            privateKey: SensitiveBuffer(copying: privateKey),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
@@ -58,7 +58,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
-        )
+        ).copiedBytes()
         XCTAssertEqual(unwrapped, privateKey)
     }
 
@@ -83,7 +83,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let largePrivateKey = Data((0..<(64 * 1024)).map { UInt8(truncatingIfNeeded: $0) })
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: largePrivateKey,
+            privateKey: SensitiveBuffer(copying: largePrivateKey),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
@@ -101,7 +101,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
-        )
+        ).copiedBytes()
         XCTAssertEqual(unwrapped, largePrivateKey)
     }
 
@@ -123,7 +123,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
 
         for tamperedEnvelope in tampered {
             let encoded = try PrivateKeyEnvelopeCodec.encode(tamperedEnvelope)
-            XCTAssertThrowsError(
+            assertThrowsError(
                 try secureEnclave.unwrap(
                     bundle: WrappedKeyBundle(envelope: encoded),
                     using: handle,
@@ -143,7 +143,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         // Re-bind the envelope to a different (valid) SE public key, then unwrap with the
         // original handle → the bound-key guard fires before any ECDH.
         let rebound = replacing(envelope, seKeyPublicKeyX963: P256.KeyAgreement.PrivateKey().publicKey.x963Representation)
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(
                 bundle: WrappedKeyBundle(envelope: try PrivateKeyEnvelopeCodec.encode(rebound)),
                 using: handle,
@@ -160,13 +160,13 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let otherHandle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: privateKey,
+            privateKey: SensitiveBuffer(copying: privateKey),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
         )
 
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(
                 bundle: bundle,
                 using: otherHandle,
@@ -180,14 +180,14 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let privateKey = Data(repeating: 0x64, count: 32)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: privateKey,
+            privateKey: SensitiveBuffer(copying: privateKey),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
         )
 
         let otherFingerprint = "fedcba9876543210fedcba9876543210fedcba98"
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(
                 bundle: bundle,
                 using: handle,
@@ -241,7 +241,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
                 expectedPayloadKind: .softwareSecretCertificate
             )
         )
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(
                 bundle: garbage,
                 using: handle,
@@ -257,13 +257,13 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let component = Data(repeating: 0x71, count: 64)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: component,
+            privateKey: SensitiveBuffer(copying: component),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .splitCustodyClassicalComponent
         )
 
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(
                 bundle: bundle,
                 using: handle,
@@ -290,7 +290,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .splitCustodyClassicalComponent
-        )
+        ).copiedBytes()
         defer { opened.zeroize() }
         XCTAssertEqual(opened, component)
     }
@@ -303,7 +303,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let sealed = try PrivateKeyEnvelopeCodec.decode(
             try secureEnclave.wrap(
-                privateKey: component,
+                privateKey: SensitiveBuffer(copying: component),
                 using: handle,
                 fingerprint: fingerprint,
                 payloadKind: .splitCustodyClassicalComponent
@@ -315,7 +315,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         let relabelled = replacing(sealed, payloadKind: .softwareSecretCertificate)
         let encoded = try PrivateKeyEnvelopeCodec.encode(relabelled)
 
-        XCTAssertThrowsError(
+        assertThrowsError(
             try secureEnclave.unwrap(
                 bundle: WrappedKeyBundle(envelope: encoded),
                 using: handle,
@@ -338,7 +338,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
     ) throws -> PrivateKeyEnvelope {
         try PrivateKeyEnvelopeCodec.decode(
             try secureEnclave.wrap(
-                privateKey: privateKey,
+                privateKey: SensitiveBuffer(copying: privateKey),
                 using: handle,
                 fingerprint: fingerprint,
                 payloadKind: .softwareSecretCertificate

@@ -88,14 +88,15 @@ final class KeyProvisioningService {
             expirySeconds: expirySeconds,
             suite: suite
         )
-        defer {
-            generated.certData.resetBytes(in: 0..<generated.certData.count)
-        }
+        // Take the raw certificate out of the engine's result the moment it
+        // arrives: wrapping is the only thing that reads it, and moving it here
+        // means no exit from this function — cancellation included — can free it.
+        let secretCertificate = SensitiveBuffer(consuming: &generated.certData)
 
         try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
         let bundle = try await wrapForProvisioning(
-            privateKey: generated.certData,
+            privateKey: secretCertificate,
             fingerprint: generated.metadata.fingerprint,
             accessControl: accessControl
         )
@@ -161,9 +162,9 @@ final class KeyProvisioningService {
             armoredData: armoredData,
             passphrase: passphrase
         )
-        defer {
-            imported.secretKeyData.resetBytes(in: 0..<imported.secretKeyData.count)
-        }
+        // As in generation: the imported secret certificate is wrapping's alone,
+        // so it moves into a buffer that erases it on every exit path.
+        let secretCertificate = SensitiveBuffer(consuming: &imported.secretKeyData)
         if let afterImportOffMainActorCheckpoint {
             await afterImportOffMainActorCheckpoint()
         }
@@ -177,7 +178,7 @@ final class KeyProvisioningService {
         try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
         let bundle = try await wrapForProvisioning(
-            privateKey: imported.secretKeyData,
+            privateKey: secretCertificate,
             fingerprint: imported.metadata.fingerprint,
             accessControl: accessControl
         )
@@ -217,7 +218,7 @@ final class KeyProvisioningService {
     }
 
     private func wrapForProvisioning(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         fingerprint: String,
         accessControl: SecAccessControl
     ) async throws -> WrappedKeyBundle {
