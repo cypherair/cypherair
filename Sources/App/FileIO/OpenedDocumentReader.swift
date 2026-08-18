@@ -48,12 +48,16 @@ struct OpenedDocumentReader {
         case .contactImport:
             return .contactImport(certificate: try wholeContent(content, isComplete: isComplete))
         case .screen(.decryption):
+            // Only once the move has actually happened: a failed adoption
+            // leaves the copy where it was, and that copy is still the app's to
+            // erase.
+            let retainedURL = try retainedFileURL(for: url)
             retained = true
             return .handoff(
                 OpenedDocument(
                     screen: .decryption,
                     fileName: fileName,
-                    delivery: .file(try retainedFileURL(for: url))
+                    delivery: .file(retainedURL)
                 )
             )
         case .screen(let screen):

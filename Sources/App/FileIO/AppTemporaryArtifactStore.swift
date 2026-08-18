@@ -134,8 +134,15 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     /// Whether `url` names a document the system left in the inbox: a copy the
     /// app owns outright. A document opened in place is not one — that file is
     /// the reader's, wherever it lives.
+    ///
+    /// Both sides are resolved through their symlinks first, because a lexical
+    /// comparison answers on spelling rather than on which file is meant. On iOS
+    /// the container's `/var` is a link to `/private/var`, so the inbox and the
+    /// URL delivered for a document in it can name the same directory in two
+    /// ways — and every answer here would be a silent "not ours": nothing
+    /// adopted, nothing erased, the copy left behind.
     func ownsOpenedDocumentCopy(at url: URL) -> Bool {
-        url.standardizedFileURL.path.hasPrefix(documentInboxDirectory.path + "/")
+        resolved(url).path.hasPrefix(resolved(documentInboxDirectory).path + "/")
     }
 
     /// Erase the inbox copy of a document once the app is done reading it.
@@ -313,6 +320,15 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         if (try? fileManager.contentsOfDirectory(atPath: root.path))?.isEmpty == true {
             eraseItem(root, result: &result)
         }
+    }
+
+    /// The path a URL actually names, once its links are followed.
+    ///
+    /// `resolvingSymlinksInPath` resolves the components that exist and leaves
+    /// the rest alone, which is what a path being compared rather than opened
+    /// needs — an erase is asked about files that may already be gone.
+    private func resolved(_ url: URL) -> URL {
+        url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL
     }
 
     private func documentInboxContents() -> [URL] {

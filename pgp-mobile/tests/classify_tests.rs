@@ -99,6 +99,67 @@ fn revocation_certificate_classifies_apart_from_the_certificate_it_is_armored_as
     );
 }
 
+/// A nested compressed container is a decompression bomb, and a header walk is
+/// where one is spent: at the depth the walk stops descending, Sequoia's
+/// `recurse` skips the container instead — by inflating all of it. The fixture
+/// below is a few hundred bytes and holds 64 MiB; the shape scales past any
+/// memory the device has, on a file anybody can send. The walk must refuse it
+/// outright, so that opening it costs an error message rather than the process.
+#[test]
+fn nested_compressed_containers_are_refused_without_inflating_them() {
+    let bomb = nested_compression_bomb(64 * 1024 * 1024);
+    assert!(
+        bomb.len() < 64 * 1024,
+        "the fixture should be tiny beside what it expands to, got {} bytes",
+        bomb.len()
+    );
+
+    let started = std::time::Instant::now();
+    let error = classify_openpgp_data(&bomb).expect_err("a nested container is refused");
+
+    assert!(
+        matches!(error, PgpError::MessageLimitsExceeded { .. }),
+        "expected a consumption bound, got {error:?}"
+    );
+    // Inflating even the first layer would take orders of magnitude longer than
+    // this; the assertion is what separates "refused" from "read it all and
+    // then complained".
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(1),
+        "refusal should not have read the payload, took {:?}",
+        started.elapsed()
+    );
+}
+
+/// `Compressed( Compressed( Literal ) )` over `payload_bytes` of zeros.
+fn nested_compression_bomb(payload_bytes: usize) -> Vec<u8> {
+    use sequoia_openpgp::serialize::stream::{Compressor, LiteralWriter, Message};
+    use sequoia_openpgp::types::CompressionAlgorithm;
+    use std::io::Write as _;
+
+    let mut bomb = Vec::new();
+    let outer = Compressor::new(Message::new(&mut bomb))
+        .algo(CompressionAlgorithm::Zip)
+        .build()
+        .expect("outer compressor");
+    let inner = Compressor::new(outer)
+        .algo(CompressionAlgorithm::Zip)
+        .build()
+        .expect("inner compressor");
+    let mut literal = LiteralWriter::new(inner).build().expect("literal writer");
+
+    let chunk = vec![0u8; 1024 * 1024];
+    let mut written = 0;
+    while written < payload_bytes {
+        let take = chunk.len().min(payload_bytes - written);
+        literal.write_all(&chunk[..take]).expect("write payload");
+        written += take;
+    }
+    literal.finalize().expect("finalize");
+
+    bomb
+}
+
 #[test]
 fn non_openpgp_bytes_are_refused() {
     let error = classify_openpgp_data(b"just some text a user dropped on the app")

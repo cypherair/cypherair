@@ -133,6 +133,37 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
         try assertCompleteFileProtection(at: artifact.fileURL)
     }
 
+    /// Ownership is a question about which file is meant, not about how the
+    /// path is spelled. iOS reaches the container through `/var`, a link to
+    /// `/private/var`, so the inbox and a URL delivered for a document inside it
+    /// routinely name the same directory two ways — and a lexical comparison
+    /// answers "not ours" to every one of them, silently: nothing adopted,
+    /// nothing erased, the copy left behind.
+    func test_ownsOpenedDocumentCopy_resolvesLinksBeforeComparing() throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let documents = temporaryDirectory.appendingPathComponent("Documents", isDirectory: true)
+        let inbox = documents.appendingPathComponent("Inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: temporaryDirectory.appendingPathComponent("linked", isDirectory: true),
+            withDestinationURL: documents
+        )
+        let throughTheLink = temporaryDirectory
+            .appendingPathComponent("linked/Inbox/handed-over.gpg")
+        try Data("someone's message".utf8).write(to: throughTheLink)
+
+        let store = CypherAir.AppTemporaryArtifactStore(
+            temporaryDirectory: temporaryDirectory,
+            documentInboxDirectory: inbox
+        )
+
+        XCTAssertTrue(store.ownsOpenedDocumentCopy(at: throughTheLink))
+
+        store.eraseOpenedDocumentCopy(at: throughTheLink)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: throughTheLink.path))
+    }
+
     /// The only files the store will delete on an open are the ones the system
     /// copied into the container. A document opened where it lives belongs to
     /// the reader.

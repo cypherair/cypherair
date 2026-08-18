@@ -1,13 +1,21 @@
 //! Consumption bounds for the packet walks that read received input.
 //!
-//! Two walks read a message before anything about it has been authenticated:
-//! the phase-1 header walk the app runs to learn a message's recipients, its
-//! quantum safety, or its password packets; and the walk Sequoia runs inside
+//! Three walks read input before anything about it has been authenticated: the
+//! phase-1 header walk the app runs to learn a message's recipients, its quantum
+//! safety, or its password packets; the walk Sequoia runs inside
 //! `DecryptorBuilder::with_policy` / `VerifierBuilder::with_policy` to reach the
-//! literal data. Sequoia installs a decompressor the moment it parses a
-//! `CompressedData` header, so both walks read a stream that expands up to
-//! 1032:1 per nested layer. An output-side ceiling cannot bound either one:
+//! literal data; and the walk `crate::classify` runs to decide what an opened
+//! file holds. Sequoia installs a decompressor the moment it parses a
+//! `CompressedData` header, so all three read a stream that expands up to
+//! 1032:1 per nested layer. An output-side ceiling cannot bound any of them:
 //! input that never yields a literal packet produces no output bytes to count.
+//!
+//! A depth limit alone does not bound one either — it relocates the cost.
+//! `PacketParser::recurse` recurses only while the parser's own limit allows,
+//! and at that limit it does what `next` does instead: finish the current packet
+//! and move on, which for a compressed container means inflating the whole thing
+//! to find where it ends. A walk that stops descending must therefore *refuse*
+//! the container it stopped at, never step over it.
 //!
 //! So the bounds live here, on the consumption side, and each one is charged
 //! before the walk reads *past* the packet it is charged for — which is what
@@ -72,6 +80,32 @@ const MAX_PREFIX_WALK_BYTES: u64 = 4 * 1024 * 1024;
 /// reason to descend at all; deeper nesting is the decompression-bomb shape
 /// rather than a message, so the walk stops there instead of inflating it.
 const MAX_PREFIX_WALK_DEPTH: u8 = 1;
+
+/// Packets a content-classification walk may consume.
+///
+/// That walk stops at the first packet that says what its input is, and the only
+/// things that can legitimately precede one are a compressed container and the
+/// marker and padding packets RFC 9580 lets a producer ignore — none of which
+/// anything emits more than once. The allowance is generous against that shape
+/// and still turns a file made entirely of them into a refusal rather than a
+/// scan of its whole length.
+const MAX_CLASSIFICATION_WALK_PACKETS: u32 = 16;
+
+/// Bytes a content-classification walk may consume.
+///
+/// Charged against the packets it steps over, which are framing rather than
+/// payload. Nothing spends a megabyte of framing ahead of the packet that
+/// identifies a file, and the bound is absolute rather than input-relative for
+/// the reason phase 1's is: the walk stops before any payload, so a large input
+/// does not entitle it to a larger header.
+const MAX_CLASSIFICATION_WALK_BYTES: u64 = 1024 * 1024;
+
+/// How deep a content-classification walk may descend.
+///
+/// One, for the same reason phase 1 descends one: a compressed message may hold
+/// the packet that decides what a file is, and nothing legitimate wraps that in
+/// turn.
+const MAX_CLASSIFICATION_WALK_DEPTH: u8 = 1;
 
 /// How deep Sequoia's setup walk may descend before we refuse the message.
 ///
@@ -182,9 +216,9 @@ pub(crate) fn walk_bound_error(error: &openpgp::anyhow::Error) -> Option<PgpErro
 
 /// What a walk may still consume.
 ///
-/// One accounting primitive for both walks: they differ in how much they are
-/// allowed and how deep they may go, never in what counts.
-struct WalkBudget {
+/// One accounting primitive for every walk here: they differ in how much they
+/// are allowed and how deep they may go, never in what counts.
+pub(crate) struct WalkBudget {
     packets: u32,
     packet_limit: u32,
     bytes: u64,
@@ -215,8 +249,53 @@ impl WalkBudget {
         }
     }
 
+    /// The budget for a walk that reads packet headers until one identifies the
+    /// input.
+    pub(crate) fn content_classification() -> Self {
+        Self {
+            packets: MAX_CLASSIFICATION_WALK_PACKETS,
+            packet_limit: MAX_CLASSIFICATION_WALK_PACKETS,
+            bytes: MAX_CLASSIFICATION_WALK_BYTES,
+            max_depth: isize::from(MAX_CLASSIFICATION_WALK_DEPTH),
+        }
+    }
+
+    /// The recursion depth to build the parser with.
+    ///
+    /// One past what the walk will descend, and that is the point. At the
+    /// parser's *own* limit `recurse` stops recursing and behaves like `next`,
+    /// and `next` over a compressed container skips it by inflating the whole
+    /// thing — so a walk whose parser limit equals its own turns a missing depth
+    /// guard into a decompression bomb rather than a refusal. Given a level of
+    /// slack the parser descends instead, cheaply, and `charge` refuses the
+    /// packet it lands on for being past `max_depth`. The guard below is still
+    /// what bounds the walk; this only decides which way a mistake fails.
+    pub(crate) fn parser_recursion_depth(&self) -> u8 {
+        u8::try_from(self.max_depth.saturating_add(1)).unwrap_or(u8::MAX)
+    }
+
+    /// Whether the walk may open the container it is looking at.
+    pub(crate) fn may_descend(&self, pp: &PacketParser) -> bool {
+        pp.recursion_depth() < self.max_depth
+    }
+
+    /// A container the walk will not open.
+    ///
+    /// Refusing it is a bound firing, not an absence of whatever the walk was
+    /// looking for, and it says so: left to a caller's "nothing found" path it
+    /// would reach the reader as "the data appears damaged, ask the sender to
+    /// resend", which is the misleading advice this error exists to avoid.
+    pub(crate) fn undescendable_container(&self) -> WalkBoundExceeded {
+        WalkBoundExceeded {
+            reason: format!(
+                "Message nests compressed data more than {} container deep",
+                self.max_depth
+            ),
+        }
+    }
+
     /// Charge one packet, before the walk reads past it.
-    fn charge(&mut self, pp: &PacketParser) -> Result<(), WalkBoundExceeded> {
+    pub(crate) fn charge(&mut self, pp: &PacketParser) -> Result<(), WalkBoundExceeded> {
         let depth = pp.recursion_depth();
         if depth > self.max_depth {
             return Err(WalkBoundExceeded {
@@ -227,12 +306,15 @@ impl WalkBudget {
             });
         }
 
-        self.packets = self.packets.checked_sub(1).ok_or_else(|| WalkBoundExceeded {
-            reason: format!(
-                "Message carries more than {} packets before its payload",
-                self.packet_limit
-            ),
-        })?;
+        self.packets = self
+            .packets
+            .checked_sub(1)
+            .ok_or_else(|| WalkBoundExceeded {
+                reason: format!(
+                    "Message carries more than {} packets before its payload",
+                    self.packet_limit
+                ),
+            })?;
 
         if is_streamed(&pp.packet) {
             // A container the walk descends into is accounted for by the
@@ -257,12 +339,13 @@ impl WalkBudget {
             });
         };
 
-        self.bytes = self
-            .bytes
-            .checked_sub(u64::from(*length))
-            .ok_or_else(|| WalkBoundExceeded {
-                reason: "Message consumes more than the maximum expansion for its size".to_string(),
-            })?;
+        self.bytes =
+            self.bytes
+                .checked_sub(u64::from(*length))
+                .ok_or_else(|| WalkBoundExceeded {
+                    reason: "Message consumes more than the maximum expansion for its size"
+                        .to_string(),
+                })?;
 
         Ok(())
     }
@@ -317,7 +400,9 @@ fn parse_failure(error: openpgp::anyhow::Error) -> PgpError {
     }
 }
 
-fn build_prefix_parser(builder: PacketParserBuilder<'_>) -> Result<PacketParserResult<'_>, PgpError> {
+fn build_prefix_parser(
+    builder: PacketParserBuilder<'_>,
+) -> Result<PacketParserResult<'_>, PgpError> {
     builder
         // Both binary and ASCII-armored input reach these routes.
         .dearmor(Dearmor::Auto(Default::default()))
@@ -356,24 +441,11 @@ where
                 visit(&pp.packet)?;
                 return Ok(PrefixEnd::Container);
             }
-            openpgp::Packet::CompressedData(_)
-                if pp.recursion_depth() < isize::from(MAX_PREFIX_WALK_DEPTH) =>
-            {
+            openpgp::Packet::CompressedData(_) if budget.may_descend(&pp) => {
                 budget.charge(&pp)?;
             }
-            // A container this walk will not open. Refusing it is a bound
-            // firing, not an absence of session-key packets, and it says so:
-            // left to the caller's "nothing found" path it would reach the
-            // reader as "the data appears damaged, ask the sender to resend",
-            // which is the misleading advice this error exists to avoid.
             openpgp::Packet::CompressedData(_) => {
-                return Err(WalkBoundExceeded {
-                    reason: format!(
-                        "Message nests compressed data more than \
-                         {MAX_PREFIX_WALK_DEPTH} container deep"
-                    ),
-                }
-                .into())
+                return Err(budget.undescendable_container().into())
             }
             // Anything else ends the session-key sequence, and ends it as an
             // absence rather than a refusal: this is where a signed-only

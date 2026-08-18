@@ -11,13 +11,16 @@
 //! The walk reads packet *headers* and stops at the first packet that settles
 //! the question, so it never reads a payload and never decrypts. It descends at
 //! most one container, because a compressed message is the only legitimate
-//! wrapper around the packet that decides.
+//! wrapper around the packet that decides — and it charges what it reads against
+//! a `bounded_walk` budget, because this runs on bytes anybody can send and a
+//! header walk is exactly where a decompression bomb is spent.
 
 use openpgp::packet::Signature;
 use openpgp::parse::{Dearmor, PacketParserBuilder, PacketParserResult, Parse as _};
 use openpgp::types::SignatureType;
 use sequoia_openpgp as openpgp;
 
+use crate::bounded_walk::WalkBudget;
 use crate::error::PgpError;
 
 /// The OpenPGP object a blob holds.
@@ -41,27 +44,15 @@ pub enum OpenPgpDataKind {
     RevocationCertificate,
 }
 
-/// Packets the walk may read before one of them settles the kind.
-///
-/// Only markers and padding are walked past, and a producer emits neither more
-/// than once. The allowance exists so that a file made entirely of them ends as
-/// a refusal instead of a scan of its whole length.
-const MAX_INDECISIVE_PACKETS: u32 = 8;
-
-/// Containers the walk may open.
-///
-/// A compressed message may wrap the signature or literal packets that decide,
-/// and nothing legitimate wraps that in turn.
-const MAX_RECURSION_DEPTH: u8 = 1;
-
 /// The header that opens the cleartext signature framework.
 const CLEARTEXT_FRAMEWORK_HEADER: &[u8] = b"-----BEGIN PGP SIGNED MESSAGE-----";
 
 /// Decide what `data` is from its packets.
 ///
-/// Fails when the bytes are not OpenPGP at all, or hold something no route in
-/// the app can act on: the caller has an opened file to answer for either way,
-/// and an error is the answer.
+/// Fails when the bytes are not OpenPGP at all, hold something no route in the
+/// app can act on, or would cost more to read than the walk is allowed: the
+/// caller has an opened file to answer for in every case, and an error is the
+/// answer.
 pub fn classify_openpgp_data(data: &[u8]) -> Result<OpenPgpDataKind, PgpError> {
     // Checked before parsing, and by shape rather than by the parser: Sequoia's
     // armor reader walks the cleartext framework's plaintext to reach the
@@ -71,17 +62,17 @@ pub fn classify_openpgp_data(data: &[u8]) -> Result<OpenPgpDataKind, PgpError> {
         return Ok(OpenPgpDataKind::SignedMessage);
     }
 
+    let mut budget = WalkBudget::content_classification();
     let mut ppr = PacketParserBuilder::from_bytes(data)
         .and_then(|builder| {
             builder
                 // Armored and binary input both arrive here.
                 .dearmor(Dearmor::Auto(Default::default()))
-                .max_recursion_depth(MAX_RECURSION_DEPTH)
+                .max_recursion_depth(budget.parser_recursion_depth())
                 .build()
         })
         .map_err(unrecognized)?;
 
-    let mut walked: u32 = 0;
     while let PacketParserResult::Some(packet_parser) = ppr {
         match &packet_parser.packet {
             openpgp::Packet::PublicKey(_) => return Ok(OpenPgpDataKind::PublicCertificate),
@@ -91,29 +82,29 @@ pub fn classify_openpgp_data(data: &[u8]) -> Result<OpenPgpDataKind, PgpError> {
             }
             openpgp::Packet::OnePassSig(_) => return Ok(OpenPgpDataKind::SignedMessage),
             openpgp::Packet::Signature(signature) => return Ok(bare_signature_kind(signature)),
-            // Ignorable by RFC 9580, and a compressed container is opened
-            // rather than answered: what it wraps is what the file is.
-            openpgp::Packet::Marker(_)
-            | openpgp::Packet::Padding(_)
-            | openpgp::Packet::CompressedData(_) => {}
+            // Ignorable by RFC 9580, and charged for what stepping over them
+            // costs — inside a container that is decompressed output.
+            openpgp::Packet::Marker(_) | openpgp::Packet::Padding(_) => {
+                budget.charge(&packet_parser)?
+            }
+            // A compressed container is opened rather than answered: what it
+            // wraps is what the file is.
+            openpgp::Packet::CompressedData(_) if budget.may_descend(&packet_parser) => {
+                budget.charge(&packet_parser)?
+            }
+            // Nesting past that is the decompression-bomb shape rather than a
+            // message. It has to be refused rather than stepped over: `recurse`
+            // recurses no further than the walk allows, and what it does
+            // instead is skip the container — by inflating all of it.
+            openpgp::Packet::CompressedData(_) => {
+                return Err(budget.undescendable_container().into())
+            }
             // Literal data, a stray subkey, an unknown packet: OpenPGP the
             // parser could read, and nothing the app opens files to do.
+            // Returning here drops the parser without reading the packet.
             _ => break,
         }
 
-        walked += 1;
-        if walked >= MAX_INDECISIVE_PACKETS {
-            return Err(PgpError::MessageLimitsExceeded {
-                reason: format!(
-                    "File carries more than {MAX_INDECISIVE_PACKETS} packets \
-                     before anything that identifies it"
-                ),
-            });
-        }
-
-        // `recurse` rather than `next`: descending into a compressed container
-        // reads its header, while stepping over it would inflate the whole
-        // body to find where it ends.
         let (_, next) = packet_parser.recurse().map_err(unrecognized)?;
         ppr = next;
     }
