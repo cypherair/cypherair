@@ -24,7 +24,7 @@ import Security
 /// fails closed instead of opening it (docs/CUSTODY.md §7).
 ///
 /// SECURITY-CRITICAL: raw component secrets are handled here. All plaintext
-/// buffers are zeroized after use. See docs/SECURITY.md Section 10.
+/// buffers are zeroized after use.
 struct SecureEnclaveCompositeClassicalComponentStore {
     private static let payloadKind = PrivateKeyEnvelopePayloadKind.splitCustodyClassicalComponent
 

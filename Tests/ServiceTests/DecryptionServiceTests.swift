@@ -943,7 +943,6 @@ final class DecryptionServiceTests: XCTestCase {
         defer { encryptedArtifact.cleanup() }
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
-        try cleanupDecryptedOperationArtifacts()
 
         let progress = FileProgressReporter()
         progress.cancel()
@@ -997,7 +996,6 @@ final class DecryptionServiceTests: XCTestCase {
             matchedKey: identity,
             inputPath: encryptedURL.path
         )
-        try cleanupDecryptedOperationArtifacts()
 
         do {
             _ = try await stack.decryptionService.decryptFileStreamingDetailed(
@@ -1056,8 +1054,6 @@ final class DecryptionServiceTests: XCTestCase {
         )
         try targetedCiphertext.write(to: encryptedURL, options: .atomic)
 
-        try cleanupDecryptedOperationArtifacts()
-
         do {
             _ = try await stack.decryptionService.decryptFileStreamingDetailed(
                 phase1: phase1,
@@ -1107,7 +1103,6 @@ final class DecryptionServiceTests: XCTestCase {
             matchedKey: identity,
             inputPath: encryptedURL.path
         )
-        try cleanupDecryptedOperationArtifacts()
 
         do {
             _ = try await stack.decryptionService.decryptFileStreamingDetailed(
@@ -1216,22 +1211,15 @@ final class DecryptionServiceTests: XCTestCase {
         )
     }
 
-    private func cleanupDecryptedOperationArtifacts() throws {
-        let decryptedDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("decrypted", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: decryptedDir.path) else { return }
-        for url in try FileManager.default.contentsOfDirectory(at: decryptedDir, includingPropertiesForKeys: nil)
-            where url.lastPathComponent.hasPrefix("op-") {
-            try? FileManager.default.removeItem(at: url)
-        }
-    }
-
+    /// Asserts the stack's decryption service left no `op-*` artifact behind.
+    /// Scans only the stack's own artifact root — never the shared user temp
+    /// directory, where a concurrent test process's mid-flight artifacts would
+    /// fail this for someone else's operation.
     private func assertNoDecryptedOperationArtifacts(
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
-        let decryptedDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("decrypted", isDirectory: true)
+        let decryptedDir = stack.tempDir.appendingPathComponent("decrypted", isDirectory: true)
         guard FileManager.default.fileExists(atPath: decryptedDir.path) else { return }
         let remaining = try FileManager.default.contentsOfDirectory(at: decryptedDir, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("op-") }

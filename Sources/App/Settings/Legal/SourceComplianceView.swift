@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SourceComplianceView: View {
     private let store: SourceComplianceStore
+    private let repositoryURLCopyAction = RepositoryURLCopyAction()
 
     @State private var info: SourceComplianceInfo?
     @State private var loadError: String?
@@ -133,7 +134,7 @@ struct SourceComplianceView: View {
                     .accessibilityIdentifier("sourcecompliance.url")
 
                 Button {
-                    didCopy = copyIfPresent(info.stableReleaseURL)
+                    didCopy = repositoryURLCopyAction.copyIfPresent(info.stableReleaseURL)
                 } label: {
                     Label(
                         didCopy
@@ -172,15 +173,5 @@ struct SourceComplianceView: View {
         } catch {
             loadError = error.localizedDescription
         }
-    }
-
-    @discardableResult
-    private func copyIfPresent(_ releaseURL: String) -> Bool {
-        guard !releaseURL.isEmpty else {
-            return false
-        }
-
-        CypherClipboard.copy(releaseURL)
-        return true
     }
 }

@@ -8,7 +8,7 @@ import LocalAuthentication
 /// SECURITY-CRITICAL: the blobs are Secure Enclave-wrapped key material —
 /// useless off-device, but their lifecycle (single blob per reference, clean
 /// deletion, reset cleanup) is part of the custody model.
-/// See docs/SECURITY.md Section 10 and docs/CUSTODY.md.
+/// See docs/CUSTODY.md.
 protocol SecureEnclaveCustodyKeyStoring: Sendable {
     /// Create a fresh Secure Enclave key for the reference's tier and role and
     /// persist its blob. Fails if a blob already exists for the reference. The

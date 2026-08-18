@@ -111,7 +111,7 @@ Password/SKESK round-trips are recipient-key-independent and are covered per mes
 
 **The require flags fail; they do not skip.** The interop helpers skip when the binary is missing, but under `CYPHERAIR_REQUIRE_GPG=1` / `CYPHERAIR_REQUIRE_SQ=1` — how the CI interop job runs them — a missing binary fails the lane instead. One deliberate exception: the post-quantum live sq tests gate additionally on a capability probe, because an sq built on pre-2.4 sequoia-openpgp predates the final RFC 9980 wire format and cannot read engine ML-DSA certificates. **Those tests skip loudly even under `CYPHERAIR_REQUIRE_SQ=1`** — the flag requires sq's presence, not its newest version — and self-activate once the installed sq can import an engine post-quantum key. The committed fixtures carry cross-implementation post-quantum coverage meanwhile.
 
-**A format trap.** sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2. That is sq's behavior, not a format-selection defect; the v4-only SEIPDv1 floor is asserted by mixing an engine Portable Legacy key into the recipient set (CLAUDE.md hard constraint 8).
+**A format trap.** sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2. That is sq's behavior, not a format-selection defect; the v4-only SEIPDv1 floor is asserted by mixing an engine Portable Legacy key into the recipient set (AGENTS.md hard constraint 8).
 
 ## 6. MIE validation
 
