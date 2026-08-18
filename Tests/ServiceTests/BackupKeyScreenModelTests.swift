@@ -31,6 +31,10 @@ private actor BackupKeyTestGate {
 final class BackupKeyScreenModelTests: XCTestCase {
     private let fingerprint = "1234567890abcdef1234567890abcdef12345678"
 
+    /// Shaped like the app's own generated passphrases, so it clears the export
+    /// gate the way a real one does. The gate itself is exercised below.
+    private static let exportablePassphrase = "Wd7f-Qm2k-Zt9x-Rb4v-Hn6p"
+
     func test_exportBackup_fileExporterPresentationConfirmsOnlyAfterSuccessfulSave() async {
         var exportedCallbackData: Data?
         var confirmedFingerprints: [String] = []
@@ -45,8 +49,8 @@ final class BackupKeyScreenModelTests: XCTestCase {
             },
             exportBackupAction: { _, _ in Data("backup".utf8) }
         )
-        model.passphrase = "secret"
-        model.passphraseConfirm = "secret"
+        model.passphrase = Self.exportablePassphrase
+        model.passphraseConfirm = Self.exportablePassphrase
 
         model.exportBackup()
 
@@ -78,8 +82,8 @@ final class BackupKeyScreenModelTests: XCTestCase {
             },
             exportBackupAction: { _, _ in Data("inline-backup".utf8) }
         )
-        model.passphrase = "secret"
-        model.passphraseConfirm = "secret"
+        model.passphrase = Self.exportablePassphrase
+        model.passphraseConfirm = Self.exportablePassphrase
 
         model.exportBackup()
 
@@ -102,8 +106,8 @@ final class BackupKeyScreenModelTests: XCTestCase {
             },
             exportBackupAction: { _, _ in Data("backup".utf8) }
         )
-        model.passphrase = "secret"
-        model.passphraseConfirm = "secret"
+        model.passphrase = Self.exportablePassphrase
+        model.passphraseConfirm = Self.exportablePassphrase
 
         model.exportBackup()
 
@@ -130,8 +134,8 @@ final class BackupKeyScreenModelTests: XCTestCase {
                 return Data("backup".utf8)
             }
         )
-        model.passphrase = "secret"
-        model.passphraseConfirm = "secret"
+        model.passphrase = Self.exportablePassphrase
+        model.passphraseConfirm = Self.exportablePassphrase
 
         model.exportBackup()
 
@@ -149,6 +153,60 @@ final class BackupKeyScreenModelTests: XCTestCase {
         XCTAssertFalse(model.isExporting)
         XCTAssertEqual(model.passphrase, "")
         XCTAssertEqual(model.passphraseConfirm, "")
+    }
+
+    func test_exportBackup_refusesAWeakPassphrase() async {
+        var exportAttempts = 0
+        let model = makeModel(
+            exportBackupAction: { _, _ in
+                exportAttempts += 1
+                return Data("backup".utf8)
+            }
+        )
+        model.passphrase = "password123"
+        model.passphraseConfirm = "password123"
+
+        XCTAssertTrue(model.exportButtonDisabled)
+
+        model.exportBackup()
+        await drainKeyRouteMainActor()
+
+        XCTAssertEqual(exportAttempts, 0)
+        XCTAssertNil(model.exportedData)
+        XCTAssertFalse(model.isExporting)
+    }
+
+    func test_exportBackup_acceptsAGeneratedPassphrase() async throws {
+        let generated = try PassphraseGenerator.generate()
+        let model = makeModel(exportBackupAction: { _, _ in Data("backup".utf8) })
+        model.passphrase = generated
+        model.passphraseConfirm = generated
+
+        XCTAssertFalse(model.exportButtonDisabled)
+
+        model.exportBackup()
+
+        await waitUntilKeyRoute("backup data to be ready") {
+            model.exportedData == Data("backup".utf8)
+        }
+    }
+
+    func test_exportBackup_refusesAStrongPassphraseTypedTwiceDifferently() async {
+        var exportAttempts = 0
+        let model = makeModel(
+            exportBackupAction: { _, _ in
+                exportAttempts += 1
+                return Data("backup".utf8)
+            }
+        )
+        model.passphrase = Self.exportablePassphrase
+        model.passphraseConfirm = Self.exportablePassphrase + "x"
+
+        model.exportBackup()
+        await drainKeyRouteMainActor()
+
+        XCTAssertEqual(exportAttempts, 0)
+        XCTAssertNil(model.exportedData)
     }
 
     func test_softwareOrUnknownKey_isNotDeviceBound() {

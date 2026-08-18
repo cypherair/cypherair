@@ -40,15 +40,10 @@ struct BackupKeyView: View {
 }
 
 private struct BackupKeyScreenHostView: View {
-    enum Field {
-        case passphrase
-        case confirm
-    }
-
     let appSessionOrchestrator: AppSessionOrchestrator
 
     @State private var model: BackupKeyScreenModel
-    @FocusState private var focusedField: Field?
+    @FocusState private var focusedField: CypherPassphraseEntry.Field?
 
     init(
         fingerprint: String,
@@ -100,28 +95,18 @@ private struct BackupKeyScreenHostView: View {
 
         return Form {
             Section {
-                CypherSecureTextField(
-                    String(localized: "backup.passphrase", defaultValue: "Passphrase"),
-                    text: $model.passphrase,
-                    submitLabel: .next,
-                    onSubmit: { focusedField = .confirm }
+                CypherPassphraseEntry(
+                    passphrase: $model.passphrase,
+                    confirmation: $model.passphraseConfirm,
+                    focus: $focusedField
                 )
-                .focused($focusedField, equals: .passphrase)
-
-                CypherSecureTextField(
-                    String(localized: "backup.confirm", defaultValue: "Confirm Passphrase"),
-                    text: $model.passphraseConfirm,
-                    submitLabel: .done,
-                    onSubmit: { focusedField = nil }
-                )
-                .focused($focusedField, equals: .confirm)
             } header: {
                 Text(String(localized: "backup.header", defaultValue: "Protect your backup with a strong passphrase."))
             } footer: {
-                if model.passphrasesMismatch {
-                    Text(String(localized: "backup.mismatch", defaultValue: "Passphrases do not match."))
-                        .foregroundStyle(.red)
-                }
+                Text(String(
+                    localized: "backup.passphrase.stake",
+                    defaultValue: "The passphrase is the whole of the backup's protection. Anyone who copies the file can keep guessing at it offline, for as long as they like."
+                ))
             }
 
             Section {

@@ -42,26 +42,37 @@ struct CypherSingleLineTextField: View {
 struct CypherSecureTextField: View {
     let title: String
     @Binding var text: String
+    /// Shows the text in the clear. A passphrase the user has to transcribe
+    /// somewhere safe is unreadable behind dots.
+    let isRevealed: Bool
     let submitLabel: SubmitLabel
     let onSubmit: () -> Void
 
     init(
         _ title: String,
         text: Binding<String>,
+        isRevealed: Bool = false,
         submitLabel: SubmitLabel = .done,
         onSubmit: @escaping () -> Void = {}
     ) {
         self.title = title
         self._text = text
+        self.isRevealed = isRevealed
         self.submitLabel = submitLabel
         self.onSubmit = onSubmit
     }
 
     var body: some View {
-        SecureField(title, text: $text)
-            .cypherOpaqueTextTraits()
-            .submitLabel(submitLabel)
-            .onSubmit(onSubmit)
+        Group {
+            if isRevealed {
+                TextField(title, text: $text)
+            } else {
+                SecureField(title, text: $text)
+            }
+        }
+        .cypherOpaqueTextTraits()
+        .submitLabel(submitLabel)
+        .onSubmit(onSubmit)
     }
 }
 
