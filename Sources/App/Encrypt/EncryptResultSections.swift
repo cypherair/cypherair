@@ -43,13 +43,10 @@ struct EncryptResultSections: View {
                     font: .system(.caption, design: .monospaced)
                 )
 
-                Button {
-                    model.copyCiphertextToClipboard()
-                } label: {
-                    Label(
-                        String(localized: "common.copy", defaultValue: "Copy"),
-                        systemImage: "doc.on.doc"
-                    )
+                CypherCopyButton(
+                    title: String(localized: "common.copy", defaultValue: "Copy")
+                ) {
+                    await model.copyCiphertextToClipboard()
                 }
                 .disabled(!model.configuration.allowsClipboardWrite)
 

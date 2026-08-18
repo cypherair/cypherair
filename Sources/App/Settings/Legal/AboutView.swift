@@ -7,10 +7,6 @@ import AppKit
 
 /// About page: app identity, positioning, licensing, and source links.
 struct AboutView: View {
-    private let repositoryURLCopyAction = RepositoryURLCopyAction()
-
-    @State private var didCopyRepositoryURL = false
-
     var body: some View {
         List {
             Section {
@@ -41,18 +37,10 @@ struct AboutView: View {
 
                     CypherScrollableTextLine(text: AppProductIdentity.repositoryURLString)
 
-                    Button {
-                        didCopyRepositoryURL = repositoryURLCopyAction.copyIfPresent(
-                            AppProductIdentity.repositoryURLString
-                        )
-                    } label: {
-                        Label(
-                            didCopyRepositoryURL
-                                ? String(localized: "license.detail.copied", defaultValue: "Copied")
-                                : String(localized: "license.detail.copy", defaultValue: "Copy Repository URL"),
-                            systemImage: didCopyRepositoryURL ? "checkmark" : "doc.on.doc"
-                        )
-                    }
+                    CypherCopyButton(
+                        title: String(localized: "license.detail.copy", defaultValue: "Copy Repository URL"),
+                        value: AppProductIdentity.repositoryURLString
+                    )
                     .buttonStyle(.borderless)
                     .accessibilityIdentifier("about.repository.copy")
                 }

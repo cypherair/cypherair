@@ -1441,8 +1441,9 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.ciphertextString, "ciphertext-body")
         XCTAssertEqual(callbackCiphertext, Data("ciphertext-body".utf8))
 
-        model.copyCiphertextToClipboard()
+        let copied = await model.copyCiphertextToClipboard()
         XCTAssertEqual(interceptedClipboard, "ciphertext-body")
+        XCTAssertFalse(copied, "An intercepted copy never reached the clipboard, so nothing may confirm it")
         XCTAssertFalse(model.operation.isShowingClipboardNotice)
 
         model.exportCiphertext()
@@ -1949,7 +1950,7 @@ final class EncryptScreenModelTests: XCTestCase {
         )
         model.ciphertext = Data("late-ciphertext".utf8)
 
-        model.copyCiphertextToClipboard()
+        let copy = Task { await model.copyCiphertextToClipboard() }
 
         await waitUntil("encrypt clipboard notice decision to suspend") {
             await gate.isSuspended()
@@ -1958,8 +1959,9 @@ final class EncryptScreenModelTests: XCTestCase {
         model.handleContentClearGenerationChange()
 
         await gate.resume(returning: true)
-        await settleAsyncWork()
+        let copied = await copy.value
 
+        XCTAssertFalse(copied, "A superseded copy never landed, so nothing may confirm it")
         XCTAssertTrue(copiedPayloads.isEmpty)
         XCTAssertFalse(model.operation.isShowingClipboardNotice)
     }

@@ -12,4 +12,11 @@ enum CypherMotion {
         guard !reduceMotion else { return nil }
         return .easeOut(duration: 0.18)
     }
+
+    /// The reveal of a finished operation's result. A completed encrypt,
+    /// decrypt, sign or verify settles into place rather than snapping in.
+    static func resultReveal(reduceMotion: Bool) -> Animation? {
+        guard !reduceMotion else { return nil }
+        return .easeOut(duration: 0.3)
+    }
 }

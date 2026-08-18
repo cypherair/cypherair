@@ -95,7 +95,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
             configuration: configuration
         )
         model.prepareIfNeeded()
-        model.copyPublicKey()
+        let copied = model.copyPublicKey()
         model.exportPublicKey()
 
         XCTAssertEqual(
@@ -103,8 +103,26 @@ final class KeyDetailScreenModelTests: XCTestCase {
             String(data: try XCTUnwrap(model.armoredPublicKey), encoding: .utf8)
         )
         XCTAssertEqual(interceptedExportFilename, "\(identity.shortKeyId).asc")
-        XCTAssertFalse(model.showCopiedNotice)
+        XCTAssertFalse(copied, "An intercepted copy never reached the clipboard, so nothing may confirm one")
         XCTAssertNil(model.exportController.payload)
+    }
+
+    @MainActor
+    func test_copyPublicKey_reportsTheCopyThatConfirms() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
+
+        var copiedStrings: [String] = []
+        let model = makeModel(
+            fingerprint: identity.fingerprint,
+            clipboardCopyAction: { copiedStrings.append($0) }
+        )
+        model.prepareIfNeeded()
+
+        XCTAssertTrue(model.copyPublicKey())
+        XCTAssertEqual(
+            copiedStrings,
+            [String(data: try XCTUnwrap(model.armoredPublicKey), encoding: .utf8)]
+        )
     }
 
     @MainActor
@@ -123,10 +141,10 @@ final class KeyDetailScreenModelTests: XCTestCase {
             }
         )
         model.prepareIfNeeded()
-        model.copyPublicKey()
+        let copied = model.copyPublicKey()
         model.exportPublicKey()
 
-        XCTAssertFalse(model.showCopiedNotice)
+        XCTAssertFalse(copied, "A screen that forbids copying has nothing to confirm")
         XCTAssertNil(model.exportController.payload)
     }
 
