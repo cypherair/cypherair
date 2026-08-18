@@ -119,8 +119,17 @@ final class SettingsScreenModel {
         protectedOrdinarySettings.snapshot?.gracePeriod ?? AuthPreferences.defaultGracePeriod
     }
 
+    /// The stored value, or — while the domain is locked, where every row is
+    /// disabled anyway — what a fresh install would show. Named against
+    /// `firstRunDefaults` so the fallback cannot drift from the real default.
     var encryptToSelfSelection: Bool {
-        protectedOrdinarySettings.snapshot?.encryptToSelf ?? true
+        protectedOrdinarySettings.snapshot?.encryptToSelf
+            ?? ProtectedOrdinarySettingsSnapshot.firstRunDefaults.encryptToSelf
+    }
+
+    var signMessagesSelection: Bool {
+        protectedOrdinarySettings.snapshot?.signMessages
+            ?? ProtectedOrdinarySettingsSnapshot.firstRunDefaults.signMessages
     }
 
     func setGracePeriod(_ gracePeriod: Int) {
@@ -129,6 +138,10 @@ final class SettingsScreenModel {
 
     func setEncryptToSelf(_ encryptToSelf: Bool) {
         protectedOrdinarySettings.setEncryptToSelf(encryptToSelf)
+    }
+
+    func setSignMessages(_ signMessages: Bool) {
+        protectedOrdinarySettings.setSignMessages(signMessages)
     }
 
     var protectedSettingsSectionState: ProtectedSettingsHost.SectionState {

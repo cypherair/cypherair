@@ -41,6 +41,10 @@ final class ProtectedOrdinarySettingsCoordinator {
         snapshot?.encryptToSelf
     }
 
+    var signMessages: Bool? {
+        snapshot?.signMessages
+    }
+
     var hasCompletedGuidedTutorial: Bool? {
         snapshot?.hasCompletedGuidedTutorial
     }
@@ -92,6 +96,12 @@ final class ProtectedOrdinarySettingsCoordinator {
     func setEncryptToSelf(_ encryptToSelf: Bool) {
         guard var snapshot else { return }
         snapshot.encryptToSelf = encryptToSelf
+        saveLoadedSnapshot(snapshot)
+    }
+
+    func setSignMessages(_ signMessages: Bool) {
+        guard var snapshot else { return }
+        snapshot.signMessages = signMessages
         saveLoadedSnapshot(snapshot)
     }
 

@@ -76,7 +76,7 @@ final class EncryptScreenModel {
     var recipientSearchText = ""
     var selectedRecipients: Set<String> = []
     private var recipientTagFilterState = TagFilterState()
-    var signMessage = true
+    var signMessage: Bool?
     var signerFingerprint: String?
     var ciphertext: Data?
     var encryptToSelf: Bool?
@@ -372,7 +372,7 @@ final class EncryptScreenModel {
         if hasStaleSelectedRecipients {
             return true
         }
-        if resolvedEncryptToSelf == nil {
+        if resolvedEncryptToSelf == nil || resolvedSignMessage == nil {
             return true
         }
 
@@ -392,12 +392,25 @@ final class EncryptScreenModel {
         fileImportRequestGate.currentToken
     }
 
+    /// The two message-composition defaults resolve the same way: the value this
+    /// message carries, falling back to the live app default so a domain that
+    /// unlocks mid-screen is picked up without waiting for a refresh. `nil` means
+    /// the app default is still unreadable — the screen states no value rather
+    /// than inventing one, and encryption stays blocked until it can.
     var resolvedEncryptToSelf: Bool? {
         encryptToSelf ?? protectedOrdinarySettings.encryptToSelf
     }
 
+    var resolvedSignMessage: Bool? {
+        signMessage ?? protectedOrdinarySettings.signMessages
+    }
+
     var encryptToSelfToggleValue: Bool {
         resolvedEncryptToSelf ?? false
+    }
+
+    var signMessageToggleValue: Bool {
+        resolvedSignMessage ?? false
     }
 
     var isEncryptToSelfControlEnabled: Bool {
@@ -405,6 +418,13 @@ final class EncryptScreenModel {
             return false
         }
         return resolvedEncryptToSelf != nil
+    }
+
+    var isSignMessageControlEnabled: Bool {
+        if configuration.signingPolicy.isLocked {
+            return false
+        }
+        return resolvedSignMessage != nil
     }
 
     var ciphertextString: String? {
@@ -584,11 +604,12 @@ final class EncryptScreenModel {
             operation.present(error: mapEncryptionError(error))
             return
         }
-        let signerFingerprint = signMessage ? signerFingerprint : nil
-        guard let encryptToSelf = resolvedEncryptToSelf else {
+        guard let signMessage = resolvedSignMessage,
+              let encryptToSelf = resolvedEncryptToSelf else {
             presentProtectedOrdinarySettingsLockedError()
             return
         }
+        let signerFingerprint = signMessage ? self.signerFingerprint : nil
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
         let onEncrypted = configuration.onEncrypted
 
@@ -625,11 +646,12 @@ final class EncryptScreenModel {
             operation.present(error: mapEncryptionError(error))
             return
         }
-        let signerFingerprint = signMessage ? signerFingerprint : nil
-        guard let encryptToSelf = resolvedEncryptToSelf else {
+        guard let signMessage = resolvedSignMessage,
+              let encryptToSelf = resolvedEncryptToSelf else {
             presentProtectedOrdinarySettingsLockedError()
             return
         }
+        let signerFingerprint = signMessage ? self.signerFingerprint : nil
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
 
         cleanupTemporaryEncryptedFile()
@@ -802,9 +824,17 @@ final class EncryptScreenModel {
         operation.present(error: mapEncryptionError(error))
     }
 
+    /// Re-seeds the toggles the ordinary-settings domain owns after it unlocks,
+    /// relocks, or is edited. Each policy gates only its own assignment: a host
+    /// that pins one toggle must keep receiving refreshes for the other, which a
+    /// single shared guard would deny it.
     func refreshProtectedOrdinarySettings() {
-        guard configuration.encryptToSelfPolicy == .appDefault else { return }
-        encryptToSelf = protectedOrdinarySettings.encryptToSelf
+        if configuration.signingPolicy == .appDefault {
+            signMessage = protectedOrdinarySettings.signMessages
+        }
+        if configuration.encryptToSelfPolicy == .appDefault {
+            encryptToSelf = protectedOrdinarySettings.encryptToSelf
+        }
     }
 
     private func performEncrypt(to recipientContactIds: [String]) {
@@ -928,11 +958,13 @@ final class EncryptScreenModel {
     }
 
     private func applySigningPolicy(from configuration: EncryptView.Configuration) {
-        signMessage = configuration.signingPolicy.initialValue(appDefault: true)
+        signMessage = configuration.signingPolicy.initialValue(
+            appDefault: protectedOrdinarySettings.signMessages
+        )
     }
 
     private func applyEncryptToSelfPolicy(from configuration: EncryptView.Configuration) {
-        encryptToSelf = configuration.encryptToSelfPolicy.optionalInitialValue(
+        encryptToSelf = configuration.encryptToSelfPolicy.initialValue(
             appDefault: protectedOrdinarySettings.encryptToSelf
         )
     }

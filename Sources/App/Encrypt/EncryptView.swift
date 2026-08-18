@@ -8,16 +8,10 @@ struct EncryptView: View {
             case initial(Bool)
             case fixed(Bool)
 
-            func initialValue(appDefault: Bool) -> Bool {
-                switch self {
-                case .appDefault:
-                    appDefault
-                case .initial(let value), .fixed(let value):
-                    value
-                }
-            }
-
-            func optionalInitialValue(appDefault: Bool?) -> Bool? {
+            /// The value a fresh message starts from. `nil` only when the policy
+            /// defers to the app default and that default cannot be read yet —
+            /// the screen refuses to invent one rather than guess what goes out.
+            func initialValue(appDefault: Bool?) -> Bool? {
                 switch self {
                 case .appDefault:
                     appDefault
@@ -37,7 +31,7 @@ struct EncryptView: View {
         var prefilledPlaintext: String?
         var initialRecipientContactIds: [String] = []
         var initialSignerFingerprint: String?
-        var signingPolicy: TogglePolicy = .initial(true)
+        var signingPolicy: TogglePolicy = .appDefault
         var encryptToSelfPolicy: TogglePolicy = .appDefault
         var allowsClipboardWrite = true
         var allowsResultExport = true

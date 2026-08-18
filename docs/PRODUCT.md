@@ -17,7 +17,6 @@ Each of these is an absence a code read cannot prove. They are decisions, not ga
 - **No messaging, no key-server sync, no custom encryption formats.** CypherAir X produces and consumes standard OpenPGP artifacts; transport is the user's problem by design.
 - **No proactive clipboard reading.** Paste areas only; the app writes to the clipboard solely on explicit copy actions.
 - **No backup flow and no backup badge for device-bound keys.** Their private material is not exportable in any form ([CUSTODY.md](CUSTODY.md) §2); the revocation certificate is the primary export action for a device-bound key.
-- **No global signing off-switch.** Signing defaults on and is toggled per message only.
 - **Contacts never store recipient lists**, and contacts-package exchange does not exist.
 - **No password (SKESK) message flow.** The app offers no way to create one and no way to open one. The engine carries the capability ([SECURITY.md](SECURITY.md) §7); exposing it is not a commitment the app has made.
 
@@ -46,6 +45,7 @@ Choices, not mechanisms — each could plausibly be built the other way and deli
 - **Message format is never a manual choice.** The engine selects it from what the recipient certificates advertise: AEAD only when every certificate the message is encrypted to advertises SEIPDv2 (CLAUDE.md Hard Constraint 8). For every key CypherAir generates that tracks the key version exactly; an imported certificate may advertise otherwise, and the advertised capability is what decides.
 - **Format downgrade is surfaced before encryption** — as a warning on the recipient chooser — never as a post-hoc error. The warning comes from the engine's decision for the recipients actually addressed, so it cannot describe a different message than the one that gets sent.
 - **A message not addressed to you never triggers an authentication prompt.** Decrypt Phase 1 matches recipients against public certificates only and fails without touching any private key ([SECURITY.md](SECURITY.md) §3).
+- **Signing is on by default, and the default is a setting.** Settings › Encryption holds what new messages start with — signing and the self copy alike; the per-message toggles decide the message being written. Signing attaches attribution, so it is stated in both places rather than assumed.
 - **Signature verification is graded, not binary** — during decryption a bad or unknown signature is reported alongside the plaintext, never used to suppress it. The standalone Verify surface grades the same way; only its summary verdict is stricter (the first bad or expired signature is decisive).
 - **Every key ships with a revocation certificate**, generated at key creation and at import, and exportable from the key detail page. If the stored artifact is missing (e.g. interrupted device-bound generation), export fails closed rather than regenerating ([SECURITY.md](SECURITY.md) §3).
 - **Tutorial state never touches the real workspace**, and the tutorial is not a prerequisite for key generation. Isolation rules: [SECURITY.md](SECURITY.md) §6.
