@@ -31,6 +31,47 @@ final class ExportFilenameTests: XCTestCase {
         XCTAssertEqual(ExportFilename("...").value, "export")
     }
 
+    /// Dots and whitespace hide behind each other, so stripping each once leaves
+    /// the other's leftovers: `". .secret"` came out as the hidden `.secret`.
+    func test_exportFilename_stripsInterleavedDotsAndWhitespaceToAFixedPoint() {
+        XCTAssertEqual(ExportFilename(base: " . .bashrc", pathExtension: "gpg").value, "bashrc.gpg")
+        XCTAssertEqual(ExportFilename(base: ". .secret", pathExtension: "gpg").value, "secret.gpg")
+        XCTAssertEqual(ExportFilename(base: ".\t.\u{00AD}.hidden", pathExtension: "gpg").value, "hidden.gpg")
+        XCTAssertEqual(ExportFilename(". . . x.txt").value, "x.txt")
+        // `init(_:)` splits the final extension off first, so this one is base
+        // ". " plus extension "secret": the base sanitises away to the fallback.
+        XCTAssertEqual(ExportFilename(". .secret").value, "export.secret")
+    }
+
+    /// Trimming drops whole graphemes, so one multi-byte character can take the
+    /// stem from over-budget straight to empty — which would leave the name
+    /// starting at its own extension's dot. Keeping the inner extension is a
+    /// preference; staying visible is the invariant.
+    func test_exportFilename_truncationNeverProducesAHiddenFile() {
+        let filename = ExportFilename(
+            base: "é." + String(repeating: "a", count: 249),
+            pathExtension: "gpg"
+        )
+
+        XCTAssertFalse(filename.value.hasPrefix("."))
+        XCTAssertTrue(filename.value.hasPrefix("é"))
+        XCTAssertLessThanOrEqual(filename.value.utf8.count, 255)
+
+        // Sweep the window where the stem empties: short multi-byte stems
+        // against an inner extension long enough to consume the budget.
+        for stemLength in 1...6 {
+            for innerExtensionLength in 244...252 {
+                let base = String(repeating: "é", count: stemLength)
+                    + "." + String(repeating: "a", count: innerExtensionLength)
+                let value = ExportFilename(base: base, pathExtension: "gpg").value
+
+                XCTAssertFalse(value.hasPrefix("."), "hidden name from \(stemLength)/\(innerExtensionLength)")
+                XCTAssertFalse(value.isEmpty, "empty name from \(stemLength)/\(innerExtensionLength)")
+                XCTAssertLessThanOrEqual(value.utf8.count, 255)
+            }
+        }
+    }
+
     func test_exportFilename_dropsDirectoryPartsAndControlCharacters() {
         XCTAssertEqual(ExportFilename("../../etc/passwd.asc").value, "passwd.asc")
         XCTAssertEqual(ExportFilename(base: "/tmp/report", pathExtension: "gpg").value, "report.gpg")

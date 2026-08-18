@@ -8,6 +8,12 @@ import Foundation
 struct AppTemporaryArtifact: Equatable {
     let fileURL: URL
     let exportFilename: ExportFilename
+
+    /// Every artifact the store hands out owns its `op-<UUID>` directory, so
+    /// `nil` is reached only by test fakes today. Collapsing the optional is
+    /// deferred rather than dismissed: those fakes point at files sitting
+    /// directly in the temporary directory, and naming that as their owner would
+    /// make `cleanup()` erase the whole temporary directory.
     let ownerDirectoryURL: URL?
 
     init(fileURL: URL, exportFilename: ExportFilename, ownerDirectoryURL: URL? = nil) {

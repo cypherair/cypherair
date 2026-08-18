@@ -52,12 +52,20 @@ struct ExportFilename: Equatable, Hashable, Sendable {
 
     /// The base additionally loses a leading dot, which would hide the file the
     /// user just saved, and surrounding whitespace, which no picker renders.
+    ///
+    /// Run to a fixed point rather than once each: the two hide behind each
+    /// other, so `". .secret"` survives a single strip-then-trim as `.secret`.
     private static func sanitizedBase(_ base: String) -> String {
-        var sanitized = printable(base).trimmingCharacters(in: .whitespacesAndNewlines)
-        while sanitized.hasPrefix(".") {
-            sanitized.removeFirst()
-        }
-        return sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
+        var sanitized = printable(base)
+        var previous: String
+        repeat {
+            previous = sanitized
+            sanitized = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
+            if sanitized.hasPrefix(".") {
+                sanitized.removeFirst()
+            }
+        } while sanitized != previous
+        return sanitized
     }
 
     private static func compose(base: String, pathExtension: String) -> String {
@@ -79,12 +87,24 @@ struct ExportFilename: Equatable, Hashable, Sendable {
         // back ([PRODUCT.md] §5) — lives at the end of the name.
         let innerExtension = (base as NSString).pathExtension
         let innerSuffix = innerExtension.isEmpty ? "" : "." + innerExtension
-        let stemBudget = budget - innerSuffix.utf8.count
-        guard stemBudget > 0 else {
-            return truncated(base, toByteBudget: budget) + suffix
+        if innerSuffix.utf8.count < budget {
+            // Whole `Character`s come off, so one multi-byte grapheme can take
+            // the stem from over-budget straight to empty — and an empty stem
+            // would leave the name starting at the inner extension's dot, which
+            // is a hidden file. Keeping the name's own extension is the
+            // preference here, not a rule that outranks staying visible.
+            let stem = truncated(
+                innerSuffix.isEmpty ? base : (base as NSString).deletingPathExtension,
+                toByteBudget: budget - innerSuffix.utf8.count
+            )
+            if !stem.isEmpty {
+                return stem + innerSuffix + suffix
+            }
         }
-        let stem = innerSuffix.isEmpty ? base : (base as NSString).deletingPathExtension
-        return truncated(stem, toByteBudget: stemBudget) + innerSuffix + suffix
+
+        // Nothing of the name's own extension can be kept, so trim the name.
+        let trimmedBase = truncated(base, toByteBudget: budget)
+        return trimmedBase.isEmpty ? fallbackBase : trimmedBase + suffix
     }
 
     /// Drops whole `Character`s, so a truncation can never split a scalar or a
