@@ -12,7 +12,7 @@ import Foundation
 ///
 /// Both constants are policy, not physics; they are here to be adjusted in one
 /// place.
-struct PassphraseRequirements: Equatable, Sendable {
+struct PassphraseRequirements: Sendable {
     /// Characters, not bytes: one emoji or one Chinese character counts once.
     static let minimumLength = 12
 
@@ -32,7 +32,7 @@ struct PassphraseRequirements: Equatable, Sendable {
         avoidsRepeatedRuns = Self.longestRun(in: characters) <= Self.maximumConsecutiveRepeats
     }
 
-    static func longestRun(in characters: [Character]) -> Int {
+    private static func longestRun(in characters: [Character]) -> Int {
         var longest = 0
         var run = 0
         var previous: Character?

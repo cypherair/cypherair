@@ -35,9 +35,6 @@ struct CypherPassphraseEntry: View {
             set: { edited in
                 passphrase = edited
                 isGenerated = false
-                if edited.isEmpty {
-                    isRevealed = false
-                }
             }
         )
     }

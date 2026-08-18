@@ -3,12 +3,9 @@ import Security
 
 /// Produces a passphrase the user does not have to invent.
 ///
-/// Uniform characters rather than words, for three reasons. A word generator
+/// Uniform characters rather than words, for two reasons. A word generator
 /// needs a wordlist — several thousand entries, carrying someone else's licence,
-/// and only ever in the languages it was built for. Uniform characters carry
-/// their strength in the open, so the strength estimator scores them from what
-/// it can see rather than from knowing where they came from; nothing here is a
-/// special case that waves its own output through the gate. And a backup
+/// and only ever in the languages it was built for. And a backup
 /// passphrase is written down, not recited, so the property that matters is
 /// transcribing it correctly months later — which is what the ambiguity-free
 /// alphabet and the short groups are for.
@@ -73,9 +70,12 @@ enum PassphraseGenerator {
         let ceiling = 256 - (256 % bound)
         while true {
             if offset == randomness.endIndex {
-                var refill = try randomBytes(count: groupCount * groupLength)
-                defer { refill.zeroize() }
-                randomness.append(refill)
+                // Replace the exhausted buffer rather than appending to it: an
+                // append can reallocate and strand the spent random bytes in
+                // freed memory, unzeroized.
+                randomness.zeroize()
+                randomness = try randomBytes(count: groupCount * groupLength)
+                offset = randomness.startIndex
             }
             let byte = Int(randomness[offset])
             offset = randomness.index(after: offset)
