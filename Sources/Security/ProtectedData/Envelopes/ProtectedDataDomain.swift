@@ -95,7 +95,6 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
     case invalidEnvelope(String)
     case registryMissingWithArtifacts
     case storageRootOutsideApplicationSupport
-    case fileProtectionUnsupported
     case fileProtectionVerificationFailed
     case protectedFileWriteFailed
     case missingWrappingRootKey
@@ -122,10 +121,8 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
             "ProtectedData registry is missing while protected-data artifacts still exist."
         case .storageRootOutsideApplicationSupport:
             "ProtectedData storage must remain inside Application Support."
-        case .fileProtectionUnsupported:
-            "ProtectedData storage is unavailable because required file protection is unsupported."
         case .fileProtectionVerificationFailed:
-            "ProtectedData storage could not verify the required file protection settings."
+            "ProtectedData storage root was not created with the required file protection class."
         case .protectedFileWriteFailed:
             "ProtectedData storage could not create a protected file."
         case .missingWrappingRootKey:

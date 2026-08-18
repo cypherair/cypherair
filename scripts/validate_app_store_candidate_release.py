@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import plistlib
 import re
 import shutil
 import subprocess
@@ -33,6 +34,9 @@ ARM64E_MANIFEST_ASSET_NAME = "PgpMobile.arm64e-build-manifest.json"
 ARM64E_STATUS_RELATIVE_PATH = Path("docs/ARM64E_STATUS.md")
 ARM64E_STAGE1_PIN_RELATIVE_PATH = Path("third_party/arm64e-stage1-toolchain.pin.json")
 SQLCIPHER_PIN_RELATIVE_PATH = Path("third_party/sqlcipher-xcframework.pin.json")
+IOS_ENTITLEMENTS_RELATIVE_PATH = Path("CypherAir.entitlements")
+IOS_DATA_PROTECTION_ENTITLEMENT_KEY = "com.apple.developer.default-data-protection"
+IOS_DATA_PROTECTION_ENTITLEMENT_VALUE = "NSFileProtectionComplete"
 PINNED_RUST_STAGE1_TAG_PATTERN = re.compile(
     r"^- \*\*Pinned prerelease tag:\*\* `([^`\r\n]+)`\s*$",
     flags=re.MULTILINE,
@@ -523,6 +527,36 @@ def validate_sqlcipher_dependency(repo_root: Path) -> None:
         )
 
 
+def validate_ios_data_protection_entitlement(repo_root: Path) -> None:
+    """Assert the complete-protection container default ships in the signed app.
+
+    The entitlement acts only on iOS, iPadOS and visionOS, so the macOS
+    validation lanes cannot observe it; it is asserted here with the rest of
+    the release checks (docs/SECURITY.md section 5).
+    """
+    entitlements_path = repo_root / IOS_ENTITLEMENTS_RELATIVE_PATH
+    try:
+        with entitlements_path.open("rb") as handle:
+            entitlements = plistlib.load(handle)
+    except FileNotFoundError as error:
+        raise CandidateValidationError(
+            f"iOS entitlements file is missing: {entitlements_path}"
+        ) from error
+    except Exception as error:
+        raise CandidateValidationError(
+            f"iOS entitlements file is unreadable: {entitlements_path}\n{error}"
+        ) from error
+
+    value = entitlements.get(IOS_DATA_PROTECTION_ENTITLEMENT_KEY)
+    if value != IOS_DATA_PROTECTION_ENTITLEMENT_VALUE:
+        raise CandidateValidationError(
+            "App Store candidate archives require the default data-protection entitlement.\n"
+            f"Expected {IOS_DATA_PROTECTION_ENTITLEMENT_KEY} = "
+            f"{IOS_DATA_PROTECTION_ENTITLEMENT_VALUE!r} in {entitlements_path}, "
+            f"found {value!r}."
+        )
+
+
 def validate_candidate_release(
     repo_root: Path,
     marketing_version: str,
@@ -621,6 +655,8 @@ def validate_candidate_release(
             f"Expected stable tag {release_tag} commit: {remote_tag_sha}\n"
             f"Current HEAD commit: {local_head_sha}"
         )
+
+    validate_ios_data_protection_entitlement(repo_root)
 
     return release_tag
 

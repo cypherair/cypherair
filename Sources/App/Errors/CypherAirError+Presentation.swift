@@ -83,6 +83,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.contactImportConfirmationStale", defaultValue: "Contacts changed while this import was open. Review the key again before adding it.")
         case .contactImportConfirmationAlreadyPending:
             String(localized: "error.contactImportConfirmationAlreadyPending", defaultValue: "Finish or cancel the current contact import before opening another one.")
+        case .operationInterruptedByDeviceLock:
+            String(localized: "error.operationInterruptedByDeviceLock", defaultValue: "The device locked while this operation was running, so it stopped and any partial output was erased. Run it again with the device unlocked.")
         }
     }
 

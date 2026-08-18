@@ -25,28 +25,28 @@ final class FileExportController {
     private(set) var defaultFilename = "export"
     var isPresented = false
 
-    private var ownedTemporaryFile: URL?
+    private var ownedTemporaryArtifact: AppTemporaryArtifact?
 
     init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) {
         self.temporaryArtifactStore = temporaryArtifactStore
     }
 
     func prepareDataExport(_ data: Data, suggestedFilename: String) throws {
-        cleanupOwnedTemporaryFile()
+        cleanupOwnedTemporaryArtifact()
 
-        let temporaryURL = try temporaryArtifactStore.writeProtectedExportData(
+        let artifact = try temporaryArtifactStore.writeProtectedExportData(
             data,
             suggestedFilename: suggestedFilename
         )
 
-        ownedTemporaryFile = temporaryURL
-        payload = ExportPayload(url: temporaryURL)
+        ownedTemporaryArtifact = artifact
+        payload = ExportPayload(url: artifact.fileURL)
         defaultFilename = suggestedFilename
         isPresented = true
     }
 
     func prepareFileExport(fileURL: URL, suggestedFilename: String) {
-        cleanupOwnedTemporaryFile()
+        cleanupOwnedTemporaryArtifact()
         payload = ExportPayload(url: fileURL)
         defaultFilename = suggestedFilename
         isPresented = true
@@ -55,13 +55,11 @@ final class FileExportController {
     func finish() {
         isPresented = false
         payload = nil
-        cleanupOwnedTemporaryFile()
+        cleanupOwnedTemporaryArtifact()
     }
 
-    private func cleanupOwnedTemporaryFile() {
-        if let ownedTemporaryFile {
-            temporaryArtifactStore.eraseTemporaryArtifact(at: ownedTemporaryFile)
-            self.ownedTemporaryFile = nil
-        }
+    private func cleanupOwnedTemporaryArtifact() {
+        ownedTemporaryArtifact?.cleanup()
+        ownedTemporaryArtifact = nil
     }
 }

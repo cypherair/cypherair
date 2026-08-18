@@ -54,6 +54,9 @@ enum CypherAirError: Error {
     case contactsUnavailable(ContactsAvailability)
     case contactImportConfirmationStale
     case contactImportConfirmationAlreadyPending
+    /// The device locked while an operation was running, so the app stopped it
+    /// before file protection sealed its output (SECURITY.md §5).
+    case operationInterruptedByDeviceLock
 
     /// Wrap any already-normalized app error into CypherAirError.
     /// - If it's already a CypherAirError, return as-is.

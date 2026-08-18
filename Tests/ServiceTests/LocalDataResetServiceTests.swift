@@ -284,7 +284,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         }
         let storageRoot = ProtectedDataStorageRoot(
             baseDirectory: baseDirectory,
-            validationMode: .allowArbitraryBaseDirectoryForTesting
+            validationMode: .allowArbitraryBaseDirectory
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -320,7 +320,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         }
         let storageRoot = ProtectedDataStorageRoot(
             baseDirectory: baseDirectory,
-            validationMode: .allowArbitraryBaseDirectoryForTesting
+            validationMode: .allowArbitraryBaseDirectory
         )
         try storageRoot.ensureRootDirectoryExists()
         try Data([0x01]).write(

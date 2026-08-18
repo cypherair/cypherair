@@ -41,7 +41,6 @@ final class ContactsSQLCipherDatabase {
             try createSchema()
             try replaceSnapshot(snapshot)
             try validateConfiguration()
-            try applyFileProtectionToDatabaseFiles()
         } catch {
             try? close()
             throw error
@@ -77,7 +76,6 @@ final class ContactsSQLCipherDatabase {
             try deleteSnapshotRows()
             try insertSnapshot(snapshot)
         }
-        try applyFileProtectionToDatabaseFiles()
     }
 
     func loadSnapshot() throws -> ContactsDomainSnapshot {
@@ -1042,12 +1040,6 @@ final class ContactsSQLCipherDatabase {
                 values.append(try columnString(statement, at: 0))
             }
             return values
-        }
-    }
-
-    private func applyFileProtectionToDatabaseFiles() throws {
-        for url in storageRoot.contactsSQLCipherDatabaseFileURLs(for: domainID) {
-            try storageRoot.applyProtectionToManagedItemIfPresent(at: url)
         }
     }
 

@@ -1160,20 +1160,6 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertNil(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"))
     }
 
-    private func assertCompleteFileProtection(
-        at url: URL,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(
-            attributes[.protectionKey] as? FileProtectionType,
-            .complete,
-            file: file,
-            line: line
-        )
-    }
-
     private func startTutorialSession(_ store: TutorialSessionStore) async {
         await store.openModule(.sandbox)
         store.confirmSandboxAcknowledgement()

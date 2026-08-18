@@ -66,49 +66,37 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             "CypherAirGuidedTutorial-\(UUID().uuidString)",
             isDirectory: true
         )
-        try createProtectedDirectory(at: directory)
+        try fileManager.createProtectedDirectory(at: directory)
         markLive(directory)
         return directory
     }
 
-    func writeProtectedExportData(_ data: Data, suggestedFilename: String) throws -> URL {
-        let sanitizedFilename = sanitizedFilename(suggestedFilename, fallback: "export.data")
-        let temporaryURL = temporaryDirectory
-            .appendingPathComponent("export-\(UUID().uuidString)-\(sanitizedFilename)")
+    /// Stage export data inside an owned directory born with the protection
+    /// class, rather than as a loose file whose class would be its own.
+    func writeProtectedExportData(_ data: Data, suggestedFilename: String) throws -> AppTemporaryArtifact {
+        let ownerDirectory = temporaryDirectory
+            .appendingPathComponent("export-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createProtectedDirectory(at: ownerDirectory)
         var shouldCleanup = true
         defer {
             if shouldCleanup {
-                eraseTemporaryArtifact(at: temporaryURL)
+                eraseTemporaryArtifact(at: ownerDirectory)
             }
         }
 
-        try data.write(to: temporaryURL, options: [.atomic, .completeFileProtection])
-        try applyAndVerifyCompleteProtection(to: temporaryURL)
-        markLive(temporaryURL)
+        let fileURL = ownerDirectory.appendingPathComponent(
+            sanitizedFilename(suggestedFilename, fallback: "export.data")
+        )
+        try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+        markLive(ownerDirectory)
         shouldCleanup = false
-        return temporaryURL
+        return AppTemporaryArtifact(fileURL: fileURL, ownerDirectoryURL: ownerDirectory)
     }
 
     /// Erase an artifact this store handed out, for owners that hold the URL
     /// rather than an `AppTemporaryArtifact`.
     func eraseTemporaryArtifact(at url: URL) {
         try? TemporaryArtifactEraser.erase(at: url, fileManager: fileManager)
-    }
-
-    func applyAndVerifyCompleteProtection(to url: URL) throws {
-        let resolvedURL = url.standardizedFileURL
-        guard try supportsFileProtection(for: resolvedURL) else {
-            throw AppTemporaryArtifactError.fileProtectionUnsupported(resolvedURL)
-        }
-
-        try fileManager.setAttributes(
-            [.protectionKey: FileProtectionType.complete],
-            ofItemAtPath: resolvedURL.path
-        )
-        let attributes = try fileManager.attributesOfItem(atPath: resolvedURL.path)
-        guard attributes[.protectionKey] as? FileProtectionType == .complete else {
-            throw AppTemporaryArtifactError.fileProtectionVerificationFailed(resolvedURL)
-        }
     }
 
     /// Erase what a previous session left behind, sparing everything this one is
@@ -203,10 +191,10 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     }
 
     private func makeOperationArtifact(rootName: String, outputFilename: String) throws -> AppTemporaryArtifact {
-        let rootDirectory = temporaryDirectory.appendingPathComponent(rootName, isDirectory: true)
-        let ownerDirectory = rootDirectory.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true)
-        try createProtectedDirectory(at: rootDirectory)
-        try createProtectedDirectory(at: ownerDirectory)
+        let ownerDirectory = temporaryDirectory
+            .appendingPathComponent(rootName, isDirectory: true)
+            .appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createProtectedDirectory(at: ownerDirectory)
         markLive(ownerDirectory)
         return AppTemporaryArtifact(
             fileURL: ownerDirectory.appendingPathComponent(
@@ -214,11 +202,6 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             ),
             ownerDirectoryURL: ownerDirectory
         )
-    }
-
-    private func createProtectedDirectory(at url: URL) throws {
-        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-        try applyAndVerifyCompleteProtection(to: url)
     }
 
     /// Erase the per-operation directories under one root, then the root itself
@@ -298,17 +281,6 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
 
     private func tutorialDefaultsPlistURL(for suiteName: String) -> URL {
         preferencesDirectory.appendingPathComponent("\(suiteName).plist")
-    }
-
-    private func supportsFileProtection(for url: URL) throws -> Bool {
-        let probeURL: URL
-        if fileManager.fileExists(atPath: url.path) {
-            probeURL = url
-        } else {
-            probeURL = url.deletingLastPathComponent()
-        }
-        let values = try probeURL.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
-        return values.allValues[.volumeSupportsFileProtectionKey] as? Bool ?? false
     }
 
     private func sanitizedFilename(_ filename: String, fallback: String) -> String {

@@ -67,14 +67,7 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: baseDirectory.path))
         let storageRoot = AppProtectedDataStorageRoot(
             baseDirectory: baseDirectory,
-            validationMode: .enforceAppSupportContainment,
-            fileProtectionCapabilityProvider: { probeURL in
-                XCTAssertTrue(
-                    self.fileManager.fileExists(atPath: probeURL.path),
-                    "File-protection capability probing must use an existing path."
-                )
-                return true
-            }
+            validationMode: .enforceAppSupportContainment
         )
         let store = AppProtectedDataRegistryStore(
             storageRoot: storageRoot,
@@ -90,6 +83,29 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         XCTAssertEqual(result.frameworkState, .sessionLocked)
         XCTAssertTrue(fileManager.fileExists(atPath: storageRoot.registryURL.path))
         try assertCompleteFileProtection(at: storageRoot.registryURL)
+    }
+
+    /// The born-protected property this storage design rests on: one call
+    /// creates the domain directory with the class as a creation attribute,
+    /// the root made along the way carries it too, and a file created bare
+    /// inside — the way the SQLCipher engine creates the database and its
+    /// journal — inherits it with nothing marking it afterwards.
+    func test_domainDirectoryCreation_directoriesBornProtected_andBareFilesInherit() throws {
+        let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataBornProtected")
+        defer { try? fileManager.removeItem(at: baseDirectory) }
+
+        let storageRoot = makeProductionStorageRoot(baseDirectory: baseDirectory)
+        let domainID: ProtectedDataDomainID = "contacts"
+
+        try storageRoot.ensureDomainDirectoryExists(for: domainID)
+
+        try assertCompleteFileProtection(at: storageRoot.rootURL)
+        try assertCompleteFileProtection(at: storageRoot.domainDirectory(for: domainID))
+
+        let engineCreatedFile = storageRoot.domainDirectory(for: domainID)
+            .appendingPathComponent("contacts.sqlite")
+        XCTAssertTrue(fileManager.createFile(atPath: engineCreatedFile.path, contents: Data([0])))
+        try assertCompleteFileProtection(at: engineCreatedFile)
     }
 
     func test_bootstrapMetadataSave_writesMetadataWithCompleteFileProtection() throws {
@@ -143,26 +159,6 @@ final class ProtectedDataStorageRootTests: XCTestCase {
 
         XCTAssertThrowsError(try store.performSynchronousBootstrap()) { error in
             XCTAssertEqual(error as? ProtectedDataError, .storageRootOutsideApplicationSupport)
-        }
-        XCTAssertFalse(fileManager.fileExists(atPath: storageRoot.rootURL.path))
-    }
-
-    func test_productionContract_unsupportedFileProtection_failsClosedBeforeBootstrap() throws {
-        let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataUnsupportedProtection")
-        defer { try? fileManager.removeItem(at: baseDirectory) }
-
-        let storageRoot = AppProtectedDataStorageRoot(
-            baseDirectory: baseDirectory,
-            validationMode: .enforceAppSupportContainment,
-            fileProtectionCapabilityProvider: { _ in false }
-        )
-        let store = AppProtectedDataRegistryStore(
-            storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.unsupported-protection"
-        )
-
-        XCTAssertThrowsError(try store.performSynchronousBootstrap()) { error in
-            XCTAssertEqual(error as? ProtectedDataError, .fileProtectionUnsupported)
         }
         XCTAssertFalse(fileManager.fileExists(atPath: storageRoot.rootURL.path))
     }
@@ -227,7 +223,13 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         defer { try? fileManager.removeItem(at: baseDirectory) }
         defer { try? fileManager.removeItem(at: containedTarget) }
 
-        try fileManager.createDirectory(at: containedTarget, withIntermediateDirectories: true)
+        // The stand-in root carries the class the root check asserts, as any
+        // root this app created would.
+        try fileManager.createDirectory(
+            at: containedTarget,
+            withIntermediateDirectories: true,
+            attributes: [.protectionKey: FileProtectionType.complete]
+        )
         try fileManager.createSymbolicLink(
             at: baseDirectory.appendingPathComponent("ProtectedData", isDirectory: true),
             withDestinationURL: containedTarget
@@ -271,16 +273,6 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         )
         try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         return url
-    }
-
-    private func assertCompleteFileProtection(at url: URL, file: StaticString = #filePath, line: UInt = #line) throws {
-        let attributes = try fileManager.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(
-            attributes[.protectionKey] as? FileProtectionType,
-            .complete,
-            file: file,
-            line: line
-        )
     }
 
     private func assertDirectoryIsEmpty(

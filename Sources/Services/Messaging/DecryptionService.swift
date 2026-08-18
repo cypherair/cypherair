@@ -155,10 +155,9 @@ final class DecryptionService {
         // Custody-specific private-key access is owned by the router-backed streaming
         // file decryptor: software custody unwraps and zeroizes a secret certificate;
         // Secure Enclave custody uses the external P-256 key-agreement route. This
-        // service keeps ownership of the temporary output artifact, success-only file
-        // protection, and cleanup. Payload authentication and the success-only
-        // plaintext-to-output release remain the Sequoia/streaming pipeline's
-        // responsibility.
+        // service keeps ownership of the temporary output artifact and its cleanup.
+        // Payload authentication and the success-only plaintext-to-output release
+        // remain the Sequoia/streaming pipeline's responsibility.
         let context = verificationContext()
 
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
@@ -173,7 +172,6 @@ final class DecryptionService {
                 verificationContext: context,
                 progress: progress
             )
-            try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
         } catch let error as CypherAirError {
             outputArtifact.cleanup()
             throw error

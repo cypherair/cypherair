@@ -598,10 +598,6 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_generateKey_realProtectedDataRelockAfterIdentityStore_doesNotLeaveOrphanedMetadata() async throws {
-        guard try supportsCompleteProtectedFileCreation() else {
-            throw XCTSkip("Complete file protection is unavailable in this macOS test sandbox.")
-        }
-
         let checkpointGate = ProvisioningCheckpointGate()
         let relockInvalidationGate = ProvisioningCheckpointGate()
         let target = try await makeProtectedKeyMetadataProvisioningTarget(
