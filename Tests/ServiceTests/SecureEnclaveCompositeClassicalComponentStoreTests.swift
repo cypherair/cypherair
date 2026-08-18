@@ -51,19 +51,16 @@ final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
         )
     }
 
-    func test_storeThenLoad_returnsBothHalvesAndZeroizesTheInputs() throws {
-        var eddsaSecret = Data(repeating: 0x31, count: 32)
-        var ecdhSecret = Data(repeating: 0x32, count: 32)
+    func test_storeThenLoad_returnsBothHalves() throws {
+        var eddsaSource = Data(repeating: 0x31, count: 32)
+        var ecdhSource = Data(repeating: 0x32, count: 32)
 
         try store.store(
             fingerprint: fingerprint,
-            eddsaSecret: &eddsaSecret,
-            ecdhSecret: &ecdhSecret,
+            eddsaSecret: SensitiveBuffer(consuming: &eddsaSource),
+            ecdhSecret: SensitiveBuffer(consuming: &ecdhSource),
             tier: .postQuantum
         )
-
-        XCTAssertEqual(eddsaSecret, Data(repeating: 0x00, count: 32))
-        XCTAssertEqual(ecdhSecret, Data(repeating: 0x00, count: 32))
 
         let component = try store.load(
             fingerprint: fingerprint,
@@ -74,6 +71,30 @@ final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
 
         XCTAssertEqual(component.eddsaSecret, Data(repeating: 0x31, count: 32))
         XCTAssertEqual(component.ecdhSecret, Data(repeating: 0x32, count: 32))
+    }
+
+    /// The · High tier's halves are 57 and 56 bytes. Equal-length halves cannot
+    /// tell a correct split from one that is off by a byte; these can.
+    func test_storeThenLoad_splitsTheHighTierHalvesAtTheirOwnLengths() throws {
+        var eddsaSource = Data(repeating: 0x51, count: 57)
+        var ecdhSource = Data(repeating: 0x52, count: 56)
+
+        try store.store(
+            fingerprint: fingerprint,
+            eddsaSecret: SensitiveBuffer(consuming: &eddsaSource),
+            ecdhSecret: SensitiveBuffer(consuming: &ecdhSource),
+            tier: .postQuantumHigh
+        )
+
+        let component = try store.load(
+            fingerprint: fingerprint,
+            authenticationContext: nil,
+            tier: .postQuantumHigh
+        )
+        defer { component.zeroize() }
+
+        XCTAssertEqual(component.eddsaSecret, Data(repeating: 0x51, count: 57))
+        XCTAssertEqual(component.ecdhSecret, Data(repeating: 0x52, count: 56))
     }
 
     func test_load_readsOnlyItsOwnNamespace() throws {
@@ -142,14 +163,14 @@ final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
     }
 
     func test_store_rejectsSecretsOfTheWrongTierLength() {
-        var eddsaSecret = Data(repeating: 0x41, count: 32)
-        var ecdhSecret = Data(repeating: 0x42, count: 32)
+        var eddsaSource = Data(repeating: 0x41, count: 32)
+        var ecdhSource = Data(repeating: 0x42, count: 32)
 
         XCTAssertThrowsError(
             try store.store(
                 fingerprint: fingerprint,
-                eddsaSecret: &eddsaSecret,
-                ecdhSecret: &ecdhSecret,
+                eddsaSecret: SensitiveBuffer(consuming: &eddsaSource),
+                ecdhSecret: SensitiveBuffer(consuming: &ecdhSource),
                 tier: .postQuantumHigh
             )
         )
@@ -157,12 +178,12 @@ final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
     }
 
     private func storeComponent() throws {
-        var eddsaSecret = Data(repeating: 0x31, count: 32)
-        var ecdhSecret = Data(repeating: 0x32, count: 32)
+        var eddsaSource = Data(repeating: 0x31, count: 32)
+        var ecdhSource = Data(repeating: 0x32, count: 32)
         try store.store(
             fingerprint: fingerprint,
-            eddsaSecret: &eddsaSecret,
-            ecdhSecret: &ecdhSecret,
+            eddsaSecret: SensitiveBuffer(consuming: &eddsaSource),
+            ecdhSecret: SensitiveBuffer(consuming: &ecdhSource),
             tier: .postQuantum
         )
     }

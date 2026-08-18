@@ -41,7 +41,7 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
     }
 
     func wrap(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
@@ -59,7 +59,7 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         try base.unwrap(
             bundle: bundle,
             using: handle,
@@ -122,7 +122,7 @@ final class BlockingReconstructSecureEnclave: SecureEnclaveManageable, @unchecke
     }
 
     func wrap(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
@@ -140,7 +140,7 @@ final class BlockingReconstructSecureEnclave: SecureEnclaveManageable, @unchecke
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         try base.unwrap(
             bundle: bundle,
             using: handle,
@@ -999,7 +999,7 @@ class KeyManagementServiceTestCase: XCTestCase {
         let metadata = PGPKeyMetadataAdapter.metadata(from: info)
         let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try mockSE.wrap(
-            privateKey: secretCertData,
+            privateKey: SensitiveBuffer(copying: secretCertData),
             using: handle,
             fingerprint: info.fingerprint,
             payloadKind: .softwareSecretCertificate

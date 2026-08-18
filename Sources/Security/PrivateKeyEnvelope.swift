@@ -207,7 +207,7 @@ enum PrivateKeyEnvelopeCodec {
     }
 
     static func seal(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind,
         seKeyData: Data,
@@ -247,12 +247,14 @@ enum PrivateKeyEnvelopeCodec {
             ephemeralPublicKeyX963: ephemeralPublicKeyX963,
             plaintextLength: privateKey.count
         )
-        let sealedBox = try AES.GCM.seal(
-            privateKey,
-            using: symmetricKey,
-            nonce: AES.GCM.Nonce(data: nonce),
-            authenticating: aad
-        )
+        let sealedBox = try privateKey.withUnsafeBytes { plaintext in
+            try AES.GCM.seal(
+                plaintext,
+                using: symmetricKey,
+                nonce: AES.GCM.Nonce(data: nonce),
+                authenticating: aad
+            )
+        }
 
         let envelope = PrivateKeyEnvelope(
             magic: PrivateKeyEnvelope.magic,
@@ -281,7 +283,7 @@ enum PrivateKeyEnvelopeCodec {
         sharedSecret: SharedSecret,
         expectedFingerprint: String,
         expectedPayloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         try envelope.validateContract(
             expectedFingerprint: expectedFingerprint,
             expectedPayloadKind: expectedPayloadKind
@@ -309,7 +311,11 @@ enum PrivateKeyEnvelopeCodec {
             ciphertext: envelope.ciphertext,
             tag: envelope.tag
         )
-        return try AES.GCM.open(sealedBox, using: symmetricKey, authenticating: aad)
+        // `AES.GCM.open` hands back a freshly allocated `Data` that nothing else
+        // references, which is exactly the ownership `init(consuming:)` needs to
+        // move the plaintext into the buffer and erase what it came from.
+        var plaintext = try AES.GCM.open(sealedBox, using: symmetricKey, authenticating: aad)
+        return SensitiveBuffer(consuming: &plaintext)
     }
 
     private static func wrappingKey(

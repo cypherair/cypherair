@@ -70,7 +70,7 @@ final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTes
 
         let handle = try custody.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try custody.wrap(
-            privateKey: secret,
+            privateKey: SensitiveBuffer(copying: secret),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
@@ -82,17 +82,16 @@ final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTes
             from: handle.dataRepresentation,
             authenticationContext: nil
         )
-        var unwrapped = try custody.unwrap(
+        let unwrapped = try custody.unwrap(
             bundle: bundle,
             using: reconstructed,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
-        )
-        defer { unwrapped.zeroize() }
+        ).copiedBytes()
         XCTAssertEqual(unwrapped, secret)
 
         // The fingerprint binding fails closed on a mismatched identity.
-        XCTAssertThrowsError(
+        assertThrowsError(
             try custody.unwrap(
                 bundle: bundle,
                 using: reconstructed,

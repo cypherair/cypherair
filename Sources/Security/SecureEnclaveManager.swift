@@ -67,7 +67,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
     }
 
     func wrap(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
@@ -97,7 +97,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         guard let hwKey = handle as? HardwareSEKey else {
             throw SecureEnclaveError.invalidKeyHandle
         }
@@ -119,13 +119,12 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
             x963Representation: envelope.ephemeralPublicKeyX963
         )
         let sharedSecret = try hwKey.key.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
-        let plaintext = try PrivateKeyEnvelopeCodec.open(
+        return try PrivateKeyEnvelopeCodec.open(
             envelope: envelope,
             sharedSecret: sharedSecret,
             expectedFingerprint: fingerprint,
             expectedPayloadKind: payloadKind
         )
-        return plaintext
     }
 
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {

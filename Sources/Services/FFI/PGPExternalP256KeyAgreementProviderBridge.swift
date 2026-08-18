@@ -16,19 +16,15 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
         request: ExternalP256KeyAgreementRequest
     ) throws -> P256RawSharedSecret {
         do {
-            var sharedSecret = try keyAgreement.deriveSharedSecret(
+            let sharedSecret = try keyAgreement.deriveSharedSecret(
                 request: request,
                 using: handle
             )
-            defer { sharedSecret.zeroize() }
-            var raw = sharedSecret.rawCopy()
-            defer { raw.resetBytes(in: 0..<raw.count) }
-            let ffiRaw = raw.withUnsafeBytes { buffer in
-                Data(buffer)
-            }
-            // UniFFI must copy this record across the callback boundary; Rust
-            // immediately validates and stores the received Vec in Zeroizing.
-            return P256RawSharedSecret(raw: ffiRaw)
+            // The one copy the FFI record costs: UniFFI must copy it across the
+            // callback boundary, and Rust immediately validates and stores the
+            // received Vec in Zeroizing. The derived secret itself is erased
+            // when this scope ends.
+            return sharedSecret.raw.withUnsafeBytes { P256RawSharedSecret(raw: Data($0)) }
         } catch is CancellationError {
             throw ExternalP256KeyAgreementError.OperationCancelled
         } catch let error as SecureEnclaveCustodyHandleError {

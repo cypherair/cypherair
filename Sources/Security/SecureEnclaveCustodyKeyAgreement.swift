@@ -1,33 +1,22 @@
 import CryptoKit
 import Foundation
 
-struct SecureEnclaveP256RawSharedSecret: Equatable, Sendable {
-    private var rawStorage: Data
+/// A P-256 ECDH shared secret that has been checked for the two shapes an
+/// enclave key agreement must never hand onward: a wrong length, and an
+/// all-zero point that would silently key everything downstream with nothing.
+/// Holding the bytes in a `SensitiveBuffer` is what keeps the validated secret
+/// the only copy in existence.
+struct SecureEnclaveP256RawSharedSecret: ~Copyable {
+    static let rawLength = 32
 
-    var raw: Data {
-        rawStorage
-    }
+    let raw: SensitiveBuffer
 
-    init(raw: Data) throws {
-        guard raw.count == 32,
-              raw.contains(where: { $0 != 0 }) else {
+    init(raw: consuming SensitiveBuffer) throws {
+        guard raw.count == Self.rawLength,
+              raw.withUnsafeBytes({ $0.contains { $0 != 0 } }) else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
         }
-        self.rawStorage = Self.copy(raw)
-    }
-
-    func rawCopy() -> Data {
-        Self.copy(rawStorage)
-    }
-
-    mutating func zeroize() {
-        rawStorage.resetBytes(in: 0..<rawStorage.count)
-    }
-
-    private static func copy(_ data: Data) -> Data {
-        data.withUnsafeBytes { buffer in
-            Data(buffer)
-        }
+        self.raw = raw
     }
 }
 
@@ -79,10 +68,13 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
             throw Self.mapEnclaveOperationError(error)
         }
 
-        var raw = sharedSecret.withUnsafeBytes { Data($0) }
-        // The validated carrier below copies; this transient extraction buffer
-        // is ours to scrub. CryptoKit zeroizes the SharedSecret backing itself.
-        defer { raw.resetBytes(in: 0..<raw.count) }
+        // Two passes over the CryptoKit secret — one for the length, one for the
+        // bytes — rather than one pass through a `Data` the extraction would
+        // then have to scrub. CryptoKit clears the `SharedSecret` backing itself.
+        let count = sharedSecret.withUnsafeBytes { $0.count }
+        let raw = SensitiveBuffer(count: count) { destination in
+            sharedSecret.withUnsafeBytes { destination.copyMemory(from: $0) }
+        }
         return try SecureEnclaveP256RawSharedSecret(raw: raw)
     }
 

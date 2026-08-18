@@ -157,24 +157,11 @@ final class ContactsSQLCipherDatabase {
     }
 
     private func keyDatabase(with domainMasterKey: Data) throws {
-        guard domainMasterKey.count == SQLCipherRawKey.rawKeyLength else {
-            throw ProtectedDataError.invalidDomainMasterKeyLength(domainMasterKey.count)
-        }
-
-        var domainMasterKeyCopy = Data(domainMasterKey)
-        var keySpec: [UInt8]
+        let keySpec: SensitiveBuffer
         do {
-            keySpec = try SQLCipherRawKey.keySpecBytes(for: domainMasterKeyCopy)
-        } catch let error as SQLCipherRawKeyError {
-            domainMasterKeyCopy.protectedDataZeroize()
-            switch error {
-            case .invalidRawKeyLength(let length):
-                throw ProtectedDataError.invalidDomainMasterKeyLength(length)
-            }
-        }
-        defer {
-            domainMasterKeyCopy.protectedDataZeroize()
-            SQLCipherRawKey.zeroize(&keySpec)
+            keySpec = try SQLCipherRawKey.keySpec(for: domainMasterKey)
+        } catch SQLCipherRawKeyError.invalidRawKeyLength(let length) {
+            throw ProtectedDataError.invalidDomainMasterKeyLength(length)
         }
 
         let database = try requireOpenDatabase()

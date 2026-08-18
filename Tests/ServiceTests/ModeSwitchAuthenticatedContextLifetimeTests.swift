@@ -68,7 +68,7 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
                 authenticationContext: nil
             )
             let bundle = try secureEnclave.wrap(
-                privateKey: Data(repeating: UInt8(0x40 + index), count: 32),
+                privateKey: SensitiveBuffer(copying: Data(repeating: UInt8(0x40 + index), count: 32)),
                 using: handle,
                 fingerprint: fingerprint,
                 payloadKind: .softwareSecretCertificate

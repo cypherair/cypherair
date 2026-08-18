@@ -73,7 +73,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     }
 
     func wrap(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
@@ -110,7 +110,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         if let error = nextError {
             nextError = nil
             throw error

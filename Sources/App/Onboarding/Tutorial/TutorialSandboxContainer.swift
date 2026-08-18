@@ -49,9 +49,16 @@ final class TutorialSandboxContainer {
     let contactsDirectory: URL
     let defaultsSuiteName: String
 
-    /// Shares one root-key buffer between the container and the contacts
-    /// domain-store closures, so `cleanup()` can zeroize the buffer in place
-    /// instead of a copy-on-write duplicate.
+    /// Gives the container and the contacts domain-store closure one mutable
+    /// holder for the tutorial's ephemeral root key.
+    ///
+    /// `cleanup()`'s erase is only as complete as the aliases outstanding when
+    /// it runs. Every read of `key` — through the closure, or the direct bind
+    /// in `openContactsIfNeeded` — hands out a value sharing this storage, and
+    /// `resetBytes` against a shared buffer copy-on-writes: the box is left
+    /// clear and the alias keeps the bytes, to be freed intact. The residual is
+    /// accepted here and nowhere else: this key is generated per sandbox, is
+    /// never persisted, and never leaves the process.
     private final class ContactsWrappingRootKeyBox {
         var key: Data
 

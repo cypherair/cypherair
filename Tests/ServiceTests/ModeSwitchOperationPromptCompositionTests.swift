@@ -67,7 +67,7 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         let fingerprint = String(repeating: "a", count: 40)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
-            privateKey: Data(repeating: 0x42, count: 32),
+            privateKey: SensitiveBuffer(copying: Data(repeating: 0x42, count: 32)),
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate

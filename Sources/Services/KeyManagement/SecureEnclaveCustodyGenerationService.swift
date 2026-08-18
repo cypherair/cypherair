@@ -280,29 +280,21 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 handlePair: handlePair,
                 compositeSigner: compositeSigner
             )
-            // Zeroize the raw classical component secrets on every exit from
-            // this scope. `store` also zeroizes them (idempotent), but a
-            // cancellation/invalidation throw between receipt and seal must not
-            // free them intact. The commit closure below reads only public
-            // metadata, so the secrets stay valid until it returns.
-            defer {
-                generated.classicalEddsaSecret.resetBytes(
-                    in: 0..<generated.classicalEddsaSecret.count
-                )
-                generated.classicalEcdhSecret.resetBytes(
-                    in: 0..<generated.classicalEcdhSecret.count
-                )
-            }
+            // Move the raw classical component secrets out of the engine's
+            // result as soon as it arrives. A cancellation or invalidation
+            // throw between receipt and seal then frees them erased, and the
+            // seal below consumes them outright.
+            let classicalEddsaSecret = SensitiveBuffer(consuming: &generated.classicalEddsaSecret)
+            let classicalEcdhSecret = SensitiveBuffer(consuming: &generated.classicalEcdhSecret)
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 
             // Seal the classical component before the durable identity commit
-            // so a committed identity never exists without its component;
-            // `store` zeroizes the secret buffers.
+            // so a committed identity never exists without its component.
             try compositeClassicalComponentStore.store(
                 fingerprint: generated.metadata.fingerprint,
-                eddsaSecret: &generated.classicalEddsaSecret,
-                ecdhSecret: &generated.classicalEcdhSecret,
+                eddsaSecret: classicalEddsaSecret,
+                ecdhSecret: classicalEcdhSecret,
                 tier: tier
             )
             storedClassicalComponentFingerprint = generated.metadata.fingerprint
