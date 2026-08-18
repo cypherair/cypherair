@@ -58,13 +58,12 @@ final class BackupKeyScreenModel {
         !passphraseProtectsExport || isExporting
     }
 
-    /// Private-key material leaves the app only under a passphrase the app is
-    /// willing to vouch for, typed identically twice. A weak one is refused
-    /// here rather than at the button, because the button is presentation and
-    /// this is the rule.
+    /// Private-key material leaves the app only under a passphrase that meets
+    /// the app's requirements, typed identically twice. One that does not is
+    /// refused here rather than at the button, because the button is
+    /// presentation and this is the rule.
     private var passphraseProtectsExport: Bool {
-        passphrase == passphraseConfirm
-            && PassphraseStrengthEstimator.estimate(passphrase).isAcceptable
+        passphrase == passphraseConfirm && PassphraseRequirements(of: passphrase).isSatisfied
     }
 
     var exportedString: String? {

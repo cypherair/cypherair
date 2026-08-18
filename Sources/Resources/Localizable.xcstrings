@@ -11637,6 +11637,70 @@
         }
       }
     },
+    "passphrase.requirement.length" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At least %lld characters"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少 %lld 个字符"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.met" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已满足"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.noRepeatedRun" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No character repeated %lld or more times in a row"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一字符不连续重复 %lld 次或以上"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.unmet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not met yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未满足"
+          }
+        }
+      }
+    },
     "passphrase.show" : {
       "localizations" : {
         "en" : {
@@ -11649,102 +11713,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示密码短语"
-          }
-        }
-      }
-    },
-    "passphrase.strength" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Passphrase strength"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密码短语强度"
-          }
-        }
-      }
-    },
-    "passphrase.strength.good" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Good"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "良好"
-          }
-        }
-      }
-    },
-    "passphrase.strength.strong" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strong"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "强"
-          }
-        }
-      }
-    },
-    "passphrase.strength.veryWeak" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Very weak"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "非常弱"
-          }
-        }
-      }
-    },
-    "passphrase.strength.weak" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weak"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "弱"
-          }
-        }
-      }
-    },
-    "passphrase.tooWeak" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guessing is the attack a passphrase has to survive, and length is what beats it. Add more characters, or generate one."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密码短语要抵御的攻击就是逐一猜测，而长度正是取胜的关键。请再多输入一些字符，或者直接生成一个。"
           }
         }
       }

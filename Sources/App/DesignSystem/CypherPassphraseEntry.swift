@@ -1,12 +1,13 @@
 import SwiftUI
 
 /// The app's one way of asking someone to choose a passphrase: generation
-/// offered before the field, strength shown while typing, and the confirmation
-/// alongside — so no screen invents its own idea of what a passphrase has to be.
+/// offered before the field, the requirements shown while typing, and the
+/// confirmation alongside — so no screen invents its own idea of what a
+/// passphrase has to be.
 ///
 /// Emits form rows; drop it inside a `Section`. The caller keeps the two
-/// strings and decides what a passphrase that fails the gate means for its own
-/// action, asking `PassphraseStrengthEstimator` the same question this view
+/// strings and decides what an unsatisfied requirement means for its own
+/// action, asking `PassphraseRequirements` the same question this view
 /// displays.
 struct CypherPassphraseEntry: View {
     enum Field: Hashable {
@@ -21,8 +22,8 @@ struct CypherPassphraseEntry: View {
     @State private var isRevealed = false
     @State private var isGenerated = false
 
-    private var strength: PassphraseStrength {
-        PassphraseStrengthEstimator.estimate(passphrase)
+    private var requirements: PassphraseRequirements {
+        PassphraseRequirements(of: passphrase)
     }
 
     /// Everything the field itself writes is a user edit, which is what makes
@@ -65,22 +66,31 @@ struct CypherPassphraseEntry: View {
             }
 
             if !passphrase.isEmpty {
-                PassphraseStrengthMeter(strength: strength)
+                VStack(alignment: .leading, spacing: 4) {
+                    PassphraseRequirementRow(
+                        text: String(
+                            localized: "passphrase.requirement.length",
+                            defaultValue: "At least \(PassphraseRequirements.minimumLength) characters"
+                        ),
+                        isMet: requirements.isLongEnough
+                    )
+                    PassphraseRequirementRow(
+                        text: String(
+                            localized: "passphrase.requirement.noRepeatedRun",
+                            defaultValue: "No character repeated \(PassphraseRequirements.maximumConsecutiveRepeats + 1) or more times in a row"
+                        ),
+                        isMet: requirements.avoidsRepeatedRuns
+                    )
+                }
 
                 if isGenerated {
-                    guidance(
-                        String(
-                            localized: "passphrase.generated.note",
-                            defaultValue: "Write it down and keep it somewhere safe. It is stored nowhere, and no one can recover it for you."
-                        )
-                    )
-                } else if !strength.isAcceptable {
-                    guidance(
-                        String(
-                            localized: "passphrase.tooWeak",
-                            defaultValue: "Guessing is the attack a passphrase has to survive, and length is what beats it. Add more characters, or generate one."
-                        )
-                    )
+                    Text(String(
+                        localized: "passphrase.generated.note",
+                        defaultValue: "Write it down and keep it somewhere safe. It is stored nowhere, and no one can recover it for you."
+                    ))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -121,13 +131,6 @@ struct CypherPassphraseEntry: View {
         )
     }
 
-    private func guidance(_ text: String) -> some View {
-        Text(text)
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
     /// Fills both fields: a passphrase nobody chose is a passphrase nobody can
     /// mistype, so asking for it twice would only be ceremony. It is revealed
     /// because a value the user has never seen has to be written down before it
@@ -146,65 +149,30 @@ struct CypherPassphraseEntry: View {
     }
 }
 
-private struct PassphraseStrengthMeter: View {
-    let strength: PassphraseStrength
-
-    private static let segments = 4
+/// One requirement and whether the passphrase has reached it yet. Unmet reads
+/// as "not there yet" rather than as an error: nothing here is a mistake the
+/// user has already made.
+private struct PassphraseRequirementRow: View {
+    let text: String
+    let isMet: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                ForEach(0..<Self.segments, id: \.self) { segment in
-                    Capsule()
-                        .fill(segment < strength.tier.filledSegments ? strength.tier.tint : unfilled)
-                        .frame(height: 4)
-                }
-            }
-
-            Text(strength.tier.title)
+        Label {
+            Text(text)
                 .font(.footnote)
-                .foregroundStyle(strength.isAcceptable ? .secondary : strength.tier.tint)
+                .foregroundStyle(isMet ? .primary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isMet ? Color.green : Color.secondary)
+                .font(.footnote)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(String(localized: "passphrase.strength", defaultValue: "Passphrase strength"))
-        .accessibilityValue(strength.tier.title)
-    }
-
-    private var unfilled: Color {
-        Color.secondary.opacity(0.25)
-    }
-}
-
-/// The meter is only drawn for a passphrase that has something in it, so
-/// `.empty` renders as nothing rather than as a verdict.
-private extension PassphraseStrengthTier {
-    var filledSegments: Int { rawValue }
-
-    var tint: Color {
-        switch self {
-        case .empty:
-            .secondary
-        case .veryWeak:
-            .red
-        case .weak:
-            .orange
-        case .good, .strong:
-            .green
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .empty:
-            ""
-        case .veryWeak:
-            String(localized: "passphrase.strength.veryWeak", defaultValue: "Very weak")
-        case .weak:
-            String(localized: "passphrase.strength.weak", defaultValue: "Weak")
-        case .good:
-            String(localized: "passphrase.strength.good", defaultValue: "Good")
-        case .strong:
-            String(localized: "passphrase.strength.strong", defaultValue: "Strong")
-        }
+        .accessibilityLabel(text)
+        .accessibilityValue(
+            isMet
+                ? String(localized: "passphrase.requirement.met", defaultValue: "Met")
+                : String(localized: "passphrase.requirement.unmet", defaultValue: "Not met yet")
+        )
     }
 }

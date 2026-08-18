@@ -155,7 +155,7 @@ final class BackupKeyScreenModelTests: XCTestCase {
         XCTAssertEqual(model.passphraseConfirm, "")
     }
 
-    func test_exportBackup_refusesAWeakPassphrase() async {
+    func test_exportBackup_refusesATooShortPassphrase() async {
         var exportAttempts = 0
         let model = makeModel(
             exportBackupAction: { _, _ in
@@ -163,8 +163,8 @@ final class BackupKeyScreenModelTests: XCTestCase {
                 return Data("backup".utf8)
             }
         )
-        model.passphrase = "password123"
-        model.passphraseConfirm = "password123"
+        model.passphrase = "backup2026"
+        model.passphraseConfirm = "backup2026"
 
         XCTAssertTrue(model.exportButtonDisabled)
 
@@ -174,6 +174,27 @@ final class BackupKeyScreenModelTests: XCTestCase {
         XCTAssertEqual(exportAttempts, 0)
         XCTAssertNil(model.exportedData)
         XCTAssertFalse(model.isExporting)
+    }
+
+    func test_exportBackup_refusesALongPassphraseThatIsOneCharacterHeldDown() async {
+        var exportAttempts = 0
+        let model = makeModel(
+            exportBackupAction: { _, _ in
+                exportAttempts += 1
+                return Data("backup".utf8)
+            }
+        )
+        let held = String(repeating: "a", count: 32)
+        model.passphrase = held
+        model.passphraseConfirm = held
+
+        XCTAssertTrue(model.exportButtonDisabled)
+
+        model.exportBackup()
+        await drainKeyRouteMainActor()
+
+        XCTAssertEqual(exportAttempts, 0)
+        XCTAssertNil(model.exportedData)
     }
 
     func test_exportBackup_acceptsAGeneratedPassphrase() async throws {
@@ -191,7 +212,7 @@ final class BackupKeyScreenModelTests: XCTestCase {
         }
     }
 
-    func test_exportBackup_refusesAStrongPassphraseTypedTwiceDifferently() async {
+    func test_exportBackup_refusesAnAcceptablePassphraseTypedTwiceDifferently() async {
         var exportAttempts = 0
         let model = makeModel(
             exportBackupAction: { _, _ in

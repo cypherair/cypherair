@@ -22,7 +22,7 @@ enum PassphraseGenerator {
 
     /// ASCII letters and digits minus the shapes that get read back wrong off
     /// paper — `0`/`O`, `1`/`l`/`I`. 56 characters, 5.8 bits each, so a
-    /// generated passphrase is worth 116 bits.
+    /// generated passphrase is worth about 116 bits.
     static let alphabet = Array(
         "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz".utf8
     )
@@ -44,11 +44,25 @@ enum PassphraseGenerator {
                 assembled.append(UInt8(ascii: "-"))
             }
             for _ in 0..<groupLength {
-                let position = try index(from: &randomness, offset: &offset)
+                var position = try index(from: &randomness, offset: &offset)
+                while extendsRunPastPolicy(assembled, with: alphabet[position]) {
+                    position = try index(from: &randomness, offset: &offset)
+                }
                 assembled.append(alphabet[position])
             }
         }
         return String(decoding: assembled, as: UTF8.self)
+    }
+
+    /// The gate refuses a character repeated more times in a row than
+    /// `PassphraseRequirements` allows, so the generator never draws one — its
+    /// output satisfies the requirements by construction rather than by luck.
+    /// At most one of the 56 characters is ever excluded, so the draw stays
+    /// effectively uniform and the redraw always terminates.
+    private static func extendsRunPastPolicy(_ assembled: Data, with character: UInt8) -> Bool {
+        let limit = PassphraseRequirements.maximumConsecutiveRepeats
+        guard limit > 0, assembled.count >= limit else { return false }
+        return assembled.suffix(limit).allSatisfy { $0 == character }
     }
 
     /// One uniform index into `alphabet`, by rejection sampling: bytes at or
