@@ -30,7 +30,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         do {
             _ = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 31_536_000
+                newValidity: .expiresIn(seconds: 31_536_000)
             )
             XCTFail("Expected blocking policy to stop Secure Enclave modify-expiry")
         } catch CypherAirError.keyOperationUnavailable(let category) {
@@ -72,7 +72,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
             let updated = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 31_536_000
+                newValidity: .expiresIn(seconds: 31_536_000)
             )
 
             XCTAssertEqual(updated.fingerprint, fixture.identity.fingerprint)
@@ -133,7 +133,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
         let updated = try await keyManagement.modifyExpiry(
             fingerprint: fixture.identity.fingerprint,
-            newExpirySeconds: nil
+            newValidity: .never
         )
 
         XCTAssertNil(updated.expiryDate)
@@ -144,7 +144,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     }
 
     func test_secureEnclaveModifyExpiryRefreshesTransportSubkeyBindingPastOriginalExpiry() async throws {
-        let fixture = try await makeSecureEnclaveRouteFixture(expirySeconds: 2)
+        let fixture = try await makeSecureEnclaveRouteFixture(validity: .expiresIn(seconds: 2))
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
         let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
@@ -167,7 +167,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
         let updated = try await keyManagement.modifyExpiry(
             fingerprint: fixture.identity.fingerprint,
-            newExpirySeconds: 31_536_000
+            newValidity: .expiresIn(seconds: 31_536_000)
         )
         XCTAssertTrue(updated.hasEncryptionSubkey)
 
@@ -191,7 +191,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         ] {
             let fixture = try await makeSecureEnclaveRouteFixture(
                 family: family,
-                expirySeconds: 1
+                validity: .expiresIn(seconds: 1)
             )
             let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
             let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
@@ -218,7 +218,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
             let extended = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 31_536_000
+                newValidity: .expiresIn(seconds: 31_536_000)
             )
             let extendedInfo = try engine.parseKeyInfo(keyData: extended.publicKeyData)
             XCTAssertFalse(extendedInfo.isExpired)
@@ -226,7 +226,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
             let removed = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: nil
+                newValidity: .never
             )
             let removedInfo = try engine.parseKeyInfo(keyData: removed.publicKeyData)
             XCTAssertFalse(removedInfo.isExpired)
@@ -260,7 +260,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         let task = Task { [keyManagement, fingerprint] in
             try await keyManagement.modifyExpiry(
                 fingerprint: fingerprint,
-                newExpirySeconds: nil
+                newValidity: .never
             )
         }
         await gate.waitUntilSuspended()
@@ -301,7 +301,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         let task = Task { [keyManagement, fingerprint] in
             try await keyManagement.modifyExpiry(
                 fingerprint: fingerprint,
-                newExpirySeconds: nil
+                newValidity: .never
             )
         }
         await gate.waitUntilSuspended()
@@ -343,7 +343,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         do {
             _ = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 31_536_000
+                newValidity: .expiresIn(seconds: 31_536_000)
             )
             XCTFail("Expected missing Secure Enclave handle to fail")
         } catch CypherAirError.keyOperationUnavailable(let category) {
@@ -390,7 +390,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             do {
                 _ = try await keyManagement.modifyExpiry(
                     fingerprint: fixture.identity.fingerprint,
-                    newExpirySeconds: 31_536_000
+                    newValidity: .expiresIn(seconds: 31_536_000)
                 )
                 XCTFail("Expected Secure Enclave signing failure")
             } catch let error as CypherAirError {
@@ -429,7 +429,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
         let updated = try await keyManagement.modifyExpiry(
             fingerprint: fixture.identity.fingerprint,
-            newExpirySeconds: 31_536_000
+            newValidity: .expiresIn(seconds: 31_536_000)
         )
 
         XCTAssertEqual(updated.fingerprint, fixture.identity.fingerprint)
@@ -474,7 +474,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         do {
             _ = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 31_536_000
+                newValidity: .expiresIn(seconds: 31_536_000)
             )
             XCTFail("Expected cancelled custody authentication to block")
         } catch CypherAirError.keyOperationUnavailable(let category) {
@@ -517,7 +517,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         do {
             _ = try await keyManagement.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 31_536_000
+                newValidity: .expiresIn(seconds: 31_536_000)
             )
             XCTFail("Expected signing failure to throw")
         } catch {
@@ -541,7 +541,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         let identity = try await keyManagement.generateKey(
             name: "Software Expiry",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         keyManagement.configurePrivateKeyExpiryMutationService(
@@ -554,7 +554,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
         let updated = try await keyManagement.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 60 * 60 * 24
+            newValidity: .expiresIn(seconds: 60 * 60 * 24)
         )
 
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
@@ -579,7 +579,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
 
     private func makeSecureEnclaveRouteFixture(
         family: PGPKeyFamily = .deviceBoundEcdsaNistP256EcdhNistP256V4,
-        expirySeconds: UInt64? = 3600
+        validity: PGPKeyValidity = .expiresIn(seconds: 3600)
     ) async throws -> ExpirySecureEnclaveRouteFixture {
         let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
         let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
@@ -590,7 +590,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Expiry",
             email: "secure-expiry@example.invalid",
-            expirySeconds: expirySeconds,
+            validity: validity,
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
@@ -708,7 +708,7 @@ private final class SuspendedExpiryMutationService: PrivateKeyExpiryMutationRout
 
     func modifySecureEnclaveExpiry(
         route: SecureEnclaveSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         await gate.suspend()
         return material
@@ -716,7 +716,7 @@ private final class SuspendedExpiryMutationService: PrivateKeyExpiryMutationRout
 
     func modifySecureEnclaveCompositeExpiry(
         route: SecureEnclaveCompositeSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
     }

@@ -6,7 +6,7 @@ use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
@@ -26,7 +26,7 @@ fn test_generate_key_legacy_produces_v4() {
     let result = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
@@ -45,7 +45,7 @@ fn test_generate_key_legacy_algorithms() {
     let result = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
@@ -75,9 +75,13 @@ fn test_generate_key_legacy_algorithms() {
 /// Sign + verify text (Legacy).
 #[test]
 fn test_sign_verify_text_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key generation should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key generation should succeed");
 
     let text = b"Hello, world! This is a test message.";
 
@@ -102,9 +106,13 @@ fn test_sign_verify_text_legacy() {
 /// Encrypt + decrypt text (SEIPDv1).
 #[test]
 fn test_encrypt_decrypt_text_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key generation should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key generation should succeed");
 
     let plaintext = b"Hello, this is a secret message for Legacy.";
 
@@ -122,13 +130,21 @@ fn test_encrypt_decrypt_text_legacy() {
 /// (extended): Encrypt + decrypt with signature.
 #[test]
 fn test_encrypt_decrypt_signed_legacy() {
-    let sender =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Sender key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Sender key gen should succeed");
 
-    let recipient =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Recipient key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Recipient key gen should succeed");
 
     let plaintext = b"Signed and encrypted message.";
 
@@ -162,13 +178,21 @@ fn test_encrypt_decrypt_signed_legacy() {
 /// Encrypt-to-self — sender decrypts own ciphertext.
 #[test]
 fn test_encrypt_to_self_legacy() {
-    let sender =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let recipient =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Message with encrypt-to-self.";
 
@@ -196,9 +220,13 @@ fn test_encrypt_to_self_legacy() {
 /// File encrypt/decrypt with various sizes (1 MB).
 #[test]
 fn test_file_encrypt_decrypt_1mb_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     // Generate 1 MB of test data
     let plaintext: Vec<u8> = (0..1_000_000).map(|i| (i % 256) as u8).collect();
@@ -216,9 +244,13 @@ fn test_file_encrypt_decrypt_1mb_legacy() {
 /// File encrypt/decrypt 10 MB.
 #[test]
 fn test_file_encrypt_decrypt_10mb_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext: Vec<u8> = (0..10_000_000).map(|i| (i % 256) as u8).collect();
 
@@ -238,9 +270,13 @@ fn test_file_encrypt_decrypt_10mb_legacy() {
 /// not just that decryption happens to fail for some other reason.
 #[test]
 fn test_tamper_detection_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Secret message that must not be tampered with.";
 
@@ -289,9 +325,13 @@ fn test_tamper_detection_legacy() {
 /// Detached signature: sign + verify file data.
 #[test]
 fn test_detached_signature_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let data = b"File content to sign.";
 
@@ -314,9 +354,13 @@ fn test_detached_signature_legacy() {
 /// Armor round-trip: public key → armor → dearmor → identical.
 #[test]
 fn test_armor_roundtrip_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let armored = armor::armor_public_key(&key.public_key_data).expect("Armor should succeed");
 
@@ -373,12 +417,21 @@ fn test_encrypt_binary_rejects_no_encryption_subkey() {
 /// Wrong key decryption: decrypt with wrong key → NoMatchingKey error.
 #[test]
 fn test_decrypt_wrong_key_legacy() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Only for Alice.";
 
@@ -398,9 +451,13 @@ fn test_decrypt_wrong_key_legacy() {
 /// Empty plaintext encrypt/decrypt round-trip (Legacy).
 #[test]
 fn test_encrypt_decrypt_empty_plaintext_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"";
     let ciphertext = encrypt::encrypt(plaintext, &[key.public_key_data.clone()], None, None)
@@ -419,13 +476,21 @@ fn test_encrypt_decrypt_empty_plaintext_legacy() {
 /// Concurrent encrypt from 2 threads (Legacy, different key pairs).
 #[test]
 fn test_concurrent_encrypt_legacy() {
-    let key1 =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key1 = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let key2 =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key2 = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let k1_pub = key1.public_key_data.clone();
     let k2_pub = key2.public_key_data.clone();

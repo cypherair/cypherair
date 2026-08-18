@@ -165,13 +165,10 @@ private struct SignScreenHostView: View {
                         font: .system(.caption, design: .monospaced)
                     )
 
-                    Button {
-                        model.copySignedMessageToClipboard()
-                    } label: {
-                        Label(
-                            String(localized: "common.copy", defaultValue: "Copy"),
-                            systemImage: "doc.on.doc"
-                        )
+                    CypherCopyButton(
+                        title: String(localized: "common.copy", defaultValue: "Copy")
+                    ) {
+                        await model.copySignedMessageToClipboard()
                     }
                     .disabled(!model.configuration.allowsClipboardWrite)
 

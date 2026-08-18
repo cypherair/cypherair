@@ -1,6 +1,6 @@
 //! QR / URL Scheme validation tests.
 
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::PgpEngine;
 
 /// v4 public key → base64url encode → cypherairx:// URL → decode → byte-identical.
@@ -11,7 +11,7 @@ fn test_qr_url_roundtrip_v4() {
     let key = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -38,8 +38,13 @@ fn test_qr_url_roundtrip_v4() {
 fn test_qr_url_roundtrip_v6() {
     let engine = PgpEngine::new();
 
-    let key = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let url = engine
         .encode_qr_url(key.public_key_data.clone())
@@ -85,9 +90,13 @@ fn test_qr_url_malformed_data() {
 fn test_qr_url_rejects_secret_key_on_encode() {
     let engine = PgpEngine::new();
 
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     // encode_qr_url should reject secret key material (defense in depth)
     let result = engine.encode_qr_url(key.cert_data.clone());
@@ -111,9 +120,13 @@ fn test_qr_url_rejects_secret_key_on_encode() {
 fn test_qr_url_rejects_secret_key_on_decode() {
     let engine = PgpEngine::new();
 
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     // Manually construct a URL with secret key data (bypassing encode_qr_url validation)
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -144,8 +157,13 @@ fn test_qr_url_length_reasonable() {
     let engine = PgpEngine::new();
 
     // Legacy key
-    let key_a = keys::generate_key_with_suite("A".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-        .expect("Key gen should succeed");
+    let key_a = keys::generate_key_with_suite(
+        "A".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
     let url_a = engine.encode_qr_url(key_a.public_key_data.clone()).unwrap();
     // Full certificate (primary key + User ID + self-sig + encryption subkey + binding sig)
     // is larger than bare key bytes. v4 certs with Ed25519+X25519 are typically ~1200-1800
@@ -157,8 +175,13 @@ fn test_qr_url_length_reasonable() {
     );
 
     // Modern High key
-    let key_b = keys::generate_key_with_suite("B".to_string(), None, None, KeySuite::Ed448X448)
-        .expect("Key gen should succeed");
+    let key_b = keys::generate_key_with_suite(
+        "B".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
     let url_b = engine.encode_qr_url(key_b.public_key_data.clone()).unwrap();
     // Modern High keys (Ed448+X448, v6 format) have larger signatures and key material.
     assert!(
@@ -194,9 +217,13 @@ fn test_qr_url_decode_query_params() {
     let engine = PgpEngine::new();
 
     // First encode a valid key to get a real URL
-    let key =
-        keys::generate_key_with_suite("Test".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Test".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let valid_url = engine
         .encode_qr_url(key.public_key_data.clone())

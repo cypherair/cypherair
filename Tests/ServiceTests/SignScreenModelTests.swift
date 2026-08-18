@@ -163,8 +163,9 @@ final class SignScreenModelTests: XCTestCase {
         }
         XCTAssertTrue(signedMessage.contains("BEGIN PGP SIGNED MESSAGE"))
 
-        model.copySignedMessageToClipboard()
+        let copied = await model.copySignedMessageToClipboard()
         XCTAssertEqual(interceptedClipboard, signedMessage)
+        XCTAssertFalse(copied, "An intercepted copy never reached the clipboard, so nothing may confirm it")
         XCTAssertFalse(model.operation.isShowingClipboardNotice)
 
         model.exportSignedMessage()
@@ -374,7 +375,7 @@ final class SignScreenModelTests: XCTestCase {
         )
         model.signedMessage = "late-signed-message"
 
-        model.copySignedMessageToClipboard()
+        let copy = Task { await model.copySignedMessageToClipboard() }
 
         await waitUntil("sign clipboard notice decision to suspend") {
             await gate.isSuspended()
@@ -383,8 +384,9 @@ final class SignScreenModelTests: XCTestCase {
         model.handleContentClearGenerationChange()
 
         await gate.resume(returning: true)
-        await settleAsyncWork()
+        let copied = await copy.value
 
+        XCTAssertFalse(copied, "A superseded copy never landed, so nothing may confirm it")
         XCTAssertTrue(copiedPayloads.isEmpty)
         XCTAssertFalse(model.operation.isShowingClipboardNotice)
     }

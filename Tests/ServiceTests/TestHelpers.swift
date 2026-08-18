@@ -164,7 +164,7 @@ enum TestHelpers {
         try await service.generateKey(
             name: name,
             email: email,
-            expirySeconds: nil,
+            validity: .never,
             suite: suite
         )
     }
@@ -211,7 +211,7 @@ enum TestHelpers {
 
         let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try mockSE.wrap(
-            privateKey: secretCertData,
+            privateKey: SensitiveBuffer(copying: secretCertData),
             using: handle,
             fingerprint: metadata.fingerprint,
             payloadKind: .softwareSecretCertificate

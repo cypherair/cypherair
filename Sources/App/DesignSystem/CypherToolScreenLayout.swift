@@ -16,16 +16,28 @@ enum ToolScreenLayoutPolicy {
 /// scrolling `Form` everywhere, except on wide macOS windows where the
 /// interactive workflow (input, options, primary action) and the produced
 /// output sit in side-by-side panes.
+///
+/// A finished operation's output settles in rather than snapping: `hasOutput`
+/// is the one place all four tools change from working to done, so the reveal
+/// is animated here and nowhere else.
 struct CypherToolScreenLayout<Workflow: View, Output: View>: View {
     let hasOutput: Bool
     @ViewBuilder let workflow: () -> Workflow
     @ViewBuilder let output: () -> Output
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     #if os(macOS)
     @State private var isWide = false
     #endif
 
     var body: some View {
+        content
+            .animation(CypherMotion.resultReveal(reduceMotion: reduceMotion), value: hasOutput)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         #if os(macOS)
         macContent
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in

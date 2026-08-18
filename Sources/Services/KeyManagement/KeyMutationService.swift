@@ -123,30 +123,30 @@ final class KeyMutationService {
 
     func modifyExpiry(
         fingerprint: String,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPKeyIdentity {
         return try await modifyExpiry(
             fingerprint: fingerprint,
-            newExpirySeconds: newExpirySeconds,
+            newValidity: newValidity,
             authMode: nil
         )
     }
 
     func modifyExpiry(
         fingerprint: String,
-        newExpirySeconds: UInt64?,
+        newValidity: PGPKeyValidity,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
         try await modifyExpiry(
             fingerprint: fingerprint,
-            newExpirySeconds: newExpirySeconds,
+            newValidity: newValidity,
             authMode: Optional(authMode)
         )
     }
 
     private func modifyExpiry(
         fingerprint: String,
-        newExpirySeconds: UInt64?,
+        newValidity: PGPKeyValidity,
         authMode: AuthenticationMode?
     ) async throws -> PGPKeyIdentity {
         let operationRoute = await routeModifyExpiry(fingerprint: fingerprint)
@@ -163,20 +163,20 @@ final class KeyMutationService {
             }
             return try await modifySoftwareExpiry(
                 route: route,
-                newExpirySeconds: newExpirySeconds,
+                newValidity: newValidity,
                 authMode: effectiveAuthMode
             )
 
         case .secureEnclaveSigner(let route):
             return try await modifySecureEnclaveExpiry(
                 route: route,
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
 
         case .secureEnclaveCompositeSigner(let route):
             return try await modifySecureEnclaveCompositeExpiry(
                 route: route,
-                newExpirySeconds: newExpirySeconds
+                newValidity: newValidity
             )
 
         case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
@@ -191,19 +191,19 @@ final class KeyMutationService {
 
     private func modifySoftwareExpiry(
         route: SoftwareSecretCertificateRoute,
-        newExpirySeconds: UInt64?,
+        newValidity: PGPKeyValidity,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
         try await performModifySoftwareExpiry(
             route: route,
-            newExpirySeconds: newExpirySeconds,
+            newValidity: newValidity,
             authMode: authMode
         )
     }
 
     private func performModifySoftwareExpiry(
         route: SoftwareSecretCertificateRoute,
-        newExpirySeconds: UInt64?,
+        newValidity: PGPKeyValidity,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
         let fingerprint = route.identity.fingerprint
@@ -231,11 +231,11 @@ final class KeyMutationService {
 
         var result = try await keyAdapter.modifyExpiry(
             certData: secretKey,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity
         )
-        defer {
-            result.certData.resetBytes(in: 0..<result.certData.count)
-        }
+        // Nothing below reads the mutated certificate except the re-wrap, so it
+        // moves into a buffer that erases it however this function leaves.
+        let mutatedCertificate = SensitiveBuffer(consuming: &result.certData)
 
         guard catalogStore.containsKey(fingerprint: fingerprint) else {
             // Not a decrypt-recipient mismatch: the key vanished from the catalog
@@ -246,7 +246,7 @@ final class KeyMutationService {
         }
 
         let bundle = try await rewrapModifiedExpiryResult(
-            certData: result.certData,
+            certData: mutatedCertificate,
             fingerprint: fingerprint,
             accessControl: accessControl,
             authenticationContext: authenticationContext
@@ -323,7 +323,7 @@ final class KeyMutationService {
     }
 
     private func rewrapModifiedExpiryResult(
-        certData: Data,
+        certData: borrowing SensitiveBuffer,
         fingerprint: String,
         accessControl: SecAccessControl,
         authenticationContext: LAContext?
@@ -344,7 +344,7 @@ final class KeyMutationService {
 
     private func modifySecureEnclaveExpiry(
         route: SecureEnclaveSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPKeyIdentity {
         guard let expiryMutationService else {
             throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
@@ -352,7 +352,7 @@ final class KeyMutationService {
 
         let result = try await expiryMutationService.modifySecureEnclaveExpiry(
             route: route,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity
         )
 
         let updated = try catalogStore.updateExpiry(
@@ -365,7 +365,7 @@ final class KeyMutationService {
 
     private func modifySecureEnclaveCompositeExpiry(
         route: SecureEnclaveCompositeSignerRoute,
-        newExpirySeconds: UInt64?
+        newValidity: PGPKeyValidity
     ) async throws -> PGPKeyIdentity {
         guard let expiryMutationService else {
             throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
@@ -373,7 +373,7 @@ final class KeyMutationService {
 
         let result = try await expiryMutationService.modifySecureEnclaveCompositeExpiry(
             route: route,
-            newExpirySeconds: newExpirySeconds
+            newValidity: newValidity
         )
 
         let updated = try catalogStore.updateExpiry(

@@ -19,7 +19,7 @@ use openpgp::serialize::stream::{Armorer, Encryptor, LiteralWriter, Message, Sig
 use openpgp::serialize::Serialize;
 use openpgp::types::SignatureType;
 use pgp_mobile::armor::{self, ArmorKind};
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::signature_details::{
     DetailedSignatureStatus, FileVerifyDetailedResult, SignatureVerificationState,
 };
@@ -204,37 +204,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer_a = keys::generate_key_with_suite(
         "FFI Detailed Signer A".to_string(),
         Some("ffi-detailed-a@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let signer_b = keys::generate_key_with_suite(
         "FFI Detailed Signer B".to_string(),
         Some("ffi-detailed-b@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let recipient = keys::generate_key_with_suite(
         "FFI Detailed Recipient".to_string(),
         Some("ffi-detailed-recipient@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let expired_signer = keys::generate_key_with_suite(
         "FFI Detailed Expired Signer".to_string(),
         Some("ffi-detailed-expired@example.com".to_string()),
-        Some(1),
+        KeyValidity::ExpiresIn { seconds: 1 },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let bad_signer = keys::generate_key_with_suite(
         "FFI Detailed Bad Signer".to_string(),
         Some("ffi-detailed-bad@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
     let unknown_signer = keys::generate_key_with_suite(
         "FFI Detailed Unknown Signer".to_string(),
         Some("ffi-detailed-unknown@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )?;
 
@@ -270,8 +270,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::thread::sleep(Duration::from_secs(2));
 
     let expired_unknown = armor::encode_armor(&expired_unknown_binary, ArmorKind::Signature)?;
-    let expired_malformed =
-        armor::encode_armor(&expired_malformed_binary, ArmorKind::Signature)?;
+    let expired_malformed = armor::encode_armor(&expired_malformed_binary, ArmorKind::Signature)?;
 
     let expired_unknown_verify = verify_detached_file(
         &mixedfold_data,

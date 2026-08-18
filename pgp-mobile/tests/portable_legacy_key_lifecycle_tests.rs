@@ -4,7 +4,7 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 
 /// Export key with Iterated+Salted S2K. Re-import with correct passphrase.
@@ -13,15 +13,15 @@ fn test_export_import_key_legacy() {
     let key = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
 
     let passphrase = "correct-horse-battery-staple";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
     assert!(!exported.is_empty());
 
     let imported = keys::import_secret_key(&exported, passphrase)
@@ -32,13 +32,16 @@ fn test_export_import_key_legacy() {
 /// Re-import with wrong passphrase → graceful error.
 #[test]
 fn test_import_wrong_passphrase_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let exported =
-        keys::export_secret_key(&key.cert_data, "correct-passphrase")
-            .expect("Export should succeed");
+    let exported = keys::export_secret_key(&key.cert_data, "correct-passphrase")
+        .expect("Export should succeed");
 
     let result = keys::import_secret_key(&exported, "wrong-passphrase");
     match result {
@@ -51,9 +54,13 @@ fn test_import_wrong_passphrase_legacy() {
 /// Unicode passphrase round-trip for S2K export/import (Legacy, Iterated+Salted).
 #[test]
 fn test_unicode_passphrase_export_import_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let passphrases = [
         "密码短语🔐安全",
@@ -63,10 +70,9 @@ fn test_unicode_passphrase_export_import_legacy() {
     ];
 
     for passphrase in &passphrases {
-        let exported = keys::export_secret_key(&key.cert_data, passphrase)
-            .expect(&format!(
-                "Export with passphrase '{passphrase}' should succeed"
-            ));
+        let exported = keys::export_secret_key(&key.cert_data, passphrase).expect(&format!(
+            "Export with passphrase '{passphrase}' should succeed"
+        ));
 
         let imported = keys::import_secret_key(&exported, passphrase).expect(&format!(
             "Import with passphrase '{passphrase}' should succeed"
@@ -86,9 +92,13 @@ fn test_unicode_passphrase_export_import_legacy() {
 /// Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     // parse_revocation_cert internally requires a KeyRevocation signature and
     // cryptographically verifies it against the source cert, so a successful
@@ -100,13 +110,21 @@ fn test_revocation_cert_legacy() {
 /// Revocation cert for key A should not verify against key B.
 #[test]
 fn test_revocation_cert_wrong_key_legacy() {
-    let key_a =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key A gen should succeed");
+    let key_a = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key A gen should succeed");
 
-    let key_b =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key B gen should succeed");
+    let key_b = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key B gen should succeed");
 
     let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
     assert!(
@@ -121,7 +139,7 @@ fn test_unicode_user_id_legacy() {
     let key = keys::generate_key_with_suite(
         "张三 🔐".to_string(),
         Some("zhangsan@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen with Unicode should succeed");
@@ -137,14 +155,18 @@ fn test_unicode_user_id_legacy() {
 /// After export, the key should not be usable without decryption (import).
 #[test]
 fn test_export_produces_encrypted_key_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let passphrase = "test-passphrase-a";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
 
     let sign_result = sign::sign_cleartext(b"test", &exported);
     assert!(
@@ -159,7 +181,7 @@ fn test_export_import_decrypt_roundtrip_legacy() {
     let key = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");
@@ -170,8 +192,8 @@ fn test_export_import_decrypt_roundtrip_legacy() {
         .expect("Encryption should succeed");
 
     let passphrase = "roundtrip-test-passphrase";
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
 
     let imported = keys::import_secret_key(&exported, passphrase).expect("Import should succeed");
 
@@ -184,12 +206,15 @@ fn test_export_import_decrypt_roundtrip_legacy() {
 /// Verify that Legacy export uses Iterated+Salted S2K (not Argon2id).
 #[test]
 fn test_export_legacy_uses_iterated_salted() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let exported = keys::export_secret_key(&key.cert_data, "test")
-        .expect("Export should succeed");
+    let exported = keys::export_secret_key(&key.cert_data, "test").expect("Export should succeed");
 
     let s2k_info = keys::parse_s2k_params(&exported).expect("S2K params should parse");
 
@@ -208,9 +233,13 @@ fn test_export_legacy_uses_iterated_salted() {
 /// Expired key detected by parse_key_info.
 #[test]
 fn test_expired_key_detected_legacy() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, Some(1), KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::ExpiresIn { seconds: 1 },
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
@@ -229,9 +258,13 @@ fn test_expired_key_detected_legacy() {
 /// Verifies the returned fingerprint is the primary key fingerprint (not the subkey ID).
 #[test]
 fn test_match_recipients_legacy_returns_primary_fingerprint() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext =
         encrypt::encrypt_binary(b"test message", &[key.public_key_data.clone()], None, None)
@@ -250,12 +283,21 @@ fn test_match_recipients_legacy_returns_primary_fingerprint() {
 /// match_recipients: encrypt to key A, match against key B → NoMatchingKey.
 #[test]
 fn test_match_recipients_legacy_wrong_key_returns_error() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"for alice only",
@@ -275,12 +317,21 @@ fn test_match_recipients_legacy_wrong_key_returns_error() {
 /// match_recipients: multi-recipient message matches both certs.
 #[test]
 fn test_match_recipients_legacy_multi_recipient() {
-    let alice =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let alice = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-        .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"for both",
@@ -304,13 +355,21 @@ fn test_match_recipients_legacy_multi_recipient() {
 /// match_recipients: encrypt-to-self includes sender in match.
 #[test]
 fn test_match_recipients_legacy_encrypt_to_self() {
-    let sender =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let sender = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
-    let recipient =
-        keys::generate_key_with_suite("Bob".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Bob".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"with encrypt-to-self",
@@ -334,13 +393,20 @@ fn test_modify_expiry_legacy_extend() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
 
-    let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
-        .expect("modify_expiry should succeed for Legacy");
+    let result = keys::modify_expiry(
+        &generated.cert_data,
+        KeyValidity::ExpiresIn {
+            seconds: 3 * 365 * 24 * 3600,
+        },
+    )
+    .expect("modify_expiry should succeed for Legacy");
 
     assert!(
         !result.cert_data.is_empty(),
@@ -359,7 +425,10 @@ fn test_modify_expiry_legacy_extend() {
         "Should have an expiry timestamp"
     );
     assert_eq!(result.key_info.key_version, 4);
-    assert_eq!(result.key_info.suite, KeySuite::Ed25519LegacyCurve25519Legacy);
+    assert_eq!(
+        result.key_info.suite,
+        KeySuite::Ed25519LegacyCurve25519Legacy
+    );
 
     let re_parsed = keys::parse_key_info(&result.public_key_data)
         .expect("Updated public key should be parseable");
@@ -374,7 +443,9 @@ fn test_modify_expiry_legacy_remove() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
@@ -386,7 +457,7 @@ fn test_modify_expiry_legacy_remove() {
         "Should have expiry before removal"
     );
 
-    let result = keys::modify_expiry(&generated.cert_data, None)
+    let result = keys::modify_expiry(&generated.cert_data, KeyValidity::Never)
         .expect("modify_expiry with None should succeed");
 
     assert!(
@@ -403,12 +474,16 @@ fn test_modify_expiry_legacy_remove() {
 /// Pass: key is expired.
 #[test]
 fn test_modify_expiry_legacy_to_past() {
-    let generated =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key generation should succeed");
+    let generated = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key generation should succeed");
 
-    let result =
-        keys::modify_expiry(&generated.cert_data, Some(1)).expect("modify_expiry should succeed");
+    let result = keys::modify_expiry(&generated.cert_data, KeyValidity::ExpiresIn { seconds: 1 })
+        .expect("modify_expiry should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(2));
 
@@ -425,13 +500,20 @@ fn test_modify_expiry_legacy_roundtrip_encrypt_decrypt() {
     let generated = keys::generate_key_with_suite(
         "Alice".to_string(),
         None,
-        Some(365 * 24 * 3600),
+        KeyValidity::ExpiresIn {
+            seconds: 365 * 24 * 3600,
+        },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
 
-    let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
-        .expect("modify_expiry should succeed");
+    let result = keys::modify_expiry(
+        &generated.cert_data,
+        KeyValidity::ExpiresIn {
+            seconds: 3 * 365 * 24 * 3600,
+        },
+    )
+    .expect("modify_expiry should succeed");
 
     let plaintext = b"Hello after expiry modification!";
     let ciphertext = encrypt::encrypt(plaintext, &[result.public_key_data.clone()], None, None)

@@ -4,15 +4,6 @@ import XCTest
 
 private final class OpenSourceNoticeBundleMarker {}
 
-@MainActor
-private final class RepositoryURLClipboardRecorder {
-    private(set) var copiedURLs: [String] = []
-
-    func record(_ repositoryURL: String) {
-        copiedURLs.append(repositoryURL)
-    }
-}
-
 final class OpenSourceNoticeStoreTests: XCTestCase {
     private lazy var bundle = Bundle(for: OpenSourceNoticeBundleMarker.self)
     private lazy var store = OpenSourceNoticeStore(bundle: bundle)
@@ -83,28 +74,6 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.4.1" })
         XCTAssertEqual(sequoia.licenseSourceKind, .cratePackage)
         XCTAssertTrue(sequoia.licenseSourceItems.contains("LICENSE.txt"))
-    }
-
-    @MainActor
-    func test_repositoryURLCopyAction_copyIfPresent_usesInjectedClipboard() {
-        let recorder = RepositoryURLClipboardRecorder()
-        let action = RepositoryURLCopyAction(copy: recorder.record)
-
-        let copied = action.copyIfPresent("https://github.com/cypherair/cypherair")
-
-        XCTAssertTrue(copied)
-        XCTAssertEqual(recorder.copiedURLs, ["https://github.com/cypherair/cypherair"])
-    }
-
-    @MainActor
-    func test_repositoryURLCopyAction_copyIfPresent_emptyURLDoesNothing() {
-        let recorder = RepositoryURLClipboardRecorder()
-        let action = RepositoryURLCopyAction(copy: recorder.record)
-
-        let copied = action.copyIfPresent("")
-
-        XCTAssertFalse(copied)
-        XCTAssertTrue(recorder.copiedURLs.isEmpty)
     }
 
 }

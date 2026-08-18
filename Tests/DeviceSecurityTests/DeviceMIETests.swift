@@ -25,8 +25,8 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         XCTAssertEqual(status, errSecSuccess)
 
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
-        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: keyData), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
         XCTAssertEqual(unwrapped, keyData, "MIE smoke: wrap/unwrap must succeed without tag mismatch")
     }
@@ -45,8 +45,8 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             XCTAssertEqual(status, errSecSuccess, "Iteration \(i): SecRandom failed")
 
             let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-            let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
-            let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            let bundle = try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: keyData), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+            let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate).copiedBytes()
 
             XCTAssertEqual(unwrapped, keyData, "Iteration \(i): wrap/unwrap mismatch")
         }
@@ -66,7 +66,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         // 1. Key generation (Ed25519+X25519, v4).
         let key = try engine.generateKey(
             name: "MIE Test A", email: "mie-a@test.local",
-            expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         XCTAssertFalse(key.certData.isEmpty, "Legacy key generation must succeed")
         XCTAssertFalse(key.fingerprint.isEmpty, "Legacy fingerprint must not be empty")
@@ -138,7 +138,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         // 1. Key generation (Ed448+X448, v6).
         let key = try engine.generateKey(
             name: "MIE Test B", email: "mie-b@test.local",
-            expirySeconds: nil, suite: .ed448X448
+            validity: .never, suite: .ed448X448
         )
         XCTAssertFalse(key.certData.isEmpty, "Modern High key generation must succeed")
 
@@ -206,10 +206,10 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let plaintext = Data("Cross-suite MIE test".utf8)
 
         let keyA = try engine.generateKey(
-            name: "Cross A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Cross A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let keyB = try engine.generateKey(
-            name: "Cross B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Cross B", email: nil, validity: .never, suite: .ed448X448
         )
 
         // B sender → A recipient: should auto-select SEIPDv1.
@@ -276,7 +276,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         // Legacy: export with Iterated+Salted S2K, then import.
         let keyA = try engine.generateKey(
-            name: "Export A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Export A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let ciphertextA = try engine.encrypt(
             plaintext: plaintext,
@@ -306,7 +306,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         // Modern High: export with Argon2id S2K, then import.
         let keyB = try engine.generateKey(
-            name: "Export B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Export B", email: nil, validity: .never, suite: .ed448X448
         )
         let ciphertextB = try engine.encrypt(
             plaintext: plaintext,
@@ -347,10 +347,10 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         // --- Generate keys for Legacy and Modern High ---
         let keyA = try engine.generateKey(
-            name: "OpenSSL A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "OpenSSL A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let keyB = try engine.generateKey(
-            name: "OpenSSL B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "OpenSSL B", email: nil, validity: .never, suite: .ed448X448
         )
 
         // 1. AES-256 via SEIPDv1 (Legacy encrypt + decrypt).
@@ -456,10 +456,10 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let engine = PgpEngine()
 
         let keyA = try engine.generateKey(
-            name: "Armor A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Armor A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let keyB = try engine.generateKey(
-            name: "Armor B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Armor B", email: nil, validity: .never, suite: .ed448X448
         )
 
         // Armor public keys and round-trip.
@@ -501,7 +501,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "100x A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "100x A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         for i in 0..<100 {
@@ -535,7 +535,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "100x B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "100x B", email: nil, validity: .never, suite: .ed448X448
         )
 
         for i in 0..<100 {
@@ -569,10 +569,10 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         let engine = PgpEngine()
         let keyA = try engine.generateKey(
-            name: "100x Sign A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "100x Sign A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let keyB = try engine.generateKey(
-            name: "100x Sign B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "100x Sign B", email: nil, validity: .never, suite: .ed448X448
         )
 
         for i in 0..<100 {

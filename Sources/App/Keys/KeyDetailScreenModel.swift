@@ -33,10 +33,8 @@ final class KeyDetailScreenModel {
     var showDeleteConfirmation = false
     var error: CypherAirError?
     var showError = false
-    var showCopiedNotice = false
     var isPreparingRevocationExport = false
     var localModifyExpiryRequest: ModifyExpiryRequest?
-    var suggestedExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
 
     init(
         fingerprint: String,
@@ -173,21 +171,26 @@ final class KeyDetailScreenModel {
         }
     }
 
-    func copyPublicKey() {
+    /// Reports whether the public key reached the clipboard: a screen that
+    /// forbids the copy, a key that failed to load, and the tutorial's
+    /// interception policy all leave nothing to confirm.
+    func copyPublicKey() -> Bool {
         guard configuration.allowsPublicKeyCopy,
               let armoredPublicKey,
               let armoredString = String(data: armoredPublicKey, encoding: .utf8) else {
-            return
+            return false
         }
 
-        if configuration.outputInterceptionPolicy.interceptClipboardCopy?(
+        guard configuration.outputInterceptionPolicy.interceptClipboardCopy?(
             armoredString,
             appConfiguration,
             .publicKey
-        ) != true {
-            clipboardCopyAction(armoredString)
-            showCopiedNotice = true
+        ) != true else {
+            return false
         }
+
+        clipboardCopyAction(armoredString)
+        return true
     }
 
     func exportRevocationCertificate() {
@@ -270,8 +273,13 @@ final class KeyDetailScreenModel {
         showError = false
     }
 
+<<<<<<< HEAD
     func dismissCopiedNotice() {
         showCopiedNotice = false
+=======
+    func finishExport() {
+        exportController.finish()
+>>>>>>> origin/main
     }
 
     func handleExportError(_ error: Error) {
@@ -287,10 +295,7 @@ final class KeyDetailScreenModel {
     }
 
     private func makeModifyExpiryRequest() -> ModifyExpiryRequest {
-        ModifyExpiryRequest(
-            fingerprint: fingerprint,
-            initialDate: suggestedExpiryDate
-        ) { [weak self] in
+        ModifyExpiryRequest(fingerprint: fingerprint) { [weak self] in
             self?.reloadPublicKey()
             self?.localModifyExpiryRequest = nil
         }

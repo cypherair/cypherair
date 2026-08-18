@@ -48,7 +48,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
             using: handle,
             fingerprint: fingerprint,
             payloadKind: .softwareSecretCertificate
-        )
+        ).copiedBytes()
 
         XCTAssertEqual(unwrapped, privateKey, "Stored key must unwrap after production authentication")
     }

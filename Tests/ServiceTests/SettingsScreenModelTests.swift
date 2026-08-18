@@ -587,7 +587,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         await waitUntil("reset restart gate", timeout: 10) {
             restartCoordinator.restartRequiredAfterLocalDataReset
         }
-        XCTAssertFalse(model.showLocalDataResetResultAlert)
+        XCTAssertFalse(model.showLocalDataResetFailureAlert)
         XCTAssertFalse(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertTrue(keychain.listItemsCalls.contains { $0.hasAuthenticationContext })
     }
@@ -742,7 +742,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         model.confirmLocalDataReset()
 
         await waitUntil("auth-unavailable reset failure") {
-            !model.isResettingLocalData && model.showLocalDataResetResultAlert
+            !model.isResettingLocalData && model.showLocalDataResetFailureAlert
         }
         XCTAssertEqual(authCallCount, 1)
         XCTAssertTrue(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
@@ -750,7 +750,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         XCTAssertEqual(keychain.deleteCallCount, 0)
         XCTAssertFalse(restartCoordinator.restartRequiredAfterLocalDataReset)
         XCTAssertEqual(
-            model.localDataResetAlertMessage,
+            model.localDataResetFailureMessage,
             AuthenticationError.appAccessBiometricsUnavailable.localizedDescription
         )
     }
@@ -793,14 +793,14 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         model.confirmLocalDataReset()
 
         await waitUntil("auth-failed reset failure") {
-            !model.isResettingLocalData && model.showLocalDataResetResultAlert
+            !model.isResettingLocalData && model.showLocalDataResetFailureAlert
         }
         XCTAssertEqual(authCallCount, 1)
         XCTAssertTrue(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertEqual(keychain.listItemsCallCount, 0)
         XCTAssertEqual(keychain.deleteCallCount, 0)
         XCTAssertFalse(restartCoordinator.restartRequiredAfterLocalDataReset)
-        XCTAssertEqual(model.localDataResetAlertMessage, AuthenticationError.failed.localizedDescription)
+        XCTAssertEqual(model.localDataResetFailureMessage, AuthenticationError.failed.localizedDescription)
     }
 
     @MainActor

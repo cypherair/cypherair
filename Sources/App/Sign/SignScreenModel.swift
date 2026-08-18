@@ -32,7 +32,6 @@ final class SignScreenModel {
     private let detachedFileSigningAction: FileOperationAction<DetachedFileSigningRequest, Data>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
     private let clipboardWriter: ClipboardWriter
-    @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var clipboardToken: UInt64 = 0
     private var fileImportRequestGate = FileImportRequestGate()
 
@@ -204,41 +203,38 @@ final class SignScreenModel {
         }
     }
 
-    func copySignedMessageToClipboard() {
+    /// Copies the signed message and reports whether it reached the clipboard.
+    ///
+    /// The write waits on the clipboard-notice decision, which is a protected
+    /// setting and may take a while to answer, so this suspends and the caller
+    /// confirms only once the copy has landed. A copy this screen forbids, one
+    /// the interception policy takes, and one superseded while it waited all
+    /// report `false`.
+    func copySignedMessageToClipboard() async -> Bool {
         guard configuration.allowsClipboardWrite,
               let signedMessage else {
-            return
+            return false
         }
 
-        if configuration.outputInterceptionPolicy.interceptClipboardCopy?(
+        guard configuration.outputInterceptionPolicy.interceptClipboardCopy?(
             signedMessage,
             appConfiguration,
             .generic
-        ) != true {
-            clipboardTask?.cancel()
-            clipboardToken &+= 1
-            let token = clipboardToken
-            let noticeDecision = clipboardNoticeDecision
-            let writer = clipboardWriter
-            clipboardTask = Task { @MainActor [weak self, token, signedMessage, noticeDecision, writer] in
-                guard let self else { return }
-                defer {
-                    if token == self.clipboardToken {
-                        self.clipboardTask = nil
-                    }
-                }
-                do {
-                    let shouldShowNotice = await noticeDecision()
-                    try Task.checkCancellation()
-                    guard token == self.clipboardToken else {
-                        return
-                    }
-                    writer(signedMessage, shouldShowNotice)
-                } catch {
-                    return
-                }
-            }
+        ) != true else {
+            return false
         }
+
+        clipboardToken &+= 1
+        let token = clipboardToken
+
+        let shouldShowNotice = await clipboardNoticeDecision()
+
+        guard token == clipboardToken else {
+            return false
+        }
+
+        clipboardWriter(signedMessage, shouldShowNotice)
+        return true
     }
 
     func exportSignedMessage() {
@@ -304,14 +300,14 @@ final class SignScreenModel {
 
     func handleContentClearGenerationChange() {
         operation.cancelAndInvalidate()
-        cancelClipboardCopy()
+        supersedePendingClipboardCopy()
         clearTransientInput()
     }
 
-    private func cancelClipboardCopy() {
-        clipboardTask?.cancel()
+    /// Supersedes a copy still waiting on the clipboard-notice decision, so a
+    /// late answer cannot write a signed message the user has already cleared.
+    private func supersedePendingClipboardCopy() {
         clipboardToken &+= 1
-        clipboardTask = nil
     }
 
     func clearTransientInput() {

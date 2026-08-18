@@ -34,7 +34,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             try await targetService.generateSecureEnclaveCustodyKey(
                 name: "Hidden Relock Drain",
                 email: "hidden-drain@example.com",
-                expirySeconds: nil,
+                validity: .never,
                 family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
         }
@@ -471,7 +471,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         do {
             _ = try await service.modifyExpiry(
                 fingerprint: fixture.identity.fingerprint,
-                newExpirySeconds: 60 * 60 * 24
+                newValidity: .expiresIn(seconds: 60 * 60 * 24)
             )
             XCTFail("Expected unrouted Secure Enclave modify-expiry to fail closed")
         } catch CypherAirError.keyOperationUnavailable(let category) {
@@ -520,7 +520,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             _ = try await service.generateSecureEnclaveCustodyKey(
                 name: "Unwired",
                 email: nil,
-                expirySeconds: nil,
+                validity: .never,
                 family: .deviceBoundEcdsaNistP256EcdhNistP256V4
             )
             XCTFail("Expected unwired Secure Enclave custody generation to fail closed")

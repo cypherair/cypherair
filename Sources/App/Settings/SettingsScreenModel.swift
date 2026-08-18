@@ -44,10 +44,9 @@ final class SettingsScreenModel {
     var showProtectedSettingsResetConfirmation = false
     var showLocalDataResetWarning = false
     var showLocalDataResetPhraseSheet = false
-    var showLocalDataResetResultAlert = false
+    var showLocalDataResetFailureAlert = false
     var localDataResetConfirmationPhrase = ""
     var isResettingLocalData = false
-    private var localDataResetSucceeded = false
     private var localDataResetErrorMessage: String?
 
     init(
@@ -191,21 +190,8 @@ final class SettingsScreenModel {
         localDataResetConfirmationPhrase == "RESET"
     }
 
-    var localDataResetAlertTitle: String {
-        if localDataResetSucceeded {
-            return String(localized: "settings.resetAll.success.title", defaultValue: "Reset Complete")
-        }
-        return String(localized: "settings.resetAll.error.title", defaultValue: "Reset Failed")
-    }
-
-    var localDataResetAlertMessage: String {
-        if localDataResetSucceeded {
-            return String(
-                localized: "settings.resetAll.success.message",
-                defaultValue: "CypherAir X local data was reset. Restart the app to complete the fresh-start state."
-            )
-        }
-        return localDataResetErrorMessage ?? String(
+    var localDataResetFailureMessage: String {
+        localDataResetErrorMessage ?? String(
             localized: "settings.resetAll.error.message",
             defaultValue: "CypherAir X could not reset all local data."
         )
@@ -447,7 +433,6 @@ final class SettingsScreenModel {
               let localDataResetService else { return }
         showLocalDataResetPhraseSheet = false
         isResettingLocalData = true
-        localDataResetSucceeded = false
         localDataResetErrorMessage = nil
 
         Task {
@@ -473,23 +458,22 @@ final class SettingsScreenModel {
                 _ = try await localDataResetService.resetAllLocalData(
                     authenticationContext: resetAuthenticationContext
                 )
-                localDataResetSucceeded = true
                 localDataResetRestartCoordinator?.markRestartRequired()
             } catch {
                 localDataResetErrorMessage = error.localizedDescription
             }
 
             isResettingLocalData = false
-            showLocalDataResetResultAlert = localDataResetErrorMessage != nil
-                || localDataResetRestartCoordinator == nil
+            // A reset that worked says so by restarting into a fresh app, not
+            // by asking the user to dismiss the news.
+            showLocalDataResetFailureAlert = localDataResetErrorMessage != nil
             localDataResetConfirmationPhrase = ""
         }
     }
 
-    func dismissLocalDataResetResultAlert() {
-        showLocalDataResetResultAlert = false
+    func dismissLocalDataResetFailureAlert() {
+        showLocalDataResetFailureAlert = false
         localDataResetErrorMessage = nil
-        localDataResetSucceeded = false
     }
 
     private var hasBackup: Bool {

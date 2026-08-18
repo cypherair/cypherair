@@ -1,4 +1,5 @@
 use super::*;
+use pgp_mobile::keys::KeyValidity;
 
 #[test]
 fn test_external_signer_runtime_encrypt_api_decrypts_and_verifies_for_v4_and_v6() {
@@ -7,7 +8,7 @@ fn test_external_signer_runtime_encrypt_api_decrypts_and_verifies_for_v4_and_v6(
         let recipient = keys::generate_key_with_suite(
             format!("Recipient {}", version.label()),
             Some(format!("recipient-{}@example.test", version.label())),
-            None,
+            KeyValidity::Never,
             recipient_profile(version),
         )
         .expect("recipient should generate");
@@ -43,14 +44,14 @@ fn test_external_signer_runtime_encrypt_mixed_recipients_downgrades_to_seipdv1()
     let recipient_v4 = keys::generate_key_with_suite(
         "Recipient v4".to_string(),
         Some("recipient-v4@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("v4 recipient should generate");
     let recipient_v6 = keys::generate_key_with_suite(
         "Recipient v6".to_string(),
         Some("recipient-v6@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed448X448,
     )
     .expect("v6 recipient should generate");
@@ -86,14 +87,14 @@ fn test_external_signer_runtime_encrypt_to_self_downgrades_and_self_decrypts() {
     let recipient_v6 = keys::generate_key_with_suite(
         "Recipient v6".to_string(),
         Some("recipient-v6@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed448X448,
     )
     .expect("v6 recipient should generate");
     let self_v4 = keys::generate_key_with_suite(
         "Self v4".to_string(),
         Some("self-v4@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("v4 self key should generate");
@@ -126,7 +127,7 @@ fn test_external_signer_runtime_encrypt_cancellation_is_preserved() {
     let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
@@ -149,7 +150,7 @@ fn test_external_signer_runtime_encrypt_sanitizes_callback_failures() {
     let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
@@ -182,7 +183,7 @@ fn test_external_signer_runtime_encrypt_rejects_invalid_responses() {
     let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
@@ -220,7 +221,7 @@ fn test_external_signer_runtime_encrypt_rejects_wrong_public_key_signature() {
     let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
@@ -244,7 +245,7 @@ fn test_external_signer_runtime_encrypt_rejects_mismatched_fingerprint() {
     let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
@@ -267,14 +268,14 @@ fn test_external_signer_runtime_encrypt_rejects_secret_non_p256_and_wrong_role_i
     let recipient = keys::generate_key_with_suite(
         "Recipient".to_string(),
         Some("recipient@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("recipient should generate");
     let secret = keys::generate_key_with_suite(
         "Software Secret".to_string(),
         Some("software-secret@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");

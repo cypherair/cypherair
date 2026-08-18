@@ -606,7 +606,7 @@ final class TutorialSessionStore {
                     defaultValue: "Bob Demo"
                 ),
                 email: "bob@demo.invalid",
-                expirySeconds: nil,
+                validity: .never,
                 family: .portableEd25519X25519
             )
             guard isCurrentTutorialSession(

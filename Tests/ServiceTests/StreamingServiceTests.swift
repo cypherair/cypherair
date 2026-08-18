@@ -743,7 +743,7 @@ final class StreamingServiceTests: XCTestCase {
         let externalKey = try engine.generateKey(
             name: "External",
             email: "ext@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 

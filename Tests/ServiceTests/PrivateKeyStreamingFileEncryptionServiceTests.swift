@@ -41,7 +41,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         var signer = try engine.generateKey(
             name: "Software File Signer",
             email: "software-file-signer@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         defer { signer.certData.resetBytes(in: 0..<signer.certData.count) }
@@ -158,7 +158,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         var selfSecret = try engine.generateKey(
             name: "Default Self",
             email: "default-self@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         defer { selfSecret.certData.resetBytes(in: 0..<selfSecret.certData.count) }
@@ -640,7 +640,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         try engine.generateKey(
             name: name,
             email: "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: suite
         )
     }
@@ -720,7 +720,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         ).generatePublicCertificate(
             name: "Secure Enclave Streaming File \(label)",
             email: "secure-streaming-file-\(label)@example.invalid",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             family: family,
             handlePair: handlePair,
             digestSigner: SoftwareP256CustodyProvider.shared.digestSigner

@@ -44,7 +44,7 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Managed Member",
             email: "managed-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -86,13 +86,13 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
         let member = try engine.generateKey(
             name: "Alpha Member",
             email: "alpha-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let available = try engine.generateKey(
             name: "Bravo Available",
             email: "bravo-available@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: member.publicKeyData)
@@ -136,7 +136,7 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Discard Member",
             email: "discard-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
@@ -171,7 +171,7 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Tagged Member",
             email: "tagged-member@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: generated.publicKeyData)

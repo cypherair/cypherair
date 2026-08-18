@@ -117,14 +117,14 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         )
         let sharedSecret = try SystemSecureEnclaveCustodyKeyAgreement()
             .deriveSharedSecret(request: request, using: keyAgreementHandle)
-        XCTAssertEqual(sharedSecret.raw.count, 32)
+        XCTAssertEqual(sharedSecret.raw.count, SecureEnclaveP256RawSharedSecret.rawLength)
 
         let custodyPublicKey = try P256.KeyAgreement.PublicKey(
             x963Representation: pair.keyAgreement.publicKeyRaw
         )
         let expectedSecret = try peerPrivateKey.sharedSecretFromKeyAgreement(with: custodyPublicKey)
         let expectedSecretData = expectedSecret.withUnsafeBytes { Data($0) }
-        XCTAssertEqual(sharedSecret.raw, expectedSecretData)
+        XCTAssertEqual(sharedSecret.raw.copiedBytes(), expectedSecretData)
         recordEvidence(.signing)
     }
 
@@ -271,7 +271,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
             recipientPublicKey: pair.signing.publicKeyRaw,
             ephemeralPublicKey: pair.keyAgreement.publicKeyRaw
         )
-        XCTAssertThrowsError(
+        assertThrowsError(
             try SystemSecureEnclaveCustodyKeyAgreement().deriveSharedSecret(request: request, using: signingBoundHandle)
         ) { error in
             XCTAssertEqual(

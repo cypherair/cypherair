@@ -19,21 +19,47 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
             with: P256.KeyAgreement.PublicKey(x963Representation: localPublicKey)
         ).withUnsafeBytes { Data($0) }
 
-        XCTAssertEqual(sharedSecret.raw, expected)
-        XCTAssertEqual(sharedSecret.raw.count, 32)
-        XCTAssertTrue(sharedSecret.raw.contains(where: { $0 != 0 }))
+        XCTAssertEqual(sharedSecret.raw.copiedBytes(), expected)
+        XCTAssertEqual(sharedSecret.raw.count, SecureEnclaveP256RawSharedSecret.rawLength)
 
         let mismatchedRequest = ExternalP256KeyAgreementRequest(
             recipientPublicKey: SoftwareP256CustodyProvider.shared.makeMaterial().keyAgreementPublicKeyX963,
             ephemeralPublicKey: peerPrivateKey.publicKey.x963Representation
         )
-        XCTAssertThrowsError(
+        assertThrowsError(
             try SoftwareP256CustodyProvider.shared.keyAgreement
                 .deriveSharedSecret(request: mismatchedRequest, using: handle)
         ) { error in
             XCTAssertEqual(
                 error as? SecureEnclaveCustodyHandleError,
                 .handlePublicKeyBindingMismatch(.keyAgreement)
+            )
+        }
+    }
+
+    /// The carrier's two fail-closed checks, which nothing downstream repeats:
+    /// a key agreement that yields an all-zero point or the wrong number of
+    /// bytes must never reach the engine as a shared secret.
+    func test_rawSharedSecret_rejectsAnAllZeroPointAndAWrongLength() {
+        assertThrowsError(
+            try SecureEnclaveP256RawSharedSecret(
+                raw: SensitiveBuffer(count: SecureEnclaveP256RawSharedSecret.rawLength) { _ in }
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .privateHandleInaccessible(.keyAgreement)
+            )
+        }
+
+        assertThrowsError(
+            try SecureEnclaveP256RawSharedSecret(
+                raw: SensitiveBuffer(copying: Data(repeating: 0x7F, count: 31))
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .privateHandleInaccessible(.keyAgreement)
             )
         }
     }
@@ -52,7 +78,7 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
             handle: handle,
             keyAgreement: ThrowingKeyAgreement(error: CancellationError())
         )
-        XCTAssertThrowsError(try cancelBridge.deriveSharedSecret(request: request)) { error in
+        assertThrowsError(try cancelBridge.deriveSharedSecret(request: request)) { error in
             XCTAssertEqual(error as? ExternalP256KeyAgreementError, .OperationCancelled)
         }
 
@@ -62,7 +88,7 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
                 error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.keyAgreement)
             )
         )
-        XCTAssertThrowsError(try authBridge.deriveSharedSecret(request: request)) { error in
+        assertThrowsError(try authBridge.deriveSharedSecret(request: request)) { error in
             XCTAssertEqual(
                 error as? ExternalP256KeyAgreementError,
                 .Failed(category: .localAuthenticationFailed)
@@ -73,7 +99,7 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
             handle: handle,
             keyAgreement: ThrowingKeyAgreement(error: RawKeyAgreementFailure())
         )
-        XCTAssertThrowsError(try unknownBridge.deriveSharedSecret(request: request)) { error in
+        assertThrowsError(try unknownBridge.deriveSharedSecret(request: request)) { error in
             XCTAssertEqual(
                 error as? ExternalP256KeyAgreementError,
                 .Failed(category: .externalOperationFailed)
@@ -94,7 +120,7 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
             keyAgreement: SoftwareP256CustodyProvider.shared.keyAgreement
         )
 
-        XCTAssertThrowsError(try bridge.deriveSharedSecret(request: request)) { error in
+        assertThrowsError(try bridge.deriveSharedSecret(request: request)) { error in
             XCTAssertEqual(
                 error as? ExternalP256KeyAgreementError,
                 .Failed(category: .externalOperationInvalidRequest)

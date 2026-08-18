@@ -44,7 +44,7 @@ struct EphemeralKeyWrappingCustody: SecureEnclaveManageable {
     }
 
     func wrap(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
@@ -65,7 +65,7 @@ struct EphemeralKeyWrappingCustody: SecureEnclaveManageable {
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data {
+    ) throws -> SensitiveBuffer {
         guard Self.isAvailable else {
             throw EphemeralKeyWrappingCustodyError.secureEnclaveUnavailable
         }

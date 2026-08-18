@@ -11,6 +11,7 @@
 mod common;
 
 use common::secure_enclave::SoftwareP256Material;
+use pgp_mobile::keys::KeyValidity;
 use pgp_mobile::keys::SecureEnclaveCertificateVersion;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{encrypt, PgpEngine};
@@ -22,8 +23,11 @@ fn record_evidence(scenario: &str) {
 }
 
 fn build_v6_material() -> SoftwareP256Material {
-    SoftwareP256Material::generate(SecureEnclaveCertificateVersion::V6, Some(3600))
-        .expect("software SE v6 material should build")
+    SoftwareP256Material::generate(
+        SecureEnclaveCertificateVersion::V6,
+        KeyValidity::ExpiresIn { seconds: 3600 },
+    )
+    .expect("software SE v6 material should build")
 }
 
 /// SEIPDv2 / AEAD-OCB round-trip: encrypt to the SE v6 certificate and decrypt

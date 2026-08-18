@@ -47,14 +47,14 @@ protocol SecureEnclaveManageable: Sendable {
     /// info) → AES-GCM seal with public-parameter AAD.
     ///
     /// - Parameters:
-    ///   - privateKey: The raw private bytes to wrap.
+    ///   - privateKey: The raw private bytes to wrap, borrowed for the call.
     ///   - handle: The SE wrapping key handle (its public key is the persistent ECDH party).
     ///   - fingerprint: The key's hex fingerprint (lowercase, no spaces); bound into the envelope.
     ///   - payloadKind: What the payload is; bound into the envelope so it can only
     ///     be reopened as the same kind.
     /// - Returns: A WrappedKeyBundle holding the single encoded envelope row.
     func wrap(
-        privateKey: Data,
+        privateKey: borrowing SensitiveBuffer,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
@@ -68,13 +68,14 @@ protocol SecureEnclaveManageable: Sendable {
     ///   - fingerprint: The key's hex fingerprint; verified against the envelope binding.
     ///   - payloadKind: The kind the caller intends to consume. An envelope sealed
     ///     as a different kind fails closed rather than being reinterpreted.
-    /// - Returns: The raw private bytes. MUST be zeroized after use.
+    /// - Returns: The raw private bytes, owned by the caller and erased when that
+    ///   owner is destroyed.
     func unwrap(
         bundle: WrappedKeyBundle,
         using handle: any SEKeyHandle,
         fingerprint: String,
         payloadKind: PrivateKeyEnvelopePayloadKind
-    ) throws -> Data
+    ) throws -> SensitiveBuffer
 
     /// Reconstruct an SE key handle from its data representation.
     /// This triggers device authentication on real hardware unless a

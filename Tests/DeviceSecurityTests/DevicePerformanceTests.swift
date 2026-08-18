@@ -13,7 +13,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
     func test_perf_textEncrypt1KB_legacy_latencyUnder50ms() throws {
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "Perf A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Perf A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let plaintext = Data(repeating: 0x41, count: 1024) // 1 KB
 
@@ -35,7 +35,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
     func test_perf_textEncrypt1KB_modernHigh_latencyUnder50ms() throws {
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "Perf B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Perf B", email: nil, validity: .never, suite: .ed448X448
         )
         let plaintext = Data(repeating: 0x41, count: 1024) // 1 KB
 
@@ -58,7 +58,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
     func test_perf_fileEncrypt100MB_legacy_latencyUnder10s() throws {
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "Perf", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Perf", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let fileData = Data(count: 100 * 1024 * 1024) // 100 MB zero-filled
 
@@ -81,7 +81,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
     func test_perf_fileEncrypt100MB_modernHigh_latencyUnder15s() throws {
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "Perf", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Perf", email: nil, validity: .never, suite: .ed448X448
         )
         let fileData = Data(count: 100 * 1024 * 1024) // 100 MB zero-filled
 
@@ -108,7 +108,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
 
         measure(metrics: [XCTClockMetric()], options: options) {
             _ = try! engine.generateKey(
-                name: "Perf", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+                name: "Perf", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
             )
         }
     }
@@ -124,7 +124,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
 
         measure(metrics: [XCTClockMetric()], options: options) {
             _ = try! engine.generateKey(
-                name: "Perf", email: nil, expirySeconds: nil, suite: .ed448X448
+                name: "Perf", email: nil, validity: .never, suite: .ed448X448
             )
         }
     }
@@ -161,13 +161,13 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
         measure(metrics: [XCTClockMetric()], options: options) {
             let handle = try! secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
             let bundle = try! secureEnclave.wrap(
-                privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint,
+                privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint,
                 payloadKind: .softwareSecretCertificate
             )
             let unwrapped = try! secureEnclave.unwrap(
                 bundle: bundle, using: handle, fingerprint: fingerprint,
                 payloadKind: .softwareSecretCertificate
-            )
+            ).copiedBytes()
             assert(unwrapped == fakePrivateKey)
         }
     }
@@ -179,7 +179,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
     func test_perf_argon2id_exportCalibrationTime() throws {
         let engine = PgpEngine()
         let key = try engine.generateKey(
-            name: "Perf", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Perf", email: nil, validity: .never, suite: .ed448X448
         )
 
         let options = XCTMeasureOptions()

@@ -1,4 +1,5 @@
 use super::*;
+use pgp_mobile::keys::KeyValidity;
 
 fn first_subkey_fingerprint(public_cert: &[u8]) -> String {
     openpgp::Cert::from_bytes(public_cert)
@@ -217,7 +218,7 @@ fn test_software_selective_revocations_keep_default_hash() {
     let generated = keys::generate_key_with_suite(
         "Software Selective Revocation Hash".to_string(),
         Some("software-selective-revocation-hash@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
@@ -312,7 +313,7 @@ fn test_external_signer_runtime_selective_revocation_rejects_secret_input_before
     let generated = keys::generate_key_with_suite(
         "Secret Selective Revocation".to_string(),
         Some("secret-selective-revocation@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
@@ -350,7 +351,8 @@ fn test_external_signer_runtime_selective_revocation_rejects_revoked_or_unresolv
 #[test]
 fn test_external_signer_runtime_selective_revocation_allows_expired_public_cert() {
     let material =
-        build_candidate_with_expiry(CandidateVersion::V4, Some(1)).expect("candidate should build");
+        build_candidate_with_validity(CandidateVersion::V4, KeyValidity::ExpiresIn { seconds: 1 })
+            .expect("candidate should build");
     let subkey_fingerprint = first_subkey_fingerprint(&material.public_cert);
     sleep_past(first_transport_subkey_expiry(&material.public_cert));
     assert_primary_expired_now(&material.public_cert);

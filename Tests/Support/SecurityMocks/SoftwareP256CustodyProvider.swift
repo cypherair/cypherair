@@ -175,8 +175,11 @@ struct SoftwareP256CustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement {
         }
 
         let sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: peerPublicKey)
+        let count = sharedSecret.withUnsafeBytes { $0.count }
         return try SecureEnclaveP256RawSharedSecret(
-            raw: sharedSecret.withUnsafeBytes { Data($0) }
+            raw: SensitiveBuffer(count: count) { destination in
+                sharedSecret.withUnsafeBytes { destination.copyMemory(from: $0) }
+            }
         )
     }
 }

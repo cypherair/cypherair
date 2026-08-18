@@ -311,7 +311,7 @@ final class SigningServiceTests: XCTestCase {
         let identity = try await stack.keyManagement.generateKey(
             name: "Expiring Signer",
             email: nil,
-            expirySeconds: 1,
+            validity: .expiresIn(seconds: 1),
             suite: .ed25519LegacyCurve25519Legacy
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -344,7 +344,7 @@ final class SigningServiceTests: XCTestCase {
         let identity = try await stack.keyManagement.generateKey(
             name: "Expiring Modern High Signer",
             email: nil,
-            expirySeconds: 1,
+            validity: .expiresIn(seconds: 1),
             suite: .ed448X448
         )
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)

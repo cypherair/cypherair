@@ -513,54 +513,6 @@
         }
       }
     },
-    "clipboard.copied.ok" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "好"
-          }
-        }
-      }
-    },
-    "clipboard.copied.publicKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Public key copied to clipboard."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公钥已拷贝到剪贴板。"
-          }
-        }
-      }
-    },
-    "clipboard.copied.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已拷贝"
-          }
-        }
-      }
-    },
     "clipboard.notice.dismiss" : {
       "localizations" : {
         "en" : {
@@ -845,6 +797,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "是"
+          }
+        }
+      }
+    },
+    "confirmation.copied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝"
           }
         }
       }
@@ -10469,18 +10437,52 @@
         }
       }
     },
-    "keygen.expiry.months" : {
+    "keygen.expiry.never" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld months"
+            "value" : "Never"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 个月"
+            "value" : "永不过期"
+          }
+        }
+      }
+    },
+    "keygen.expiry.years" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld year"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld years"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 年"
+                }
+              }
+            }
           }
         }
       }
@@ -10901,22 +10903,6 @@
         }
       }
     },
-    "license.detail.copied" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已复制"
-          }
-        }
-      }
-    },
     "license.detail.copy" : {
       "localizations" : {
         "en" : {
@@ -10928,7 +10914,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "复制仓库链接"
+            "value" : "拷贝仓库链接"
           }
         }
       }
@@ -14021,38 +14007,6 @@
         }
       }
     },
-    "settings.resetAll.success.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir X local data was reset. Restart the app to complete the fresh-start state."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir X 本机数据已重置。请重启 App 以完成全新启动状态。"
-          }
-        }
-      }
-    },
-    "settings.resetAll.success.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Complete"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置完成"
-          }
-        }
-      }
-    },
     "settings.resetAll.title" : {
       "localizations" : {
         "en" : {
@@ -14677,22 +14631,6 @@
         }
       }
     },
-    "sourceCompliance.copied" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已复制"
-          }
-        }
-      }
-    },
     "sourceCompliance.copy" : {
       "localizations" : {
         "en" : {
@@ -14704,7 +14642,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "复制发布链接"
+            "value" : "拷贝发布链接"
           }
         }
       }

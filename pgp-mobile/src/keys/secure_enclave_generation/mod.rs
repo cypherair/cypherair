@@ -14,7 +14,6 @@ use crate::external_signer::{map_external_signing_error, signer_for_provider};
 const P256_X963_PUBLIC_KEY_LENGTH: usize = 65;
 #[cfg(test)]
 const P256_SCALAR_LENGTH: usize = 32;
-const DEFAULT_VALIDITY_SECONDS: u64 = 2 * 365 * 24 * 60 * 60;
 
 pub fn generate_secure_enclave_public_certificate(
     input: SecureEnclavePublicCertificateInput,
@@ -53,7 +52,9 @@ pub fn generate_secure_enclave_public_certificate(
         input.key_agreement_public_key_x963.as_slice(),
     )?;
     let signing_public = signing_key.clone().role_as_unspecified().clone();
-    let validity = Duration::from_secs(input.expiry_seconds.unwrap_or(DEFAULT_VALIDITY_SECONDS));
+    // `None` leaves the Key Expiration Time subpacket off both bindings below,
+    // so the certificate never expires.
+    let validity = input.validity.period();
 
     let mut external_signer =
         signer_for_provider(signing_public.clone(), signer.clone()).map_err(|error| {

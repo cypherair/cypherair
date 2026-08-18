@@ -143,17 +143,17 @@ private struct SettingsScreenPresentations: ViewModifier {
                 #endif
             }
             .alert(
-                model.localDataResetAlertTitle,
+                String(localized: "settings.resetAll.error.title", defaultValue: "Reset Failed"),
                 isPresented: Binding(
-                    get: { model.showLocalDataResetResultAlert },
-                    set: { if !$0 { model.dismissLocalDataResetResultAlert() } }
+                    get: { model.showLocalDataResetFailureAlert },
+                    set: { if !$0 { model.dismissLocalDataResetFailureAlert() } }
                 )
             ) {
                 Button(String(localized: "error.ok", defaultValue: "OK")) {
-                    model.dismissLocalDataResetResultAlert()
+                    model.dismissLocalDataResetFailureAlert()
                 }
             } message: {
-                Text(model.localDataResetAlertMessage)
+                Text(model.localDataResetFailureMessage)
             }
             #if !os(iOS)
             .sheet(isPresented: $model.showOnboarding) {

@@ -99,6 +99,6 @@ class DeviceSecurityTestCase: XCTestCase {
     ) throws -> WrappedKeyBundle {
         let accessControl = try mode.createAccessControl()
         let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
-        return try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
+        return try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: privateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
     }
 }

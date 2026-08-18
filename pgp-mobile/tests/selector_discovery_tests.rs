@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use pgp_mobile::armor;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite, UserIdSelectorInput};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 use openpgp::cert::prelude::*;
@@ -19,7 +19,7 @@ fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
-        None,
+        KeyValidity::Never,
         profile,
     )
     .expect("key generation should succeed")
@@ -641,7 +641,10 @@ fn test_discover_certificate_selectors_multiple_subkeys_preserve_native_order() 
 
 #[test]
 fn test_discover_certificate_selectors_catalog_selectors_drive_revocation_apis() {
-    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorRevocations");
+    let generated = generate_key(
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        "SelectorRevocations",
+    );
     let discovered = keys::discover_certificate_selectors(&generated.public_key_data)
         .expect("selector discovery should succeed");
 
@@ -703,8 +706,8 @@ fn test_discover_certificate_selectors_unbound_user_id_is_not_self_certified() {
         "Injected Identity <injected@example.com>",
     );
 
-    let discovered = keys::discover_certificate_selectors(&extended)
-        .expect("selector discovery should succeed");
+    let discovered =
+        keys::discover_certificate_selectors(&extended).expect("selector discovery should succeed");
 
     assert_eq!(discovered.user_ids.len(), 2);
     assert!(

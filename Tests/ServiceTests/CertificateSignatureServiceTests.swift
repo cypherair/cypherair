@@ -32,7 +32,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         try stack.engine.generateKey(
             name: name,
             email: email,
-            expirySeconds: nil,
+            validity: .never,
             suite: suite
         )
     }

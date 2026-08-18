@@ -1,4 +1,5 @@
 use super::*;
+use pgp_mobile::keys::KeyValidity;
 
 fn first_user_id_selector(public_cert: &[u8]) -> keys::UserIdSelectorInput {
     let selectors =
@@ -33,7 +34,7 @@ fn generated_target(version: CandidateVersion) -> keys::GeneratedKey {
             "external-certification-target-{}@example.test",
             version.label()
         )),
-        None,
+        KeyValidity::Never,
         recipient_profile(version),
     )
     .expect("target key should generate")
@@ -195,18 +196,21 @@ fn test_external_signer_runtime_user_id_certifications_verify_for_v4_and_v6() {
 
 #[test]
 fn test_software_user_id_certification_keeps_default_hash() {
-    for profile in [keys::KeySuite::Ed25519LegacyCurve25519Legacy, keys::KeySuite::Ed448X448] {
+    for profile in [
+        keys::KeySuite::Ed25519LegacyCurve25519Legacy,
+        keys::KeySuite::Ed448X448,
+    ] {
         let signer = keys::generate_key_with_suite(
             "Software Certification Hash".to_string(),
             Some("software-certification-hash@example.test".to_string()),
-            None,
+            KeyValidity::Never,
             profile,
         )
         .expect("software signer should generate");
         let target = keys::generate_key_with_suite(
             "Software Certification Target".to_string(),
             Some("software-certification-target@example.test".to_string()),
-            None,
+            KeyValidity::Never,
             profile,
         )
         .expect("software target should generate");
@@ -305,7 +309,7 @@ fn test_external_signer_runtime_user_id_certification_rejects_secret_non_p256_an
     let secret = keys::generate_key_with_suite(
         "Secret Certification".to_string(),
         Some("secret-certification@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         keys::KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("software key should generate");
@@ -374,7 +378,8 @@ fn test_external_signer_runtime_user_id_certification_rejects_revoked_or_unresol
 #[test]
 fn test_external_signer_runtime_user_id_certification_allows_expired_but_not_revoked_signer() {
     let material =
-        build_candidate_with_expiry(CandidateVersion::V4, Some(1)).expect("candidate should build");
+        build_candidate_with_validity(CandidateVersion::V4, KeyValidity::ExpiresIn { seconds: 1 })
+            .expect("candidate should build");
     std::thread::sleep(std::time::Duration::from_secs(2));
     let target = generated_target(CandidateVersion::V4);
     let selector = first_user_id_selector(&target.public_key_data);

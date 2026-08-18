@@ -1360,7 +1360,7 @@ final class AppContainer: @unchecked Sendable {
         let generated = try engine.generateKey(
             name: "UITest Contact",
             email: "uitest-contact@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)

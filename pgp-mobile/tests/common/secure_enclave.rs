@@ -30,8 +30,9 @@ use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
     self, ExternalP256KeyAgreementError, ExternalP256KeyAgreementFailureCategory,
     ExternalP256KeyAgreementProvider, ExternalP256KeyAgreementRequest, ExternalP256SigningError,
-    ExternalP256SigningFailureCategory, ExternalP256SigningProvider, P256EcdsaSignature,
-    P256RawSharedSecret, SecureEnclaveCertificateVersion, SecureEnclavePublicCertificateInput,
+    ExternalP256SigningFailureCategory, ExternalP256SigningProvider, KeyValidity,
+    P256EcdsaSignature, P256RawSharedSecret, SecureEnclaveCertificateVersion,
+    SecureEnclavePublicCertificateInput,
 };
 use sequoia_openpgp as openpgp;
 
@@ -125,7 +126,7 @@ impl SoftwareP256Material {
     /// public halves, self-signed through the software external signer.
     pub fn generate(
         version: SecureEnclaveCertificateVersion,
-        expiry_seconds: Option<u64>,
+        validity: KeyValidity,
     ) -> Result<Self, PgpError> {
         let signing_key: Key<key::SecretParts, key::PrimaryRole> = match version {
             SecureEnclaveCertificateVersion::V4 => key::Key4::generate_ecc(true, Curve::NistP256)
@@ -171,7 +172,7 @@ impl SoftwareP256Material {
             SecureEnclavePublicCertificateInput {
                 name: "Software SE P-256".to_string(),
                 email: Some("software-se-p256@example.test".to_string()),
-                expiry_seconds,
+                validity,
                 version,
                 signing_public_key_x963,
                 key_agreement_public_key_x963,

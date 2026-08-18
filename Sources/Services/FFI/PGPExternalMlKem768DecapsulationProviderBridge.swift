@@ -22,10 +22,11 @@ final class PGPExternalMlKem768DecapsulationProviderBridge: ExternalMlKem768Deca
         request: ExternalMlKem768DecapsulationRequest
     ) throws -> MlKem768KeyShare {
         do {
-            var keyShare = try decapsulator.decapsulateMlKem768(request: request, using: handle)
-            defer { keyShare.resetBytes(in: 0..<keyShare.count) }
-            let ffiShare = keyShare.withUnsafeBytes { buffer in Data(buffer) }
-            return MlKem768KeyShare(raw: ffiShare)
+            let keyShare = try decapsulator.decapsulateMlKem768(request: request, using: handle)
+            // The one copy the FFI record costs: UniFFI must copy it across the
+            // callback boundary, and Rust stores the received Vec in Zeroizing.
+            // The decapsulated share itself is erased when this scope ends.
+            return keyShare.withUnsafeBytes { MlKem768KeyShare(raw: Data($0)) }
         } catch is CancellationError {
             throw ExternalCompositeKeyAgreementError.OperationCancelled
         } catch let error as SecureEnclaveCustodyHandleError {

@@ -2,11 +2,9 @@ import SwiftUI
 
 struct SourceComplianceView: View {
     private let store: SourceComplianceStore
-    private let repositoryURLCopyAction = RepositoryURLCopyAction()
 
     @State private var info: SourceComplianceInfo?
     @State private var loadError: String?
-    @State private var didCopy = false
 
     init(store: SourceComplianceStore = SourceComplianceStore()) {
         self.store = store
@@ -133,22 +131,13 @@ struct SourceComplianceView: View {
                 CypherScrollableTextLine(text: releaseURLText(info))
                     .accessibilityIdentifier("sourcecompliance.url")
 
-                Button {
-                    didCopy = repositoryURLCopyAction.copyIfPresent(info.stableReleaseURL)
-                } label: {
-                    Label(
-                        didCopy
-                            ? String(
-                                localized: "sourceCompliance.copied",
-                                defaultValue: "Copied"
-                            )
-                            : String(
-                                localized: "sourceCompliance.copy",
-                                defaultValue: "Copy Release URL"
-                            ),
-                        systemImage: didCopy ? "checkmark" : "doc.on.doc"
-                    )
-                }
+                CypherCopyButton(
+                    title: String(
+                        localized: "sourceCompliance.copy",
+                        defaultValue: "Copy Release URL"
+                    ),
+                    value: info.stableReleaseURL
+                )
                 .buttonStyle(.borderless)
                 .disabled(info.stableReleaseURL.isEmpty)
                 .accessibilityIdentifier("sourcecompliance.copy")

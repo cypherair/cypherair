@@ -213,7 +213,7 @@ final class SelfTestService {
         let generated = try await selfTestAdapter.generateKey(
             name: "Self-Test",
             email: "test@cypherair.local",
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             suite: suite
         )
         guard generated.keyVersion == suite.keyVersion else {
@@ -390,7 +390,7 @@ final class SelfTestService {
         var generated = try await selfTestAdapter.generateKey(
             name: "QR-Test",
             email: nil,
-            expirySeconds: 3600,
+            validity: .expiresIn(seconds: 3600),
             suite: .ed25519LegacyCurve25519Legacy
         )
         defer {

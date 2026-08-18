@@ -633,7 +633,7 @@ final class DecryptionServiceTests: XCTestCase {
         let externalSigner = try stack.engine.generateKey(
             name: "Unknown Detailed Signer",
             email: "unknown-detailed@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let plaintext = Data("Unknown signer detailed decrypt".utf8)
@@ -838,7 +838,7 @@ final class DecryptionServiceTests: XCTestCase {
         let externalSigner = try stack.engine.generateKey(
             name: "Unknown File Detailed Signer",
             email: "unknown-file-detailed@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let plaintext = Data("Unknown signer detailed file decrypt".utf8)

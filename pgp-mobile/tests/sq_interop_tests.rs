@@ -41,7 +41,7 @@ use tempfile::NamedTempFile;
 use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use pgp_mobile::verify;
@@ -186,7 +186,10 @@ fn assert_engine_encrypts_to_sq_cert(suite: &SqSuite) {
         has_v2,
         "encryption to an SEIPDv2-advertising sq cert must produce SEIPDv2"
     );
-    assert!(!has_v1, "no SEIPDv1 fallback for an SEIPDv2-capable recipient");
+    assert!(
+        !has_v1,
+        "no SEIPDv1 fallback for an SEIPDv2-capable recipient"
+    );
 
     // Any PQ recipient additionally forces the AES-256 floor (RFC 9980).
     if suite.is_post_quantum() {
@@ -341,7 +344,7 @@ fn test_mixed_engine_v4_only_and_sq_v6_recipients_floor_to_seipdv1() {
     let engine_key = keys::generate_key_with_suite(
         "Engine Legacy".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("engine legacy key gen should succeed");
@@ -353,7 +356,10 @@ fn test_mixed_engine_v4_only_and_sq_v6_recipients_floor_to_seipdv1() {
         .expect("mixed-recipient encryption should succeed");
     let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
     assert!(has_v1, "a v4-only recipient must floor the set to SEIPDv1");
-    assert!(!has_v2, "never SEIPDv2 when a v4-only holder is a recipient");
+    assert!(
+        !has_v2,
+        "never SEIPDv2 when a v4-only holder is a recipient"
+    );
 
     let ciphertext = encrypt::encrypt(plaintext, &recipients, None, None)
         .expect("mixed-recipient encryption should succeed");

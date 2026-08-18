@@ -31,8 +31,8 @@ use pgp_mobile::keys::{
     ExternalCompositeSigningError, ExternalCompositeSigningFailureCategory,
     ExternalMlDsa65SigningProvider, ExternalMlDsa87SigningProvider,
     ExternalMlKem1024DecapsulationProvider, ExternalMlKem1024DecapsulationRequest,
-    ExternalMlKem768DecapsulationProvider, ExternalMlKem768DecapsulationRequest, MlDsa65Signature,
-    MlDsa87Signature, MlKem1024KeyShare, MlKem768KeyShare,
+    ExternalMlKem768DecapsulationProvider, ExternalMlKem768DecapsulationRequest, KeyValidity,
+    MlDsa65Signature, MlDsa87Signature, MlKem1024KeyShare, MlKem768KeyShare,
     SecureEnclaveCompositeHighPublicCertificateInput, SecureEnclaveCompositePublicCertificateInput,
 };
 use sequoia_openpgp as openpgp;
@@ -144,18 +144,18 @@ impl SoftwareCompositeMaterial {
     /// Generate software composite PQ donor keys and build the production
     /// split-custody-shaped public certificate around their PQ public halves,
     /// self-signed through the software external signer.
-    pub fn generate(expiry_seconds: Option<u64>) -> Result<Self, PgpError> {
+    pub fn generate(validity: KeyValidity) -> Result<Self, PgpError> {
         Self::generate_with_identity(
             "Software Composite",
             Some("software-composite@example.test"),
-            expiry_seconds,
+            validity,
         )
     }
 
     pub fn generate_with_identity(
         name: &str,
         email: Option<&str>,
-        expiry_seconds: Option<u64>,
+        validity: KeyValidity,
     ) -> Result<Self, PgpError> {
         let (donor, _rev) = CertBuilder::new()
             .set_cipher_suite(CipherSuite::MLDSA65_Ed25519)
@@ -204,7 +204,7 @@ impl SoftwareCompositeMaterial {
             SecureEnclaveCompositePublicCertificateInput {
                 name: name.to_string(),
                 email: email.map(str::to_string),
-                expiry_seconds,
+                validity,
                 mldsa65_signing_public_key: mldsa65_signing_public_key.clone(),
                 mlkem768_key_agreement_public_key: mlkem768_key_agreement_public_key.clone(),
             },
@@ -376,18 +376,18 @@ pub struct SoftwareCompositeHighMaterial {
 }
 
 impl SoftwareCompositeHighMaterial {
-    pub fn generate(expiry_seconds: Option<u64>) -> Result<Self, PgpError> {
+    pub fn generate(validity: KeyValidity) -> Result<Self, PgpError> {
         Self::generate_with_identity(
             "Software Composite High",
             Some("software-composite-high@example.test"),
-            expiry_seconds,
+            validity,
         )
     }
 
     pub fn generate_with_identity(
         name: &str,
         email: Option<&str>,
-        expiry_seconds: Option<u64>,
+        validity: KeyValidity,
     ) -> Result<Self, PgpError> {
         let (donor, _rev) = CertBuilder::new()
             .set_cipher_suite(CipherSuite::MLDSA87_Ed448)
@@ -436,7 +436,7 @@ impl SoftwareCompositeHighMaterial {
             SecureEnclaveCompositeHighPublicCertificateInput {
                 name: name.to_string(),
                 email: email.map(str::to_string),
-                expiry_seconds,
+                validity,
                 mldsa87_signing_public_key: mldsa87_signing_public_key.clone(),
                 mlkem1024_key_agreement_public_key: mlkem1024_key_agreement_public_key.clone(),
             },

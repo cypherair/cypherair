@@ -63,7 +63,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -77,7 +77,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             return try await performGenerateClassicalKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 invalidationToken: token
             )
@@ -85,7 +85,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             return try await performGenerateCompositeKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 tier: tier,
                 invalidationToken: token
@@ -100,7 +100,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private func performGenerateClassicalKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -138,7 +138,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             let generated = try await certificateBuilder.generatePublicCertificate(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family,
                 handlePair: loadedPair,
                 digestSigner: digestSigner
@@ -216,7 +216,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private func performGenerateCompositeKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         family: PGPKeyFamily,
         tier: SecureEnclaveCustodyTier,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
@@ -276,33 +276,25 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             var generated = try await compositeCertificateBuilder.generateCompositeCertificate(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 handlePair: handlePair,
                 compositeSigner: compositeSigner
             )
-            // Zeroize the raw classical component secrets on every exit from
-            // this scope. `store` also zeroizes them (idempotent), but a
-            // cancellation/invalidation throw between receipt and seal must not
-            // free them intact. The commit closure below reads only public
-            // metadata, so the secrets stay valid until it returns.
-            defer {
-                generated.classicalEddsaSecret.resetBytes(
-                    in: 0..<generated.classicalEddsaSecret.count
-                )
-                generated.classicalEcdhSecret.resetBytes(
-                    in: 0..<generated.classicalEcdhSecret.count
-                )
-            }
+            // Move the raw classical component secrets out of the engine's
+            // result as soon as it arrives. A cancellation or invalidation
+            // throw between receipt and seal then frees them erased, and the
+            // seal below consumes them outright.
+            let classicalEddsaSecret = SensitiveBuffer(consuming: &generated.classicalEddsaSecret)
+            let classicalEcdhSecret = SensitiveBuffer(consuming: &generated.classicalEcdhSecret)
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 
             // Seal the classical component before the durable identity commit
-            // so a committed identity never exists without its component;
-            // `store` zeroizes the secret buffers.
+            // so a committed identity never exists without its component.
             try compositeClassicalComponentStore.store(
                 fingerprint: generated.metadata.fingerprint,
-                eddsaSecret: &generated.classicalEddsaSecret,
-                ecdhSecret: &generated.classicalEcdhSecret,
+                eddsaSecret: classicalEddsaSecret,
+                ecdhSecret: classicalEcdhSecret,
                 tier: tier
             )
             storedClassicalComponentFingerprint = generated.metadata.fingerprint
