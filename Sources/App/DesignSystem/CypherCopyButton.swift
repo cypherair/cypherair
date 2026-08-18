@@ -18,31 +18,31 @@ import UIKit
 /// a screen declines to make confirms nothing.
 struct CypherCopyButton: View {
     /// How long the confirmation holds before the button returns to rest — long
-    /// enough to read and to hear under VoiceOver, short enough to stay out of
-    /// the way.
+    /// enough to read, short enough to stay out of the way.
     private static let confirmationDuration = Duration.seconds(2)
 
     private let title: String
-    private let copy: @MainActor () -> Bool
+    private let copy: @MainActor () async -> Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var copyCount = 0
     @State private var isConfirming = false
 
-    /// Copies `value`. An empty value is nothing to copy, so it confirms
-    /// nothing.
+    /// Copies `value` — the plain case, where reaching the clipboard is the
+    /// whole operation.
     init(title: String, value: String) {
         self.init(title: title) {
-            guard !value.isEmpty else { return false }
             CypherClipboard.copy(value)
             return true
         }
     }
 
-    /// `copy` performs the copy and reports whether it happened — an output
-    /// interception policy or an unavailable value means no copy and no
-    /// confirmation.
-    init(title: String, copy: @escaping @MainActor () -> Bool) {
+    /// `copy` performs the copy and reports whether it landed. It may suspend —
+    /// the Encrypt and Sign copies wait on a protected setting before writing —
+    /// and the confirmation waits with it, so nothing is ever confirmed at tap
+    /// time. A refusal, an interception or a superseded copy reports `false`
+    /// and confirms nothing.
+    init(title: String, copy: @escaping @MainActor () async -> Bool) {
         self.title = title
         self.copy = copy
     }
@@ -51,10 +51,16 @@ struct CypherCopyButton: View {
         let haptic = confirmationHaptic
 
         Button {
-            guard copy() else { return }
-            copyCount += 1
-            withAnimation(CypherMotion.spring(reduceMotion: reduceMotion)) {
-                isConfirming = true
+            Task {
+                guard await copy() else { return }
+                copyCount += 1
+                withAnimation(CypherMotion.spring(reduceMotion: reduceMotion)) {
+                    isConfirming = true
+                }
+                // The label swap is silent to VoiceOver, which is focused on
+                // the button it just activated; the alert this replaced spoke
+                // for itself.
+                AccessibilityNotification.Announcement(confirmedTitle).post()
             }
         } label: {
             Label {

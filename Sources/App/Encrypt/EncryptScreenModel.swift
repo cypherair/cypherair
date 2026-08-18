@@ -67,7 +67,6 @@ final class EncryptScreenModel {
         question: OutgoingFormatQuestion,
         decision: OutgoingFormatDecision?
     )?
-    @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var clipboardToken: UInt64 = 0
     private var fileImportRequestGate = FileImportRequestGate()
 
@@ -677,41 +676,38 @@ final class EncryptScreenModel {
         }
     }
 
-    func copyCiphertextToClipboard() {
+    /// Copies the ciphertext and reports whether it reached the clipboard.
+    ///
+    /// The write waits on the clipboard-notice decision, which is a protected
+    /// setting and may take a while to answer, so this suspends and the caller
+    /// confirms only once the copy has landed. A copy this screen forbids, one
+    /// the interception policy takes, and one superseded while it waited all
+    /// report `false`.
+    func copyCiphertextToClipboard() async -> Bool {
         guard configuration.allowsClipboardWrite,
               let ciphertextString else {
-            return
+            return false
         }
 
-        if configuration.outputInterceptionPolicy.interceptClipboardCopy?(
+        guard configuration.outputInterceptionPolicy.interceptClipboardCopy?(
             ciphertextString,
             appConfiguration,
             .ciphertext
-        ) != true {
-            clipboardTask?.cancel()
-            clipboardToken &+= 1
-            let token = clipboardToken
-            let noticeDecision = clipboardNoticeDecision
-            let writer = clipboardWriter
-            clipboardTask = Task { @MainActor [weak self, token, ciphertextString, noticeDecision, writer] in
-                guard let self else { return }
-                defer {
-                    if token == self.clipboardToken {
-                        self.clipboardTask = nil
-                    }
-                }
-                do {
-                    let shouldShowNotice = await noticeDecision()
-                    try Task.checkCancellation()
-                    guard token == self.clipboardToken else {
-                        return
-                    }
-                    writer(ciphertextString, shouldShowNotice)
-                } catch {
-                    return
-                }
-            }
+        ) != true else {
+            return false
         }
+
+        clipboardToken &+= 1
+        let token = clipboardToken
+
+        let shouldShowNotice = await clipboardNoticeDecision()
+
+        guard token == clipboardToken else {
+            return false
+        }
+
+        clipboardWriter(ciphertextString, shouldShowNotice)
+        return true
     }
 
     func exportCiphertext() {
@@ -793,15 +789,15 @@ final class EncryptScreenModel {
 
     func handleContentClearGenerationChange() {
         operation.cancelAndInvalidate()
-        cancelClipboardCopy()
+        supersedePendingClipboardCopy()
         cleanupTemporaryEncryptedFile()
         clearTransientInput()
     }
 
-    private func cancelClipboardCopy() {
-        clipboardTask?.cancel()
+    /// Supersedes a copy still waiting on the clipboard-notice decision, so a
+    /// late answer cannot write ciphertext the user has already cleared.
+    private func supersedePendingClipboardCopy() {
         clipboardToken &+= 1
-        clipboardTask = nil
     }
 
     func clearTransientInput() {
