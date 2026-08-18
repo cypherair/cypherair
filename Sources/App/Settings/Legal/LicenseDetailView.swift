@@ -3,20 +3,16 @@ import SwiftUI
 struct LicenseDetailView: View {
     private let notice: OpenSourceNotice
     private let store: OpenSourceNoticeStore
-    private let repositoryURLCopyAction: RepositoryURLCopyAction
 
     @State private var licenseText: String?
     @State private var loadError: String?
-    @State private var didCopy = false
 
     init(
         notice: OpenSourceNotice,
-        store: OpenSourceNoticeStore = OpenSourceNoticeStore(),
-        repositoryURLCopyAction: RepositoryURLCopyAction = RepositoryURLCopyAction()
+        store: OpenSourceNoticeStore = OpenSourceNoticeStore()
     ) {
         self.notice = notice
         self.store = store
-        self.repositoryURLCopyAction = repositoryURLCopyAction
     }
 
     var body: some View {
@@ -42,17 +38,12 @@ struct LicenseDetailView: View {
 
                     CypherScrollableTextLine(text: notice.repositoryURL)
 
-                    Button {
-                        didCopy = repositoryURLCopyAction.copyIfPresent(notice.repositoryURL)
-                    } label: {
-                        Label(
-                            didCopy
-                                ? String(localized: "license.detail.copied", defaultValue: "Copied")
-                                : String(localized: "license.detail.copy", defaultValue: "Copy Repository URL"),
-                            systemImage: didCopy ? "checkmark" : "doc.on.doc"
-                        )
-                    }
+                    CypherCopyButton(
+                        title: String(localized: "license.detail.copy", defaultValue: "Copy Repository URL"),
+                        value: notice.repositoryURL
+                    )
                     .buttonStyle(.borderless)
+                    .disabled(notice.repositoryURL.isEmpty)
                 }
                 .padding(.vertical, 4)
             }

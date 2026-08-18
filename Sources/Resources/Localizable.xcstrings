@@ -513,54 +513,6 @@
         }
       }
     },
-    "clipboard.copied.ok" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "好"
-          }
-        }
-      }
-    },
-    "clipboard.copied.publicKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Public key copied to clipboard."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公钥已拷贝到剪贴板。"
-          }
-        }
-      }
-    },
-    "clipboard.copied.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已拷贝"
-          }
-        }
-      }
-    },
     "clipboard.notice.dismiss" : {
       "localizations" : {
         "en" : {
@@ -845,6 +797,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "是"
+          }
+        }
+      }
+    },
+    "confirmation.copied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝"
           }
         }
       }
@@ -10901,22 +10869,6 @@
         }
       }
     },
-    "license.detail.copied" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已复制"
-          }
-        }
-      }
-    },
     "license.detail.copy" : {
       "localizations" : {
         "en" : {
@@ -14673,22 +14625,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提交"
-          }
-        }
-      }
-    },
-    "sourceCompliance.copied" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已复制"
           }
         }
       }

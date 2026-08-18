@@ -196,13 +196,10 @@ private struct KeyDetailScreenHostView: View {
                         }
                         .accessibilityIdentifier("keydetail.qr")
 
-                        Button {
+                        CypherCopyButton(
+                            title: String(localized: "keydetail.copyPublicKey", defaultValue: "Copy Public Key")
+                        ) {
                             model.copyPublicKey()
-                        } label: {
-                            Label(
-                                String(localized: "keydetail.copyPublicKey", defaultValue: "Copy Public Key"),
-                                systemImage: "doc.on.doc"
-                            )
                         }
                         .disabled(model.armoredPublicKey == nil || !model.configuration.allowsPublicKeyCopy)
                     } header: {
@@ -360,19 +357,6 @@ private struct KeyDetailScreenHostView: View {
             }
         } message: { err in
             Text(err.localizedDescription)
-        }
-        .alert(
-            String(localized: "clipboard.copied.title", defaultValue: "Copied"),
-            isPresented: Binding(
-                get: { model.showCopiedNotice },
-                set: { if !$0 { model.dismissCopiedNotice() } }
-            )
-        ) {
-            Button(String(localized: "clipboard.copied.ok", defaultValue: "OK")) {
-                model.dismissCopiedNotice()
-            }
-        } message: {
-            Text(String(localized: "clipboard.copied.publicKey", defaultValue: "Public key copied to clipboard."))
         }
         .sheet(item: Binding(
             get: { model.localModifyExpiryRequest },
