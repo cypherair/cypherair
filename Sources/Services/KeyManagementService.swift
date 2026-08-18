@@ -464,7 +464,7 @@ final class KeyManagementService: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key to modify.
-    ///   - newValidity: New expiry duration from now in seconds, or nil to remove expiry.
+    ///   - newValidity: The validity to set — a finite term from now, or `.never`.
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The updated key identity with new expiry information.
     func modifyExpiry(
