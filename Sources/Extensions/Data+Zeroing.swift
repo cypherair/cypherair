@@ -1,7 +1,7 @@
 import Foundation
 
 /// Extension for secure memory zeroing of sensitive data.
-/// SECURITY-CRITICAL: See CLAUDE.md hard constraint #5.
+/// SECURITY-CRITICAL: See AGENTS.md Hard Constraint 5 (memory zeroing).
 extension Data {
     /// Overwrite all bytes with zeros.
     /// Call this on any `Data` containing key material, passphrases, or plaintext

@@ -10,7 +10,7 @@ import Foundation
 /// place keeps every codec's unsupported-field rejection byte-for-byte identical.
 ///
 /// SECURITY-CRITICAL: participates in strict envelope decoding (rejecting
-/// unknown/missing fields before a payload is trusted). See SECURITY.md Section 10.
+/// unknown/missing fields before a payload is trusted).
 enum EnvelopePlistInspector {
     /// Returns the top-level dictionary keys of a binary property-list payload, or
     /// `nil` when the payload is not a `[String: Any]` dictionary. Throws only when

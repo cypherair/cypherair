@@ -85,7 +85,7 @@ final class SelfTestService {
             // Need key data for subsequent tests
             guard genResult.passed, var generated = genResult.value else { continue }
             defer {
-                // Best-effort zeroing of self-test key material per CLAUDE.md #5.
+                // Best-effort zeroing of self-test key material.
                 generated.zeroizeSensitiveMaterial()
             }
 

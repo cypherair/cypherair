@@ -254,6 +254,10 @@ enum TestHelpers {
     ) async -> ServiceStack {
         let (keyMgmt, mockSE, mockKC, _, metadataPersistence) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
         let (contactSvc, tempDir) = await makeContactService(engine: engine)
+        // Rooted in the per-stack directory so operation artifacts stay isolated
+        // from other test processes sharing the user temp directory, and die with
+        // the stack in `cleanup()`.
+        let temporaryArtifactStore = AppTemporaryArtifactStore(temporaryDirectory: tempDir)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let textEncryptor = makeTextEncryptor(
@@ -282,7 +286,8 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             contactService: contactSvc,
             textEncryptor: textEncryptor,
-            fileEncryptor: fileEncryptor
+            fileEncryptor: fileEncryptor,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         let messageDecryptor = makeMessageDecryptor(
             engine: engine,
@@ -299,7 +304,8 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             contactService: contactSvc,
             messageDecryptor: messageDecryptor,
-            fileDecryptor: fileDecryptor
+            fileDecryptor: fileDecryptor,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         let cleartextSigner = makeCleartextSigner(
             engine: engine,

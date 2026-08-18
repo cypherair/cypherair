@@ -15,7 +15,7 @@
 //!   sq certificate;
 //! - mixed-recipient sets exercise the SEIPDv1 floor (hard constraint #8).
 //!
-//! Format-selection nuance (CLAUDE.md hard constraint 8; docs/TESTING.md §5):
+//! Format-selection nuance (AGENTS.md hard constraint 8; docs/TESTING.md §5):
 //! selection is negotiated from the
 //! recipient certificates' Features subpackets. sq advertises `SEIPDv1,
 //! SEIPDv2` even on its default v4 profile, so every sq suite — including
