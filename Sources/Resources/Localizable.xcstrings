@@ -385,22 +385,6 @@
         }
       }
     },
-    "backup.confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirm Passphrase"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确认密码短语"
-          }
-        }
-      }
-    },
     "backup.deviceBound.unavailable.description" : {
       "localizations" : {
         "en" : {
@@ -465,34 +449,18 @@
         }
       }
     },
-    "backup.mismatch" : {
+    "backup.passphrase.stake" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Passphrases do not match."
+            "value" : "The passphrase is the whole of the backup's protection. Anyone who copies the file can keep guessing at it offline, for as long as they like."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "密码短语不匹配。"
-          }
-        }
-      }
-    },
-    "backup.passphrase" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Passphrase"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密码短语"
+            "value" : "这句密码短语就是备份文件的全部保护。任何人只要拷走文件，就能离线地、不限时长地一直猜下去。"
           }
         }
       }
@@ -11601,6 +11569,182 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跳过教程并进入应用"
+          }
+        }
+      }
+    },
+    "passphrase.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm Passphrase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认密码短语"
+          }
+        }
+      }
+    },
+    "passphrase.field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passphrase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码短语"
+          }
+        }
+      }
+    },
+    "passphrase.generate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate a Strong Passphrase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成强密码短语"
+          }
+        }
+      }
+    },
+    "passphrase.generated.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write it down and keep it somewhere safe. It is stored nowhere, and no one can recover it for you."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请抄写下来并妥善保管。它不会被保存在任何地方，任何人都无法帮你找回。"
+          }
+        }
+      }
+    },
+    "passphrase.hide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide Passphrase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏密码短语"
+          }
+        }
+      }
+    },
+    "passphrase.mismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passphrases do not match."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两次输入的密码短语不一致。"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.length" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At least %lld characters"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少 %lld 个字符"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.met" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已满足"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.noRepeatedRun" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No character repeated %lld or more times in a row"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一字符不连续重复 %lld 次或以上"
+          }
+        }
+      }
+    },
+    "passphrase.requirement.unmet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not met yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未满足"
+          }
+        }
+      }
+    },
+    "passphrase.show" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Passphrase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示密码短语"
           }
         }
       }

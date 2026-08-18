@@ -55,11 +55,15 @@ final class BackupKeyScreenModel {
     }
 
     var exportButtonDisabled: Bool {
-        passphrase.isEmpty || passphrase != passphraseConfirm || isExporting
+        !passphraseProtectsExport || isExporting
     }
 
-    var passphrasesMismatch: Bool {
-        !passphrase.isEmpty && passphrase != passphraseConfirm
+    /// Private-key material leaves the app only under a passphrase that meets
+    /// the app's requirements, typed identically twice. One that does not is
+    /// refused here rather than at the button, because the button is
+    /// presentation and this is the rule.
+    private var passphraseProtectsExport: Bool {
+        passphrase == passphraseConfirm && PassphraseRequirements(of: passphrase).isSatisfied
     }
 
     var exportedString: String? {
@@ -74,6 +78,10 @@ final class BackupKeyScreenModel {
     }
 
     func exportBackup() {
+        guard passphraseProtectsExport else {
+            return
+        }
+
         exportTask?.cancel()
         exportToken &+= 1
         let token = exportToken
