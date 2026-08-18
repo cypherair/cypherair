@@ -4,7 +4,7 @@
 
 ## 1. What CypherAir X is
 
-CypherAir X is a fully offline OpenPGP encryption tool for people who want to communicate securely without cryptographic knowledge — encrypt, decrypt, sign, and verify with keys and contacts managed on device. It never touches the network (AGENTS.md Hard Constraint 1) and asks for no permissions beyond the Face ID / Touch ID usage description; the additional iOS entitlements (`increased-memory-limit`, `extended-virtual-addressing`) are resource entitlements for Argon2id memory headroom, not privacy permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.
+CypherAir X is a fully offline OpenPGP encryption tool for people who want to communicate securely without cryptographic knowledge — encrypt, decrypt, sign, and verify with keys and contacts managed on device. It never touches the network and asks for no permissions beyond the Face ID / Touch ID usage description; the additional iOS entitlements (`increased-memory-limit`, `extended-virtual-addressing`) are resource entitlements for Argon2id memory headroom, not privacy permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.
 
 The product name is **CypherAir X**; copyright lines keep "CypherAir".
 
@@ -41,7 +41,7 @@ Actions that never proceed without an explicit user step:
 
 Choices, not mechanisms — each could plausibly be built the other way and deliberately is not:
 
-- **Message format is never a manual choice.** The engine selects it from what the recipient certificates advertise: AEAD only when every certificate the message is encrypted to advertises SEIPDv2 (AGENTS.md Hard Constraint 8). For every key CypherAir generates that tracks the key version exactly; an imported certificate may advertise otherwise, and the advertised capability is what decides.
+- **Message format is never a manual choice.** The engine selects it from what the recipient certificates advertise: AEAD only when every certificate the message is encrypted to advertises SEIPDv2. For every key CypherAir generates that tracks the key version exactly; an imported certificate may advertise otherwise, and the advertised capability is what decides.
 - **Format downgrade is surfaced before encryption** — as a warning on the recipient chooser — never as a post-hoc error. The warning comes from the engine's decision for the recipients actually addressed, so it cannot describe a different message than the one that gets sent.
 - **A message not addressed to you never triggers an authentication prompt.** Decrypt Phase 1 matches recipients against public certificates only and fails without touching any private key ([SECURITY.md](SECURITY.md) §3).
 - **Signing is on by default, and the default is a setting.** Settings › Encryption holds what new messages start with — signing and the self copy alike; the per-message toggles decide the message being written. Signing attaches attribution, so it is stated in both places rather than assumed.
@@ -54,7 +54,7 @@ Choices, not mechanisms — each could plausibly be built the other way and deli
 - **No pop-up reports a success.** Setting aside the informing notice above, an alert asks a question or reports a failure, and nothing the user succeeded at has to be dismissed: a completed local-data reset restarts into a fresh app rather than announcing itself, and a finished encrypt, decrypt, sign or verify settles its result into place rather than snapping in.
 - **Self-test report data is export-only and never persisted.**
 - **Fingerprints are read segment-by-segment by VoiceOver** — a fingerprint is only useful if it can be verified, including aurally.
-- **Error copy is owned by the String Catalog**; the app-owned error taxonomy is `CypherAirError`. The meaning contract that survives any copy edit: authentication failure during decryption aborts with no partial plaintext (AGENTS.md Hard Constraint 3).
+- **Error copy is owned by the String Catalog**; the app-owned error taxonomy is `CypherAirError`. The meaning contract that survives any copy edit: authentication failure during decryption aborts with no partial plaintext.
 
 ## 6. Compatibility promises (tool families, not version pins)
 

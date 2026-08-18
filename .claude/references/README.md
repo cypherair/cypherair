@@ -1,8 +1,8 @@
 # Agent-model prompting references
 
 Verbatim snapshots of the vendor prompting guides for the agent models this
-repository targets (CLAUDE.md for Claude sessions, AGENTS.md for Codex). They
-are reference material for maintaining the entry docs and skills — not project
+repository targets (CLAUDE.md for Claude sessions). They are reference
+material for maintaining the entry docs and skills — not project
 documentation (docs/ classes do not apply) and not build inputs.
 
 | File | Source | Fetched |
