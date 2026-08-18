@@ -30,7 +30,7 @@ The mechanism rests on an API in tension with itself: the shipped SDK header des
 - **Outgoing messages are never compressed.** `deflate` is read-only for compatibility; bzip2 is excluded (a second C dependency).
 - **Any post-quantum recipient enforces an AES-256 floor**, inside both SEIPDv1 and SEIPDv2 containers.
 - **The quantum-safety badge derives from the produced artifact** — the session-key (PKESK) algorithms of the message — never from the live recipient selection. Classification fails closed on a truncated prefix; callers map the failure to *no badge*, never a misleading one.
-- Message-format selection is AGENTS.md Hard Constraint 8; AEAD hard-fail with no partial plaintext is Hard Constraint 3.
+- **Message-format selection follows advertised recipient capability** ([PRODUCT.md](PRODUCT.md) §5), and an AEAD authentication failure during decryption aborts with no partial plaintext.
 
 ## 3. Key Custody & Storage
 
@@ -118,7 +118,7 @@ Enablement is the Enhanced Security capability (`ENABLE_ENHANCED_SECURITY = YES`
 
 ### Memory Resource Entitlements
 
-`CypherAir.entitlements` (iOS/iPadOS/visionOS) additionally carries `com.apple.developer.kernel.increased-memory-limit` and `com.apple.developer.kernel.extended-virtual-addressing`. They are a **separate axis from MIE** and neither is a hardening key: removing them weakens no defense, and removing the `hardened-process*` keys is what AGENTS.md Hard Constraint 7 forbids.
+`CypherAir.entitlements` (iOS/iPadOS/visionOS) additionally carries `com.apple.developer.kernel.increased-memory-limit` and `com.apple.developer.kernel.extended-virtual-addressing`. They are a **separate axis from MIE** and neither is a hardening key: removing them weakens no defense, while the `hardened-process*` keys above are the MIE surface and must never be removed.
 
 They exist for one reason — §7's Argon2id derivation needs 2 GiB, and that does not fit under the default app memory limit. macOS applies no such limit and `CypherAirMacOS.entitlements` carries neither key.
 
