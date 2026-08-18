@@ -24,6 +24,14 @@ struct AppLaunchConfiguration {
         isUITestMode || isXCTestHost
     }
 
+    /// The UI-test container boots with the app session already authenticated
+    /// and the lock armed: either nothing asked for a manual unlock, or the
+    /// manual-auth variant asked to start unlocked so a UI test can drive a
+    /// real lock transition without a human biometric at launch.
+    var bootsPreAuthenticated: Bool {
+        usesUITestAppContainer && (!requiresManualAuthentication || manualAuthStartsUnlocked)
+    }
+
     init(
         processInfo: ProcessInfo = .processInfo,
         allowsUITestLaunchOverrides: Bool = Self.defaultAllowsUITestLaunchOverrides

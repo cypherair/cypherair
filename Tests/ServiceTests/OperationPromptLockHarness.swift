@@ -54,7 +54,6 @@ final class OperationPromptLockHarness {
             relockProtectedData: { state.relock() },
             postAuthenticationHandler: { _ in },
             contentClearHandler: { state.contentClear() },
-            shouldBypassAuthentication: { false },
             operationPromptInProgressProvider: { [weak coordinator] in
                 coordinator?.isOperationPromptInProgress ?? false
             }

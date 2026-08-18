@@ -11,7 +11,6 @@ final class AppLockControllerTests: XCTestCase {
     final class Spy {
         var gracePeriod: Int? = 0
         var lastAuthenticationDate: Date?
-        var bypass = false
 
         /// Outcome the auth stub returns (once unpaused).
         var authOutcome: Result<AppSessionAuthenticationResult, Error> = .success(.authenticated(context: nil))
@@ -162,7 +161,6 @@ final class AppLockControllerTests: XCTestCase {
             relockProtectedData: { await spy.relock() },
             postAuthenticationHandler: { await spy.postAuth($0) },
             contentClearHandler: { spy.contentClear() },
-            shouldBypassAuthentication: { spy.bypass },
             operationPromptInProgressProvider: operationPromptInProgressProvider,
             waitForAwayRelockDeadline: { try await awayDeadline.wait($0) }
         )
@@ -323,18 +321,6 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .locked)
         await controller.handleForegroundActive()
         XCTAssertEqual(spy.evaluateCount, 2)
-    }
-
-    // MARK: - Bypass
-
-    func test_bypass_goesStraightToUnlocked_withoutAuth() async {
-        let spy = Spy()
-        spy.bypass = true
-        let controller = makeController(spy: spy)
-        await controller.handleForegroundActive()
-        XCTAssertEqual(controller.lockState, .unlocked)
-        XCTAssertEqual(spy.evaluateCount, 0)
-        XCTAssertEqual(spy.relockCount, 0)
     }
 
     // MARK: - Foreground-active gate (R2: lock-surface auto-invoke while backgrounded)
@@ -739,24 +725,6 @@ final class AppLockControllerTests: XCTestCase {
         await controller.handleForegroundActive()
 
         XCTAssertEqual(spy.evaluateCount, evaluationsBeforeReturn + 1, "The return authenticates.")
-        XCTAssertEqual(controller.lockState, .unlocked)
-    }
-
-    /// UI-test bypass never locks the app, so nothing may be armed to lock it.
-    func test_awayDeadline_bypassMode_neverArms() async {
-        let spy = Spy()
-        spy.gracePeriod = 60
-        spy.bypass = true
-        let deadline = AwayDeadlineClock()
-        let controller = makeController(spy: spy, awayDeadline: deadline)
-        await controller.handleForegroundActive()
-        XCTAssertEqual(controller.lockState, .unlocked)
-
-        controller.noteForegroundActive(false)
-        controller.handleAwayEvent()
-        await settle()
-
-        XCTAssertEqual(deadline.armCount, 0)
         XCTAssertEqual(controller.lockState, .unlocked)
     }
     #endif

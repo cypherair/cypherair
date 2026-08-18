@@ -1,6 +1,7 @@
 import Foundation
 
-/// App-owned private-operation and material-operation vocabulary.
+/// App-owned key-operation vocabulary: key generation plus the private-key
+/// operation classes custody routing dispatches on.
 enum PGPKeyOperationKind: String, CaseIterable, Codable, Hashable, Sendable {
     case generate
     case sign
@@ -8,6 +9,4 @@ enum PGPKeyOperationKind: String, CaseIterable, Codable, Hashable, Sendable {
     case certify
     case revoke
     case modifyExpiry
-    case exportPublicMaterial
-    case exportRevocationArtifact
 }

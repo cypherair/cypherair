@@ -16,16 +16,6 @@ struct PGPKeyCapabilityResolver: Sendable {
         )
     }
 
-    struct MetadataAvailability: Equatable, Sendable {
-        var hasPublicMaterial: Bool
-        var hasRevocationArtifact: Bool
-
-        static let present = MetadataAvailability(
-            hasPublicMaterial: true,
-            hasRevocationArtifact: true
-        )
-    }
-
     private let policy: Policy
 
     init(policy: Policy = .production) {
@@ -45,14 +35,12 @@ struct PGPKeyCapabilityResolver: Sendable {
     func support(
         for operation: PGPKeyOperationKind,
         family: PGPKeyFamily,
-        custody: PGPPrivateKeyCustodyKind,
-        metadataAvailability: MetadataAvailability = .present
+        custody: PGPPrivateKeyCustodyKind
     ) -> PGPKeyOperationSupport {
         resolution(
             for: operation,
             family: family,
-            custody: custody,
-            metadataAvailability: metadataAvailability
+            custody: custody
         ).support
     }
 
@@ -63,19 +51,14 @@ struct PGPKeyCapabilityResolver: Sendable {
         resolution(
             for: operation,
             family: identity.keyFamily,
-            custody: identity.privateKeyCustodyKind,
-            metadataAvailability: MetadataAvailability(
-                hasPublicMaterial: !identity.publicKeyData.isEmpty,
-                hasRevocationArtifact: !identity.revocationCert.isEmpty
-            )
+            custody: identity.privateKeyCustodyKind
         )
     }
 
     func resolution(
         for operation: PGPKeyOperationKind,
         family: PGPKeyFamily,
-        custody: PGPPrivateKeyCustodyKind,
-        metadataAvailability: MetadataAvailability = .present
+        custody: PGPPrivateKeyCustodyKind
     ) -> PGPKeyOperationResolution {
         guard isValidFamilyCustodyPair(
             family: family,
@@ -88,10 +71,7 @@ struct PGPKeyCapabilityResolver: Sendable {
         case .softwareSecretCertificate:
             return .supported
         case .appleSecureEnclavePrivateOperations:
-            return resolutionForSecureEnclaveCustody(
-                operation: operation,
-                metadataAvailability: metadataAvailability
-            )
+            return resolutionForSecureEnclaveCustody(operation: operation)
         }
     }
 
@@ -115,8 +95,7 @@ struct PGPKeyCapabilityResolver: Sendable {
     }
 
     private func resolutionForSecureEnclaveCustody(
-        operation: PGPKeyOperationKind,
-        metadataAvailability: MetadataAvailability
+        operation: PGPKeyOperationKind
     ) -> PGPKeyOperationResolution {
         switch operation {
         case .generate:
@@ -128,14 +107,6 @@ struct PGPKeyCapabilityResolver: Sendable {
             return resolutionForPolicySupport(policy.secureEnclaveSigningOperationSupport)
         case .decrypt:
             return resolutionForPolicySupport(policy.secureEnclaveKeyAgreementOperationSupport)
-        case .exportPublicMaterial:
-            return metadataAvailability.hasPublicMaterial
-                ? .supported
-                : .unavailable(.publicMaterialUnavailable)
-        case .exportRevocationArtifact:
-            return metadataAvailability.hasRevocationArtifact
-                ? .supported
-                : .unavailable(.revocationArtifactUnavailable)
         }
     }
 

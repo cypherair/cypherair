@@ -26,7 +26,7 @@ The mechanism rests on an API in tension with itself: the shipped SDK header des
 
 ## 2. Format & Interop Security Rules
 
-- **Read-support contract:** the app reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. The legacy Symmetrically Encrypted Data packet (tag 9, no MDC) is hard-rejected on decrypt.
+- **Read-support contract:** the app reads v4 keys, v6 keys, SEIPDv1, and SEIPDv2 (OCB/GCM), and on the key-import path both Iterated+Salted S2K and Argon2id S2K. The legacy Symmetrically Encrypted Data packet (tag 9, no MDC) is hard-rejected on decrypt.
 - **Outgoing messages are never compressed.** `deflate` is read-only for compatibility; bzip2 is excluded (a second C dependency).
 - **Any post-quantum recipient enforces an AES-256 floor**, inside both SEIPDv1 and SEIPDv2 containers.
 - **The quantum-safety badge derives from the produced artifact** — the session-key (PKESK) algorithms of the message — never from the live recipient selection. Classification fails closed on a truncated prefix; callers map the failure to *no badge*, never a misleading one.
@@ -96,7 +96,9 @@ The guided tutorial may run real app services and real OpenPGP operations only i
 
 ## 7. Argon2id
 
-Argon2id S2K runs on exactly three paths: **private-key export**, **passphrase-protected private-key import** (both for the v6 portable families), and **reading a password-encrypted (SKESK) message whose sender chose Argon2** — §2 read support, where the parameters are the sender's and are bounded before the KDF runs. It never runs for routine decrypt/sign with your own key, and never for Portable Legacy, which uses Iterated+Salted (mode 3) in both directions.
+Argon2id S2K runs on exactly two shipped paths: **private-key export** and **passphrase-protected private-key import**, both for the v6 portable families. It never runs for routine decrypt/sign with your own key, and never for Portable Legacy, which uses Iterated+Salted (mode 3) in both directions.
+
+The engine can also derive under a foreign message's Argon2 parameters when opening a password-encrypted (SKESK) message, where the parameters are the sender's and are bounded before the KDF runs. That is engine capability, not a shipped surface: no app flow reaches it, and the app has made no commitment to one ([PRODUCT.md](PRODUCT.md) §2).
 
 The parameters we emit are RFC 9106's primary recommendation at 2 GiB; a foreign message's parameters are its own. The cost the memory guard checks is the cost the KDF runs under.
 
@@ -120,6 +122,6 @@ They exist for one reason — §7's Argon2id derivation needs 2 GiB, and that do
 
 ## 9. Known Limitations
 
-- **Passphrase `String` cannot be reliably zeroized.** The secure text field binds to `String` and the FFI copies it, so the Swift-side copy's lifetime is up to ARC — an accepted platform-wide limitation. Scope: import/export passphrases and SKESK flows only. Password-message flows move the buffer by value into Rust, where it is encrypted in memory; key export/import leaves a Rust-side copy that is dropped **without zeroization** — an open gap, not a mitigated one (**roadmap:** the decided byte-passphrase FFI change closes it). The passphrase lives only for the duration of the call and is never persisted.
+- **Passphrase `String` cannot be reliably zeroized.** The secure text field binds to `String` and the FFI copies it, so the Swift-side copy's lifetime is up to ARC — an accepted platform-wide limitation. Scope: the import and export passphrases, which are the only passphrases any shipped flow collects. Key export/import leaves a Rust-side copy that is dropped **without zeroization** — an open gap, not a mitigated one (**roadmap:** the decided byte-passphrase FFI change closes it). The passphrase lives only for the duration of the call and is never persisted.
 - **FFI transit copies.** Every buffer crossing the UniFFI boundary is serialized into a transit copy that the FFI layer frees without zeroization. Both endpoints zeroize the copies they own (the SE-unwrapped key material, the P-256 and ML-KEM shared-secret shares); the transit copy's brief lifetime in freed heap memory is an accepted residual.
 - ASLR, the app sandbox, and MIE (§8) raise the bar for exploiting both residuals; they do not close them.

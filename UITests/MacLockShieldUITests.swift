@@ -8,9 +8,10 @@ import XCTest
 ///
 /// Mechanics: the app launches the manual-auth UI-test container
 /// pre-authenticated (`UITEST_MANUAL_AUTH_STARTS_UNLOCKED`), so it boots
-/// unlocked with the lock genuinely armed (auth bypass OFF — a bypass
-/// container can never hold a locked state, because the lock surface's
-/// auto-auth immediately unlocks it). Each test then confirms the app is
+/// unlocked with the lock genuinely armed: the launch seam settles the session
+/// as already authenticated and nothing else is stubbed, so a later lock is a
+/// real lock and unlocking it needs a real authentication. Each test then
+/// confirms the app is
 /// genuinely ACTIVE (frontmost) before opening its presentation and locking —
 /// active-app-then-lock is the canonical #697 reproduction, and only an
 /// active app elevates the shield above sheet level, which is what makes the
