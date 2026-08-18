@@ -1,10 +1,6 @@
 import XCTest
 @testable import CypherAir
 
-private enum SelfTestReportExportTestError: Error {
-    case failed
-}
-
 /// Tests for SelfTestService — the one-tap diagnostic.
 /// SelfTestService uses real PGP adapters (no mocks needed).
 final class SelfTestServiceTests: XCTestCase {
@@ -84,10 +80,10 @@ final class SelfTestServiceTests: XCTestCase {
 
         let report = try XCTUnwrap(selfTestService.latestReport)
         XCTAssertTrue(
-            report.suggestedFilename.hasPrefix("CypherAir-X-SelfTest-Report-"),
-            "Report should have a suggested export filename"
+            report.exportFilename.value.hasPrefix("CypherAir-X-SelfTest-Report-"),
+            "Report should carry the name saving it offers"
         )
-        XCTAssertEqual((report.suggestedFilename as NSString).pathExtension, "txt")
+        XCTAssertEqual((report.exportFilename.value as NSString).pathExtension, "txt")
 
         let reportString = String(data: report.data, encoding: .utf8)
         XCTAssertNotNil(reportString, "Report should be UTF-8 text in memory")
@@ -101,43 +97,4 @@ final class SelfTestServiceTests: XCTestCase {
         )
     }
 
-    func test_selfTest_reportExportCompletion_successClearsServiceReport() async throws {
-        await selfTestService.runAllTests()
-        var presentedReport: SelfTestService.SelfTestReport? = try XCTUnwrap(selfTestService.latestReport)
-
-        let exportURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAir-X-SelfTest-Report-\(UUID().uuidString).txt")
-
-        SelfTestReportExportCompletion.finish(
-            .success(exportURL),
-            clearLatestReport: {
-                self.selfTestService.clearLatestReport()
-            },
-            clearPresentedReport: {
-                presentedReport = nil
-            }
-        )
-
-        XCTAssertNil(selfTestService.latestReport)
-        XCTAssertNil(presentedReport)
-    }
-
-    func test_selfTest_reportExportCompletion_failurePreservesServiceReportForRetry() async throws {
-        await selfTestService.runAllTests()
-        let latestReport = try XCTUnwrap(selfTestService.latestReport)
-        var presentedReport: SelfTestService.SelfTestReport? = latestReport
-
-        SelfTestReportExportCompletion.finish(
-            .failure(SelfTestReportExportTestError.failed),
-            clearLatestReport: {
-                self.selfTestService.clearLatestReport()
-            },
-            clearPresentedReport: {
-                presentedReport = nil
-            }
-        )
-
-        XCTAssertEqual(selfTestService.latestReport, latestReport)
-        XCTAssertNil(presentedReport)
-    }
 }

@@ -159,16 +159,14 @@ final class KeyDetailScreenModel {
             return
         }
 
+        let filename = exportFilename(for: .publicKey)
         do {
             if try configuration.outputInterceptionPolicy.interceptDataExport?(
                 armoredPublicKey,
-                exportFilename(for: .publicKey),
+                filename,
                 .publicKey
             ) != true {
-                try exportController.prepareDataExport(
-                    armoredPublicKey,
-                    suggestedFilename: exportFilename(for: .publicKey)
-                )
+                try exportController.prepareDataExport(armoredPublicKey, filename: filename)
             }
         } catch {
             presentMappedError(error)
@@ -218,15 +216,13 @@ final class KeyDetailScreenModel {
                 guard generation == self.revocationExportGeneration else {
                     return
                 }
+                let filename = self.exportFilename(for: .revocation)
                 if try self.configuration.outputInterceptionPolicy.interceptDataExport?(
                     exported,
-                    self.exportFilename(for: .revocation),
+                    filename,
                     .revocation
                 ) != true {
-                    try self.exportController.prepareDataExport(
-                        exported,
-                        suggestedFilename: self.exportFilename(for: .revocation)
-                    )
+                    try self.exportController.prepareDataExport(exported, filename: filename)
                 }
             } catch {
                 guard !Self.shouldIgnore(error),
@@ -278,10 +274,6 @@ final class KeyDetailScreenModel {
         showCopiedNotice = false
     }
 
-    func finishExport() {
-        exportController.finish()
-    }
-
     func handleExportError(_ error: Error) {
         presentMappedError(error)
     }
@@ -328,12 +320,13 @@ final class KeyDetailScreenModel {
         return false
     }
 
-    private func exportFilename(for exportType: ExportType) -> String {
+    private func exportFilename(for exportType: ExportType) -> ExportFilename {
+        let shortKeyId = key?.shortKeyId ?? "key"
         switch exportType {
         case .publicKey:
-            "\(key?.shortKeyId ?? "key").asc"
+            return ExportFilename("\(shortKeyId).asc")
         case .revocation:
-            "revocation-\(key?.shortKeyId ?? "key").asc"
+            return ExportFilename("revocation-\(shortKeyId).asc")
         }
     }
 

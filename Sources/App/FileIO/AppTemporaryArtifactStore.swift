@@ -18,6 +18,12 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     private static let streamingRootName = "streaming"
     private static let operationRootNames = [decryptedRootName, streamingRootName]
 
+    /// Every operation artifact is written under this name inside its own
+    /// `op-<UUID>` directory. No temporary path carries anything derived from
+    /// what the user chose or produced — the name a save is offered under lives
+    /// in the artifact value, in memory, and never on disk.
+    private static let operationOutputName = "output"
+
     private let fileManager: FileManager
     private let temporaryDirectory: URL
     private let preferencesDirectory: URL
@@ -47,17 +53,16 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     }
 
     func makeStreamingArtifact(for inputURL: URL) throws -> AppTemporaryArtifact {
-        let outputFilename = sanitizedFilename(inputURL.lastPathComponent, fallback: "file") + ".gpg"
-        return try makeOperationArtifact(
+        try makeOperationArtifact(
             rootName: Self.streamingRootName,
-            outputFilename: outputFilename
+            exportFilename: ExportFilename(base: inputURL.lastPathComponent, pathExtension: "gpg")
         )
     }
 
     func makeDecryptedArtifact(for inputFilename: String) throws -> AppTemporaryArtifact {
         try makeOperationArtifact(
             rootName: Self.decryptedRootName,
-            outputFilename: Self.decryptedOutputFilename(for: inputFilename)
+            exportFilename: Self.decryptedExportFilename(for: inputFilename)
         )
     }
 
@@ -71,10 +76,12 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         return directory
     }
 
-    func writeProtectedExportData(_ data: Data, suggestedFilename: String) throws -> URL {
-        let sanitizedFilename = sanitizedFilename(suggestedFilename, fallback: "export.data")
+    /// Stage data for a save under a name that describes nothing about it. The
+    /// prefix is what the launch sweep matches on; the UUID is the whole rest of
+    /// the name.
+    func writeProtectedExportData(_ data: Data) throws -> URL {
         let temporaryURL = temporaryDirectory
-            .appendingPathComponent("export-\(UUID().uuidString)-\(sanitizedFilename)")
+            .appendingPathComponent("export-\(UUID().uuidString)")
         var shouldCleanup = true
         defer {
             if shouldCleanup {
@@ -192,26 +199,32 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         return suiteNames
     }
 
-    static func decryptedOutputFilename(for inputFilename: String) -> String {
-        let sanitizedInputFilename = sanitizedFilename(inputFilename, fallback: "file")
-        let ext = (sanitizedInputFilename as NSString).pathExtension.lowercased()
-        if ["gpg", "pgp", "asc"].contains(ext) {
-            let stripped = (sanitizedInputFilename as NSString).deletingPathExtension
-            return stripped.isEmpty ? "file" : stripped
+    /// Decryption undoes the extension encryption added — `report.pdf.gpg`
+    /// becomes `report.pdf` again. A ciphertext that carries no OpenPGP
+    /// extension has no original name to recover, so the plaintext takes a
+    /// suffix rather than the ciphertext's own name, which would propose
+    /// overwriting the file being decrypted.
+    private static func decryptedExportFilename(for inputFilename: String) -> ExportFilename {
+        let component = (inputFilename as NSString).lastPathComponent
+        let pathExtension = (component as NSString).pathExtension.lowercased()
+        guard ["gpg", "pgp", "asc"].contains(pathExtension) else {
+            return ExportFilename(base: component, pathExtension: "decrypted")
         }
-        return sanitizedInputFilename + ".decrypted"
+        return ExportFilename((component as NSString).deletingPathExtension)
     }
 
-    private func makeOperationArtifact(rootName: String, outputFilename: String) throws -> AppTemporaryArtifact {
+    private func makeOperationArtifact(
+        rootName: String,
+        exportFilename: ExportFilename
+    ) throws -> AppTemporaryArtifact {
         let rootDirectory = temporaryDirectory.appendingPathComponent(rootName, isDirectory: true)
         let ownerDirectory = rootDirectory.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true)
         try createProtectedDirectory(at: rootDirectory)
         try createProtectedDirectory(at: ownerDirectory)
         markLive(ownerDirectory)
         return AppTemporaryArtifact(
-            fileURL: ownerDirectory.appendingPathComponent(
-                sanitizedFilename(outputFilename, fallback: "file")
-            ),
+            fileURL: ownerDirectory.appendingPathComponent(Self.operationOutputName),
+            exportFilename: exportFilename,
             ownerDirectoryURL: ownerDirectory
         )
     }
@@ -309,15 +322,5 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         }
         let values = try probeURL.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
         return values.allValues[.volumeSupportsFileProtectionKey] as? Bool ?? false
-    }
-
-    private func sanitizedFilename(_ filename: String, fallback: String) -> String {
-        Self.sanitizedFilename(filename, fallback: fallback)
-    }
-
-    private static func sanitizedFilename(_ filename: String, fallback: String) -> String {
-        let lastPathComponent = (filename as NSString).lastPathComponent
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return lastPathComponent.isEmpty ? fallback : lastPathComponent
     }
 }

@@ -112,7 +112,11 @@ final class TemporaryArtifactEraserTests: XCTestCase {
         try plaintext.write(to: output)
         let witness = try makeWitness(for: output)
 
-        AppTemporaryArtifact(fileURL: output, ownerDirectoryURL: owned).cleanup()
+        AppTemporaryArtifact(
+            fileURL: output,
+            exportFilename: ExportFilename("decrypted"),
+            ownerDirectoryURL: owned
+        ).cleanup()
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: owned.path))
         await waitUntil("the scheduled zero pass to reach the artifact's bytes") {

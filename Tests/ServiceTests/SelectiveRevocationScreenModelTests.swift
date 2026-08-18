@@ -297,7 +297,7 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
         await waitUntil("subkey export to present file exporter") {
             model.activeExportOperation == nil && model.exportController.isPresented
         }
-        model.finishExport()
+        model.exportController.finish()
     }
 
     func test_presentedFileExporterDisablesBothExportActionsUntilDismissed() async {
@@ -319,7 +319,7 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
         XCTAssertFalse(model.canExportSubkey)
         XCTAssertFalse(model.canExportUserId)
 
-        model.finishExport()
+        model.exportController.finish()
 
         XCTAssertTrue(model.canExportSubkey)
         XCTAssertTrue(model.canExportUserId)
@@ -341,12 +341,11 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
             model.activeExportOperation == nil && model.exportController.isPresented
         }
 
-        XCTAssertNotNil(model.exportController.payload)
         XCTAssertEqual(
-            model.exportController.defaultFilename,
+            model.exportController.payload?.filename.value,
             "subkey-revocation-\(IdentityPresentation.shortKeyId(from: fingerprint))-\(IdentityPresentation.shortKeyId(from: subkey.fingerprint)).asc"
         )
-        model.finishExport()
+        model.exportController.finish()
     }
 
     func test_userIdExportSuccessPreparesPayloadWithExpectedFilename() async {
@@ -365,18 +364,17 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
             model.activeExportOperation == nil && model.exportController.isPresented
         }
 
-        XCTAssertNotNil(model.exportController.payload)
         XCTAssertEqual(
-            model.exportController.defaultFilename,
+            model.exportController.payload?.filename.value,
             "userid-revocation-\(IdentityPresentation.shortKeyId(from: fingerprint))-\(userId.occurrenceIndex + 1).asc"
         )
-        model.finishExport()
+        model.exportController.finish()
     }
 
     func test_outputInterceptionPreventsFileExporterPayloadForSubkeyExport() async {
         let catalog = makeCatalog()
         let subkey = catalog.subkeys[0]
-        var interceptedFilename: String?
+        var interceptedFilename: ExportFilename?
         var interceptedKind: OutputArtifactKind?
         var configuration = SelectiveRevocationView.Configuration()
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
@@ -405,7 +403,7 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
 
         XCTAssertEqual(interceptedKind, .revocation)
         XCTAssertEqual(
-            interceptedFilename,
+            interceptedFilename?.value,
             "subkey-revocation-\(IdentityPresentation.shortKeyId(from: fingerprint))-\(IdentityPresentation.shortKeyId(from: subkey.fingerprint)).asc"
         )
         XCTAssertFalse(model.exportController.isPresented)

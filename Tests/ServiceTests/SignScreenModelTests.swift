@@ -134,7 +134,7 @@ final class SignScreenModelTests: XCTestCase {
         _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
 
         var interceptedClipboard: String?
-        var interceptedExportFilename: String?
+        var interceptedExportFilename: ExportFilename?
         var configuration = SignView.Configuration()
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
             interceptClipboardCopy: { string, _, kind in
@@ -168,7 +168,7 @@ final class SignScreenModelTests: XCTestCase {
         XCTAssertFalse(model.operation.isShowingClipboardNotice)
 
         model.exportSignedMessage()
-        XCTAssertEqual(interceptedExportFilename, "signed.asc")
+        XCTAssertEqual(interceptedExportFilename?.value, "signed.asc")
         XCTAssertNil(model.exportController.payload)
     }
 
@@ -203,12 +203,11 @@ final class SignScreenModelTests: XCTestCase {
 
         model.exportDetachedSignature()
 
-        XCTAssertNotNil(model.exportController.payload)
         XCTAssertEqual(
-            model.exportController.defaultFilename,
+            model.exportController.payload?.filename.value,
             "\(fileURL.lastPathComponent).sig"
         )
-        model.finishExport()
+        model.exportController.finish()
     }
 
     @MainActor
@@ -278,7 +277,10 @@ final class SignScreenModelTests: XCTestCase {
         model.requestFileImport()
         XCTAssertFalse(model.showFileImporter)
 
-        model.detachedSignature = Data("signature".utf8)
+        model.detachedSignature = SignScreenModel.DetachedSignatureOutput(
+            data: Data("signature".utf8),
+            exportFilename: ExportFilename("blocked.txt.sig")
+        )
         model.selectedFileName = "blocked.txt"
         model.exportDetachedSignature()
 
@@ -326,7 +328,10 @@ final class SignScreenModelTests: XCTestCase {
         let model = makeModel()
         model.text = "Message to sign"
         model.signedMessage = "signed"
-        model.detachedSignature = Data("signature".utf8)
+        model.detachedSignature = SignScreenModel.DetachedSignatureOutput(
+            data: Data("signature".utf8),
+            exportFilename: ExportFilename("message.txt.sig")
+        )
         model.showFileImporter = true
         model.selectedFileURL = URL(fileURLWithPath: "/tmp/message.txt")
         model.selectedFileName = "message.txt"

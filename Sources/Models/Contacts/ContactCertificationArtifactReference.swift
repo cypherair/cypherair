@@ -110,19 +110,22 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
         return "\(keyId)|\(targetSelector.deduplicationKey)|\(digest)"
     }
 
-    var resolvedExportFilename: String {
+    /// The name saving this artifact offers: the one recorded when it was
+    /// produced, or one rebuilt from the artifact's own identity for the
+    /// imported artifacts that were never given one.
+    var resolvedExportFilename: ExportFilename {
         if let exportFilename, !exportFilename.isEmpty {
-            return exportFilename
+            return ExportFilename(exportFilename)
         }
         let shortKeyId = targetKeyFingerprint.map {
             IdentityPresentation.shortKeyId(from: $0)
         } ?? keyId
         switch targetSelector.kind {
         case .directKey:
-            return "direct-key-certification-\(shortKeyId).asc"
+            return ExportFilename("direct-key-certification-\(shortKeyId).asc")
         case .userId:
             let occurrence = (targetSelector.occurrenceIndex ?? 0) + 1
-            return "userid-certification-\(shortKeyId)-\(occurrence).asc"
+            return ExportFilename("userid-certification-\(shortKeyId)-\(occurrence).asc")
         }
     }
 

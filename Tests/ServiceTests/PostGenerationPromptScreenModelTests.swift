@@ -39,13 +39,12 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(exportedFingerprint, identity.fingerprint)
-        XCTAssertNotNil(model.exportController.payload)
         XCTAssertEqual(
-            model.exportController.defaultFilename,
+            model.exportController.payload?.filename.value,
             "revocation-\(identity.shortKeyId).asc"
         )
         XCTAssertFalse(model.showError)
-        model.finishExport()
+        model.exportController.finish()
     }
 
     func test_exportRevocationCertificate_failureSurfacesError() async {
@@ -84,7 +83,7 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
         }
 
         XCTAssertFalse(keyManagement.keys.contains { $0.isBackedUp })
-        model.finishExport()
+        model.exportController.finish()
     }
 
     func test_handleDisappear_suppressesLateExportPayload() async {

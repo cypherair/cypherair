@@ -399,7 +399,7 @@ final class ContactService: @unchecked Sendable {
 
     func exportCertificationArtifact(
         artifactId: String
-    ) throws -> (data: Data, filename: String) {
+    ) throws -> (data: Data, filename: ExportFilename) {
         try requireContactsAvailable()
         guard let snapshot = openContactsSnapshot,
               let artifact = snapshot.certificationArtifacts.first(where: { $0.artifactId == artifactId }) else {

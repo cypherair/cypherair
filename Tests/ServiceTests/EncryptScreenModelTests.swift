@@ -1405,7 +1405,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         var interceptedClipboard: String?
-        var interceptedExportFilename: String?
+        var interceptedExportFilename: ExportFilename?
         var callbackCiphertext: Data?
         var configuration = EncryptView.Configuration()
         configuration.initialRecipientContactIds = [recipientContactId]
@@ -1446,7 +1446,7 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertFalse(model.operation.isShowingClipboardNotice)
 
         model.exportCiphertext()
-        XCTAssertEqual(interceptedExportFilename, "encrypted.asc")
+        XCTAssertEqual(interceptedExportFilename?.value, "encrypted.asc")
         XCTAssertNil(model.exportController.payload)
     }
 
@@ -1517,7 +1517,7 @@ final class EncryptScreenModelTests: XCTestCase {
         }
 
         var interceptedURL: URL?
-        var interceptedFilename: String?
+        var interceptedFilename: ExportFilename?
         var configuration = EncryptView.Configuration()
         configuration.initialRecipientContactIds = [recipientContactId]
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
@@ -1531,7 +1531,15 @@ final class EncryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            fileEncryptionAction: { _ in TemporaryFileOutput(fileURL: outputURL) }
+            fileEncryptionAction: { request in
+                TemporaryFileOutput(
+                    fileURL: outputURL,
+                    exportFilename: ExportFilename(
+                        base: request.fileURL.lastPathComponent,
+                        pathExtension: "gpg"
+                    )
+                )
+            }
         )
         model.encryptMode = .file
         model.handleAppear()
@@ -1549,7 +1557,9 @@ final class EncryptScreenModelTests: XCTestCase {
         model.exportEncryptedFile()
 
         XCTAssertEqual(interceptedURL, outputURL)
-        XCTAssertEqual(interceptedFilename, "\(inputURL.lastPathComponent).gpg")
+        // Offered under the name encryption gave the artifact, not one the
+        // screen rebuilds from its own file selection.
+        XCTAssertEqual(interceptedFilename?.value, "\(inputURL.lastPathComponent).gpg")
         XCTAssertNil(model.exportController.payload)
     }
 
@@ -1585,7 +1595,10 @@ final class EncryptScreenModelTests: XCTestCase {
                 _ = capturedProgress?.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
-                return TemporaryFileOutput(fileURL: inputURL)
+                return TemporaryFileOutput(
+                    fileURL: inputURL,
+                    exportFilename: ExportFilename(base: inputURL.lastPathComponent, pathExtension: "gpg")
+                )
             }
         )
         model.encryptMode = .file
@@ -1646,7 +1659,10 @@ final class EncryptScreenModelTests: XCTestCase {
             operation: operation,
             fileEncryptionAction: { _ in
                 operation.cancel()
-                return TemporaryFileOutput(fileURL: outputURL)
+                return TemporaryFileOutput(
+                    fileURL: outputURL,
+                    exportFilename: ExportFilename(outputURL.lastPathComponent)
+                )
             }
         )
         model.encryptMode = .file
@@ -1710,13 +1726,36 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_configurationFlags_gateFileImportAndExports() {
+    func test_configurationFlags_gateFileImportAndExports() async throws {
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateLegacyKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
+
+        let inputURL = try makeTemporaryFile(named: "message.txt", contents: Data("plaintext".utf8))
+        let outputURL = try makeTemporaryFile(named: "message.txt.gpg", contents: Data("ciphertext".utf8))
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+
         var configuration = EncryptView.Configuration()
+        configuration.initialRecipientContactIds = [recipientContactId]
         configuration.allowsFileInput = false
         configuration.allowsResultExport = false
         configuration.allowsFileResultExport = false
 
-        let model = makeModel(configuration: configuration)
+        let model = makeModel(
+            configuration: configuration,
+            fileEncryptionAction: { _ in
+                TemporaryFileOutput(
+                    fileURL: outputURL,
+                    exportFilename: ExportFilename(outputURL.lastPathComponent)
+                )
+            }
+        )
 
         model.requestFileImport()
         XCTAssertFalse(model.showFileImporter)
@@ -1725,7 +1764,18 @@ final class EncryptScreenModelTests: XCTestCase {
         model.exportCiphertext()
         XCTAssertNil(model.exportController.payload)
 
-        model.encryptedFileURL = URL(fileURLWithPath: "/tmp/encrypted.gpg")
+        model.encryptMode = .file
+        model.handleAppear()
+        model.handleImportedFile(inputURL)
+        model.encryptFile()
+
+        await waitUntil("file encryption to finish") {
+            model.operation.isRunning == false
+        }
+
+        // A finished encryption is present, so the export is refused by the
+        // configuration flag rather than by having nothing to offer.
+        XCTAssertNotNil(model.encryptedFileURL)
         model.exportEncryptedFile()
         XCTAssertNil(model.exportController.payload)
     }

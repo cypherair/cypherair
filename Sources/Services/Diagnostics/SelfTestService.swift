@@ -28,7 +28,7 @@ final class SelfTestService {
     /// In-memory report prepared for explicit user export.
     struct SelfTestReport: Equatable {
         let data: Data
-        let suggestedFilename: String
+        let exportFilename: ExportFilename
     }
 
     /// Current state of the self-test run.
@@ -408,7 +408,9 @@ final class SelfTestService {
     private static func makeReport(results: [TestResult], date: Date = Date()) -> SelfTestReport {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let filename = "CypherAir-X-SelfTest-Report-\(dateFormatter.string(from: date)).txt"
+        let filename = ExportFilename(
+            "CypherAir-X-SelfTest-Report-\(dateFormatter.string(from: date)).txt"
+        )
 
         var report = String(localized: "selftest.report.title", defaultValue: "CypherAir X Self-Test Report") + "\n"
         let dateString = String(describing: date)
@@ -435,7 +437,7 @@ final class SelfTestService {
 
         return SelfTestReport(
             data: Data(report.utf8),
-            suggestedFilename: filename
+            exportFilename: filename
         )
     }
 

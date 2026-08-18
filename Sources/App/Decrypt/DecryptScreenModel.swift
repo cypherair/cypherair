@@ -429,15 +429,13 @@ final class DecryptScreenModel {
             return
         }
 
+        let filename = fileDecryptionResult.output.exportFilename
         if configuration.outputInterceptionPolicy.interceptFileExport?(
             decryptedFileURL,
-            decryptedFilename(),
+            filename,
             .generic
         ) != true {
-            exportController.prepareFileExport(
-                fileURL: decryptedFileURL,
-                suggestedFilename: decryptedFilename()
-            )
+            exportController.prepareFileExport(fileURL: decryptedFileURL, filename: filename)
         }
     }
 
@@ -482,22 +480,8 @@ final class DecryptScreenModel {
         operation.dismissError()
     }
 
-    func finishExport() {
-        exportController.finish()
-    }
-
     func handleExportError(_ error: Error) {
         operation.present(error: mapDecryptError(error))
-    }
-
-    private func decryptedFilename() -> String {
-        guard let name = selectedFileName else { return "decrypted" }
-        for ext in [".gpg", ".pgp", ".asc"] {
-            if name.hasSuffix(ext) {
-                return String(name.dropLast(ext.count))
-            }
-        }
-        return name
     }
 
     private func importCiphertextTextFile(from url: URL) {

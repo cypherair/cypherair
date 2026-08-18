@@ -75,7 +75,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
         let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var interceptedClipboard: String?
-        var interceptedExportFilename: String?
+        var interceptedExportFilename: ExportFilename?
         var configuration = KeyDetailView.Configuration()
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
             interceptClipboardCopy: { string, _, kind in
@@ -102,7 +102,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
             interceptedClipboard,
             String(data: try XCTUnwrap(model.armoredPublicKey), encoding: .utf8)
         )
-        XCTAssertEqual(interceptedExportFilename, "\(identity.shortKeyId).asc")
+        XCTAssertEqual(interceptedExportFilename?.value, "\(identity.shortKeyId).asc")
         XCTAssertFalse(model.showCopiedNotice)
         XCTAssertNil(model.exportController.payload)
     }
@@ -146,9 +146,11 @@ final class KeyDetailScreenModelTests: XCTestCase {
             model.isPreparingRevocationExport == false
         }
 
-        XCTAssertNotNil(model.exportController.payload)
-        XCTAssertEqual(model.exportController.defaultFilename, "revocation-\(identity.shortKeyId).asc")
-        model.finishExport()
+        XCTAssertEqual(
+            model.exportController.payload?.filename.value,
+            "revocation-\(identity.shortKeyId).asc"
+        )
+        model.exportController.finish()
     }
 
     @MainActor

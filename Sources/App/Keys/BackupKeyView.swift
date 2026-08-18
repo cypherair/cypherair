@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Passphrase-protected key export for backup.
 struct BackupKeyView: View {
@@ -140,7 +139,7 @@ private struct BackupKeyScreenHostView: View {
             } else if model.exportedData != nil {
                 Section {
                     Button {
-                        model.showFileExporter = true
+                        model.presentFileExporter()
                     } label: {
                         Label(
                             String(localized: "backup.share", defaultValue: "Save Backup File"),
@@ -174,12 +173,7 @@ private struct BackupKeyScreenHostView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
-        .fileExporter(
-            isPresented: $model.showFileExporter,
-            item: model.exportedData,
-            contentTypes: [.data],
-            defaultFilename: model.defaultFilename
-        ) { result in
+        .fileExport(model.exportController) { result in
             model.handleFileExporterResult(result)
         }
         .onDisappear {

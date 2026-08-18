@@ -38,7 +38,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [saved.artifactId])
         XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
-        XCTAssertEqual(export.filename, "artifact-save.asc")
+        XCTAssertEqual(export.filename.value, "artifact-save.asc")
 
         try await service.relockProtectedData()
         let reopened = await reopenProtectedContactService(

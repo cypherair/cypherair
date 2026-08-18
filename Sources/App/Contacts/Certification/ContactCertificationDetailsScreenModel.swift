@@ -55,7 +55,7 @@ final class ContactCertificationDetailsScreenModel {
         String?
     ) async throws -> ContactCertificationArtifactValidation
     typealias SaveArtifactAction = @MainActor (VerifiedContactCertificationArtifact) throws -> ContactCertificationArtifactReference
-    typealias ExportArtifactAction = @MainActor (String) throws -> (data: Data, filename: String)
+    typealias ExportArtifactAction = @MainActor (String) throws -> (data: Data, filename: ExportFilename)
     typealias SignatureFileImportAction = @MainActor (URL) throws -> (data: Data, text: String?)
 
     private static let certificationKinds: [OpenPGPCertificationKind] = [
@@ -469,7 +469,7 @@ final class ContactCertificationDetailsScreenModel {
                 targetCert,
                 selectedUserId,
                 .generated,
-                filename
+                filename.value
             )
             try checkActive()
             guard let artifact = validation.artifact else {
@@ -548,10 +548,6 @@ final class ContactCertificationDetailsScreenModel {
             try self.prepareExport(export.data, filename: export.filename)
             return (self.verification, self.pendingArtifact, self.lastSavedArtifact)
         }
-    }
-
-    func finishExport() {
-        exportController.finish()
     }
 
     func handleExportError(_ error: Error) {
@@ -781,13 +777,13 @@ final class ContactCertificationDetailsScreenModel {
         }
     }
 
-    private func prepareExport(_ data: Data, filename: String) throws {
+    private func prepareExport(_ data: Data, filename: ExportFilename) throws {
         if try configuration.outputInterceptionPolicy.interceptDataExport?(
             data,
             filename,
             .generic
         ) != true {
-            try exportController.prepareDataExport(data, suggestedFilename: filename)
+            try exportController.prepareDataExport(data, filename: filename)
         }
     }
 
@@ -795,8 +791,10 @@ final class ContactCertificationDetailsScreenModel {
         key: ContactKeySummary,
         signer: PGPKeyIdentity,
         userId: UserIdSelectionOption
-    ) -> String {
-        "userid-certification-\(key.shortKeyId)-\(userId.occurrenceIndex + 1)-by-\(signer.shortKeyId).asc"
+    ) -> ExportFilename {
+        ExportFilename(
+            "userid-certification-\(key.shortKeyId)-\(userId.occurrenceIndex + 1)-by-\(signer.shortKeyId).asc"
+        )
     }
 
     private func invalidatePreview() {

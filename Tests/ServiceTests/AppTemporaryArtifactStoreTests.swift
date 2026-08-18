@@ -17,10 +17,36 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
 
         XCTAssertNotEqual(first.fileURL, second.fileURL)
         XCTAssertNotEqual(first.ownerDirectoryURL, second.ownerDirectoryURL)
-        XCTAssertEqual(first.fileURL.lastPathComponent, "repeated-name.txt.gpg")
         XCTAssertTrue(first.fileURL.path.contains("/streaming/op-"))
+        // The name the user will be offered rides on the artifact; the path it
+        // is written to says nothing about the file it came from.
+        XCTAssertEqual(first.exportFilename.value, "repeated-name.txt.gpg")
+        XCTAssertFalse(first.fileURL.path.contains("repeated-name"))
         try assertCompleteFileProtection(at: try XCTUnwrap(first.ownerDirectoryURL))
         try assertCompleteFileProtection(at: try XCTUnwrap(second.ownerDirectoryURL))
+    }
+
+    /// Decryption gives back the name encryption took away; a ciphertext with no
+    /// OpenPGP extension has no original name to give back, so the plaintext is
+    /// offered under one that cannot overwrite the file being decrypted.
+    func test_appTemporaryArtifactStore_decryptedArtifactNamesTheRecoveredPlaintext() throws {
+        let store = CypherAir.AppTemporaryArtifactStore()
+
+        let cases = [
+            ("report.pdf.gpg", "report.pdf"),
+            ("notes.txt.asc", "notes.txt"),
+            ("archive.PGP", "archive"),
+            ("message", "message.decrypted"),
+            ("blob.bin", "blob.bin.decrypted")
+        ]
+
+        for (input, expected) in cases {
+            let artifact = try store.makeDecryptedArtifact(for: input)
+            defer { artifact.cleanup() }
+
+            XCTAssertEqual(artifact.exportFilename.value, expected)
+            XCTAssertFalse(artifact.fileURL.path.contains(expected))
+        }
     }
 
     /// The sweep no longer finishes before the session starts, so "present in
@@ -41,7 +67,7 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
         try Data("stale export".utf8).write(to: abandonedExport)
 
         let liveOperation = try XCTUnwrap(store.makeDecryptedArtifact(for: "message.gpg").ownerDirectoryURL)
-        let liveExport = try store.writeProtectedExportData(Data("live".utf8), suggestedFilename: "key.asc")
+        let liveExport = try store.writeProtectedExportData(Data("live".utf8))
         let liveTutorial = try store.makeTutorialSandboxDirectory()
 
         let result = store.sweepAbandonedArtifacts()
@@ -67,7 +93,7 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
         let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
 
         let liveOperation = try XCTUnwrap(store.makeDecryptedArtifact(for: "message.gpg").ownerDirectoryURL)
-        let liveExport = try store.writeProtectedExportData(Data("live".utf8), suggestedFilename: "key.asc")
+        let liveExport = try store.writeProtectedExportData(Data("live".utf8))
 
         let result = store.removeAllTemporaryArtifacts()
 

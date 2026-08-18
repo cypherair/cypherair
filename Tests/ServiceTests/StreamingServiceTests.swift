@@ -166,7 +166,8 @@ final class StreamingServiceTests: XCTestCase {
         }
 
         XCTAssertNotEqual(first.fileURL, second.fileURL)
-        XCTAssertEqual(first.fileURL.lastPathComponent, "same-name.txt.gpg")
+        XCTAssertEqual(first.exportFilename.value, "same-name.txt.gpg")
+        XCTAssertFalse(first.fileURL.path.contains("same-name"))
         XCTAssertTrue(first.fileURL.path.contains("/streaming/op-"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: first.fileURL.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: second.fileURL.path))
@@ -194,7 +195,7 @@ final class StreamingServiceTests: XCTestCase {
         }
 
         XCTAssertNotEqual(first.artifact.fileURL, second.artifact.fileURL)
-        XCTAssertEqual(first.artifact.fileURL.lastPathComponent, "same-encrypted.txt")
+        XCTAssertFalse(first.artifact.fileURL.path.contains("same-encrypted"))
         XCTAssertTrue(first.artifact.fileURL.path.contains("/decrypted/op-"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: first.artifact.fileURL.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: second.artifact.fileURL.path))
