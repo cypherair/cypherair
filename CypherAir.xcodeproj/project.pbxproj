@@ -104,6 +104,7 @@
 				App/Decrypt/DecryptScreenModel.swift,
 				App/Decrypt/DecryptView.swift,
 				App/Decrypt/Support/ArmoredTextMessageClassifier.swift,
+				App/DesignSystem/ClipboardSafetyNotice.swift,
 				App/DesignSystem/CypherClipboard.swift,
 				App/DesignSystem/CypherLayout.swift,
 				App/DesignSystem/CypherMotion.swift,

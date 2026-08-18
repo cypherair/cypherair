@@ -598,13 +598,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The signed message has been copied. Remember to clear your clipboard after pasting."
+            "value" : "This copy stays on this device and is removed from the clipboard after 5 minutes. It is never sent to your other devices."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "签名消息已拷贝。请在粘贴后清除剪贴板。"
+            "value" : "这次拷贝仅保留在本设备，5 分钟后会自动从剪贴板移除，不会发送到你的其他设备。"
           }
         }
       }
