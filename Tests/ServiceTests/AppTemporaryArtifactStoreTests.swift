@@ -50,7 +50,7 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: abandonedOperation.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: abandonedExport.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: liveOperation.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: liveExport.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: liveExport.fileURL.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: liveTutorial.path))
         // The root is only dropped when the sweep emptied it, and this one still
         // holds a live operation.
@@ -73,8 +73,31 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
 
         XCTAssertTrue(result.failures.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: liveOperation.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: liveExport.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: liveExport.fileURL.path))
         XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
+    }
+
+    /// The export handoff is staged inside an owned directory born with the
+    /// protection class, and the staged file inherits it — nothing marks the
+    /// file itself after the write.
+    func test_writeProtectedExportData_stagesInsideOwnedProtectedDirectory() throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
+
+        let export = try store.writeProtectedExportData(
+            Data("payload".utf8),
+            suggestedFilename: "key.asc"
+        )
+
+        let ownerDirectory = try XCTUnwrap(export.ownerDirectoryURL)
+        XCTAssertEqual(export.fileURL.deletingLastPathComponent().path, ownerDirectory.path)
+        XCTAssertTrue(ownerDirectory.lastPathComponent.hasPrefix("export-"))
+        XCTAssertEqual(export.fileURL.lastPathComponent, "key.asc")
+        try assertCompleteFileProtection(at: ownerDirectory)
+        try assertCompleteFileProtection(at: export.fileURL)
+
+        export.cleanup()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ownerDirectory.path))
     }
 
     private func makeTemporaryDirectory() throws -> URL {
@@ -85,19 +108,5 @@ final class AppTemporaryArtifactStoreTests: XCTestCase {
             try? FileManager.default.removeItem(at: directory)
         }
         return directory
-    }
-
-    private func assertCompleteFileProtection(
-        at url: URL,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(
-            attributes[.protectionKey] as? FileProtectionType,
-            .complete,
-            file: file,
-            line: line
-        )
     }
 }

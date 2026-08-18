@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import plistlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,22 @@ module = load_script_module(
     "validate_app_store_candidate_release",
     "scripts/validate_app_store_candidate_release.py",
 )
+
+
+def write_ios_entitlements(repo_root: Path, value: str | None = None) -> None:
+    entitlements = {
+        module.IOS_DATA_PROTECTION_ENTITLEMENT_KEY: (
+            module.IOS_DATA_PROTECTION_ENTITLEMENT_VALUE if value is None else value
+        ),
+    }
+    with (repo_root / "CypherAir.entitlements").open("wb") as handle:
+        plistlib.dump(entitlements, handle)
+
+
+def init_candidate_repo(root: Path) -> tuple[Path, Path]:
+    repo_root, remote_root = init_repo_with_remote(root)
+    write_ios_entitlements(repo_root)
+    return repo_root, remote_root
 
 
 STAGE1_HOST = "aarch64-apple-darwin"
@@ -275,7 +292,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_clean_main_repo_matching_remote_tag_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=True):
                 with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
@@ -289,9 +306,51 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                     )
             self.assertEqual(validated_tag, release_tag)
 
+    def test_missing_data_protection_entitlement_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            with mock.patch.object(module, "stable_release_exists", return_value=True):
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    with self.assertRaisesRegex(
+                        module.CandidateValidationError,
+                        "iOS entitlements file is missing",
+                    ):
+                        module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=False,
+                        )
+
+    def test_weakened_data_protection_entitlement_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            write_ios_entitlements(
+                repo_root,
+                value="NSFileProtectionCompleteUntilFirstUserAuthentication",
+            )
+            create_annotated_stable_tag(repo_root)
+            with mock.patch.object(module, "stable_release_exists", return_value=True):
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    with self.assertRaisesRegex(
+                        module.CandidateValidationError,
+                        "default data-protection entitlement",
+                    ):
+                        module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=False,
+                        )
+
     def test_non_main_branch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             run(["git", "checkout", "-b", "feature"], cwd=repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=True):
                 with self.assertRaisesRegex(module.CandidateValidationError, "main branch"):
@@ -306,7 +365,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_tracked_worktree_changes_fail(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             (repo_root / "tracked.txt").write_text("dirty\n", encoding="utf-8")
             with mock.patch.object(module, "stable_release_exists", return_value=True):
@@ -322,7 +381,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_staged_changes_fail(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             (repo_root / "tracked.txt").write_text("staged\n", encoding="utf-8")
             run(["git", "add", "tracked.txt"], cwd=repo_root)
@@ -339,7 +398,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_untracked_files_do_not_block_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             (repo_root / "notes.txt").write_text("scratch\n", encoding="utf-8")
             with mock.patch.object(module, "stable_release_exists", return_value=True):
@@ -355,7 +414,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_missing_release_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=False):
                 with self.assertRaisesRegex(module.CandidateValidationError, "Missing GitHub stable release"):
@@ -370,7 +429,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_trusted_verdict_skips_release_visibility_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             verdict_path = Path(temp_dir_name) / "verdict.json"
             write_bound_verdict(repo_root, verdict_path)
@@ -398,7 +457,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_trust_verdict_commit_mismatch_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             verdict_path = Path(temp_dir_name) / "verdict.json"
             write_bound_verdict(repo_root, verdict_path, commit_sha="f" * 40)
@@ -415,7 +474,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_trust_verdict_for_different_build_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             verdict_path = Path(temp_dir_name) / "verdict.json"
             write_bound_verdict(repo_root, verdict_path, build_number="4")
@@ -432,7 +491,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_trust_verdict_absent_falls_back_to_live_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             verdict_path = Path(temp_dir_name) / "missing-verdict.json"
             with mock.patch.object(module, "stable_release_exists", return_value=False):
@@ -449,7 +508,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_trust_verdict_without_arm64e_verification_fails_when_required(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             verdict_path = Path(temp_dir_name) / "verdict.json"
             write_bound_verdict(
@@ -473,7 +532,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_trust_verdict_malformed_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             verdict_path = Path(temp_dir_name) / "verdict.json"
             verdict_path.write_text("not json", encoding="utf-8")
@@ -491,7 +550,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
     def test_fork_origin_tag_mismatch_does_not_override_canonical_stable_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_root = Path(temp_dir_name)
-            repo_root, canonical_remote = init_repo_with_remote(temp_root)
+            repo_root, canonical_remote = init_candidate_repo(temp_root)
             release_tag = create_annotated_stable_tag(repo_root)
             fork_remote = temp_root / "fork.git"
             fork_work = temp_root / "fork-work"
@@ -523,7 +582,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_head_mismatch_against_remote_tag_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             (repo_root / "tracked.txt").write_text("new commit\n", encoding="utf-8")
             run(["git", "add", "tracked.txt"], cwd=repo_root)
@@ -543,7 +602,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
     def test_missing_canonical_stable_tag_fails_even_when_origin_has_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_root = Path(temp_dir_name)
-            repo_root, _ = init_repo_with_remote(temp_root)
+            repo_root, _ = init_candidate_repo(temp_root)
             create_annotated_stable_tag(repo_root)
             canonical_remote = temp_root / "canonical-without-tag.git"
             run(["git", "init", "--bare", str(canonical_remote)])
@@ -562,7 +621,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_arm64e_release_manifest_is_required_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=True):
                 with mock.patch.object(
@@ -589,7 +648,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_candidate_passes_canonical_stage1_tag_to_manifest_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             stage1_tag = "rust-stage1-arm64e-toolchain-canonical-test"
             stage1_pin = write_stage1_pin(repo_root, stage1_tag)
@@ -701,7 +760,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_main_writes_candidate_release_metadata_on_success(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root, build_number="4")
             output_path = Path(temp_dir_name) / "SourceComplianceOverrides.json"
             args = argparse.Namespace(
@@ -733,7 +792,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_main_emits_verdict_on_success(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root, build_number="4")
             verdict_path = Path(temp_dir_name) / "verdict.json"
             args = argparse.Namespace(
@@ -769,7 +828,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_main_does_not_write_metadata_when_validation_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             run(["git", "checkout", "-b", "feature"], cwd=repo_root)
             output_path = Path(temp_dir_name) / "SourceComplianceOverrides.json"
             args = argparse.Namespace(
@@ -794,7 +853,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_xcode_cloud_detached_head_matching_tag_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             run(["git", "checkout", release_tag], cwd=repo_root)
             ci_env = {
@@ -817,7 +876,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_sqlcipher_dependency_gate_runs_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=True):
                 with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
@@ -839,7 +898,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_xcode_cloud_tag_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             run(["git", "checkout", release_tag], cwd=repo_root)
             ci_env = {
@@ -865,7 +924,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_xcode_cloud_commit_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             run(["git", "checkout", release_tag], cwd=repo_root)
             ci_env = {
@@ -889,7 +948,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_local_detached_head_without_xcode_cloud_still_requires_main(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, _ = init_candidate_repo(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             run(["git", "checkout", release_tag], cwd=repo_root)
             with mock.patch.dict(module.os.environ, {"CI_XCODE_CLOUD": ""}):

@@ -563,25 +563,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         return url
     }
 
-    func supportsCompleteProtectedFileCreation() throws -> Bool {
-        let probeDirectory = try makeTemporaryDirectory("ProtectedFileCreationProbe")
-        defer {
-            try? FileManager.default.removeItem(at: probeDirectory)
-        }
-
-        let probeURL = probeDirectory.appendingPathComponent("probe.dat")
-        guard FileManager.default.createFile(
-            atPath: probeURL.path,
-            contents: Data([0]),
-            attributes: [.protectionKey: FileProtectionType.complete]
-        ) else {
-            return false
-        }
-
-        let attributes = try FileManager.default.attributesOfItem(atPath: probeURL.path)
-        return attributes[.protectionKey] as? FileProtectionType == .complete
-    }
-
     func makeCheckpointedProvisioningService(
         checkpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint
     ) -> (

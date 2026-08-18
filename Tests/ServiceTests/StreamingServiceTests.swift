@@ -823,26 +823,12 @@ final class StreamingServiceTests: XCTestCase {
             }
         }
     }
-
-    private func assertCompleteFileProtection(
-        at url: URL,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(
-            attributes[.protectionKey] as? FileProtectionType,
-            .complete,
-            file: file,
-            line: line
-        )
-    }
 }
 
 /// Records whether the streaming file encryptor was reached, which is what lets a
 /// pre-flight test distinguish "refused up front" from "refused after the work".
-/// Creates the output file on the way out because `EncryptionService` applies file
-/// protection to it before returning.
+/// Creates the output file on the way out, matching the engine's contract that a
+/// successful call leaves the output at `outputPath`.
 ///
 /// `@unchecked Sendable`: the counter is written once inside the awaited call and
 /// read after it returns, never concurrently.
@@ -864,8 +850,8 @@ private final class SpyStreamingFileEncryptor: StreamingFileEncrypting, @uncheck
 
 /// Records whether the streaming file decryptor was reached, which is what lets a
 /// pre-flight test distinguish "refused up front" from "refused after the work".
-/// Creates the output file on the way out because `DecryptionService` applies file
-/// protection to it before returning.
+/// Creates the output file on the way out, matching the engine's contract that a
+/// successful call leaves the output at `outputPath`.
 ///
 /// `@unchecked Sendable`: the counter is written once inside the awaited call and
 /// read after it returns, never concurrently.

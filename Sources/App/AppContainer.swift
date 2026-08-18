@@ -996,14 +996,8 @@ final class AppContainer: @unchecked Sendable {
         let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let protectedDataBaseDirectory = applicationSupportDirectory
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: documentDirectory,
-            withIntermediateDirectories: true
-        )
-        try? FileManager.default.createDirectory(
-            at: protectedDataBaseDirectory,
-            withIntermediateDirectories: true
-        )
+        try? FileManager.default.createProtectedDirectory(at: documentDirectory)
+        try? FileManager.default.createProtectedDirectory(at: protectedDataBaseDirectory)
         let protectedDataStorageRoot = ProtectedDataStorageRoot(
             baseDirectory: protectedDataBaseDirectory,
             validationMode: .enforceAppSupportContainment

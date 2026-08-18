@@ -111,6 +111,76 @@ final class OperationControllerTests: XCTestCase {
         XCTAssertFalse(controller.isShowingError)
     }
 
+    /// A protected-data stop rides the cancellation path but must inform the
+    /// person — a cancel they asked for stays silent (pinned by the cancel test
+    /// above), while this one presents the interruption error.
+    func test_operationController_protectedDataStop_stopsOperationAndInformsUser() async {
+        let gate = OperationGate()
+        let controller = OperationController()
+
+        controller.runFileOperation(mapError: { _ in .internalError(reason: "unexpected") }) { progress in
+            _ = progress.onProgress(bytesProcessed: 1, totalBytes: 10)
+            await gate.suspend(operationID: 1)
+            try Task.checkCancellation()
+        }
+
+        await waitUntil("operation to suspend before the stop") {
+            guard controller.isRunning, controller.progress != nil else { return false }
+            return gate.isSuspended(operationID: 1)
+        }
+
+        controller.stopForProtectedDataUnavailability()
+        XCTAssertTrue(controller.isCancelling)
+        gate.resume(operationID: 1)
+
+        await waitUntil("operation to stop") {
+            controller.isRunning == false
+        }
+
+        guard case .operationInterruptedByDeviceLock = controller.error else {
+            return XCTFail("Expected the device-lock interruption error, got \(String(describing: controller.error))")
+        }
+        XCTAssertTrue(controller.isShowingError)
+    }
+
+    /// An operation that fails mid-write after the stop signal — the file
+    /// sealed under it — surfaces the interruption, not the raw failure.
+    func test_operationController_protectedDataStop_replacesMappedFailureWithInterruption() async {
+        let gate = OperationGate()
+        let controller = OperationController()
+
+        controller.runFileOperation(mapError: { _ in .internalError(reason: "mid-write failure") }) { _ in
+            await gate.suspend(operationID: 1)
+            throw CommonHelpersTestError.delayedFailure
+        }
+
+        await waitUntil("operation to suspend before the stop") {
+            guard controller.isRunning else { return false }
+            return gate.isSuspended(operationID: 1)
+        }
+
+        controller.stopForProtectedDataUnavailability()
+        gate.resume(operationID: 1)
+
+        await waitUntil("operation to stop") {
+            controller.isRunning == false
+        }
+
+        guard case .operationInterruptedByDeviceLock = controller.error else {
+            return XCTFail("Expected the device-lock interruption error, got \(String(describing: controller.error))")
+        }
+    }
+
+    func test_operationController_protectedDataStop_whenIdle_doesNothing() {
+        let controller = OperationController()
+
+        controller.stopForProtectedDataUnavailability()
+
+        XCTAssertNil(controller.error)
+        XCTAssertFalse(controller.isShowingError)
+        XCTAssertFalse(controller.isCancelling)
+    }
+
     func test_operationController_staleCompletionDoesNotClearReplacementOperation() async {
         let gate = OperationGate()
         let controller = OperationController()

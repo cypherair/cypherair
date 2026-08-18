@@ -36,18 +36,4 @@ final class FileExportControllerTests: XCTestCase {
         controller.finish()
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
     }
-
-    private func assertCompleteFileProtection(
-        at url: URL,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(
-            attributes[.protectionKey] as? FileProtectionType,
-            .complete,
-            file: file,
-            line: line
-        )
-    }
 }

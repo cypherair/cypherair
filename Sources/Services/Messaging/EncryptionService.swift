@@ -126,7 +126,6 @@ final class EncryptionService {
                 selfKey: selfKey,
                 progress: progress
             )
-            try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
         } catch let error as CypherAirError {
             outputArtifact.cleanup()
             throw error

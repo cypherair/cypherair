@@ -4,6 +4,15 @@ import UIKit
 #endif
 
 /// Shared async operation state for task lifecycle, cancellation, progress, and error mapping.
+///
+/// Two behaviors here exist because the complete file-protection class seals
+/// the app's files shortly after the device locks (SECURITY.md §5): while an
+/// operation runs the app holds off idle sleep, and when protected data is
+/// about to become unavailable anyway — the device locked past backgrounding —
+/// the operation in flight is stopped inside the grace window, its partial
+/// output erased by the owning service's cancellation path, and the person
+/// told it can be run again. On macOS files do not seal on lock, so the
+/// notification wiring and the idle-sleep hold are UIKit-only.
 @MainActor
 @Observable
 final class OperationController {
@@ -23,12 +32,38 @@ final class OperationController {
     private var currentOperationID: UInt64 = 0
     private var nextOperationID: UInt64 = 0
 
+    /// Distinguishes a protected-data stop from an ordinary user cancel, which
+    /// stays silent: this one must tell the person what happened.
+    @ObservationIgnored private var isStoppedForProtectedDataUnavailability = false
+    #if canImport(UIKit)
+    @ObservationIgnored private nonisolated(unsafe) var protectedDataObserver: (any NSObjectProtocol)?
+    #endif
+
     init(
         backgroundRunner: @escaping BackgroundOperationRunner = PlatformBackgroundActivity.perform,
         progressFactory: @escaping () -> FileProgressReporter = { FileProgressReporter() }
     ) {
         self.backgroundRunner = backgroundRunner
         self.progressFactory = progressFactory
+        #if canImport(UIKit)
+        protectedDataObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.protectedDataWillBecomeUnavailableNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.stopForProtectedDataUnavailability()
+            }
+        }
+        #endif
+    }
+
+    deinit {
+        #if canImport(UIKit)
+        if let protectedDataObserver {
+            NotificationCenter.default.removeObserver(protectedDataObserver)
+        }
+        #endif
     }
 
     func run(
@@ -64,6 +99,18 @@ final class OperationController {
         isCancelling = true
     }
 
+    /// Stop the operation in flight because protected data is about to become
+    /// unavailable. The stop rides the ordinary cancellation path — the owning
+    /// service erases its partial output there — but surfaces as an error the
+    /// person sees, where a cancel they asked for stays silent.
+    func stopForProtectedDataUnavailability() {
+        guard isRunning else { return }
+        isStoppedForProtectedDataUnavailability = true
+        progress?.cancel()
+        currentTask?.cancel()
+        isCancelling = true
+    }
+
     func cancelAndInvalidate() {
         progress?.cancel()
         currentTask?.cancel()
@@ -72,6 +119,7 @@ final class OperationController {
         progress = nil
         isRunning = false
         isCancelling = false
+        isStoppedForProtectedDataUnavailability = false
         currentTask = nil
         dismissError()
         isShowingClipboardNotice = false
@@ -116,8 +164,14 @@ final class OperationController {
         self.progress = progress
         isRunning = true
         isCancelling = false
+        isStoppedForProtectedDataUnavailability = false
 
         currentTask = Task { @MainActor [weak self] in
+            OperationController.beginHoldingOffIdleSleep()
+            defer {
+                OperationController.endHoldingOffIdleSleep()
+            }
+
             guard let self else { return }
 
             defer {
@@ -130,13 +184,15 @@ final class OperationController {
                 } else {
                     try await operation()
                 }
-            } catch is CancellationError {
-                return
             } catch {
-                if Self.shouldIgnore(error) {
+                guard self.currentOperationID == operationID else { return }
+                if self.isStoppedForProtectedDataUnavailability {
+                    self.present(error: .operationInterruptedByDeviceLock)
                     return
                 }
-                guard self.currentOperationID == operationID else { return }
+                if error is CancellationError || Self.shouldIgnore(error) {
+                    return
+                }
                 self.present(error: mapError(error))
             }
         }
@@ -148,6 +204,31 @@ final class OperationController {
         isRunning = false
         isCancelling = false
         currentTask = nil
+    }
+
+    // MARK: - Idle-Sleep Hold
+
+    /// One hold per running operation task, counted across every controller
+    /// instance — a briefly overlapping pair must not drop the hold when the
+    /// first finishes.
+    #if canImport(UIKit)
+    private static var idleSleepHoldCount = 0
+    #endif
+
+    private static func beginHoldingOffIdleSleep() {
+        #if canImport(UIKit)
+        idleSleepHoldCount += 1
+        UIApplication.shared.isIdleTimerDisabled = true
+        #endif
+    }
+
+    private static func endHoldingOffIdleSleep() {
+        #if canImport(UIKit)
+        idleSleepHoldCount -= 1
+        if idleSleepHoldCount == 0 {
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        #endif
     }
 
     private static func shouldIgnore(_ error: Error) -> Bool {
