@@ -5,16 +5,11 @@ import XCTest
 @testable import CypherAir
 
 @MainActor
-final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCase {
+final class LocalDataResetServiceTests: XCTestCase {
     func test_resetAllLocalData_removesStorageAndClearsMemoryState() async throws {
         let container = AppContainer.makeUITest()
         defer {
-            try? FileManager.default.removeItem(
-                at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
-            )
-            if let defaultsSuiteName = container.defaultsSuiteName {
-                UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
-            }
+            cleanup(container)
         }
 
         let markerService = "\(KeychainConstants.prefix).test-reset-marker.ABCDEF"
@@ -99,13 +94,8 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             .appendingPathComponent("CypherAirResetMissingBase-\(UUID().uuidString)", isDirectory: true)
         let temporaryArtifactStore = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
         defer {
-            try? FileManager.default.removeItem(
-                at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
-            )
+            cleanup(container)
             try? FileManager.default.removeItem(at: temporaryDirectory)
-            if let defaultsSuiteName = container.defaultsSuiteName {
-                UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
-            }
         }
 
         let protectedDataBaseDirectory = container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
@@ -123,27 +113,17 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertNotNil(container.appSessionOrchestrator.lastAuthenticationDate)
     }
 
-    func test_resetAllLocalData_cleansTemporaryArtifactsAndTutorialDefaultsSuites() async throws {
+    func test_resetAllLocalData_cleansTemporaryArtifacts() async throws {
         let container = AppContainer.makeUITest()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
         let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
-        let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
-        let unrelatedSuiteName = "com.cypherair.tests.tutorial.\(UUID().uuidString)"
         defer {
             cleanup(container)
             try? FileManager.default.removeItem(at: temporaryDirectory)
-            UserDefaults(suiteName: fixedTutorialSuiteName)?.removePersistentDomain(forName: fixedTutorialSuiteName)
-            UserDefaults(suiteName: unrelatedSuiteName)?.removePersistentDomain(forName: unrelatedSuiteName)
         }
 
         try makeSweepableTemporaryArtifacts(in: temporaryDirectory)
-        let fixedTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: fixedTutorialSuiteName))
-        fixedTutorialDefaults.set("fixed", forKey: "marker")
-        _ = fixedTutorialDefaults.synchronize()
-        let unrelatedDefaults = try XCTUnwrap(UserDefaults(suiteName: unrelatedSuiteName))
-        unrelatedDefaults.set("keep", forKey: "marker")
-        _ = unrelatedDefaults.synchronize()
 
         let resetService = makeResetService(
             from: container,
@@ -153,9 +133,44 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         _ = try await resetService.resetAllLocalData()
 
         XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
-        XCTAssertTrue(store.remainingTutorialSandboxDefaultsSuites().isEmpty)
-        XCTAssertNil(UserDefaults(suiteName: fixedTutorialSuiteName)?.string(forKey: "marker"))
-        XCTAssertEqual(UserDefaults(suiteName: unrelatedSuiteName)?.string(forKey: "marker"), "keep")
+    }
+
+    func test_resetAllLocalData_erasesPersistedPreferenceKeys() async throws {
+        let container = AppContainer.makeUITest()
+        defer {
+            cleanup(container)
+        }
+        container.config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+        container.config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
+        XCTAssertFalse(container.config.persistedPreferenceKeysRemaining.isEmpty)
+        let resetService = makeResetService(from: container)
+
+        _ = try await resetService.resetAllLocalData()
+
+        XCTAssertTrue(container.config.persistedPreferenceKeysRemaining.isEmpty)
+        XCTAssertEqual(container.config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    func test_resetAllLocalData_failsWhenPreferenceKeySurvives() async throws {
+        let container = AppContainer.makeUITest()
+        defer {
+            cleanup(container)
+        }
+        let stubbornPreferences = RemovalIgnoringPreferenceStorage()
+        stubbornPreferences.setString(
+            AppSessionAuthenticationPolicy.biometricsOnly.rawValue,
+            forKey: AppConfiguration.appSessionAuthenticationPolicyKey
+        )
+        let resetService = makeResetService(
+            from: container,
+            config: AppConfiguration(preferences: stubbornPreferences)
+        )
+
+        await XCTAssertThrowsErrorAsync({
+            try await resetService.resetAllLocalData()
+        }) { error in
+            XCTAssertTrue(error is LocalDataResetError, "Expected LocalDataResetError, got \(type(of: error))")
+        }
     }
 
     func test_resetAllLocalData_removesSecureEnclaveCustodyHandles() async throws {
@@ -354,26 +369,20 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         )
-        if let defaultsSuiteName = container.defaultsSuiteName {
-            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
-        }
     }
 
     private func makeResetService(
         from container: AppContainer,
         keychain: (any KeychainManageable)? = nil,
         temporaryArtifactStore: CypherAir.AppTemporaryArtifactStore? = nil,
+        config: AppConfiguration? = nil,
         protectedDataRootSecretExists: @escaping () -> Bool = { false },
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil
     ) -> LocalDataResetService {
-        let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        return LocalDataResetService(
+        LocalDataResetService(
             keychain: keychain ?? container.keychain,
             protectedDataStorageRoot: container.protectedDataStorageRoot,
-            defaults: defaults,
-            defaultsDomainName: defaultsSuiteName,
-            config: container.config,
+            config: config ?? container.config,
             protectedOrdinarySettingsCoordinator: container.protectedOrdinarySettingsCoordinator,
             keyManagement: container.keyManagement,
             contactService: container.contactService,
@@ -391,8 +400,6 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         let decryptedDir = temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
         let streamingDir = temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
         let exportURL = temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)-sample.asc")
-        let tutorialDir = temporaryDirectory
-            .appendingPathComponent("CypherAirGuidedTutorial-\(UUID().uuidString)", isDirectory: true)
 
         try FileManager.default.createDirectory(
             at: decryptedDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
@@ -402,10 +409,25 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             at: streamingDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
             withIntermediateDirectories: true
         )
-        try FileManager.default.createDirectory(at: tutorialDir, withIntermediateDirectories: true)
         try Data("export".utf8).write(to: exportURL, options: .atomic)
     }
 
+}
+
+/// `AppPreferenceStorage` whose `removeValue` silently does nothing — the
+/// storage fault local data reset's preference post-condition must catch.
+private final class RemovalIgnoringPreferenceStorage: AppPreferenceStorage {
+    private var values: [String: String] = [:]
+
+    func string(forKey key: String) -> String? {
+        values[key]
+    }
+
+    func setString(_ value: String, forKey key: String) {
+        values[key] = value
+    }
+
+    func removeValue(forKey key: String) {}
 }
 
 private final class ProtectedDataRootSecretFlag: @unchecked Sendable {

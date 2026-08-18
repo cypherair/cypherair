@@ -403,11 +403,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
     }
 
     func test_postUnlockRecoveryWarningAppend_surfacesCustomWarningAndClears() {
-        let suiteName = "com.cypherair.postUnlockContactsWarning.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         let customWarning = "Retry loading protected data after unlocking again."
 
         config.appendPostUnlockRecoveryLoadWarning(customWarning)
@@ -418,11 +414,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
     }
 
     func test_postUnlockRecoveryWarningAppend_preservesDistinctWarningsWithoutDuplicates() throws {
-        let suiteName = "com.cypherair.postUnlockCombinedWarning.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         let customWarning = "Retry loading protected data after unlocking again."
         let keyWarning = AppContainer.postUnlockRecoveryLoadWarning(
             rewrapSummary: PrivateKeyRewrapRecoverySummary(outcomes: [.retryableFailure]),
@@ -441,11 +433,6 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
     }
 
     func test_postUnlockRecovery_resyncsConfigAfterRewrapCompletes() async throws {
-        let suiteName = "com.cypherair.postUnlockSync.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
         let keychain = MockKeychain()
         let secureEnclave = MockSecureEnclave()
         let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
@@ -472,7 +459,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
         try privateKeyControlStore.markRewrapCommitRequired()
 
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         config.privateKeyControlState = .unlocked(.standard)
 
         AppContainer.recoverPrivateKeyControlJournalsAfterPostUnlock(

@@ -830,18 +830,17 @@ final class ModelTests: XCTestCase {
     }
 
     func test_appConfiguration_appSessionPolicy_defaultsToUserPresence() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
 
         XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
     }
 
     func test_appConfiguration_appSessionPolicy_persistsBiometricsOnly() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let preferences = InMemoryAppPreferenceStorage()
+        let config = AppConfiguration(preferences: preferences)
         config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
 
-        let reloaded = AppConfiguration(defaults: defaults)
+        let reloaded = AppConfiguration(preferences: preferences)
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
         XCTAssertNil(reloaded.pendingAppSessionAuthenticationPolicySwitch)
     }
@@ -851,14 +850,14 @@ final class ModelTests: XCTestCase {
     /// than the Keychain gate (issue #747). The unconfirmed target survives the
     /// relaunch and pulls the effective policy up to the stricter of the pair.
     func test_appConfiguration_interruptedPolicySwitch_survivesRelaunchAsStricterPolicy() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let preferences = InMemoryAppPreferenceStorage()
+        let config = AppConfiguration(preferences: preferences)
         config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
 
         XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
         XCTAssertEqual(config.committedAppSessionAuthenticationPolicy, .userPresence)
 
-        let reloaded = AppConfiguration(defaults: defaults)
+        let reloaded = AppConfiguration(preferences: preferences)
         XCTAssertEqual(reloaded.pendingAppSessionAuthenticationPolicySwitch, .biometricsOnly)
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
         XCTAssertEqual(reloaded.committedAppSessionAuthenticationPolicy, .userPresence)
@@ -868,8 +867,7 @@ final class ModelTests: XCTestCase {
     /// the switch is confirmed, the prompt keeps demanding biometry even though
     /// the gate may already accept a passcode.
     func test_appConfiguration_interruptedRelaxingSwitch_keepsStricterPolicyUntilCommitted() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
         config.beginAppSessionAuthenticationPolicySwitch(to: .userPresence)
 
@@ -886,17 +884,17 @@ final class ModelTests: XCTestCase {
     /// must read back as the target on both sides — never as the reverse gap
     /// (cleared journal over an uncommitted preference), which is issue #747.
     func test_appConfiguration_commitGapState_readsBackAsTheTargetPolicy() {
-        let defaults = makeIsolatedDefaults()
-        defaults.set(
+        let preferences = InMemoryAppPreferenceStorage()
+        preferences.setString(
             AppSessionAuthenticationPolicy.biometricsOnly.rawValue,
             forKey: AppConfiguration.appSessionAuthenticationPolicyKey
         )
-        defaults.set(
+        preferences.setString(
             AppSessionAuthenticationPolicy.biometricsOnly.rawValue,
             forKey: AppConfiguration.pendingAppSessionAuthenticationPolicySwitchKey
         )
 
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: preferences)
 
         XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
         XCTAssertEqual(config.committedAppSessionAuthenticationPolicy, .biometricsOnly)
@@ -906,23 +904,23 @@ final class ModelTests: XCTestCase {
     /// The journal is cleared only by a commit, and the commit persists both
     /// halves — a reload must show no leftover intent.
     func test_appConfiguration_completedSwitch_clearsPersistedJournal() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let preferences = InMemoryAppPreferenceStorage()
+        let config = AppConfiguration(preferences: preferences)
         config.beginAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
         config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
 
         XCTAssertNil(
-            defaults.string(forKey: AppConfiguration.pendingAppSessionAuthenticationPolicySwitchKey)
+            preferences.string(forKey: AppConfiguration.pendingAppSessionAuthenticationPolicySwitchKey)
         )
         XCTAssertEqual(
-            defaults.string(forKey: AppConfiguration.appSessionAuthenticationPolicyKey),
+            preferences.string(forKey: AppConfiguration.appSessionAuthenticationPolicyKey),
             AppSessionAuthenticationPolicy.biometricsOnly.rawValue
         )
     }
 
     func test_appConfiguration_resetToFirstRunDefaults_clearsPolicyAndJournal() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let preferences = InMemoryAppPreferenceStorage()
+        let config = AppConfiguration(preferences: preferences)
         config.completeAppSessionAuthenticationPolicySwitch(to: .biometricsOnly)
         config.beginAppSessionAuthenticationPolicySwitch(to: .userPresence)
 
@@ -930,8 +928,9 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
         XCTAssertNil(config.pendingAppSessionAuthenticationPolicySwitch)
+        XCTAssertTrue(config.persistedPreferenceKeysRemaining.isEmpty)
 
-        let reloaded = AppConfiguration(defaults: defaults)
+        let reloaded = AppConfiguration(preferences: preferences)
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .userPresence)
         XCTAssertNil(reloaded.pendingAppSessionAuthenticationPolicySwitch)
     }
@@ -946,11 +945,31 @@ final class ModelTests: XCTestCase {
     func test_protectedOrdinarySettings_guidedTutorial_completionPersists() {
         let store = InMemoryOrdinarySettingsStore()
         let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
-        coordinator.markGuidedTutorialCompleted()
+
+        XCTAssertTrue(coordinator.markGuidedTutorialCompleted())
 
         let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.snapshot?.hasCompletedGuidedTutorial, true)
         XCTAssertEqual(reloaded.hasCompletedGuidedTutorial, true)
+    }
+
+    func test_protectedOrdinarySettings_markGuidedTutorialCompleted_failsWhileLocked() {
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: InMemoryOrdinarySettingsStore()
+        )
+
+        XCTAssertFalse(coordinator.markGuidedTutorialCompleted())
+        XCTAssertEqual(coordinator.state, .locked)
+    }
+
+    func test_protectedOrdinarySettings_markGuidedTutorialCompleted_failsWhenSaveThrows() {
+        let persistence = SaveFailingOrdinarySettingsPersistence()
+        let coordinator = ProtectedOrdinarySettingsCoordinator(persistence: persistence)
+        coordinator.loadFromUngatedEphemeralPersistence()
+        persistence.failNextSave = true
+
+        XCTAssertFalse(coordinator.markGuidedTutorialCompleted())
+        XCTAssertEqual(coordinator.state, .recoveryRequired)
     }
 
     // MARK: - Factory Helpers
@@ -1007,13 +1026,6 @@ final class ModelTests: XCTestCase {
         )
     }
 
-    private func makeIsolatedDefaults() -> UserDefaults {
-        let suiteName = "com.cypherair.tests.model.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        return defaults
-    }
-
     private func makeLoadedProtectedOrdinarySettings(
         store: InMemoryOrdinarySettingsStore = InMemoryOrdinarySettingsStore()
     ) -> ProtectedOrdinarySettingsCoordinator {
@@ -1040,6 +1052,26 @@ final class ModelTests: XCTestCase {
 
         func saveSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) {
             saveCount += 1
+        }
+
+        func removePersistentValues() {}
+    }
+
+    private struct OrdinarySettingsSaveError: Error {}
+
+    private final class SaveFailingOrdinarySettingsPersistence: ProtectedOrdinarySettingsPersistence {
+        var failNextSave = false
+        private var snapshot = ProtectedOrdinarySettingsSnapshot.firstRunDefaults
+
+        func loadSnapshot() -> ProtectedOrdinarySettingsSnapshot {
+            snapshot
+        }
+
+        func saveSnapshot(_ updatedSnapshot: ProtectedOrdinarySettingsSnapshot) throws {
+            if failNextSave {
+                throw OrdinarySettingsSaveError()
+            }
+            snapshot = updatedSnapshot
         }
 
         func removePersistentValues() {}

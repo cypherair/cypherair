@@ -3,12 +3,12 @@ import SwiftUI
 /// Lists imported contacts (public keys).
 struct ContactsView: View {
     @Environment(ContactService.self) private var contactService
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
 
     var body: some View {
         ContactsScreenHostView(
             contactService: contactService,
-            appSessionOrchestrator: appSessionOrchestrator
+            contentClear: contentClear
         )
     }
 }
@@ -16,11 +16,11 @@ struct ContactsView: View {
 private struct ContactsScreenHostView: View {
     @Environment(\.appRouteNavigator) private var routeNavigator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
     @State private var model: ContactsScreenModel
 
-    init(contactService: ContactService, appSessionOrchestrator: AppSessionOrchestrator) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+    init(contactService: ContactService, contentClear: ContentClearSignal) {
+        self.contentClear = contentClear
         _model = State(initialValue: ContactsScreenModel(contactService: contactService))
     }
 
@@ -87,7 +87,7 @@ private struct ContactsScreenHostView: View {
                 Text(deleteError)
             }
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.clearTransientInput()
         }
     }

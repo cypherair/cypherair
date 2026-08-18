@@ -1,36 +1,29 @@
 import Foundation
 
 enum TutorialSandboxContainerError: LocalizedError {
-    case defaultsUnavailable
-    case contactsDirectoryCreationFailed
     case contactsProtectedDomainOpenFailed
-    case contactsWrappingRootKeyUnavailable
 
     var errorDescription: String? {
         switch self {
-        case .defaultsUnavailable:
-            String(localized: "guidedTutorial.error.defaults", defaultValue: "Could not create isolated tutorial preferences.")
-        case .contactsDirectoryCreationFailed:
-            String(localized: "guidedTutorial.error.contactsDirectory", defaultValue: "Could not create isolated tutorial contacts storage.")
         case .contactsProtectedDomainOpenFailed:
             String(localized: "guidedTutorial.error.contactsProtectedDomain", defaultValue: "Could not open isolated tutorial contacts storage.")
-        case .contactsWrappingRootKeyUnavailable:
-            String(localized: "guidedTutorial.error.contactsRootKey", defaultValue: "Could not prepare isolated tutorial contacts protection.")
         }
     }
 }
 
 /// Isolated dependency graph for the guided tutorial.
 ///
-/// Uses real app services backed by sandbox storage and real, ephemeral
+/// Uses real app services backed by RAM-only stores and real, ephemeral
 /// security primitives: software-key wrapping runs on the actual Secure
 /// Enclave through `EphemeralKeyWrappingCustody` (promptless nil-ACL wrapping
 /// keys whose representations live only inside envelope rows), and those
 /// envelope rows live in an in-memory `EphemeralKeychainStore` that is wiped
-/// on cleanup. Device-bound custody seams are wired to the inert fail-closed
-/// conformances in `InertCustodyStores.swift`, so the sandbox cannot reach
-/// real custody state by construction. The product flow owns a single active
-/// tutorial sandbox at a time.
+/// on cleanup. The container names no storage root, no registry, no database,
+/// and no preferences suite — the sandbox writes zero bytes to disk by
+/// construction. Device-bound custody seams are wired to the inert
+/// fail-closed conformances in `InertCustodyStores.swift`, so the sandbox
+/// cannot reach real custody state by construction. The product flow owns a
+/// single active tutorial sandbox at a time.
 final class TutorialSandboxContainer {
     let engine: PgpEngine
     let keychain: EphemeralKeychainStore
@@ -38,6 +31,7 @@ final class TutorialSandboxContainer {
     let privateKeyControlStore: InMemoryPrivateKeyControlStore
     let config: AppConfiguration
     let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
+    let contentClear = ContentClearSignal()
     let keyManagement: KeyManagementService
     let contactService: ContactService
     let encryptionService: EncryptionService
@@ -46,58 +40,15 @@ final class TutorialSandboxContainer {
     let certificateSignatureService: CertificateSignatureService
     let qrService: QRService
     let selfTestService: SelfTestService
-    let contactsDirectory: URL
-    let defaultsSuiteName: String
-
-    /// Gives the container and the contacts domain-store closure one mutable
-    /// holder for the tutorial's ephemeral root key.
-    ///
-    /// `cleanup()`'s erase is only as complete as the aliases outstanding when
-    /// it runs. Every read of `key` — through the closure, or the direct bind
-    /// in `openContactsIfNeeded` — hands out a value sharing this storage, and
-    /// `resetBytes` against a shared buffer copy-on-writes: the box is left
-    /// clear and the alias keeps the bytes, to be freed intact. The residual is
-    /// accepted here and nowhere else: this key is generated per sandbox, is
-    /// never persisted, and never leaves the process.
-    private final class ContactsWrappingRootKeyBox {
-        var key: Data
-
-        init(key: Data) {
-            self.key = key
-        }
-
-        func zeroize() {
-            key.zeroize()
-        }
-    }
 
     private let keyWrappingCustody: EphemeralKeyWrappingCustody
-    private let defaults: UserDefaults
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let contactsWrappingRootKeyBox: ContactsWrappingRootKeyBox
-    private var didCleanup = false
 
-    init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) throws {
+    init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) {
         self.engine = PgpEngine()
         self.keyWrappingCustody = EphemeralKeyWrappingCustody()
         self.keychain = EphemeralKeychainStore()
         self.authenticationPromptCoordinator = AuthenticationPromptCoordinator()
-
-        let suiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            throw TutorialSandboxContainerError.defaultsUnavailable
-        }
-        defaults.removePersistentDomain(forName: suiteName)
-        _ = defaults.synchronize()
-        self.defaultsSuiteName = suiteName
-        self.defaults = defaults
-
-        do {
-            let contactsDirectory = try temporaryArtifactStore.makeTutorialSandboxDirectory()
-            self.contactsDirectory = contactsDirectory
-        } catch {
-            throw TutorialSandboxContainerError.contactsDirectoryCreationFailed
-        }
 
         self.authManager = AuthenticationManager(
             secureEnclave: keyWrappingCustody,
@@ -106,7 +57,7 @@ final class TutorialSandboxContainer {
         )
         self.privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         self.authManager.configurePrivateKeyControlStore(privateKeyControlStore)
-        self.config = AppConfiguration(defaults: defaults)
+        self.config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         self.config.privateKeyControlState = .unlocked(.standard)
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
@@ -127,24 +78,10 @@ final class TutorialSandboxContainer {
             metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? self.keyManagement.loadKeys()
-        let contactsWrappingRootKeyBox: ContactsWrappingRootKeyBox
-        do {
-            contactsWrappingRootKeyBox = ContactsWrappingRootKeyBox(
-                key: try EphemeralWrappingRootKey.generate()
-            )
-        } catch {
-            throw TutorialSandboxContainerError.contactsWrappingRootKeyUnavailable
-        }
-        self.contactsWrappingRootKeyBox = contactsWrappingRootKeyBox
-        let contactsDomainStore = try Self.makeContactsDomainStore(
-            baseDirectory: contactsDirectory.appendingPathComponent("protected-contacts", isDirectory: true),
-            wrappingRootKey: { contactsWrappingRootKeyBox.key },
-            keychain: keychain
-        )
         self.contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDomainStore: contactsDomainStore
+            contactsDomainStore: InMemoryContactsDomainStore()
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         // Inert fail-closed custody seams: the sandbox offers no device-bound
@@ -288,19 +225,14 @@ final class TutorialSandboxContainer {
         }
 
         try Task.checkCancellation()
-        let contactService = self.contactService
-        let wrappingRootKey = contactsWrappingRootKeyBox.key
-        let ownSignerKeys = keyManagement.keys
-        let availability = await Task.detached {
-            await contactService.openContactsAfterPostUnlock(
-                gateDecision: ContactsPostAuthGateDecision(
-                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
-                    frameworkState: .sessionAuthorized
-                ),
-                wrappingRootKey: { wrappingRootKey },
-                ownSignerKeys: ownSignerKeys
-            )
-        }.value
+        let availability = await contactService.openContactsAfterPostUnlock(
+            gateDecision: ContactsPostAuthGateDecision(
+                postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                frameworkState: .sessionAuthorized
+            ),
+            wrappingRootKey: { Data() },
+            ownSignerKeys: keyManagement.keys
+        )
         try Task.checkCancellation()
         guard availability == .availableProtectedDomain else {
             throw TutorialSandboxContainerError.contactsProtectedDomainOpenFailed
@@ -308,51 +240,10 @@ final class TutorialSandboxContainer {
     }
 
     func cleanup() {
-        guard !didCleanup else { return }
-        didCleanup = true
-
-        try? TemporaryArtifactEraser.erase(at: contactsDirectory)
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        _ = defaults.synchronize()
         keychain.wipe()
-        contactsWrappingRootKeyBox.zeroize()
     }
 
     deinit {
         cleanup()
-    }
-
-    private static func makeContactsDomainStore(
-        baseDirectory: URL,
-        wrappingRootKey: @escaping () -> Data,
-        keychain: any KeychainManageable
-    ) throws -> ContactsDomainStore {
-        let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let domainKeyManager = ProtectedDomainKeyManager(
-            storageRoot: storageRoot,
-            keychain: keychain
-        )
-        let registryStore = ProtectedDataRegistryStore(
-            storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tutorial.contacts.\(UUID().uuidString)",
-            hasExternalProtectedDataArtifacts: {
-                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
-            }
-        )
-        _ = try registryStore.performSynchronousBootstrap()
-        var registry = try registryStore.loadRegistry()
-        if registry.committedMembership.isEmpty,
-           registry.sharedResourceLifecycleState == .absent {
-            registry.sharedResourceLifecycleState = .ready
-            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
-            try registryStore.saveRegistry(registry)
-        }
-
-        return ContactsDomainStore(
-            storageRoot: storageRoot,
-            registryStore: registryStore,
-            domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: wrappingRootKey
-        )
     }
 }

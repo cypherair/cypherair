@@ -68,7 +68,7 @@ private struct CypherMultilineInputRow: View {
 
     @State private var isEditorPresented = false
     @Environment(\.isEnabled) private var isEnabled
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator: AppSessionOrchestrator?
+    @Environment(ContentClearSignal.self) private var contentClear: ContentClearSignal?
 
     var body: some View {
         Button {
@@ -97,7 +97,7 @@ private struct CypherMultilineInputRow: View {
         // content-clear generation instead of lingering — now empty — over
         // the tool screen after unlock. Privacy is not the reason: the shield
         // window (#697/#723) covers this sheet while locked or away.
-        .onChange(of: appSessionOrchestrator?.contentClearGeneration) { _, _ in
+        .onChange(of: contentClear?.generation) { _, _ in
             isEditorPresented = false
         }
     }

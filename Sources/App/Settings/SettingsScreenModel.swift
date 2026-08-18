@@ -571,14 +571,3 @@ final class SettingsScreenModel {
         }
     }
 }
-
-private struct AppAccessPolicySwitchActionKey: EnvironmentKey {
-    static let defaultValue: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
-}
-
-extension EnvironmentValues {
-    var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? {
-        get { self[AppAccessPolicySwitchActionKey.self] }
-        set { self[AppAccessPolicySwitchActionKey.self] = newValue }
-    }
-}

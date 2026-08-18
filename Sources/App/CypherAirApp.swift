@@ -74,7 +74,9 @@ struct CypherAirApp: App {
         if launchConfiguration.shouldSkipOnboarding {
             container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)
         }
-        let tutorialStore = TutorialSessionStore()
+        let tutorialStore = TutorialSessionStore(
+            launchChoreography: launchConfiguration.tutorialChoreography
+        )
         let incomingURLImportCoordinator = IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
@@ -373,7 +375,6 @@ struct CypherAirApp: App {
                     .appLifecycleObserver(
                         appLockController: container.appLockController
                     )
-                    .environment(container.appLockController)
                     .environment(container.config)
                     .environment(container.protectedOrdinarySettingsCoordinator)
                     .environment(container.keyManagement)
@@ -385,11 +386,14 @@ struct CypherAirApp: App {
                     .environment(container.qrService)
                     .environment(container.selfTestService)
                     .environment(container.authManager)
-                    .environment(container.appSessionOrchestrator)
-                    .environment(\.localDataResetService, container.localDataResetService)
-                    .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
-                    .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
-                    .environment(\.protectedSettingsHost, protectedSettingsHost)
+                    .environment(container.appSessionOrchestrator.contentClear)
+                    .environment(\.realWorkspace, RealWorkspaceAccess(
+                        sessionOrchestrator: container.appSessionOrchestrator,
+                        protectedSettingsHost: protectedSettingsHost,
+                        appAccessPolicySwitchAction: appAccessPolicySwitchAction,
+                        localDataResetService: container.localDataResetService,
+                        localDataResetRestartCoordinator: localDataResetRestartCoordinator
+                    ))
                     .environment(tutorialStore)
                     #if os(iOS) || os(visionOS)
                     .environment(\.iosPresentationController, iosPresentationControllerValue)
@@ -547,7 +551,6 @@ struct CypherAirApp: App {
                 .environment(container.config)
                 .environment(container.protectedOrdinarySettingsCoordinator)
                 .environment(tutorialStore)
-                .environment(container.appSessionOrchestrator)
                 .environment(\.iosPresentationController, iosPresentationControllerValue)
         }
     }

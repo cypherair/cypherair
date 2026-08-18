@@ -12,15 +12,12 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         var failures: [String] = []
     }
 
-    static let tutorialSandboxDefaultsSuiteName = "com.cypherair.tutorial.sandbox"
-
     private static let decryptedRootName = "decrypted"
     private static let streamingRootName = "streaming"
     private static let operationRootNames = [decryptedRootName, streamingRootName]
 
     private let fileManager: FileManager
     private let temporaryDirectory: URL
-    private let preferencesDirectory: URL
 
     /// Paths this process handed out. The sweep no longer finishes before the
     /// session starts, so "present in `tmp/`" stopped meaning "abandoned" and
@@ -34,16 +31,10 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
 
     init(
         fileManager: FileManager = .default,
-        temporaryDirectory: URL? = nil,
-        preferencesDirectory: URL? = nil
+        temporaryDirectory: URL? = nil
     ) {
         self.fileManager = fileManager
         self.temporaryDirectory = (temporaryDirectory ?? fileManager.temporaryDirectory).standardizedFileURL
-        self.preferencesDirectory = (
-            preferencesDirectory
-                ?? fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent("Preferences", isDirectory: true)
-        ).standardizedFileURL
     }
 
     func makeStreamingArtifact(for inputURL: URL) throws -> AppTemporaryArtifact {
@@ -59,16 +50,6 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             rootName: Self.decryptedRootName,
             outputFilename: Self.decryptedOutputFilename(for: inputFilename)
         )
-    }
-
-    func makeTutorialSandboxDirectory() throws -> URL {
-        let directory = temporaryDirectory.appendingPathComponent(
-            "CypherAirGuidedTutorial-\(UUID().uuidString)",
-            isDirectory: true
-        )
-        try createProtectedDirectory(at: directory)
-        markLive(directory)
-        return directory
     }
 
     func writeProtectedExportData(_ data: Data, suggestedFilename: String) throws -> URL {
@@ -173,25 +154,6 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
         return remaining
     }
 
-    func cleanupTutorialSandboxDefaultsSuite() -> CleanupResult {
-        var result = CleanupResult()
-        cleanupTutorialDefaultsSuite(
-            named: Self.tutorialSandboxDefaultsSuiteName,
-            result: &result
-        )
-        return result
-    }
-
-    func remainingTutorialSandboxDefaultsSuites() -> [String] {
-        var suiteNames: [String] = []
-        if fileManager.fileExists(
-            atPath: tutorialDefaultsPlistURL(for: Self.tutorialSandboxDefaultsSuiteName).path
-        ) {
-            suiteNames.append(Self.tutorialSandboxDefaultsSuiteName)
-        }
-        return suiteNames
-    }
-
     static func decryptedOutputFilename(for inputFilename: String) -> String {
         let sanitizedInputFilename = sanitizedFilename(inputFilename, fallback: "file")
         let ext = (sanitizedInputFilename as NSString).pathExtension.lowercased()
@@ -276,28 +238,7 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
     }
 
     private func shouldRemoveTemporaryItem(_ url: URL) -> Bool {
-        let name = url.lastPathComponent
-        return name.hasPrefix("export-")
-            || name.hasPrefix("CypherAirGuidedTutorial-")
-    }
-
-    private func cleanupTutorialDefaultsSuite(
-        named suiteName: String,
-        result: inout CleanupResult
-    ) {
-        if let defaults = UserDefaults(suiteName: suiteName) {
-            defaults.removePersistentDomain(forName: suiteName)
-            _ = defaults.synchronize()
-        }
-
-        let plistURL = tutorialDefaultsPlistURL(for: suiteName)
-        if fileManager.fileExists(atPath: plistURL.path) {
-            eraseItem(plistURL, result: &result)
-        }
-    }
-
-    private func tutorialDefaultsPlistURL(for suiteName: String) -> URL {
-        preferencesDirectory.appendingPathComponent("\(suiteName).plist")
+        url.lastPathComponent.hasPrefix("export-")
     }
 
     private func supportsFileProtection(for url: URL) throws -> Bool {

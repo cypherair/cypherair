@@ -9,7 +9,7 @@ struct ContactCertificationDetailsView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(CertificateSignatureService.self) private var certificateSignatureService
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
 
     init(
         contactId: String,
@@ -28,14 +28,14 @@ struct ContactCertificationDetailsView: View {
             contactService: contactService,
             keyManagement: keyManagement,
             certificateSignatureService: certificateSignatureService,
-            appSessionOrchestrator: appSessionOrchestrator,
+            contentClear: contentClear,
             configuration: configuration
         )
     }
 }
 
 private struct ContactCertificationDetailsHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @State private var model: ContactCertificationDetailsScreenModel
 
@@ -45,10 +45,10 @@ private struct ContactCertificationDetailsHostView: View {
         contactService: ContactService,
         keyManagement: KeyManagementService,
         certificateSignatureService: CertificateSignatureService,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         configuration: ContactCertificationDetailsConfiguration
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: ContactCertificationDetailsScreenModel(
                 contactId: contactId,
@@ -141,7 +141,7 @@ private struct ContactCertificationDetailsHostView: View {
                 to: currentAvailability
             )
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.clearTransientInput()
         }
     }

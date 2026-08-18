@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsScreenHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @State private var model: SettingsScreenModel
 
@@ -10,7 +10,7 @@ struct SettingsScreenHostView: View {
         protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction?,
@@ -18,7 +18,7 @@ struct SettingsScreenHostView: View {
         localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?,
         configuration: SettingsView.Configuration
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: SettingsScreenModel(
                 config: config,
@@ -48,7 +48,7 @@ struct SettingsScreenHostView: View {
             .task {
                 await model.prepareProtectedSettingsSection()
             }
-            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            .onChange(of: contentClear.generation) {
                 model.clearTransientInput()
             }
     }

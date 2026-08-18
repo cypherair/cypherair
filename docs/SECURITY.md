@@ -88,11 +88,13 @@ Protected app data is the security domain for CypherAir-owned local state outsid
 
 ## 6. Guided Tutorial Containment
 
-The guided tutorial may run real app services and real OpenPGP operations only inside an isolated tutorial dependency graph; it must never read or mutate real keys, contacts, settings, files, or exports. Today the isolation runs on a sandboxed dependency graph (fixed defaults suite, temporary directory, ephemeral Secure Enclave custody); **roadmap:** the tutorial is being rebuilt fully in-memory on a unified composition graph. These rules bind both shapes:
+The guided tutorial may run real app services and real OpenPGP operations only inside an isolated tutorial dependency graph; it must never read or mutate real keys, contacts, settings, files, or exports. The sandbox graph is fully in-memory — RAM domain stores, an in-memory keychain, in-memory preferences, ephemeral Secure Enclave key wrapping — and names no storage root, registry, database, or preferences suite, so it writes zero bytes to disk by construction. **Roadmap:** the sandbox graph and the production graph converge on one composition body.
 
+- **Structural isolation, not guards** — every real-world mutator reaches views only through the single optional `realWorkspace` environment value, which the tutorial mirror shell explicitly injects as nil; the content-clear signal is its own small value each world injects. A sandbox screen cannot name a real mutator.
+- **Same validation as production** — the in-memory domain conformances run the same model-level contract validation the production stores run, so the sandbox cannot reach states production rejects.
 - **No software fallback in sandbox custody** — without a Secure Enclave it fails closed.
 - **No impersonation** — the ephemeral stores throw their own error types and never impersonate production error types.
-- **Output interception** blocks real file import/export, clipboard writes, URL handoff, app-icon changes, and every other real-workspace side effect. Tutorial completion state is the only fact that persists across restarts.
+- **Output interception** blocks real file import/export, clipboard writes, URL handoff, app-icon changes, and every other real-workspace side effect. Tutorial completion state is the only fact that persists across restarts, and persisting it reports success or failure rather than failing silently.
 
 ## 7. Argon2id
 

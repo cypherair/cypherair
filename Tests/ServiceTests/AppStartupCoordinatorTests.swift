@@ -3,37 +3,21 @@ import XCTest
 @testable import CypherAir
 
 @MainActor
-final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCase {
-    func test_appStartupCoordinator_cleansTemporaryArtifactsAndTutorialSandboxDefaults() throws {
+final class AppStartupCoordinatorTests: XCTestCase {
+    func test_appStartupCoordinator_cleansTemporaryArtifacts() throws {
         let baseDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirStartupTemp-\(UUID().uuidString)", isDirectory: true)
-        let preferencesDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirStartupPrefs-\(UUID().uuidString)", isDirectory: true)
         defer {
             try? FileManager.default.removeItem(at: baseDirectory)
-            try? FileManager.default.removeItem(at: preferencesDirectory)
         }
         try makeSweepableTemporaryArtifacts(in: baseDirectory)
-        try FileManager.default.createDirectory(at: preferencesDirectory, withIntermediateDirectories: true)
-        let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
-        let fixedTutorialPlist = preferencesDirectory.appendingPathComponent("\(fixedTutorialSuiteName).plist")
-        try Data("fixed".utf8).write(to: fixedTutorialPlist, options: .atomic)
-        let unrelatedSuiteName = "com.cypherair.tests.startup.\(UUID().uuidString)"
-        let unrelatedPlist = preferencesDirectory.appendingPathComponent("\(unrelatedSuiteName).plist")
-        try Data("keep".utf8).write(to: unrelatedPlist, options: .atomic)
 
-        let store = CypherAir.AppTemporaryArtifactStore(
-            temporaryDirectory: baseDirectory,
-            preferencesDirectory: preferencesDirectory
-        )
+        let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: baseDirectory)
         AppStartupCoordinator().cleanupTemporaryFiles(
             temporaryArtifactStore: store
         )
 
         XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
-        XCTAssertTrue(store.remainingTutorialSandboxDefaultsSuites().isEmpty)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: fixedTutorialPlist.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedPlist.path))
     }
 
     /// Launch schedules the sweep rather than running it, so the wiring that
@@ -42,19 +26,12 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
     func test_appStartupCoordinator_scheduledCleanupSweepsWithoutBlockingTheCaller() async throws {
         let baseDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirScheduledSweep-\(UUID().uuidString)", isDirectory: true)
-        let preferencesDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirScheduledPrefs-\(UUID().uuidString)", isDirectory: true)
         defer {
             try? FileManager.default.removeItem(at: baseDirectory)
-            try? FileManager.default.removeItem(at: preferencesDirectory)
         }
         try makeSweepableTemporaryArtifacts(in: baseDirectory)
-        try FileManager.default.createDirectory(at: preferencesDirectory, withIntermediateDirectories: true)
 
-        let store = CypherAir.AppTemporaryArtifactStore(
-            temporaryDirectory: baseDirectory,
-            preferencesDirectory: preferencesDirectory
-        )
+        let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: baseDirectory)
         AppStartupCoordinator().scheduleTemporaryFileCleanup(temporaryArtifactStore: store)
 
         let deadline = Date().addingTimeInterval(5)
@@ -101,8 +78,6 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
         let decryptedDir = temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
         let streamingDir = temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
         let exportURL = temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)-sample.asc")
-        let tutorialDir = temporaryDirectory
-            .appendingPathComponent("CypherAirGuidedTutorial-\(UUID().uuidString)", isDirectory: true)
 
         try FileManager.default.createDirectory(
             at: decryptedDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
@@ -112,7 +87,6 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
             at: streamingDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
             withIntermediateDirectories: true
         )
-        try FileManager.default.createDirectory(at: tutorialDir, withIntermediateDirectories: true)
         try Data("export".utf8).write(to: exportURL, options: .atomic)
     }
 }

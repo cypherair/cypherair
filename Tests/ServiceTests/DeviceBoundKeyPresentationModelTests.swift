@@ -6,23 +6,14 @@ import XCTest
 /// keys: key-detail custody flags, degraded-availability mapping,
 /// and the backup-surface fail-closed flag.
 final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
-    private var defaultsSuiteName: String!
     private var config: AppConfiguration!
 
     override func setUp() {
         super.setUp()
-        defaultsSuiteName = "com.cypherair.tests.devicebound-presentation.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        config = AppConfiguration(defaults: defaults)
+        config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
     }
 
     override func tearDown() {
-        if let defaultsSuiteName {
-            UserDefaults(suiteName: defaultsSuiteName)?
-                .removePersistentDomain(forName: defaultsSuiteName)
-        }
-        defaultsSuiteName = nil
         config = nil
         super.tearDown()
     }

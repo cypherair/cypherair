@@ -18,8 +18,6 @@ struct LocalDataResetError: LocalizedError, Equatable {
 final class LocalDataResetService {
     private let keychain: any KeychainManageable
     private let protectedDataStorageRoot: ProtectedDataStorageRoot
-    private let defaults: UserDefaults
-    private let defaultsDomainName: String?
     private let config: AppConfiguration
     private let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
     private let keyManagement: KeyManagementService
@@ -36,8 +34,6 @@ final class LocalDataResetService {
     init(
         keychain: any KeychainManageable,
         protectedDataStorageRoot: ProtectedDataStorageRoot,
-        defaults: UserDefaults,
-        defaultsDomainName: String?,
         config: AppConfiguration,
         protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator,
         keyManagement: KeyManagementService,
@@ -53,8 +49,6 @@ final class LocalDataResetService {
     ) {
         self.keychain = keychain
         self.protectedDataStorageRoot = protectedDataStorageRoot
-        self.defaults = defaults
-        self.defaultsDomainName = defaultsDomainName
         self.config = config
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         self.keyManagement = keyManagement
@@ -112,9 +106,6 @@ final class LocalDataResetService {
 
         removeTemporaryResetTargets(&removedDirectoryCount, failures: &failures)
 
-        if let defaultsDomainName {
-            defaults.removePersistentDomain(forName: defaultsDomainName)
-        }
         config.resetToFirstRunDefaults()
         protectedOrdinarySettingsCoordinator.resetAfterLocalDataReset(
             preserveAuthentication: authenticationContext != nil
@@ -240,6 +231,7 @@ final class LocalDataResetService {
                 failures: &failures
             )
             let remainingTemporaryTargets = temporaryResetTargetsRemaining()
+            let remainingPreferenceKeys = config.persistedPreferenceKeysRemaining
             let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
             if hasProtectedArtifacts {
                 failures.append("protectedData.artifactsRemaining")
@@ -255,6 +247,9 @@ final class LocalDataResetService {
             }
             if !remainingTemporaryTargets.isEmpty {
                 failures.append("temporary.remaining.\(remainingTemporaryTargets.count)")
+            }
+            if !remainingPreferenceKeys.isEmpty {
+                failures.append("preferences.remaining.\(remainingPreferenceKeys.count)")
             }
             if !keyManagement.keys.isEmpty {
                 failures.append("memory.keys.remaining.\(keyManagement.keys.count)")
@@ -320,15 +315,10 @@ final class LocalDataResetService {
         let temporaryCleanup = temporaryArtifactStore.removeAllTemporaryArtifacts()
         removedDirectoryCount += temporaryCleanup.removedItemCount
         failures.append(contentsOf: temporaryCleanup.failures.map { "temporary.\($0)" })
-
-        let tutorialDefaultsCleanup = temporaryArtifactStore.cleanupTutorialSandboxDefaultsSuite()
-        removedDirectoryCount += tutorialDefaultsCleanup.removedItemCount
-        failures.append(contentsOf: tutorialDefaultsCleanup.failures.map { "tutorialDefaults.\($0)" })
     }
 
     private func temporaryResetTargetsRemaining() -> [String] {
         temporaryArtifactStore.remainingTemporaryArtifacts()
-            + temporaryArtifactStore.remainingTutorialSandboxDefaultsSuites()
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {
@@ -384,16 +374,5 @@ final class LocalDataResetService {
         default:
             "unknown"
         }
-    }
-}
-
-private struct LocalDataResetServiceKey: EnvironmentKey {
-    nonisolated(unsafe) static let defaultValue: LocalDataResetService? = nil
-}
-
-extension EnvironmentValues {
-    var localDataResetService: LocalDataResetService? {
-        get { self[LocalDataResetServiceKey.self] }
-        set { self[LocalDataResetServiceKey.self] = newValue }
     }
 }

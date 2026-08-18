@@ -3,7 +3,7 @@ import SwiftUI
 struct LicenseListView: View {
     private let store: OpenSourceNoticeStore
 
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
     @State private var notices: [OpenSourceNotice] = []
     @State private var hasLoaded = false
     @State private var loadError: String?
@@ -56,7 +56,7 @@ struct LicenseListView: View {
             guard !hasLoaded, loadError == nil else { return }
             loadNotices()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             searchText = ""
         }
     }

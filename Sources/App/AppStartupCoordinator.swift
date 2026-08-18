@@ -78,7 +78,6 @@ struct AppStartupCoordinator {
     /// knows of none.
     func cleanupTemporaryFiles(temporaryArtifactStore: AppTemporaryArtifactStore) {
         _ = temporaryArtifactStore.sweepAbandonedArtifacts()
-        _ = temporaryArtifactStore.cleanupTutorialSandboxDefaultsSuite()
     }
 
     func mergedStartupMessages(

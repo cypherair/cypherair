@@ -103,14 +103,6 @@ enum TutorialLaunchOrigin: Equatable {
 
 typealias TutorialPresentationContext = TutorialLaunchOrigin
 
-struct TutorialSessionID: Hashable {
-    let rawValue: UUID
-
-    init(rawValue: UUID = UUID()) {
-        self.rawValue = rawValue
-    }
-}
-
 struct TutorialArtifacts {
     var aliceIdentity: PGPKeyIdentity?
     var bobIdentity: PGPKeyIdentity?
@@ -244,7 +236,6 @@ struct TutorialNavigationState {
 
 struct TutorialSessionState {
     var lifecycleState: TutorialLifecycleState = .notStarted
-    var sessionID: TutorialSessionID?
     var moduleStates: [TutorialModuleID: TutorialModuleState] = Dictionary(
         uniqueKeysWithValues: TutorialModuleID.allCases.map { ($0, TutorialModuleState()) }
     )
@@ -257,10 +248,6 @@ struct TutorialSessionState {
             return module
         }
         return nil
-    }
-
-    var hasStartedSession: Bool {
-        sessionID != nil
     }
 
     var completedCount: Int {

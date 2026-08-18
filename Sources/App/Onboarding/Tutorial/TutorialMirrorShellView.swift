@@ -23,6 +23,11 @@ struct TutorialMirrorShellView: View {
             .environment(container.qrService)
             .environment(container.selfTestService)
             .environment(container.authManager)
+            .environment(container.contentClear)
+            // Structural isolation: the sandbox world has no real workspace.
+            // On macOS the mirror shell renders inside the main window's
+            // environment, so the absence must be injected, not assumed.
+            .environment(\.realWorkspace, nil)
             .screenReady(tutorialStore.currentModule?.readyMarker ?? "tutorial.workspace.ready")
             .onAppear {
                 tutorialStore.noteVisibleSurface(

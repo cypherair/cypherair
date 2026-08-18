@@ -7,7 +7,7 @@ struct ContactTagAssignmentSheet: View {
     let createAndAssignTag: (String) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
     @State private var newTagName = ""
     @State private var errorMessage: String?
     @State private var showError = false
@@ -72,7 +72,7 @@ struct ContactTagAssignmentSheet: View {
                     Text(errorMessage)
                 }
             }
-            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            .onChange(of: contentClear.generation) {
                 newTagName = ""
             }
         }

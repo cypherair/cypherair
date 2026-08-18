@@ -13,16 +13,17 @@ import LocalAuthentication
 ///   context is produced by app-session `evaluatePolicy` and is **never** routed
 ///   into a private-key operation.
 /// - **`lastAuthenticationDate`** — the grace clock the controller reads.
-/// - **`contentClearGeneration`** — the relock signal App views observe (via
-///   `.onChange`) to clear decrypted content. `requestContentClear()` bumps it.
+/// - **The content-clear signal** — `requestContentClear()` raises the
+///   injected `ContentClearSignal` views observe.
 /// - **Local Data Reset hook** and the **Protected App-Data access gate**.
 @Observable
 @MainActor
 final class AppSessionOrchestrator {
+    let contentClear = ContentClearSignal()
+
     private let protectedDataAccessGateClassifier: ProtectedDataAccessGateClassifier
 
     private var pendingAuthenticatedContext: LAContext?
-    private(set) var contentClearGeneration = 0
     private(set) var postAuthenticationGeneration = 0
     private(set) var lastAuthenticationDate: Date?
 
@@ -61,18 +62,18 @@ final class AppSessionOrchestrator {
 
     // MARK: - Content clear (the view-observed relock signal)
 
-    /// Discard the handoff context and bump the content-clear generation App views
+    /// Discard the handoff context and raise the content-clear signal App views
     /// observe to clear decrypted content on relock. The settings relock is
     /// performed by the caller (the controller's content-clear closure).
     func requestContentClear() {
         discardPendingAuthenticatedContext()
-        contentClearGeneration += 1
+        contentClear.raise()
     }
 
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
         discardPendingAuthenticatedContext()
         lastAuthenticationDate = preserveAuthentication ? Date() : nil
-        contentClearGeneration += 1
+        contentClear.raise()
     }
 
     // MARK: - Authenticated-context handoff custody

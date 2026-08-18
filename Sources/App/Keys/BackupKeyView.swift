@@ -19,7 +19,7 @@ struct BackupKeyView: View {
     let configuration: Configuration
 
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
 
     init(
         fingerprint: String,
@@ -33,14 +33,14 @@ struct BackupKeyView: View {
         BackupKeyScreenHostView(
             fingerprint: fingerprint,
             keyManagement: keyManagement,
-            appSessionOrchestrator: appSessionOrchestrator,
+            contentClear: contentClear,
             configuration: configuration
         )
     }
 }
 
 private struct BackupKeyScreenHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @State private var model: BackupKeyScreenModel
     @FocusState private var focusedField: CypherPassphraseEntry.Field?
@@ -48,10 +48,10 @@ private struct BackupKeyScreenHostView: View {
     init(
         fingerprint: String,
         keyManagement: KeyManagementService,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         configuration: BackupKeyView.Configuration
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: BackupKeyScreenModel(
                 fingerprint: fingerprint,
@@ -186,7 +186,7 @@ private struct BackupKeyScreenHostView: View {
             focusedField = nil
             model.handleDisappear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             focusedField = nil
             model.handleContentClearGenerationChange()
         }

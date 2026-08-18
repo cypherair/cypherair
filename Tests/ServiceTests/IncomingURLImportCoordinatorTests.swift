@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerializedTestCase {
+final class IncomingURLImportCoordinatorTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
 
     override func setUp() async throws {
@@ -233,7 +233,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         await tutorialStore.openModule(.sandbox)
         tutorialStore.setTutorialPresentationActive(false)
 
-        XCTAssertTrue(tutorialStore.session.hasStartedSession)
+        XCTAssertTrue(tutorialStore.hasStartedSession)
         XCTAssertFalse(tutorialStore.isTutorialPresentationActive)
 
         let coordinator = makeCoordinator()

@@ -9,21 +9,17 @@ private struct SettingsScreenModelTestError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase {
+final class SettingsScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
     private var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator!
     private var authManager: AuthenticationManager!
     private var privateKeyControlStore: InMemoryPrivateKeyControlStore!
-    private var defaultsSuiteName: String!
 
     override func setUp() async throws {
         try await super.setUp()
         stack = await TestHelpers.makeServiceStack()
-        defaultsSuiteName = "com.cypherair.tests.settingsscreen.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        config = AppConfiguration(defaults: defaults)
+        config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
@@ -39,17 +35,12 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     }
 
     override func tearDown() {
-        if let defaultsSuiteName {
-            UserDefaults(suiteName: defaultsSuiteName)?
-                .removePersistentDomain(forName: defaultsSuiteName)
-        }
         stack.cleanup()
         stack = nil
         config = nil
         protectedOrdinarySettings = nil
         authManager = nil
         privateKeyControlStore = nil
-        defaultsSuiteName = nil
         super.tearDown()
     }
 
@@ -1779,13 +1770,9 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         from container: AppContainer,
         keychain: any KeychainManageable
     ) -> LocalDataResetService {
-        let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        return LocalDataResetService(
+        LocalDataResetService(
             keychain: keychain,
             protectedDataStorageRoot: container.protectedDataStorageRoot,
-            defaults: defaults,
-            defaultsDomainName: defaultsSuiteName,
             config: container.config,
             protectedOrdinarySettingsCoordinator: container.protectedOrdinarySettingsCoordinator,
             keyManagement: container.keyManagement,
@@ -1837,9 +1824,6 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         )
-        if let defaultsSuiteName = container.defaultsSuiteName {
-            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
-        }
     }
 
     @MainActor

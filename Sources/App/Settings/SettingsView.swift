@@ -30,12 +30,10 @@ struct SettingsView: View {
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
-    @Environment(\.appAccessPolicySwitchAction) private var appAccessPolicySwitchAction
-    @Environment(\.localDataResetService) private var localDataResetService
-    @Environment(\.localDataResetRestartCoordinator) private var localDataResetRestartCoordinator
+    @Environment(\.realWorkspace) private var realWorkspace
 
     let configuration: Configuration
 
@@ -49,12 +47,12 @@ struct SettingsView: View {
             protectedOrdinarySettings: protectedOrdinarySettings,
             authManager: authManager,
             keyManagement: keyManagement,
-            appSessionOrchestrator: appSessionOrchestrator,
+            contentClear: contentClear,
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
-            appAccessPolicySwitchAction: appAccessPolicySwitchAction,
-            localDataResetService: localDataResetService,
-            localDataResetRestartCoordinator: localDataResetRestartCoordinator,
+            appAccessPolicySwitchAction: realWorkspace?.appAccessPolicySwitchAction,
+            localDataResetService: realWorkspace?.localDataResetService,
+            localDataResetRestartCoordinator: realWorkspace?.localDataResetRestartCoordinator,
             configuration: configuration
         )
     }

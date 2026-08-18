@@ -41,17 +41,9 @@ struct TutorialView: View {
                 hasPreparedPresentation = true
                 tutorialStore.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
-                #if DEBUG
-                if tutorialStore.prepareUITestCompletionSurfaceIfRequested() {
+                if await tutorialStore.performLaunchChoreographyIfRequested() {
                     return
                 }
-                if await tutorialStore.prepareUITestAuthModeConfirmationIfRequested() {
-                    return
-                }
-                if await tutorialStore.prepareUITestContactDetailSurfaceIfRequested() {
-                    return
-                }
-                #endif
                 if let initialModule {
                     await tutorialStore.openModule(initialModule)
                 }
@@ -148,9 +140,9 @@ struct TutorialView: View {
                     .accessibilityIdentifier(TutorialAutomationContract.primaryActionIdentifier)
                 }
 
-                if tutorialStore.session.hasStartedSession {
+                if tutorialStore.hasStartedSession {
                     Button(String(localized: "guidedTutorial.reset", defaultValue: "Reset Tutorial")) {
-                        tutorialStore.resetTutorial()
+                        tutorialStore.endSession()
                     }
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier(TutorialAutomationContract.resetIdentifier)
@@ -333,7 +325,7 @@ struct TutorialView: View {
             }
         case .notStarted, .finished:
             if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
-                tutorialStore.resetTutorial()
+                tutorialStore.endSession()
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
             }
             await tutorialStore.openModule(.sandbox)
@@ -342,7 +334,7 @@ struct TutorialView: View {
 
     private func finishTutorial() {
         tutorialStore.markFinishedTutorial()
-        tutorialStore.finishAndCleanupTutorial()
+        tutorialStore.endSession()
         dismissTutorial()
     }
 

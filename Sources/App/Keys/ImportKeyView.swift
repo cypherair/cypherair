@@ -4,29 +4,29 @@ import UniformTypeIdentifiers
 /// Import a private key from file, paste, or QR photo.
 struct ImportKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ImportKeyScreenHostView(
             keyManagement: keyManagement,
-            appSessionOrchestrator: appSessionOrchestrator,
+            contentClear: contentClear,
             dismissAction: { dismiss() }
         )
     }
 }
 
 private struct ImportKeyScreenHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @State private var model: ImportKeyScreenModel
 
     init(
         keyManagement: KeyManagementService,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         dismissAction: @escaping @MainActor () -> Void
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: ImportKeyScreenModel(
                 keyManagement: keyManagement,
@@ -132,7 +132,7 @@ private struct ImportKeyScreenHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.handleContentClearGenerationChange()
         }
     }

@@ -138,15 +138,11 @@ final class EncryptScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
     private var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator!
-    private var defaultsSuiteName: String!
 
     override func setUp() async throws {
         try await super.setUp()
         stack = await TestHelpers.makeServiceStack()
-        defaultsSuiteName = "com.cypherair.tests.encryptscreen.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        config = AppConfiguration(defaults: defaults)
+        config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
@@ -154,15 +150,10 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     override func tearDown() {
-        if let defaultsSuiteName {
-            UserDefaults(suiteName: defaultsSuiteName)?
-                .removePersistentDomain(forName: defaultsSuiteName)
-        }
         stack.cleanup()
         stack = nil
         config = nil
         protectedOrdinarySettings = nil
-        defaultsSuiteName = nil
         super.tearDown()
     }
 

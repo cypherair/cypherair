@@ -28,7 +28,6 @@ final class AppContainer: @unchecked Sendable {
     let selfTestService: SelfTestService
     let temporaryArtifactStore: AppTemporaryArtifactStore
     let localDataResetService: LocalDataResetService
-    let defaultsSuiteName: String?
     private var uiTestContactsBootstrap: UITestContactsBootstrap?
 
     init(
@@ -57,8 +56,7 @@ final class AppContainer: @unchecked Sendable {
         qrService: QRService,
         selfTestService: SelfTestService,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
-        localDataResetService: LocalDataResetService,
-        defaultsSuiteName: String? = nil
+        localDataResetService: LocalDataResetService
     ) {
         self.appLockController = appLockController
         self.authPromptCoordinator = authPromptCoordinator
@@ -86,12 +84,10 @@ final class AppContainer: @unchecked Sendable {
         self.selfTestService = selfTestService
         self.temporaryArtifactStore = temporaryArtifactStore
         self.localDataResetService = localDataResetService
-        self.defaultsSuiteName = defaultsSuiteName
         uiTestContactsBootstrap = nil
     }
 
     private struct UITestContactsBootstrap {
-        let wrappingRootKey: Data
         let preloadContact: Bool
         var didPreloadContact: Bool = false
         var isPreparing: Bool = false
@@ -589,8 +585,7 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        let defaults = UserDefaults.standard
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: UserDefaultsAppPreferenceStorage())
         let protectedDataStorageRoot = ProtectedDataStorageRoot()
         let protectedDomainKeyManager = ProtectedDomainKeyManager(
             storageRoot: protectedDataStorageRoot,
@@ -919,8 +914,6 @@ final class AppContainer: @unchecked Sendable {
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            defaults: defaults,
-            defaultsDomainName: Bundle.main.bundleIdentifier,
             config: config,
             protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             keyManagement: keyManagement,
@@ -976,30 +969,21 @@ final class AppContainer: @unchecked Sendable {
         let authPromptCoordinator = AuthenticationPromptCoordinator()
         let secureEnclave = EphemeralKeyWrappingCustody()
         let keychain = EphemeralKeychainStore()
-        let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
-        defaults.removePersistentDomain(forName: suiteName)
 
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        let config = AppConfiguration(defaults: defaults)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
         let engine = PgpEngine()
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
-        let documentDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
         let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let protectedDataBaseDirectory = applicationSupportDirectory
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: documentDirectory,
-            withIntermediateDirectories: true
-        )
         try? FileManager.default.createDirectory(
             at: protectedDataBaseDirectory,
             withIntermediateDirectories: true
@@ -1078,25 +1062,7 @@ final class AppContainer: @unchecked Sendable {
             )
             protectedOrdinarySettingsCoordinator.loadFromUngatedEphemeralPersistence()
         }
-        let contactsWrappingRootKey: Data
-        do {
-            contactsWrappingRootKey = try EphemeralWrappingRootKey.generate()
-        } catch {
-            fatalError("Failed to generate the UI-test contacts wrapping root key: \(error)")
-        }
-        let contactsDomainStore: ContactsDomainStore
-        do {
-            contactsDomainStore = try makeSandboxContactsDomainStore(
-                baseDirectory: protectedDataBaseDirectory.appendingPathComponent(
-                    "contacts-sandbox",
-                    isDirectory: true
-                ),
-                wrappingRootKey: contactsWrappingRootKey,
-                keychain: keychain
-            )
-        } catch {
-            fatalError("Failed to create UI-test Contacts protected domain: \(error)")
-        }
+        let contactsDomainStore = InMemoryContactsDomainStore()
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
@@ -1182,7 +1148,7 @@ final class AppContainer: @unchecked Sendable {
                         postUnlockOutcome: postUnlockOutcome,
                         frameworkState: protectedDataSessionCoordinator.frameworkState
                     ),
-                    wrappingRootKey: { contactsWrappingRootKey },
+                    wrappingRootKey: { Data() },
                     ownSignerKeys: keyManagement.keys
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
@@ -1245,8 +1211,6 @@ final class AppContainer: @unchecked Sendable {
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            defaults: defaults,
-            defaultsDomainName: suiteName,
             config: config,
             protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             keyManagement: keyManagement,
@@ -1286,12 +1250,10 @@ final class AppContainer: @unchecked Sendable {
             qrService: pgpServices.qrService,
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            localDataResetService: localDataResetService,
-            defaultsSuiteName: suiteName
+            localDataResetService: localDataResetService
         )
         if !requiresManualAuthentication {
             container.uiTestContactsBootstrap = UITestContactsBootstrap(
-                wrappingRootKey: contactsWrappingRootKey,
                 preloadContact: preloadContact
             )
         }
@@ -1325,7 +1287,7 @@ final class AppContainer: @unchecked Sendable {
                 postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
                 frameworkState: .sessionAuthorized
             ),
-            wrappingRootKey: { bootstrap.wrappingRootKey },
+            wrappingRootKey: { Data() },
             ownSignerKeys: keyManagement.keys
         )
         var didPreloadContact = bootstrap.didPreloadContact
@@ -1364,40 +1326,6 @@ final class AppContainer: @unchecked Sendable {
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
-    }
-
-    private static func makeSandboxContactsDomainStore(
-        baseDirectory: URL,
-        wrappingRootKey: Data,
-        keychain: any KeychainManageable
-    ) throws -> ContactsDomainStore {
-        let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let domainKeyManager = ProtectedDomainKeyManager(
-            storageRoot: storageRoot,
-            keychain: keychain
-        )
-        let registryStore = ProtectedDataRegistryStore(
-            storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.uitests.contacts.\(UUID().uuidString)",
-            hasExternalProtectedDataArtifacts: {
-                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
-            }
-        )
-        _ = try registryStore.performSynchronousBootstrap()
-        var registry = try registryStore.loadRegistry()
-        if registry.committedMembership.isEmpty,
-           registry.sharedResourceLifecycleState == .absent {
-            registry.sharedResourceLifecycleState = .ready
-            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
-            try registryStore.saveRegistry(registry)
-        }
-
-        return ContactsDomainStore(
-            storageRoot: storageRoot,
-            registryStore: registryStore,
-            domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey }
-        )
     }
 
     private static func protectedOrdinarySettingsAvailability(

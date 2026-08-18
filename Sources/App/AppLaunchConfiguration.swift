@@ -6,9 +6,20 @@ struct AppLaunchConfiguration {
         case tutorial
     }
 
+    /// UI-test choreography that stages a specific tutorial surface at launch.
+    /// Parsed here — behind the same Release kill switch as every other
+    /// launch override — and handed to `TutorialView`, which asks the session
+    /// store to perform it.
+    enum TutorialChoreography {
+        case completionSurface
+        case authModeConfirmation
+        case contactDetailSurface
+    }
+
     let root: Root
     let shouldSkipOnboarding: Bool
     let tutorialModule: TutorialModuleID?
+    let tutorialChoreography: TutorialChoreography?
     let isUITestMode: Bool
     let isXCTestHost: Bool
     let requiresManualAuthentication: Bool
@@ -59,6 +70,7 @@ struct AppLaunchConfiguration {
             self.preloadsUITestContact = false
             self.shouldSkipOnboarding = false
             self.tutorialModule = nil
+            self.tutorialChoreography = nil
             return
         }
 
@@ -73,6 +85,22 @@ struct AppLaunchConfiguration {
         self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
         self.tutorialModule = environment["UITEST_TUTORIAL_TASK"].flatMap(Self.tutorialModule(for:))
+        self.tutorialChoreography = Self.tutorialChoreography(for: environment)
+    }
+
+    private static func tutorialChoreography(
+        for environment: [String: String]
+    ) -> TutorialChoreography? {
+        if environment["UITEST_TUTORIAL_COMPLETION"] == "1" {
+            return .completionSurface
+        }
+        if environment["UITEST_TUTORIAL_AUTHMODE_CONFIRMATION"] == "1" {
+            return .authModeConfirmation
+        }
+        if environment["UITEST_TUTORIAL_CONTACT_DETAIL"] == "1" {
+            return .contactDetailSurface
+        }
+        return nil
     }
 
     private static func detectXCTestHost(processInfo: ProcessInfo) -> Bool {

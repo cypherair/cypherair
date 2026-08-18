@@ -45,36 +45,17 @@ private final class TutorialContactsOpenGate {
 }
 
 @MainActor
-final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase {
-    func test_tutorialSandboxContainer_usesIsolatedSandboxStorage() async throws {
-        let container = try TutorialSandboxContainer()
+final class TutorialSessionStoreTests: XCTestCase {
+    func test_tutorialSandboxContainer_opensContactsIntoEmptyState() async throws {
+        let container = TutorialSandboxContainer()
         defer { container.cleanup() }
 
         try await container.openContactsIfNeeded()
 
-        XCTAssertTrue(FileManager.default.fileExists(atPath: container.contactsDirectory.path))
-        try assertCompleteFileProtection(at: container.contactsDirectory)
-        XCTAssertEqual(
-            container.defaultsSuiteName,
-            AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
-        )
         XCTAssertEqual(container.authManager.currentMode, .standard)
         XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
         XCTAssertEqual(container.contactService.testContactKeyRecords.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
-        XCTAssertTrue(container.contactsDirectory.path.contains("CypherAirGuidedTutorial-"))
-    }
-
-    func test_tutorialSandboxContainer_clearsFixedDefaultsSuiteOnCreation() throws {
-        let suiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defaults.set("stale", forKey: "marker")
-        _ = defaults.synchronize()
-
-        let container = try TutorialSandboxContainer()
-        defer { container.cleanup() }
-
-        XCTAssertNil(defaults.string(forKey: "marker"))
     }
 
     func test_prepareForPresentation_doesNotStartSandboxUntilModuleOpens() {
@@ -133,7 +114,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertEqual(store.hostSurface, .sandboxAcknowledgement)
     }
 
-    func test_openModule_sandboxIgnoresContactsOpenAfterReset() async {
+    func test_openModule_sandboxIgnoresContactsOpenAfterEndSession() async {
         let gate = TutorialContactsOpenGate()
         let store = TutorialSessionStore(openTutorialContacts: { container in
             try await gate.open(container)
@@ -145,30 +126,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         await gate.waitUntilStarted()
         XCTAssertNotNil(store.container)
 
-        store.resetTutorial()
-        XCTAssertFalse(store.isOpeningModule)
-        gate.release()
-        await task.value
-
-        XCTAssertNil(store.container)
-        XCTAssertEqual(store.lifecycleState, .notStarted)
-        XCTAssertEqual(store.hostSurface, .hub)
-        XCTAssertFalse(store.isOpeningModule)
-    }
-
-    func test_openModule_sandboxIgnoresContactsOpenAfterFinishAndCleanup() async {
-        let gate = TutorialContactsOpenGate()
-        let store = TutorialSessionStore(openTutorialContacts: { container in
-            try await gate.open(container)
-        })
-        let task = Task { @MainActor in
-            await store.openModule(.sandbox)
-        }
-
-        await gate.waitUntilStarted()
-        XCTAssertNotNil(store.container)
-
-        store.finishAndCleanupTutorial()
+        store.endSession()
         XCTAssertFalse(store.isOpeningModule)
         gate.release()
         await task.value
@@ -236,7 +194,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertTrue(store.isCompleted(.createDemoIdentity))
     }
 
-    func test_returnToOverview_preservesNavigationStateUntilNextModuleLaunch() async {
+    func test_returnToOverview_clearsNavigationState() async {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         store.markCompletedForTesting(.createDemoIdentity)
@@ -247,12 +205,12 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         store.returnToOverview()
 
         XCTAssertEqual(store.hostSurface, .hub)
-        XCTAssertEqual(store.routePath(for: .home), [.encrypt])
-        XCTAssertEqual(store.visibleRoute, .encrypt)
+        XCTAssertEqual(store.routePath(for: .home), [])
+        XCTAssertNil(store.visibleRoute)
         XCTAssertEqual(store.selectedTab, .home)
     }
 
-    func test_openSandboxAcknowledgement_preservesNavigationStateUntilHostSwitches() async {
+    func test_openSandboxAcknowledgement_clearsNavigationState() async {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         store.markCompletedForTesting(.createDemoIdentity)
@@ -263,12 +221,12 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         store.openSandboxAcknowledgement()
 
         XCTAssertEqual(store.hostSurface, .sandboxAcknowledgement)
-        XCTAssertEqual(store.routePath(for: .home), [.encrypt])
-        XCTAssertEqual(store.visibleRoute, .encrypt)
+        XCTAssertEqual(store.routePath(for: .home), [])
+        XCTAssertNil(store.visibleRoute)
         XCTAssertEqual(store.selectedTab, .home)
     }
 
-    func test_showCompletionView_preservesNavigationStateUntilHostSwitches() async {
+    func test_showCompletionView_clearsNavigationState() async {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         for module in TutorialModuleID.allCases {
@@ -280,19 +238,18 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         store.showCompletionView()
 
         XCTAssertEqual(store.hostSurface, .completion)
-        XCTAssertEqual(store.routePath(for: .home), [.encrypt])
-        XCTAssertEqual(store.visibleRoute, .encrypt)
+        XCTAssertEqual(store.routePath(for: .home), [])
+        XCTAssertNil(store.visibleRoute)
         XCTAssertEqual(store.selectedTab, .home)
     }
 
-    func test_resetTutorial_recreatesSandboxAndClearsProgress() async throws {
+    func test_endSession_clearsProgressAndNextSessionGetsFreshContainer() async throws {
         guard SecureEnclave.isAvailable else {
             throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
         }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let oldContainer = try XCTUnwrap(store.container)
-        let oldDirectory = oldContainer.contactsDirectory
 
         let alice = try await oldContainer.keyManagement.generateKey(
             name: "Alice Demo",
@@ -302,13 +259,19 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         )
         await store.noteAliceGenerated(alice)
 
-        store.resetTutorial()
+        store.endSession()
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDirectory.path))
         XCTAssertFalse(store.isCompleted(.createDemoIdentity))
         XCTAssertNil(store.session.artifacts.aliceIdentity)
         XCTAssertNil(store.container)
+        XCTAssertFalse(store.hasStartedSession)
         XCTAssertEqual(store.lifecycleState, .notStarted)
+
+        await startTutorialSession(store)
+        let newContainer = try XCTUnwrap(store.container)
+        defer { store.endSession() }
+        XCTAssertTrue(newContainer !== oldContainer)
+        XCTAssertEqual(newContainer.keyManagement.keys.count, 0)
     }
 
     func test_tutorialSessionStore_recordsArtifactsAcrossFullModuleFlow() async throws {
@@ -390,7 +353,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertEqual(store.lifecycleState, .stepsCompleted)
         XCTAssertEqual(protectedOrdinarySettings.snapshot?.hasCompletedGuidedTutorial, false)
 
-        store.markFinishedTutorial()
+        XCTAssertTrue(store.markFinishedTutorial())
 
         XCTAssertEqual(
             protectedOrdinarySettings.snapshot?.hasCompletedGuidedTutorial,
@@ -523,7 +486,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
 
         await startTutorialSession(store)
         let interceptor = try XCTUnwrap(store.outputInterceptionPolicy)
-        let config = AppConfiguration(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
 
         XCTAssertTrue(interceptor.interceptClipboardCopy?("ciphertext", config, .ciphertext) == true)
         XCTAssertTrue(try interceptor.interceptDataExport?(Data("demo".utf8), "demo.asc", .ciphertext) == true)
@@ -612,7 +575,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         await startTutorialSession(store)
 
         let configuration = store.configurationFactory.keyDetailConfiguration()
-        let config = AppConfiguration(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        let config = AppConfiguration(preferences: InMemoryAppPreferenceStorage())
 
         XCTAssertFalse(configuration.allowsPublicKeySave)
         XCTAssertFalse(configuration.allowsPublicKeyCopy)
@@ -1134,44 +1097,6 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         ).definitions()
 
         XCTAssertEqual(definitions.map(\.tab), AppShellTab.allCases)
-    }
-
-    func test_finishAndCleanupTutorial_clearsSandboxArtifacts() async throws {
-        let store = TutorialSessionStore()
-        await startTutorialSession(store)
-        let container = try XCTUnwrap(store.container)
-        let oldSuite = container.defaultsSuiteName
-        let oldContactsDirectory = container.contactsDirectory
-        UserDefaults(suiteName: oldSuite)?.set("temporary", forKey: "marker")
-        XCTAssertEqual(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"), "temporary")
-
-        store.finishAndCleanupTutorial()
-
-        XCTAssertNil(store.container)
-        XCTAssertEqual(store.lifecycleState, .notStarted)
-        XCTAssertNil(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: oldContactsDirectory.path))
-
-        await startTutorialSession(store)
-        let newContainer = try XCTUnwrap(store.container)
-        defer { newContainer.cleanup() }
-        XCTAssertEqual(newContainer.defaultsSuiteName, oldSuite)
-        XCTAssertNotEqual(newContainer.contactsDirectory, oldContactsDirectory)
-        XCTAssertNil(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"))
-    }
-
-    private func assertCompleteFileProtection(
-        at url: URL,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(
-            attributes[.protectionKey] as? FileProtectionType,
-            .complete,
-            file: file,
-            line: line
-        )
     }
 
     private func startTutorialSession(_ store: TutorialSessionStore) async {

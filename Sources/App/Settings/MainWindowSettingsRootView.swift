@@ -1,22 +1,23 @@
 import SwiftUI
 
 struct MainWindowSettingsRootView: View {
-    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(\.realWorkspace) private var realWorkspace
+    @Environment(ContentClearSignal.self) private var contentClear
 
     var body: some View {
         var configuration = SettingsView.Configuration.default
         configuration.protectedSettingsHostMode = .mainWindowLive
-        configuration.protectedSettingsHost = protectedSettingsHost
+        configuration.protectedSettingsHost = realWorkspace?.protectedSettingsHost
         return SettingsView(configuration: configuration)
-            .onChange(of: appSessionOrchestrator.contentClearGeneration) { _, generation in
+            .onChange(of: contentClear.generation) { _, generation in
                 Task {
-                    await protectedSettingsHost?.invalidateForContentClearGeneration(generation)
+                    await realWorkspace?.protectedSettingsHost.invalidateForContentClearGeneration(generation)
                 }
             }
-            .onChange(of: appSessionOrchestrator.postAuthenticationGeneration) { _, generation in
+            .onChange(of: realWorkspace?.sessionOrchestrator.postAuthenticationGeneration) { _, generation in
+                guard let generation else { return }
                 Task {
-                    await protectedSettingsHost?.refreshAfterAppAuthenticationGeneration(generation)
+                    await realWorkspace?.protectedSettingsHost.refreshAfterAppAuthenticationGeneration(generation)
                 }
             }
     }

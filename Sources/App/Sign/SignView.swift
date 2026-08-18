@@ -38,8 +38,8 @@ struct SignView: View {
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
+    @Environment(ContentClearSignal.self) private var contentClear
+    @Environment(\.realWorkspace) private var realWorkspace
 
     let configuration: Configuration
 
@@ -52,15 +52,15 @@ struct SignView: View {
             signingService: signingService,
             keyManagement: keyManagement,
             config: config,
-            appSessionOrchestrator: appSessionOrchestrator,
-            protectedSettingsHost: protectedSettingsHost,
+            contentClear: contentClear,
+            protectedSettingsHost: realWorkspace?.protectedSettingsHost,
             configuration: configuration
         )
     }
 }
 
 private struct SignScreenHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: SignScreenModel
@@ -69,11 +69,11 @@ private struct SignScreenHostView: View {
         signingService: SigningService,
         keyManagement: KeyManagementService,
         config: AppConfiguration,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: SignView.Configuration
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: SignScreenModel(
                 signingService: signingService,
@@ -277,7 +277,7 @@ private struct SignScreenHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.handleContentClearGenerationChange()
         }
     }

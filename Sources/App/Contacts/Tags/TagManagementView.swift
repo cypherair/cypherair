@@ -2,25 +2,25 @@ import SwiftUI
 
 struct TagManagementView: View {
     @Environment(ContactService.self) private var contactService
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
 
     var body: some View {
         TagManagementHostView(
             contactService: contactService,
-            appSessionOrchestrator: appSessionOrchestrator
+            contentClear: contentClear
         )
     }
 }
 
 private struct TagManagementHostView: View {
     @Environment(\.appRouteNavigator) private var routeNavigator
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @State private var model: TagManagementScreenModel
     @State private var isCreateTagSheetPresented = false
 
-    init(contactService: ContactService, appSessionOrchestrator: AppSessionOrchestrator) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+    init(contactService: ContactService, contentClear: ContentClearSignal) {
+        self.contentClear = contentClear
         _model = State(initialValue: TagManagementScreenModel(contactService: contactService))
     }
 
@@ -60,7 +60,7 @@ private struct TagManagementHostView: View {
         .onAppear {
             model.handleAppear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.clearTransientInput()
             isCreateTagSheetPresented = false
         }

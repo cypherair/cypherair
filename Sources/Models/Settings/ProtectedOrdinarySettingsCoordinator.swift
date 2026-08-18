@@ -111,10 +111,14 @@ final class ProtectedOrdinarySettingsCoordinator {
         saveLoadedSnapshot(snapshot)
     }
 
-    func markGuidedTutorialCompleted() {
-        guard var snapshot else { return }
+    /// Persist tutorial completion — the one fact the tutorial is allowed to
+    /// persist. Returns whether the write reached persistence: `false` when the
+    /// settings domain is not loaded or the save failed, so callers can act on
+    /// the outcome instead of silently losing it.
+    func markGuidedTutorialCompleted() -> Bool {
+        guard var snapshot else { return false }
         snapshot.hasCompletedGuidedTutorial = true
-        saveLoadedSnapshot(snapshot)
+        return saveLoadedSnapshot(snapshot)
     }
 
     private func loadFromPersistence() {
@@ -134,14 +138,17 @@ final class ProtectedOrdinarySettingsCoordinator {
         }
     }
 
-    private func saveLoadedSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) {
+    @discardableResult
+    private func saveLoadedSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) -> Bool {
         var normalized = snapshot
         normalized.normalize()
         do {
             try persistence.saveSnapshot(normalized)
             state = .loaded(normalized)
+            return true
         } catch {
             state = .recoveryRequired
+            return false
         }
     }
 }

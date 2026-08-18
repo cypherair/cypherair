@@ -103,14 +103,3 @@ struct LocalDataResetRestartRequiredView: View {
         #endif
     }
 }
-
-private struct LocalDataResetRestartCoordinatorKey: EnvironmentKey {
-    static let defaultValue: LocalDataResetRestartCoordinator? = nil
-}
-
-extension EnvironmentValues {
-    var localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? {
-        get { self[LocalDataResetRestartCoordinatorKey.self] }
-        set { self[LocalDataResetRestartCoordinatorKey.self] = newValue }
-    }
-}

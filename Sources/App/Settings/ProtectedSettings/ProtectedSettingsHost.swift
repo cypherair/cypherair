@@ -324,14 +324,3 @@ final class ProtectedSettingsHost {
         )
     }
 }
-
-private struct ProtectedSettingsHostKey: EnvironmentKey {
-    static let defaultValue: ProtectedSettingsHost? = nil
-}
-
-extension EnvironmentValues {
-    var protectedSettingsHost: ProtectedSettingsHost? {
-        get { self[ProtectedSettingsHostKey.self] }
-        set { self[ProtectedSettingsHostKey.self] = newValue }
-    }
-}

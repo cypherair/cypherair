@@ -16,11 +16,8 @@ final class TutorialSessionStore {
     private(set) var isTutorialPresentationActive = false
     private(set) var openingModule: TutorialModuleID?
     @ObservationIgnored
-    private var openingModuleToken: UUID?
-    #if DEBUG
-    private var didPrepareUITestCompletionSurface = false
-    private var didPrepareUITestAuthModeConfirmation = false
-    #endif
+    private let launchChoreography: AppLaunchConfiguration.TutorialChoreography?
+    private var didPerformLaunchChoreography = false
 
     var selectedTab: AppShellTab { navigation.selectedTab }
     var routePath: [AppRoute] { navigation.path(for: navigation.selectedTab) }
@@ -32,10 +29,12 @@ final class TutorialSessionStore {
     var blocklist = TutorialUnsafeRouteBlocklist()
 
     init(
+        launchChoreography: AppLaunchConfiguration.TutorialChoreography? = nil,
         openTutorialContacts: @escaping @MainActor (TutorialSandboxContainer) async throws -> Void = { container in
             try await container.openContactsIfNeeded()
         }
     ) {
+        self.launchChoreography = launchChoreography
         self.openTutorialContacts = openTutorialContacts
     }
 
@@ -70,8 +69,15 @@ final class TutorialSessionStore {
         return protectedOrdinarySettings?.hasCompletedGuidedTutorial ?? false
     }
 
+    /// The sandbox session's lifetime is the container's: one object is created
+    /// when the session begins and destroyed when it ends, and its identity is
+    /// the race token every async continuation checks.
+    var hasStartedSession: Bool {
+        container != nil
+    }
+
     var outputInterceptionPolicy: OutputInterceptionPolicy? {
-        guard session.hasStartedSession else { return nil }
+        guard hasStartedSession else { return nil }
 
         return OutputInterceptionPolicy(
             interceptClipboardCopy: { _, _, _ in
@@ -119,31 +125,20 @@ final class TutorialSessionStore {
         clearNavigationState()
 
         if session.lifecycleState == .finished {
-            resetTutorial()
-        } else if session.hasStartedSession && container == nil {
-            recreateContainer()
-            session.surface = .hub
-        } else {
-            session.surface = .hub
+            endSession()
         }
+        session.surface = .hub
     }
 
     func openModule(_ requestedModule: TutorialModuleID) async {
         guard canOpen(requestedModule) else { return }
-        guard let openingToken = beginOpeningModule(requestedModule) else { return }
+        guard beginOpeningModule(requestedModule) else { return }
         defer {
-            finishOpeningModule(openingToken)
+            openingModule = nil
         }
 
-        ensureSession()
-        guard let activeContainer = container,
-              let activeSessionID = session.sessionID else {
-            return
-        }
-        guard await openContactsIfNeeded(
-            for: activeContainer,
-            sessionID: activeSessionID
-        ) else {
+        let activeContainer = beginSessionIfNeeded()
+        guard await openContactsIfNeeded(for: activeContainer) else {
             return
         }
 
@@ -153,14 +148,8 @@ final class TutorialSessionStore {
         }
 
         if requestedModule == .addDemoContact {
-            await ensureBobPrepared(
-                container: activeContainer,
-                sessionID: activeSessionID
-            )
-            guard isCurrentTutorialSession(
-                container: activeContainer,
-                sessionID: activeSessionID
-            ) else {
+            await ensureBobPrepared(container: activeContainer)
+            guard isCurrentTutorialSession(activeContainer) else {
                 return
             }
         }
@@ -173,10 +162,11 @@ final class TutorialSessionStore {
     }
 
     func openSandboxAcknowledgement() {
-        ensureSession()
+        _ = beginSessionIfNeeded()
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
+        clearNavigationState()
         session.surface = .sandboxAcknowledgement
         refreshLifecycleState()
     }
@@ -196,9 +186,7 @@ final class TutorialSessionStore {
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
-        // Preserve the live navigation tree until the workspace is no longer rendered.
-        // On macOS, tearing down routed tutorial content before switching surfaces can
-        // trip SwiftUI/AttributeGraph into a tagged-memory fault during teardown.
+        clearNavigationState()
         session.surface = .hub
     }
 
@@ -211,6 +199,7 @@ final class TutorialSessionStore {
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
+        clearNavigationState()
         session.surface = .completion
         refreshLifecycleState()
     }
@@ -230,27 +219,26 @@ final class TutorialSessionStore {
         }
     }
 
-    func resetTutorial() {
+    /// The single session-lifetime teardown: destroy the sandbox container and
+    /// every piece of session and navigation state with it. Reset, finish, and
+    /// a failed contacts open all end the session through here.
+    func endSession() {
         container?.cleanup()
         container = nil
         session = TutorialSessionState()
         navigation = TutorialNavigationState()
         errorMessage = nil
-        clearOpeningModule()
     }
 
-    func markFinishedTutorial() {
-        protectedOrdinarySettings?.markGuidedTutorialCompleted()
+    /// Persist tutorial completion and mark the lifecycle finished. Returns
+    /// whether completion actually reached persistence — the write can fail
+    /// when the real settings domain is locked or saving throws, and callers
+    /// see that instead of a silent no-op.
+    @discardableResult
+    func markFinishedTutorial() -> Bool {
+        let persisted = protectedOrdinarySettings?.markGuidedTutorialCompleted() == true
         session.lifecycleState = .finished
-    }
-
-    func finishAndCleanupTutorial() {
-        container?.cleanup()
-        container = nil
-        session = TutorialSessionState()
-        navigation = TutorialNavigationState()
-        errorMessage = nil
-        clearOpeningModule()
+        return persisted
     }
 
     func selectTab(_ tab: AppShellTab) {
@@ -364,99 +352,88 @@ final class TutorialSessionStore {
     func markCompletedForTesting(_ module: TutorialModuleID) {
         complete(module)
     }
+    #endif
 
-    func prepareUITestContactDetailSurfaceIfRequested(
-        processInfo: ProcessInfo = .processInfo
-    ) async -> Bool {
-        guard processInfo.environment["UITEST_TUTORIAL_CONTACT_DETAIL"] == "1" else {
+    /// Stage the surface a UI-test launch asked for, once per process. The
+    /// request comes from `AppLaunchConfiguration` — behind its Release kill
+    /// switch, so a Release store always holds nil — not from an environment
+    /// read of this store's own, and it applies through every presentation
+    /// route (window root, cover, Settings sheet).
+    func performLaunchChoreographyIfRequested() async -> Bool {
+        guard let choreography = launchChoreography,
+              !didPerformLaunchChoreography else {
             return false
         }
+        didPerformLaunchChoreography = true
 
-        ensureSession()
-        markCompletedForTesting(.sandbox)
-        markCompletedForTesting(.createDemoIdentity)
-        await openModule(.addDemoContact)
-
-        do {
-            guard let container else {
-                return false
+        switch choreography {
+        case .completionSurface:
+            _ = beginSessionIfNeeded()
+            for module in TutorialModuleID.allCases {
+                complete(module)
             }
-
-            await ensureBobPrepared()
-            guard let bobArmoredPublicKey = session.artifacts.bobArmoredPublicKey else {
-                return false
+            session.pendingCompletionPromptModule = nil
+            showCompletionView()
+            return true
+        case .authModeConfirmation:
+            _ = beginSessionIfNeeded()
+            for module in TutorialModuleID.allCases
+            where module.rawValue < TutorialModuleID.enableHighSecurity.rawValue {
+                complete(module)
             }
-
-            let result = try container.contactService.importContact(
-                publicKeyData: Data(bobArmoredPublicKey.utf8)
-            )
-            let contact: ContactIdentitySummary
-            switch result {
-            case .added(let added, _),
-                 .addedWithCandidate(let added, _, _),
-                 .duplicate(let added, _),
-                 .updated(let added, _):
-                contact = added
-            }
-
-            noteBobImported(contact)
-            selectTab(.contacts)
-            setRoutePath(
-                [.contactDetail(contactId: contact.contactId)],
-                for: .contacts
+            await openModule(.enableHighSecurity)
+            presentAuthModeConfirmation(
+                SettingsAuthModeRequestBuilder.makeRequest(
+                    for: .highSecurity,
+                    hasBackup: false,
+                    onConfirm: { [weak self] in
+                        self?.noteHighSecurityEnabled(.highSecurity)
+                    },
+                    onCancel: {}
+                )
             )
             return true
-        } catch {
-            errorMessage = error.localizedDescription
-            return false
+        case .contactDetailSurface:
+            _ = beginSessionIfNeeded()
+            complete(.sandbox)
+            complete(.createDemoIdentity)
+            await openModule(.addDemoContact)
+
+            do {
+                guard let container else {
+                    return false
+                }
+
+                await ensureBobPrepared()
+                guard let bobArmoredPublicKey = session.artifacts.bobArmoredPublicKey else {
+                    return false
+                }
+
+                let result = try container.contactService.importContact(
+                    publicKeyData: Data(bobArmoredPublicKey.utf8)
+                )
+                let contact: ContactIdentitySummary
+                switch result {
+                case .added(let added, _),
+                     .addedWithCandidate(let added, _, _),
+                     .duplicate(let added, _),
+                     .updated(let added, _):
+                    contact = added
+                }
+
+                noteBobImported(contact)
+                selectTab(.contacts)
+                setRoutePath(
+                    [.contactDetail(contactId: contact.contactId)],
+                    for: .contacts
+                )
+                return true
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
+            }
         }
     }
-
-    func prepareUITestCompletionSurfaceIfRequested(
-        processInfo: ProcessInfo = .processInfo
-    ) -> Bool {
-        guard processInfo.environment["UITEST_TUTORIAL_COMPLETION"] == "1",
-              !didPrepareUITestCompletionSurface else {
-            return false
-        }
-
-        didPrepareUITestCompletionSurface = true
-        ensureSession()
-        for module in TutorialModuleID.allCases {
-            markCompletedForTesting(module)
-        }
-        session.pendingCompletionPromptModule = nil
-        showCompletionView()
-        return true
-    }
-
-    func prepareUITestAuthModeConfirmationIfRequested(
-        processInfo: ProcessInfo = .processInfo
-    ) async -> Bool {
-        guard processInfo.environment["UITEST_TUTORIAL_AUTHMODE_CONFIRMATION"] == "1",
-              !didPrepareUITestAuthModeConfirmation else {
-            return false
-        }
-
-        didPrepareUITestAuthModeConfirmation = true
-        ensureSession()
-        for module in TutorialModuleID.allCases where module.rawValue < TutorialModuleID.enableHighSecurity.rawValue {
-            markCompletedForTesting(module)
-        }
-        await openModule(.enableHighSecurity)
-        presentAuthModeConfirmation(
-            SettingsAuthModeRequestBuilder.makeRequest(
-                for: .highSecurity,
-                hasBackup: false,
-                onConfirm: { [weak self] in
-                    self?.noteHighSecurityEnabled(.highSecurity)
-                },
-                onCancel: {}
-            )
-        )
-        return true
-    }
-    #endif
 
     func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {
         var path = routePath(for: navigation.selectedTab)
@@ -472,62 +449,31 @@ final class TutorialSessionStore {
         refreshLifecycleState()
     }
 
-    private func beginOpeningModule(_ module: TutorialModuleID) -> UUID? {
-        guard openingModule == nil else { return nil }
-        let token = UUID()
+    private func beginOpeningModule(_ module: TutorialModuleID) -> Bool {
+        guard openingModule == nil else { return false }
         openingModule = module
-        openingModuleToken = token
-        return token
+        return true
     }
 
-    private func finishOpeningModule(_ token: UUID) {
-        guard openingModuleToken == token else { return }
-        clearOpeningModule()
-    }
-
-    private func clearOpeningModule() {
-        openingModule = nil
-        openingModuleToken = nil
-    }
-
-    private func ensureSession() {
-        if container == nil {
-            recreateContainer()
+    /// The single session-lifetime start: the sandbox container is created
+    /// here and nowhere else, and its identity is the session's race token.
+    private func beginSessionIfNeeded() -> TutorialSandboxContainer {
+        if let container {
+            return container
         }
-
-        if session.sessionID == nil {
-            session.sessionID = TutorialSessionID()
-            session.lifecycleState = .inProgress
-        }
-    }
-
-    private func recreateContainer() {
-        do {
-            container = try TutorialSandboxContainer()
-            errorMessage = nil
-        } catch {
-            container = nil
-            errorMessage = error.localizedDescription
-        }
+        let newContainer = TutorialSandboxContainer()
+        container = newContainer
+        session.lifecycleState = .inProgress
+        errorMessage = nil
+        return newContainer
     }
 
     private func openContactsIfNeeded(
-        for activeContainer: TutorialSandboxContainer,
-        sessionID activeSessionID: TutorialSessionID
+        for activeContainer: TutorialSandboxContainer
     ) async -> Bool {
-        guard isCurrentTutorialSession(
-            container: activeContainer,
-            sessionID: activeSessionID
-        ) else {
-            return false
-        }
-
         do {
             try await openTutorialContacts(activeContainer)
-            guard isCurrentTutorialSession(
-                container: activeContainer,
-                sessionID: activeSessionID
-            ) else {
+            guard isCurrentTutorialSession(activeContainer) else {
                 return false
             }
             errorMessage = nil
@@ -536,8 +482,7 @@ final class TutorialSessionStore {
             return false
         } catch {
             if container === activeContainer {
-                activeContainer.cleanup()
-                container = nil
+                endSession()
             }
             errorMessage = error.localizedDescription
             return false
@@ -545,12 +490,9 @@ final class TutorialSessionStore {
     }
 
     private func isCurrentTutorialSession(
-        container expectedContainer: TutorialSandboxContainer,
-        sessionID expectedSessionID: TutorialSessionID
+        _ expectedContainer: TutorialSandboxContainer
     ) -> Bool {
-        !Task.isCancelled
-            && container === expectedContainer
-            && session.sessionID == expectedSessionID
+        !Task.isCancelled && container === expectedContainer
     }
 
     private func refreshLifecycleState() {
@@ -560,7 +502,7 @@ final class TutorialSessionStore {
 
         if session.hasCompletedAllModules {
             session.lifecycleState = .stepsCompleted
-        } else if session.hasStartedSession {
+        } else if hasStartedSession {
             session.lifecycleState = .inProgress
         } else {
             session.lifecycleState = .notStarted
@@ -578,21 +520,16 @@ final class TutorialSessionStore {
     }
 
     private func ensureBobPrepared() async {
-        guard let container,
-              let sessionID = session.sessionID else {
+        guard let container else {
             return
         }
-        await ensureBobPrepared(container: container, sessionID: sessionID)
+        await ensureBobPrepared(container: container)
     }
 
     private func ensureBobPrepared(
-        container activeContainer: TutorialSandboxContainer,
-        sessionID activeSessionID: TutorialSessionID
+        container activeContainer: TutorialSandboxContainer
     ) async {
-        guard isCurrentTutorialSession(
-            container: activeContainer,
-            sessionID: activeSessionID
-        ) else {
+        guard isCurrentTutorialSession(activeContainer) else {
             return
         }
         if session.artifacts.bobIdentity != nil, session.artifacts.bobArmoredPublicKey != nil {
@@ -609,10 +546,7 @@ final class TutorialSessionStore {
                 expirySeconds: nil,
                 family: .portableEd25519X25519
             )
-            guard isCurrentTutorialSession(
-                container: activeContainer,
-                sessionID: activeSessionID
-            ) else {
+            guard isCurrentTutorialSession(activeContainer) else {
                 return
             }
             session.artifacts.bobIdentity = bob
@@ -623,10 +557,7 @@ final class TutorialSessionStore {
         } catch is CancellationError {
             return
         } catch {
-            guard isCurrentTutorialSession(
-                container: activeContainer,
-                sessionID: activeSessionID
-            ) else {
+            guard isCurrentTutorialSession(activeContainer) else {
                 return
             }
             errorMessage = error.localizedDescription

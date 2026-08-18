@@ -1,9 +1,9 @@
 import Foundation
 
-/// App-wide boot-safe configuration stored in UserDefaults.
+/// App-wide boot-safe configuration persisted through `AppPreferenceStorage`.
 @Observable
 final class AppConfiguration {
-    private let defaults: UserDefaults
+    private let preferences: any AppPreferenceStorage
 
     /// Private-key control state. The mode is available only after the
     /// `private-key-control` ProtectedData domain opens.
@@ -64,7 +64,7 @@ final class AppConfiguration {
     /// re-protection is known to have completed.
     private(set) var committedAppSessionAuthenticationPolicy: AppSessionAuthenticationPolicy {
         didSet {
-            defaults.set(
+            preferences.setString(
                 committedAppSessionAuthenticationPolicy.rawValue,
                 forKey: Self.appSessionAuthenticationPolicyKey
             )
@@ -78,10 +78,10 @@ final class AppConfiguration {
     private(set) var pendingAppSessionAuthenticationPolicySwitch: AppSessionAuthenticationPolicy? {
         didSet {
             guard let pending = pendingAppSessionAuthenticationPolicySwitch else {
-                defaults.removeObject(forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
+                preferences.removeValue(forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
                 return
             }
-            defaults.set(pending.rawValue, forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
+            preferences.setString(pending.rawValue, forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
         }
     }
 
@@ -114,14 +114,14 @@ final class AppConfiguration {
 
     // MARK: - Initialization
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    init(preferences: any AppPreferenceStorage) {
+        self.preferences = preferences
 
-        let appSessionPolicyString = defaults.string(forKey: Self.appSessionAuthenticationPolicyKey)
+        let appSessionPolicyString = preferences.string(forKey: Self.appSessionAuthenticationPolicyKey)
             ?? AppSessionAuthenticationPolicy.userPresence.rawValue
         self.committedAppSessionAuthenticationPolicy = AppSessionAuthenticationPolicy(rawValue: appSessionPolicyString)
             ?? .userPresence
-        self.pendingAppSessionAuthenticationPolicySwitch = defaults
+        self.pendingAppSessionAuthenticationPolicySwitch = preferences
             .string(forKey: Self.pendingAppSessionAuthenticationPolicySwitchKey)
             .flatMap(AppSessionAuthenticationPolicy.init(rawValue:))
     }
@@ -130,15 +130,23 @@ final class AppConfiguration {
         privateKeyControlState = .locked
         completeAppSessionAuthenticationPolicySwitch(to: .userPresence)
 
-        for key in Self.resetPersistentKeys {
-            defaults.removeObject(forKey: key)
+        for key in Self.persistentPreferenceKeys {
+            preferences.removeValue(forKey: key)
         }
+    }
+
+    /// The persisted preference keys still present in storage. Local data
+    /// reset's completeness check reads this through the same seam every write
+    /// goes through, so an unerased key cannot hide behind a different access
+    /// path.
+    var persistedPreferenceKeysRemaining: [String] {
+        Self.persistentPreferenceKeys.filter { preferences.string(forKey: $0) != nil }
     }
 
     /// Available grace period values in seconds.
     static let validGracePeriodValues = [0, 60, 180, 300]
 
-    private static var resetPersistentKeys: [String] {
+    private static var persistentPreferenceKeys: [String] {
         [
             appSessionAuthenticationPolicyKey,
             pendingAppSessionAuthenticationPolicySwitchKey

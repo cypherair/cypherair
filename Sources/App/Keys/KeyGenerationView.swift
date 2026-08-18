@@ -29,7 +29,7 @@ struct KeyGenerationView: View {
     let configuration: Configuration
 
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
     @Environment(\.appRouteNavigator) private var routeNavigator
 
     init(configuration: Configuration = .default) {
@@ -39,7 +39,7 @@ struct KeyGenerationView: View {
     var body: some View {
         KeyGenerationScreenHostView(
             keyManagement: keyManagement,
-            appSessionOrchestrator: appSessionOrchestrator,
+            contentClear: contentClear,
             routeNavigator: routeNavigator,
             configuration: configuration
         )
@@ -47,17 +47,17 @@ struct KeyGenerationView: View {
 }
 
 private struct KeyGenerationScreenHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @State private var model: KeyGenerationScreenModel
 
     init(
         keyManagement: KeyManagementService,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         routeNavigator: AppRouteNavigator,
         configuration: KeyGenerationView.Configuration
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
 
         let postGenerationPromptAction: KeyGenerationScreenModel.PostGenerationPromptAction?
         #if os(macOS)
@@ -101,7 +101,7 @@ private struct KeyGenerationScreenHostView: View {
             .onAppear {
                 model.handleAppear()
             }
-            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            .onChange(of: contentClear.generation) {
                 model.handleContentClearGenerationChange()
             }
     }

@@ -4,13 +4,13 @@ struct TagDetailView: View {
     let tagId: String
 
     @Environment(ContactService.self) private var contactService
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
 
     var body: some View {
         TagDetailHostView(
             tagId: tagId,
             contactService: contactService,
-            appSessionOrchestrator: appSessionOrchestrator
+            contentClear: contentClear
         )
     }
 }
@@ -18,15 +18,15 @@ struct TagDetailView: View {
 private struct TagDetailHostView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
     @State private var model: TagDetailScreenModel
 
     init(
         tagId: String,
         contactService: ContactService,
-        appSessionOrchestrator: AppSessionOrchestrator
+        contentClear: ContentClearSignal
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(initialValue: TagDetailScreenModel(tagId: tagId, contactService: contactService))
     }
 
@@ -116,7 +116,7 @@ private struct TagDetailHostView: View {
         .onAppear {
             model.handleAppear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.clearTransientInput()
         }
     }

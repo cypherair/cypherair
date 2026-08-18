@@ -7,7 +7,7 @@ enum ContactsDomainStoreState: Equatable {
     case recoveryNeeded
 }
 
-final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Sendable {
+final class ContactsDomainStore: ContactsDomainPersistence, ProtectedDataRelockParticipant, @unchecked Sendable {
     static let domainID: ProtectedDataDomainID = "contacts"
 
     private let storageRoot: ProtectedDataStorageRoot

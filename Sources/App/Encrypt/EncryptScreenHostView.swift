@@ -3,7 +3,7 @@ import SwiftUI
 struct EncryptScreenHostView: View {
     let configuration: EncryptView.Configuration
     let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: EncryptScreenModel
@@ -14,13 +14,13 @@ struct EncryptScreenHostView: View {
         contactService: ContactService,
         config: AppConfiguration,
         protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: EncryptView.Configuration
     ) {
         self.configuration = configuration
         self.protectedOrdinarySettings = protectedOrdinarySettings
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: EncryptScreenModel(
                 encryptionService: encryptionService,
@@ -80,7 +80,7 @@ struct EncryptScreenHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.handleContentClearGenerationChange()
         }
     }

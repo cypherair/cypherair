@@ -9,6 +9,8 @@ CypherAir X is a layered application: a SwiftUI presentation layer, a Swift serv
 Boundary rules:
 
 - **App → Security is a narrow edge.** Feature views reach crypto, Keychain, and lock state through the Services layer; only composition, the shell/lock surfaces, and the settings surfaces touch Security types directly.
+- **Real-world mutators reach views as one optional value.** The app session, protected-settings host, policy switch, and local data reset travel only inside the single `realWorkspace` environment value; the tutorial sandbox injects nil, so sandbox screens cannot name a real mutator. The content-clear signal is its own small injected value, never a reason to hand a view the session orchestrator.
+- **Protected domain stores sit behind protocol seams with in-memory conformances.** Domain invariants live on the model (shared validation both conformances run), never only in a storage backend, so a RAM-backed world cannot reach states the persisted world rejects.
 - **Services never call the engine directly** — each operation family has a dedicated FFI adapter. **One documented exception:** quantum-safety classification of the produced artifact calls the stateless generated engine directly.
 - **Error normalization has one chokepoint.** Generated `PgpError` is normalized into the app-owned `CypherAirError` vocabulary only at the FFI adapter boundary; Models, ScreenModels, and Views never see `PgpError`. External-seam callback failures travel as sanitized categories, never free-form strings.
 

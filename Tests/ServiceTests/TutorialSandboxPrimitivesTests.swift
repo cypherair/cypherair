@@ -8,7 +8,7 @@ import XCTest
 /// contract, and one full wrap → reconstruct → unwrap roundtrip through the
 /// real Secure Enclave (skipped where no enclave exists).
 @MainActor
-final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTestCase {
+final class TutorialSandboxPrimitivesTests: XCTestCase {
 
     // MARK: - EphemeralKeychainStore
 
@@ -40,7 +40,7 @@ final class TutorialSandboxPrimitivesTests: TutorialSandboxDefaultsSerializedTes
     }
 
     func test_tutorialContainerCleanup_wipesEphemeralKeychainRows() throws {
-        let container = try TutorialSandboxContainer()
+        let container = TutorialSandboxContainer()
         let markerService = KeychainConstants.privateKeyEnvelopeService(fingerprint: "abcdef0123456789")
         try container.keychain.save(
             Data([0xAB]),

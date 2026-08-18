@@ -11,7 +11,7 @@ import Foundation
 @Observable
 final class ContactService: @unchecked Sendable {
     private let certificateAdapter: PGPCertificateOperationAdapter
-    private let contactsDomainStore: ContactsDomainStore?
+    private let contactsDomainStore: (any ContactsDomainPersistence)?
     private let recipientResolver = ContactRecipientResolver()
     private let summaryProjector = ContactSummaryProjector()
     private let snapshotMutator: ContactSnapshotMutator
@@ -21,7 +21,7 @@ final class ContactService: @unchecked Sendable {
     init(
         contactImportAdapter: PGPContactImportAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,
-        contactsDomainStore: ContactsDomainStore? = nil
+        contactsDomainStore: (any ContactsDomainPersistence)? = nil
     ) {
         self.certificateAdapter = certificateAdapter
         snapshotMutator = ContactSnapshotMutator(

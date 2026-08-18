@@ -24,7 +24,7 @@ struct VerifyView: View {
     }
 
     @Environment(SigningService.self) private var signingService
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(ContentClearSignal.self) private var contentClear
 
     let configuration: Configuration
 
@@ -35,24 +35,24 @@ struct VerifyView: View {
     var body: some View {
         VerifyScreenHostView(
             signingService: signingService,
-            appSessionOrchestrator: appSessionOrchestrator,
+            contentClear: contentClear,
             configuration: configuration
         )
     }
 }
 
 private struct VerifyScreenHostView: View {
-    let appSessionOrchestrator: AppSessionOrchestrator
+    let contentClear: ContentClearSignal
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: VerifyScreenModel
 
     init(
         signingService: SigningService,
-        appSessionOrchestrator: AppSessionOrchestrator,
+        contentClear: ContentClearSignal,
         configuration: VerifyView.Configuration
     ) {
-        self.appSessionOrchestrator = appSessionOrchestrator
+        self.contentClear = contentClear
         _model = State(
             initialValue: VerifyScreenModel(
                 signingService: signingService,
@@ -183,7 +183,7 @@ private struct VerifyScreenHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
-        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+        .onChange(of: contentClear.generation) {
             model.handleContentClearGenerationChange()
         }
     }
