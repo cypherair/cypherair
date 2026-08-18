@@ -71,7 +71,7 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             }
         }
 
-        let accessControl = try Self.makeFixedAccessControl()
+        let accessControl = try SecureEnclaveCustodyAccessControl.deviceBound()
         let handle = try secureEnclave.generateWrappingKey(
             accessControl: accessControl,
             authenticationContext: nil
@@ -188,19 +188,5 @@ struct SecureEnclaveCompositeClassicalComponentStore {
 
     private static func service(for fingerprint: String) -> String {
         KeychainConstants.splitCustodyClassicalComponentService(fingerprint: fingerprint)
-    }
-
-    private static func makeFixedAccessControl() throws -> SecAccessControl {
-        var error: Unmanaged<CFError>?
-        guard let accessControl = SecAccessControlCreateWithFlags(
-            kCFAllocatorDefault,
-            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            [.privateKeyUsage, .biometryAny],
-            &error
-        ) else {
-            _ = error?.takeRetainedValue()
-            throw SecureEnclaveCustodyHandleError.accessPolicyUnavailable
-        }
-        return accessControl
     }
 }

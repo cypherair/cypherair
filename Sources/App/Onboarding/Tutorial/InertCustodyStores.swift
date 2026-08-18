@@ -12,7 +12,6 @@ import LocalAuthentication
 struct InertCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
         throw SecureEnclaveCustodyHandleError.hardwareUnavailable

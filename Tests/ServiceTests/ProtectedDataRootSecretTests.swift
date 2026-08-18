@@ -25,10 +25,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         }
 
         XCTAssertEqual(decoded.magic, ProtectedDataRootSecretEnvelope.magic)
-        XCTAssertEqual(decoded.formatVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
-        XCTAssertEqual(decoded.aadVersion, ProtectedDataRootSecretEnvelope.currentAADVersion)
-        XCTAssertEqual(ProtectedDataRootSecretEnvelope.currentAADVersion, 5)
-        XCTAssertEqual(decoded.algorithmID, ProtectedDataRootSecretEnvelope.algorithmID)
+        XCTAssertEqual(decoded.magic, "CAPDSEV1")
         XCTAssertEqual(decoded.hkdfSalt.count, ProtectedDataRootSecretEnvelope.expectedSaltLength)
         XCTAssertEqual(decoded.nonce.count, ProtectedDataRootSecretEnvelope.expectedNonceLength)
         XCTAssertEqual(decoded.tag.count, ProtectedDataRootSecretEnvelope.expectedAuthenticationTagLength)
@@ -61,7 +58,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         }
     }
 
-    func test_rootSecretEnvelope_aadBindsEphemeralPublicKeyAndRejectsUnsupportedAADVersion() throws {
+    func test_rootSecretEnvelope_aadBindsEphemeralPublicKey() throws {
         let provider = MockProtectedDataDeviceBindingProvider()
         let rootSecret = Data(repeating: 0x26, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
         let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
@@ -85,14 +82,6 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         )
 
         XCTAssertNotEqual(originalAAD, substitutedAAD)
-
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        let aadV1Payload = try encoder.encode(replacing(envelope, aadVersion: 1))
-        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.decode(
-            aadV1Payload,
-            expectedSharedRightIdentifier: envelopeTestSharedRight
-        ))
     }
 
     func test_rootSecretEnvelope_rejectsMalformedContractAndUnsupportedFields() throws {
@@ -101,8 +90,6 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
 
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, magic: "INVALID0")))
-        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, formatVersion: 1)))
-        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, hkdfSalt: Data(repeating: 0x00, count: 31))))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, nonce: Data(repeating: 0x00, count: 11))))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, tag: Data(repeating: 0x00, count: 15))))

@@ -6,9 +6,11 @@ import Security
 ///
 /// Kept distinct from `ProtectedDataError`: the private-key envelope protects
 /// OpenPGP secret key bytes and must not be conflated with the ProtectedData
-/// app-data wrapping path (see SECURITY.md Section 3).
+/// app-data wrapping path (see SECURITY.md Section 3). The one exception is the
+/// pre-decode strict-field check, which is `EnvelopePlistInspector`'s shared
+/// mechanism and throws that mechanism's error.
 enum PrivateKeyEnvelopeError: Error, Equatable {
-    /// Magic / version / algorithm / binding contract was not satisfied.
+    /// Magic / binding contract was not satisfied.
     case invalidEnvelope(String)
     /// HKDF salt length was not the expected size.
     case invalidSaltLength(Int)
@@ -57,24 +59,27 @@ enum PrivateKeyEnvelopePayloadKind: String, Codable, Equatable, Sendable, CaseIt
 /// check were bypassed.
 ///
 /// This deliberately does **not** reuse the ProtectedData root-secret envelope:
-/// the two are domain-separated by `magic` (`CAPKEV6` vs `CAPDSEV5`) and by their
-/// HKDF/AAD prefixes so neither blob can be misread as the other.
+/// the two are domain-separated by `magic` (`CAPKEV1` vs `CAPDSEV1`) and by their
+/// HKDF/AAD prefixes so neither blob can be misread as the other. The magic is
+/// the format's whole identity — there is exactly one construction per magic —
+/// and it is bound into both the HKDF `sharedInfo` and the AES-GCM AAD.
 ///
 /// See SECURITY.md Section 3.
 struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CAPKEV6"
-    static let currentFormatVersion = 6
-    static let currentAADVersion = 6
-    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v6"
+    static let magic = "CAPKEV1"
+    /// HKDF `sharedInfo` domain-separation prefix for this magic.
+    static let hkdfInfoPrefix = "CAPKKI1"
+    /// AES-GCM AAD domain-separation prefix for this magic.
+    static let aadPrefix = "CAPKAD1"
+    /// Derived AES-256 wrapping-key length. Its own fact: it happens to agree
+    /// with `expectedSaltLength`, which is a different quantity.
+    static let wrappingKeyLength = 32
     static let expectedSaltLength = 32
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
     static let expectedP256X963Length = 65
 
     let magic: String
-    let formatVersion: Int
-    let algorithmID: String
-    let aadVersion: Int
     /// What the ciphertext holds. Authenticated, never inferred.
     let payloadKind: PrivateKeyEnvelopePayloadKind
     /// Lowercase hex fingerprint of the wrapped key (bound identity).
@@ -97,20 +102,12 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
         guard magic == Self.magic else {
             throw PrivateKeyEnvelopeError.invalidEnvelope("Unsupported private-key envelope magic.")
         }
-        guard formatVersion == Self.currentFormatVersion else {
-            throw PrivateKeyEnvelopeError.invalidEnvelope("Unsupported private-key envelope format version \(formatVersion).")
-        }
-        guard algorithmID == Self.algorithmID else {
-            throw PrivateKeyEnvelopeError.invalidEnvelope("Unsupported private-key envelope algorithm.")
-        }
-        guard aadVersion == Self.currentAADVersion else {
-            throw PrivateKeyEnvelopeError.invalidEnvelope("Unsupported private-key envelope AAD version \(aadVersion).")
-        }
         guard payloadKind == expectedPayloadKind else {
             throw PrivateKeyEnvelopeError.payloadKindMismatch
         }
-        try SEConstants.validateFingerprint(fingerprint)
-        guard fingerprint == fingerprint.lowercased() else {
+        // Reject: the seal path already normalized, so a stored fingerprint
+        // that is not lowercase hex is a malformed envelope.
+        guard HexIdentifier.isValid(fingerprint, letterCase: .lowercase) else {
             throw PrivateKeyEnvelopeError.invalidEnvelope("Private-key envelope fingerprint must be lowercase hex.")
         }
         if let expectedFingerprint {
@@ -152,9 +149,6 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
 enum PrivateKeyEnvelopeCodec {
     private static let allowedKeys: Set<String> = [
         "magic",
-        "formatVersion",
-        "algorithmID",
-        "aadVersion",
         "payloadKind",
         "fingerprint",
         "seKeyData",
@@ -181,7 +175,11 @@ enum PrivateKeyEnvelopeCodec {
         expectedFingerprint: String? = nil,
         expectedPayloadKind: PrivateKeyEnvelopePayloadKind
     ) throws -> PrivateKeyEnvelope {
-        try validateNoUnsupportedKeys(in: data)
+        try EnvelopePlistInspector.validateTopLevelKeys(
+            in: data,
+            allowed: allowedKeys,
+            noun: "Private-key envelope"
+        )
         let envelope = try PropertyListDecoder().decode(PrivateKeyEnvelope.self, from: data)
         try envelope.validateContract(
             expectedFingerprint: expectedFingerprint,
@@ -214,6 +212,8 @@ enum PrivateKeyEnvelopeCodec {
         seKeyPublicKeyX963: Data,
         ephemeralPrivateKey: P256.KeyAgreement.PrivateKey? = nil
     ) throws -> PrivateKeyEnvelope {
+        // Normalize: fingerprints arrive in either hex case; the envelope
+        // binds and stores lowercase.
         try SEConstants.validateFingerprint(fingerprint)
         let normalizedFingerprint = fingerprint.lowercased()
         guard !privateKey.isEmpty else {
@@ -258,9 +258,6 @@ enum PrivateKeyEnvelopeCodec {
 
         let envelope = PrivateKeyEnvelope(
             magic: PrivateKeyEnvelope.magic,
-            formatVersion: PrivateKeyEnvelope.currentFormatVersion,
-            algorithmID: PrivateKeyEnvelope.algorithmID,
-            aadVersion: PrivateKeyEnvelope.currentAADVersion,
             payloadKind: payloadKind,
             fingerprint: normalizedFingerprint,
             seKeyData: seKeyData,
@@ -329,7 +326,7 @@ enum PrivateKeyEnvelopeCodec {
         plaintextLength: Int
     ) throws -> SymmetricKey {
         let sharedInfo = try bindingData(
-            prefix: "CAPKKI6",
+            prefix: PrivateKeyEnvelope.hkdfInfoPrefix,
             payloadKind: payloadKind,
             fingerprint: fingerprint,
             seKeyData: seKeyData,
@@ -341,7 +338,7 @@ enum PrivateKeyEnvelopeCodec {
             using: SHA256.self,
             salt: salt,
             sharedInfo: sharedInfo,
-            outputByteCount: 32
+            outputByteCount: PrivateKeyEnvelope.wrappingKeyLength
         )
     }
 
@@ -354,7 +351,7 @@ enum PrivateKeyEnvelopeCodec {
         plaintextLength: Int
     ) throws -> Data {
         try bindingData(
-            prefix: "CAPKAD6",
+            prefix: PrivateKeyEnvelope.aadPrefix,
             payloadKind: payloadKind,
             fingerprint: fingerprint,
             seKeyData: seKeyData,
@@ -375,7 +372,6 @@ enum PrivateKeyEnvelopeCodec {
     ) throws -> Data {
         guard let prefixData = prefix.data(using: .utf8),
               let magicData = PrivateKeyEnvelope.magic.data(using: .utf8),
-              let algorithmData = PrivateKeyEnvelope.algorithmID.data(using: .utf8),
               let payloadKindData = payloadKind.rawValue.data(using: .utf8),
               let fingerprintData = fingerprint.data(using: .utf8) else {
             throw PrivateKeyEnvelopeError.internalFailure("Private-key envelope binding data could not be encoded.")
@@ -383,12 +379,8 @@ enum PrivateKeyEnvelopeCodec {
 
         var data = Data()
         data.append(prefixData)
-        data.append(UInt8(PrivateKeyEnvelope.currentFormatVersion))
-        data.append(UInt8(PrivateKeyEnvelope.currentAADVersion))
         data.append(UInt16(magicData.count).bigEndianData)
         data.append(magicData)
-        data.append(UInt16(algorithmData.count).bigEndianData)
-        data.append(algorithmData)
         data.append(UInt16(payloadKindData.count).bigEndianData)
         data.append(payloadKindData)
         data.append(UInt16(fingerprintData.count).bigEndianData)
@@ -399,15 +391,6 @@ enum PrivateKeyEnvelopeCodec {
         data.append(UInt16(ephemeralPublicKeyX963.count).bigEndianData)
         data.append(UInt64(plaintextLength).bigEndianData)
         return data
-    }
-
-    private static func validateNoUnsupportedKeys(in data: Data) throws {
-        guard let keys = try EnvelopePlistInspector.topLevelKeys(in: data) else {
-            throw PrivateKeyEnvelopeError.invalidEnvelope("Private-key envelope is not a dictionary.")
-        }
-        guard keys == allowedKeys else {
-            throw PrivateKeyEnvelopeError.invalidEnvelope("Private-key envelope contains unsupported or missing fields.")
-        }
     }
 
     private static func randomData(count: Int) throws -> Data {

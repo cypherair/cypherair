@@ -15,14 +15,13 @@ import Security
 struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
         guard try loadRow(reference: reference) == nil else {
             throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(reference.role)
         }
 
-        let accessControl = try accessPolicy.makeSecAccessControl()
+        let accessControl = try SecureEnclaveCustodyAccessControl.deviceBound()
         let privateKey: SecureEnclaveCustodyLoadedHandle.PrivateKey
         let publicKeyRaw: Data
         let blob: Data
@@ -289,8 +288,7 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
     ) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String:
-                "\(SecureEnclaveCustodyHandleReference.servicePrefix).\(tier.serviceNamespaceSegment).\(role.rawValue)",
+            kSecAttrService as String: SecureEnclaveCustodyHandleReference.serviceString(tier: tier, role: role),
             kSecUseDataProtectionKeychain as String: true
         ]
         #if os(macOS)

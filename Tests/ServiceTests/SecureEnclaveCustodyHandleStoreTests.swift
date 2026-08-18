@@ -20,18 +20,6 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertEqual(keyStore.createRequests.count, 2)
     }
 
-    func test_createLoadedHandlePair_requestsCustodySpecificAccessPolicy() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
-
-        _ = try store.createLoadedHandlePair(authenticationContext: nil)
-
-        XCTAssertEqual(keyStore.createRequests.count, 2)
-        for request in keyStore.createRequests {
-            XCTAssertEqual(request.accessPolicy, .privateKeyUsageBiometryAny)
-        }
-    }
-
     func test_createLoadedHandlePair_secondCreateFailureRollsBackBothReferences() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failCreateRole = .keyAgreement
@@ -380,11 +368,11 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         )
         XCTAssertEqual(
             signing.serviceString,
-            "com.cypherair.v5.secure-enclave-custody.p256.signing"
+            "com.cypherair.secure-enclave-custody.p256.signing"
         )
         XCTAssertEqual(
             keyAgreement.serviceString,
-            "com.cypherair.v5.secure-enclave-custody.post-quantum-high.keyAgreement"
+            "com.cypherair.secure-enclave-custody.post-quantum-high.keyAgreement"
         )
     }
 

@@ -12,15 +12,21 @@ import Security
 /// SE-encrypted key that is useless off-device, and its hash is bound into both the
 /// HKDF `sharedInfo` and the AES-GCM AAD.
 ///
-/// Domain-separated from the per-key private-key envelope (`CAPKEV6`) by distinct
-/// `magic` (`CAPDSEV5`) and HKDF/AAD prefixes so neither blob can be misread.
+/// Domain-separated from the per-key private-key envelope (`CAPKEV1`) by distinct
+/// `magic` (`CAPDSEV1`) and HKDF/AAD prefixes so neither blob can be misread. The
+/// magic is the format's whole identity — there is exactly one construction per
+/// magic — and it is bound into both the HKDF `sharedInfo` and the AES-GCM AAD.
 ///
 /// See SECURITY.md Section 3.
 struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CAPDSEV5"
-    static let currentFormatVersion = 5
-    static let currentAADVersion = 5
-    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v5"
+    static let magic = "CAPDSEV1"
+    /// HKDF `sharedInfo` domain-separation prefix for this magic.
+    static let hkdfInfoPrefix = "CAPDSEKI1"
+    /// AES-GCM AAD domain-separation prefix for this magic.
+    static let aadPrefix = "CAPDSEAD1"
+    /// Derived AES-256 wrapping-key length. Its own fact: the root secret and
+    /// the HKDF salt agree on the number, but each is a different quantity.
+    static let wrappingKeyLength = 32
     static let expectedRootSecretLength = 32
     static let expectedSaltLength = 32
     static let expectedNonceLength = 12
@@ -28,9 +34,6 @@ struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
     static let expectedP256X963Length = 65
 
     let magic: String
-    let formatVersion: Int
-    let algorithmID: String
-    let aadVersion: Int
     let sharedRightIdentifier: String
     let deviceBindingKeyIdentifier: String
     /// ProtectedData device-binding Secure Enclave key `dataRepresentation` — folded in
@@ -46,15 +49,6 @@ struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
     func validateContract(expectedSharedRightIdentifier: String? = nil) throws {
         guard magic == Self.magic else {
             throw ProtectedDataError.invalidEnvelope("Unsupported root-secret envelope magic.")
-        }
-        guard formatVersion == Self.currentFormatVersion else {
-            throw ProtectedDataError.invalidEnvelope("Unsupported root-secret envelope format version \(formatVersion).")
-        }
-        guard algorithmID == Self.algorithmID else {
-            throw ProtectedDataError.invalidEnvelope("Unsupported root-secret envelope algorithm.")
-        }
-        guard aadVersion == Self.currentAADVersion else {
-            throw ProtectedDataError.invalidEnvelope("Unsupported root-secret envelope AAD version \(aadVersion).")
         }
         if let expectedSharedRightIdentifier {
             guard sharedRightIdentifier == expectedSharedRightIdentifier else {
@@ -77,13 +71,16 @@ struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope HKDF salt has invalid length.")
         }
         guard nonce.count == Self.expectedNonceLength else {
-            throw ProtectedDataError.invalidNonceLength(nonce.count)
+            throw ProtectedDataError.invalidNonceLength(expected: Self.expectedNonceLength, got: nonce.count)
         }
         guard ciphertext.count == Self.expectedRootSecretLength else {
-            throw ProtectedDataError.invalidCiphertextLength(ciphertext.count)
+            throw ProtectedDataError.invalidCiphertextLength(expected: Self.expectedRootSecretLength, got: ciphertext.count)
         }
         guard tag.count == Self.expectedAuthenticationTagLength else {
-            throw ProtectedDataError.invalidAuthenticationTagLength(tag.count)
+            throw ProtectedDataError.invalidAuthenticationTagLength(
+                expected: Self.expectedAuthenticationTagLength,
+                got: tag.count
+            )
         }
 
         _ = try P256.KeyAgreement.PublicKey(x963Representation: deviceBindingPublicKeyX963)
@@ -94,9 +91,6 @@ struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
 enum ProtectedDataRootSecretEnvelopeCodec {
     private static let allowedKeys: Set<String> = [
         "magic",
-        "formatVersion",
-        "algorithmID",
-        "aadVersion",
         "sharedRightIdentifier",
         "deviceBindingKeyIdentifier",
         "deviceBindingKeyData",
@@ -116,7 +110,11 @@ enum ProtectedDataRootSecretEnvelopeCodec {
     }
 
     static func decode(_ data: Data, expectedSharedRightIdentifier: String? = nil) throws -> ProtectedDataRootSecretEnvelope {
-        try validateNoUnsupportedKeys(in: data)
+        try EnvelopePlistInspector.validateTopLevelKeys(
+            in: data,
+            allowed: allowedKeys,
+            noun: "Root-secret envelope"
+        )
         let envelope = try PropertyListDecoder().decode(ProtectedDataRootSecretEnvelope.self, from: data)
         try envelope.validateContract(expectedSharedRightIdentifier: expectedSharedRightIdentifier)
         return envelope
@@ -131,7 +129,10 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         ephemeralPrivateKey: P256.KeyAgreement.PrivateKey? = nil
     ) throws -> ProtectedDataRootSecretEnvelope {
         guard rootSecret.count == ProtectedDataRootSecretEnvelope.expectedRootSecretLength else {
-            throw ProtectedDataError.invalidDomainMasterKeyLength(rootSecret.count)
+            throw ProtectedDataError.invalidKeyMaterialLength(
+                expected: ProtectedDataRootSecretEnvelope.expectedRootSecretLength,
+                got: rootSecret.count
+            )
         }
         guard !deviceBindingKeyData.isEmpty else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key data is missing.")
@@ -172,9 +173,6 @@ enum ProtectedDataRootSecretEnvelopeCodec {
 
         let envelope = ProtectedDataRootSecretEnvelope(
             magic: ProtectedDataRootSecretEnvelope.magic,
-            formatVersion: ProtectedDataRootSecretEnvelope.currentFormatVersion,
-            algorithmID: ProtectedDataRootSecretEnvelope.algorithmID,
-            aadVersion: ProtectedDataRootSecretEnvelope.currentAADVersion,
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
             deviceBindingKeyData: deviceBindingKeyData,
@@ -220,7 +218,10 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         )
         let rootSecret = try AES.GCM.open(sealedBox, using: symmetricKey, authenticating: aad)
         guard rootSecret.count == ProtectedDataRootSecretEnvelope.expectedRootSecretLength else {
-            throw ProtectedDataError.invalidDomainMasterKeyLength(rootSecret.count)
+            throw ProtectedDataError.invalidKeyMaterialLength(
+                expected: ProtectedDataRootSecretEnvelope.expectedRootSecretLength,
+                got: rootSecret.count
+            )
         }
         return rootSecret
     }
@@ -234,7 +235,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         rootSecretLength: Int
     ) throws -> Data {
         try rootSecretEnvelopeBindingData(
-            prefix: "CAPDSEAD5",
+            prefix: ProtectedDataRootSecretEnvelope.aadPrefix,
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
             deviceBindingKeyData: deviceBindingKeyData,
@@ -255,7 +256,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         rootSecretLength: Int
     ) throws -> SymmetricKey {
         let sharedInfo = try rootSecretEnvelopeBindingData(
-            prefix: "CAPDSEKI5",
+            prefix: ProtectedDataRootSecretEnvelope.hkdfInfoPrefix,
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
             deviceBindingKeyData: deviceBindingKeyData,
@@ -267,7 +268,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             using: SHA256.self,
             salt: salt,
             sharedInfo: sharedInfo,
-            outputByteCount: 32
+            outputByteCount: ProtectedDataRootSecretEnvelope.wrappingKeyLength
         )
     }
 
@@ -282,7 +283,6 @@ enum ProtectedDataRootSecretEnvelopeCodec {
     ) throws -> Data {
         guard let prefixData = prefix.data(using: .utf8),
               let magicData = ProtectedDataRootSecretEnvelope.magic.data(using: .utf8),
-              let algorithmData = ProtectedDataRootSecretEnvelope.algorithmID.data(using: .utf8),
               let sharedRightData = sharedRightIdentifier.data(using: .utf8),
               let deviceBindingKeyIdentifierData = deviceBindingKeyIdentifier.data(using: .utf8) else {
             throw ProtectedDataError.internalFailure("Root-secret envelope binding data could not be encoded.")
@@ -290,12 +290,8 @@ enum ProtectedDataRootSecretEnvelopeCodec {
 
         var data = Data()
         data.append(prefixData)
-        data.append(UInt8(ProtectedDataRootSecretEnvelope.currentFormatVersion))
-        data.append(UInt8(ProtectedDataRootSecretEnvelope.currentAADVersion))
         data.append(UInt16(magicData.count).bigEndianData)
         data.append(magicData)
-        data.append(UInt16(algorithmData.count).bigEndianData)
-        data.append(algorithmData)
         data.append(UInt16(sharedRightData.count).bigEndianData)
         data.append(sharedRightData)
         data.append(UInt16(deviceBindingKeyIdentifierData.count).bigEndianData)
@@ -309,15 +305,6 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         data.append(UInt16(ephemeralPublicKeyX963.count).bigEndianData)
         data.append(UInt16(rootSecretLength).bigEndianData)
         return data
-    }
-
-    private static func validateNoUnsupportedKeys(in data: Data) throws {
-        guard let keys = try EnvelopePlistInspector.topLevelKeys(in: data) else {
-            throw ProtectedDataError.invalidEnvelope("Root-secret envelope is not a dictionary.")
-        }
-        guard keys == allowedKeys else {
-            throw ProtectedDataError.invalidEnvelope("Root-secret envelope contains unsupported or missing fields.")
-        }
     }
 
     private static func randomData(count: Int) throws -> Data {

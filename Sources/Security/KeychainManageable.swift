@@ -10,7 +10,7 @@ protocol KeychainManageable {
     ///
     /// - Parameters:
     ///   - data: The data to store.
-    ///   - service: The Keychain service identifier (e.g., "com.cypherair.v5.privkey-envelope.{fingerprint}").
+    ///   - service: The Keychain service identifier (e.g., "com.cypherair.privkey-envelope.{fingerprint}").
     ///   - account: The Keychain account identifier.
     ///   - accessControl: Optional SecAccessControl for biometric/passcode protection.
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws
@@ -47,7 +47,7 @@ protocol KeychainManageable {
     /// Used by reset cleanup.
     ///
     /// - Parameters:
-    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v5.").
+    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.").
     ///   - account: The Keychain account identifier.
     /// - Returns: Array of full service names matching the prefix.
     func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String]
@@ -75,12 +75,14 @@ extension KeychainManageable {
     }
 }
 
-/// Keychain service name constants.
-/// Row promises and the envelope version map: docs/STORAGE.md.
+/// Keychain service name constants. Every app-owned service name is built here
+/// (or from `SecureEnclaveCustodyHandleReference`, which builds on `prefix`), so
+/// construction and reset classification share one set of segment spellings.
+/// Row promises: docs/STORAGE.md.
 enum KeychainConstants {
-    /// Prefix for all Keychain items. The version segment is the schema
-    /// generation of the persisted format family, nothing more.
-    static let prefix = "com.cypherair.v5"
+    /// Prefix for all Keychain items: the product identifier. Each row family
+    /// appends its role segment.
+    static let prefix = "com.cypherair"
 
     /// Prefix for the single self-contained software private-key envelope rows.
     static let privateKeyEnvelopeServicePrefix = "\(prefix).privkey-envelope."
@@ -109,11 +111,14 @@ enum KeychainConstants {
         "\(splitCustodyClassicalComponentServicePrefix)\(fingerprint)"
     }
 
-    /// Stable ProtectedData CAPDSEV5 device-binding label; not a persisted Keychain item.
+    /// Stable ProtectedData CAPDSEV1 device-binding label; not a persisted Keychain item.
     static let protectedDataDeviceBindingKeyService = "\(prefix).protected-data.device-binding-key"
 
     /// Prefix for ProtectedData wrapped domain master key rows.
     static let protectedDataDomainKeyServicePrefix = "\(prefix).protected-data.domain-key."
+
+    /// Prefix for ProtectedData staged wrapped domain master key rows.
+    static let stagedProtectedDataDomainKeyServicePrefix = "\(protectedDataDomainKeyServicePrefix)staged."
 
     /// ProtectedData committed wrapped domain master key record.
     static func protectedDataDomainKeyService(domainID: ProtectedDataDomainID) -> String {
@@ -122,9 +127,17 @@ enum KeychainConstants {
 
     /// ProtectedData staged wrapped domain master key record.
     static func stagedProtectedDataDomainKeyService(domainID: ProtectedDataDomainID) -> String {
-        "\(protectedDataDomainKeyServicePrefix)staged.\(domainID.rawValue)"
+        "\(stagedProtectedDataDomainKeyServicePrefix)\(domainID.rawValue)"
     }
 
-    /// Default Keychain account identifier.
-    static let defaultAccount = "com.cypherair"
+    /// The single ProtectedData root-secret row: the shared-right identifier the
+    /// root-secret envelope is bound to, and the target of the reset flow's
+    /// dedicated exact delete (docs/STORAGE.md §3).
+    static let protectedDataSharedRightService = "\(prefix).protected-data.shared-right"
+
+    /// Default Keychain account identifier for app-owned rows. Deliberately not
+    /// a reverse-DNS string: the service carries the namespace; the account is
+    /// just the row's account label (custody handle rows use random handle-set
+    /// identifiers instead).
+    static let defaultAccount = "default"
 }

@@ -54,12 +54,12 @@ Structural red lines:
 
 ## 7. Classical-component storage
 
-The classical component secrets (Ed25519+X25519, or Ed448+X448 for · High) are concatenated and sealed as one `CAPKEV6` envelope under a fixed-access Secure Enclave wrapping key, stored per fingerprint in the **`split-custody-classical.<fingerprint>`** row family — its own Keychain namespace, distinct from every software-custody row ([STORAGE.md](STORAGE.md) §3).
+The classical component secrets (Ed25519+X25519, or Ed448+X448 for · High) are concatenated and sealed as one `CAPKEV1` envelope under a fixed-access Secure Enclave wrapping key, stored per fingerprint in the **`split-custody-classical.<fingerprint>`** row family — its own Keychain namespace, distinct from every software-custody row ([STORAGE.md](STORAGE.md) §3).
 
 Two properties hold the boundary, and they are independent:
 
 - **Location.** A single component store is the only writer and only reader of that namespace. No software-custody path resolves a service name that reaches it.
-- **Payload kind.** The envelope binding names what it seals (`split-custody-classical-component`), authenticated by both the HKDF `sharedInfo` and the AES-GCM AAD (version map: [STORAGE.md](STORAGE.md) §5). Moving a row does not change what it is: a component handed to a software-certificate consumer is rejected before any Secure Enclave call, and fails the AEAD even if that check is bypassed.
+- **Payload kind.** The envelope binding names what it seals (`split-custody-classical-component`), authenticated by both the HKDF `sharedInfo` and the AES-GCM AAD (envelope magics: [STORAGE.md](STORAGE.md) §5). Moving a row does not change what it is: a component handed to a software-certificate consumer is rejected before any Secure Enclave call, and fails the AEAD even if that check is bypassed.
 
 The custody health check reports the component's presence as its own availability value: split custody needs both halves, and an intact enclave handle pair says nothing about the sealed component (§5 routing depends on both).
 

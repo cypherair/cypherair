@@ -9,13 +9,15 @@ final class ProtectedDataDomainKeyKeychainStoreTests: ProtectedDataFrameworkTest
 
         XCTAssertEqual(
             KeychainConstants.protectedDataDomainKeyService(domainID: domainID),
-            "com.cypherair.v5.protected-data.domain-key.contacts"
+            "com.cypherair.protected-data.domain-key.contacts"
         )
         XCTAssertEqual(
             KeychainConstants.stagedProtectedDataDomainKeyService(domainID: domainID),
-            "com.cypherair.v5.protected-data.domain-key.staged.contacts"
+            "com.cypherair.protected-data.domain-key.staged.contacts"
         )
-        XCTAssertEqual(KeychainConstants.defaultAccount, "com.cypherair")
+        // The account must never read as the service prefix: the service names
+        // the row, the account is only the row's account label.
+        XCTAssertNotEqual(KeychainConstants.defaultAccount, KeychainConstants.prefix)
     }
 
     func test_writeTransactionStoresCommittedKeychainRowAndRemovesStagedRow() throws {

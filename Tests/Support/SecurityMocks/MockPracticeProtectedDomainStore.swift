@@ -6,7 +6,7 @@ import LocalAuthentication
 /// domain to join, delete, or recover alongside a real product domain.
 ///
 /// It stores a fixed marker payload and nothing else, but drives the real
-/// registry store, domain-key manager, and `CPDENV5` envelope codec — so the
+/// registry store, domain-key manager, and `CPDENV1` envelope codec — so the
 /// framework behavior a test observes is production behavior, not a stub's.
 /// Like every real non-first domain it can only join an existing ready shared
 /// resource, and that rule is enforced where the framework enforces it: in

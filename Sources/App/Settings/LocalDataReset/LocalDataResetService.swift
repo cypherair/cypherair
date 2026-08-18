@@ -67,7 +67,7 @@ final class LocalDataResetService {
         self.temporaryArtifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
         self.protectedDataRootSecretExists = protectedDataRootSecretExists ?? {
             keychain.exists(
-                service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+                service: KeychainConstants.protectedDataSharedRightService,
                 account: KeychainConstants.defaultAccount,
                 authenticationContext: nil
             )
@@ -91,7 +91,7 @@ final class LocalDataResetService {
         )
 
         deletedKeychainItemCount += deleteExactKeychainItem(
-            service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            service: KeychainConstants.protectedDataSharedRightService,
             account: KeychainConstants.defaultAccount,
             authenticationContext: authenticationContext,
             failureKey: "keychain.protectedDataRootSecret",
@@ -345,19 +345,21 @@ final class LocalDataResetService {
 
     /// Classifies a managed Keychain service string into a stable failure-key
     /// token so reset failures identify which item class could not be removed
-    /// without exposing the raw service identifier.
+    /// without exposing the raw service identifier. Every discriminating
+    /// segment comes from the constant that constructs the service name, so a
+    /// renamed segment keeps this classification accurate or fails to compile.
     private static func keychainServiceKind(for service: String) -> String {
         if service.hasPrefix("\(SecureEnclaveCustodyHandleReference.servicePrefix).") {
-            if service.hasSuffix(".signing") {
+            if service.hasSuffix(".\(PGPPrivateOperationRole.signing.rawValue)") {
                 return "secureEnclaveCustodySigningHandle"
             }
-            if service.hasSuffix(".keyAgreement") {
+            if service.hasSuffix(".\(PGPPrivateOperationRole.keyAgreement.rawValue)") {
                 return "secureEnclaveCustodyKeyAgreementHandle"
             }
             return "secureEnclaveCustodyHandle"
         }
         if service.hasPrefix(KeychainConstants.protectedDataDomainKeyServicePrefix) {
-            if service.hasPrefix("\(KeychainConstants.protectedDataDomainKeyServicePrefix)staged.") {
+            if service.hasPrefix(KeychainConstants.stagedProtectedDataDomainKeyServicePrefix) {
                 return "protectedDataStagedDomainKey"
             }
             return "protectedDataDomainKey"
@@ -371,7 +373,7 @@ final class LocalDataResetService {
         if service.hasPrefix(KeychainConstants.splitCustodyClassicalComponentServicePrefix) {
             return "splitCustodyClassicalComponent"
         }
-        if service == ProtectedDataRightIdentifiers.productionSharedRightIdentifier {
+        if service == KeychainConstants.protectedDataSharedRightService {
             return "protectedDataRootSecret"
         }
         return "unknown"

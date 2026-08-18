@@ -205,7 +205,7 @@ final class AppContainer: @unchecked Sendable {
         ProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedRightIdentifier: KeychainConstants.protectedDataSharedRightService,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
             authenticationPromptCoordinator: authPromptCoordinator
         )
@@ -598,7 +598,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedRightIdentifier: KeychainConstants.protectedDataSharedRightService,
             hasExternalProtectedDataArtifacts: {
                 try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
             }
@@ -1014,7 +1014,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedRightIdentifier: KeychainConstants.protectedDataSharedRightService,
             hasExternalProtectedDataArtifacts: {
                 try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
             }
