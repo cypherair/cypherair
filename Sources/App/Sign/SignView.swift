@@ -245,21 +245,13 @@ private struct SignScreenHostView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
-        .alert(
-            String(localized: "clipboard.notice.title", defaultValue: "Copied to Clipboard"),
+        .clipboardSafetyNotice(
             isPresented: Binding(
                 get: { operation.isShowingClipboardNotice },
                 set: { if !$0 { model.dismissClipboardNotice() } }
             )
-        ) {
-            Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {
-                model.dismissClipboardNotice()
-            }
-            Button(String(localized: "clipboard.notice.dontShow", defaultValue: "Don't Show Again")) {
-                model.dismissClipboardNotice(disableFutureNotices: true)
-            }
-        } message: {
-            Text(String(localized: "clipboard.notice.message", defaultValue: "The signed message has been copied. Remember to clear your clipboard after pasting."))
+        ) { disableFutureNotices in
+            model.dismissClipboardNotice(disableFutureNotices: disableFutureNotices)
         }
         .fileImporter(
             isPresented: $model.showFileImporter,
