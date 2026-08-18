@@ -65,8 +65,6 @@ final class AppLockController {
     private let postAuthenticationHandler: (LAContext?) async -> Void
     /// Ordinary-settings relock side effect.
     private let contentClearHandler: () -> Void
-    /// UI-test bypass.
-    private let shouldBypassAuthentication: () -> Bool
     /// Live coordinator query used on macOS to close begin/end hook races. When
     /// absent, tests that exercise the controller directly fall back to the
     /// main-actor mirror.
@@ -146,7 +144,7 @@ final class AppLockController {
     /// synchronously in `noteForegroundActive` on the false→true transition and
     /// cleared by `handleForegroundActive`'s top-level `defer` on every exit path,
     /// so the cover persists until the lock decision has resolved (surface raised,
-    /// stayed unlocked within grace, bypass, or spurious foreground).
+    /// stayed unlocked within grace, or spurious foreground).
     private(set) var isResolvingForegroundLock = false
 
     /// Generation of lock-state transitions, used by views/tests as an
@@ -162,7 +160,6 @@ final class AppLockController {
         relockProtectedData: @escaping () async -> Void,
         postAuthenticationHandler: @escaping (LAContext?) async -> Void = { _ in },
         contentClearHandler: @escaping () -> Void = {},
-        shouldBypassAuthentication: @escaping () -> Bool = { false },
         operationPromptInProgressProvider: (() -> Bool)? = nil,
         waitForAwayRelockDeadline: @escaping (TimeInterval) async throws -> Void = { seconds in
             try await Task.sleep(for: .seconds(seconds), tolerance: .seconds(1), clock: .continuous)
@@ -176,7 +173,6 @@ final class AppLockController {
         self.relockProtectedData = relockProtectedData
         self.postAuthenticationHandler = postAuthenticationHandler
         self.contentClearHandler = contentClearHandler
-        self.shouldBypassAuthentication = shouldBypassAuthentication
         self.operationPromptInProgressProvider = operationPromptInProgressProvider
         self.waitForAwayRelockDeadline = waitForAwayRelockDeadline
     }
@@ -281,11 +277,6 @@ final class AppLockController {
         // Any genuine away invalidates an in-flight unlock attempt.
         awayGeneration &+= 1
         discardHandoffContext()
-
-        // In UI-test bypass mode the app never locks.
-        guard !shouldBypassAuthentication() else {
-            return
-        }
 
         // "Immediately" (interval 0) locks on the away event, literally. A
         // non-zero interval leaves the session open for the rest of the grace
@@ -427,7 +418,7 @@ final class AppLockController {
     /// auto-invoke.
     func handleForegroundActive() async {
         // Release the resume-time cover hold once the lock decision has resolved,
-        // on EVERY exit path (bypass, not-foreground-active, in-flight, spurious,
+        // on EVERY exit path (not-foreground-active, in-flight, spurious,
         // within-grace, or the full unlock flow). On the unlock path this fires in
         // the same main-actor slice as the terminal `setLockState`, so when the
         // surface is not raised (unlocked/within-grace) the cover and any surface
@@ -435,13 +426,6 @@ final class AppLockController {
         // already draws above the cover, so clearing here is safe. Structurally
         // prevents a cover stuck up forever.
         defer { isResolvingForegroundLock = false }
-
-        if shouldBypassAuthentication() {
-            if isLocked {
-                setLockState(.unlocked)
-            }
-            return
-        }
 
         // Only a genuine foreground-active state drives an unlock. The lock surface
         // auto-invokes this on appear, and at grace=0 the surface is inserted during

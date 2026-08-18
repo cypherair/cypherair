@@ -81,14 +81,8 @@ enum AuthenticationError: Error, LocalizedError {
 /// See SECURITY.md Section 4.
 @Observable
 final class AuthenticationManager: AuthenticationEvaluable {
-    private enum UITestPreferences {
-        static let bypassAuthenticationKey = "com.cypherair.preference.uiTestBypassAuthentication"
-    }
-
     // MARK: - Dependencies
 
-    private let defaults: UserDefaults
-    private let allowsUITestAuthenticationBypass: Bool
     private let modeSwitchAuthenticator: PrivateKeyModeSwitchAuthenticator
     private let rewrapRecoveryCoordinator: PrivateKeyRewrapRecoveryCoordinator
     private let rewrapWorkflow: PrivateKeyRewrapWorkflow
@@ -120,8 +114,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
     init(
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
-        defaults: UserDefaults = .standard,
-        allowsUITestAuthenticationBypass: Bool = false,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
         localAuthenticationPolicyEvaluator: @escaping (
@@ -136,8 +128,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
             }
         }
     ) {
-        self.defaults = defaults
-        self.allowsUITestAuthenticationBypass = allowsUITestAuthenticationBypass
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
         self.privateKeyControlStore = privateKeyControlStore
@@ -192,10 +182,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         mode: AuthenticationMode,
         reason: String
     ) async throws -> PrivateKeyAuthenticationResult {
-        if isUITestAuthenticationBypassEnabled {
-            return .authenticated(context: nil)
-        }
-
         let context = LAContext()
         let policy: LAPolicy
         switch mode {
@@ -239,10 +225,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         policy: AppSessionAuthenticationPolicy,
         reason: String
     ) async throws -> AppSessionAuthenticationResult {
-        if isUITestAuthenticationBypassEnabled {
-            return .authenticated(context: nil)
-        }
-
         let context = LAContext()
         policy.configure(context)
 
@@ -265,10 +247,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         } catch {
             throw AuthenticationError.failed
         }
-    }
-
-    private var isUITestAuthenticationBypassEnabled: Bool {
-        allowsUITestAuthenticationBypass && defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey)
     }
 
     private func evaluateLocalAuthenticationPolicy(

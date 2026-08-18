@@ -66,6 +66,52 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertFalse(configuration.manualAuthStartsUnlocked)
     }
 
+    /// `bootsPreAuthenticated` is the single predicate that decides whether the
+    /// app settles its session as already authenticated at launch, so it is the
+    /// one place a UI-test launch can open the lock. It must be true for exactly
+    /// the two UI-test flavors that boot pre-authenticated, false for the plain
+    /// manual-auth container that has to authenticate for real, and false in a
+    /// build where the launch overrides are off.
+    func test_bootsPreAuthenticated_coversOnlyTheUITestFlavorsThatBootUnlocked() {
+        func configuration(
+            _ environment: [String: String],
+            allowsUITestLaunchOverrides: Bool = true
+        ) -> AppLaunchConfiguration {
+            AppLaunchConfiguration(
+                environment: environment,
+                detectsXCTestHost: false,
+                allowsUITestLaunchOverrides: allowsUITestLaunchOverrides
+            )
+        }
+
+        XCTAssertTrue(
+            configuration(["UITEST_SKIP_ONBOARDING": "1"]).bootsPreAuthenticated,
+            "A UI-test container that asks for no manual unlock boots pre-authenticated."
+        )
+        XCTAssertFalse(
+            configuration([
+                "UITEST_SKIP_ONBOARDING": "1",
+                "UITEST_REQUIRE_MANUAL_AUTH": "1"
+            ]).bootsPreAuthenticated,
+            "Plain manual auth must reach the real authentication path at launch."
+        )
+        XCTAssertTrue(
+            configuration([
+                "UITEST_SKIP_ONBOARDING": "1",
+                "UITEST_REQUIRE_MANUAL_AUTH": "1",
+                "UITEST_MANUAL_AUTH_STARTS_UNLOCKED": "1"
+            ]).bootsPreAuthenticated,
+            "The lock-shield seam boots unlocked with the lock armed."
+        )
+        XCTAssertFalse(
+            configuration(
+                ["UITEST_SKIP_ONBOARDING": "1"],
+                allowsUITestLaunchOverrides: false
+            ).bootsPreAuthenticated,
+            "With the launch overrides off, nothing may open the lock at launch."
+        )
+    }
+
     func test_debugGateHonorsXCTestHostDetection() {
         let configuration = AppLaunchConfiguration(
             environment: [:],

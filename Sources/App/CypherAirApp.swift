@@ -52,26 +52,24 @@ struct CypherAirApp: App {
         #else
         container = AppContainer.makeDefault()
         #endif
-        if launchConfiguration.usesUITestAppContainer {
-            if !launchConfiguration.requiresManualAuthentication {
-                container.appSessionOrchestrator.recordAuthentication()
-            } else if launchConfiguration.manualAuthStartsUnlocked {
-                // UI-test seam (DEBUG-only via AppLaunchConfiguration's
-                // release kill switch): boot the manual-auth container
-                // already unlocked so MacUITests can drive a REAL lock
-                // transition — and assert the lock shield's coverage —
-                // without a human biometric at launch. Reuses the existing
-                // controller hook that settles `.unlocked` and marks the
-                // away epoch handled; auth bypass stays OFF, so any
-                // subsequent unlock still requires real authentication.
-                // The container side pairs with this: `makeUITest` gives the
-                // seam variant the ungated ordinary-settings persistence
-                // (already loaded), because the post-auth fan-out that would
-                // load settings through the protected domain never runs at a
-                // pre-authenticated boot.
-                container.appLockController.resetAfterLocalDataReset(preserveAuthentication: true)
-                container.appSessionOrchestrator.recordAuthentication()
-            }
+        if launchConfiguration.bootsPreAuthenticated {
+            // The one UI-test launch seam (DEBUG-only via
+            // AppLaunchConfiguration's release kill switch): settle the
+            // session as already authenticated, with the lock genuinely
+            // armed. Nothing is bypassed — the controller starts `.unlocked`
+            // with the current away epoch already answered, so the first
+            // foreground return does not prompt and every later away event,
+            // grace decision, and unlock runs the real path. MacUITests
+            // therefore drive a REAL lock transition without needing a human
+            // biometric at launch.
+            //
+            // The container side pairs with this: `makeUITest` gives a
+            // pre-authenticated boot the ungated ordinary-settings
+            // persistence (already loaded), because the post-auth fan-out
+            // that would load settings through the protected domain never
+            // runs when nothing authenticated at launch.
+            container.appLockController.resetAfterLocalDataReset(preserveAuthentication: true)
+            container.appSessionOrchestrator.recordAuthentication()
         }
         if launchConfiguration.shouldSkipOnboarding {
             container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)

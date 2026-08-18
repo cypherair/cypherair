@@ -19,7 +19,7 @@ Each of these is an absence a code read cannot prove. They are decisions, not ga
 - **No backup flow and no backup badge for device-bound keys.** Their private material is not exportable in any form ([CUSTODY.md](CUSTODY.md) §2); the revocation certificate is the primary export action for a device-bound key.
 - **No global signing off-switch.** Signing defaults on and is toggled per message only.
 - **Contacts never store recipient lists**, and contacts-package exchange does not exist.
-- **Password (SKESK) messages are read, never created** — the app opens them like any other OpenPGP input ([SECURITY.md](SECURITY.md) §2) and offers no way to send one.
+- **No password (SKESK) message flow.** The app offers no way to create one and no way to open one. The engine carries the capability ([SECURITY.md](SECURITY.md) §7); exposing it is not a commitment the app has made.
 
 ## 3. Consent gates
 

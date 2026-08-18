@@ -55,16 +55,12 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
 
     private func makeManager(
         coordinator: AuthenticationPromptCoordinator
-    ) throws -> (manager: AuthenticationManager, fingerprint: String, defaultsSuiteName: String) {
-        let suiteName = "com.cypherair.tests.modeswitch.composition.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+    ) throws -> (manager: AuthenticationManager, fingerprint: String) {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
         let manager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults,
             authenticationPromptCoordinator: coordinator
         )
         manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
@@ -77,7 +73,7 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
             payloadKind: .softwareSecretCertificate
         )
         try KeyBundleStore(keychain: keychain).saveBundle(bundle, fingerprint: fingerprint)
-        return (manager, fingerprint, suiteName)
+        return (manager, fingerprint)
     }
 
     func test_switchMode_runsInsideOperationPromptSession_resignDeferred_thenLockedWhenStillAway() async throws {
@@ -85,7 +81,6 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         await harness.unlockForTest()
         let relocksBefore = harness.relockCount
         let made = try makeManager(coordinator: harness.coordinator)
-        defer { UserDefaults(suiteName: made.defaultsSuiteName)?.removePersistentDomain(forName: made.defaultsSuiteName) }
         let stub = GatedModeSwitchAuthenticator(coordinator: harness.coordinator)
 
         let action = Task {
@@ -130,7 +125,6 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         await harness.unlockForTest()
         let relocksBefore = harness.relockCount
         let made = try makeManager(coordinator: harness.coordinator)
-        defer { UserDefaults(suiteName: made.defaultsSuiteName)?.removePersistentDomain(forName: made.defaultsSuiteName) }
         let stub = GatedModeSwitchAuthenticator(coordinator: harness.coordinator)
 
         let action = Task {
@@ -160,7 +154,6 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         let harness = OperationPromptLockHarness(gracePeriod: 0)
         await harness.unlockForTest()
         let made = try makeManager(coordinator: harness.coordinator)
-        defer { UserDefaults(suiteName: made.defaultsSuiteName)?.removePersistentDomain(forName: made.defaultsSuiteName) }
 
         do {
             try await made.manager.switchMode(

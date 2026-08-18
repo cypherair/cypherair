@@ -32,7 +32,6 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         authManager = AuthenticationManager(
             secureEnclave: stack.mockSE,
             keychain: stack.mockKC,
-            defaults: defaults,
             authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)

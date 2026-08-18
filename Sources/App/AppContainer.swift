@@ -897,7 +897,6 @@ final class AppContainer: @unchecked Sendable {
                 protectedOrdinarySettingsCoordinator.relock()
                 appSessionOrchestrator.requestContentClear()
             },
-            shouldBypassAuthentication: { false },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
             }
@@ -980,13 +979,10 @@ final class AppContainer: @unchecked Sendable {
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(!requiresManualAuthentication, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
 
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults,
-            allowsUITestAuthenticationBypass: true,
             authenticationPromptCoordinator: authPromptCoordinator
         )
         let config = AppConfiguration(defaults: defaults)
@@ -1067,18 +1063,16 @@ final class AppContainer: @unchecked Sendable {
                 )
             )
         } else {
-            // Auth-bypass graph AND the pre-authenticated manual-auth seam
-            // (`manualAuthStartsUnlocked`): both boot as an already-
-            // authenticated session, but the post-auth fan-out that loads
-            // ordinary settings through the protected-settings domain has not
-            // run at boot. Give them the ungated ephemeral persistence so the
-            // boot state is, for UI purposes, indistinguishable from a
-            // genuinely authenticated one — otherwise every settings-gated
-            // control (e.g. the Guided Tutorial entry, which requires
+            // Every pre-authenticated boot: the launch seam settles the
+            // session as already authenticated, so the post-auth fan-out that
+            // loads ordinary settings through the protected-settings domain
+            // never ran. Give it the ungated ephemeral persistence so the boot
+            // state is, for UI purposes, indistinguishable from a genuinely
+            // authenticated one — otherwise every settings-gated control (e.g.
+            // the Guided Tutorial entry, which requires
             // `isProtectedOrdinarySettingsEditable`) boots disabled. This
-            // loosens no production gating: DEBUG-only container, and any
-            // unlock after the seam's boot still requires real
-            // authentication.
+            // loosens no production gating: DEBUG-only container, and every
+            // later away event and unlock runs the real path.
             protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
                 persistence: InMemoryOrdinarySettingsStore()
             )
@@ -1226,7 +1220,6 @@ final class AppContainer: @unchecked Sendable {
                 protectedOrdinarySettingsCoordinator.relock()
                 appSessionOrchestrator.requestContentClear()
             },
-            shouldBypassAuthentication: { !requiresManualAuthentication },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
             }

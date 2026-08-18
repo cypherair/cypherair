@@ -48,19 +48,14 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
         let manager: AuthenticationManager
         let secureEnclave: MockSecureEnclave
         let fingerprints: [String]
-        let defaultsSuiteName: String
     }
 
     private func makeFixture(keyCount: Int) throws -> Fixture {
-        let suiteName = "com.cypherair.tests.modeswitch.contextlifetime.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
         let manager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults,
             authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
@@ -84,14 +79,12 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
         return Fixture(
             manager: manager,
             secureEnclave: secureEnclave,
-            fingerprints: fingerprints,
-            defaultsSuiteName: suiteName
+            fingerprints: fingerprints
         )
     }
 
     func test_switchMode_authenticatesOnce_reusesThatContextForEveryKey_thenInvalidatesIt() async throws {
         let fixture = try makeFixture(keyCount: 2)
-        defer { UserDefaults().removePersistentDomain(forName: fixture.defaultsSuiteName) }
         let stub = StubModeSwitchAuthenticator()
         let generatesBeforeSwitch = fixture.secureEnclave.generateCallCount
 
@@ -131,7 +124,6 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
 
     func test_switchMode_failedRewrap_stillInvalidatesTheAuthenticatedContext() async throws {
         let fixture = try makeFixture(keyCount: 1)
-        defer { UserDefaults().removePersistentDomain(forName: fixture.defaultsSuiteName) }
         let stub = StubModeSwitchAuthenticator()
         fixture.secureEnclave.nextError = MockSEError.invalidKeyHandle
 
@@ -156,7 +148,6 @@ final class ModeSwitchAuthenticatedContextLifetimeTests: XCTestCase {
 
     func test_switchMode_notAuthenticatedResult_abortsAndInvalidatesTheContextItWasHanded() async throws {
         let fixture = try makeFixture(keyCount: 1)
-        defer { UserDefaults().removePersistentDomain(forName: fixture.defaultsSuiteName) }
         let stub = StubModeSwitchAuthenticator()
         stub.reportsAuthenticated = false
 

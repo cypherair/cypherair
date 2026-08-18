@@ -266,11 +266,6 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
-        let passwordMessageEncryptor = makePasswordMessageEncryptor(
-            engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
         let expiryMutator = makeExpiryMutator(
             engine: engine,
             keyManagement: keyMgmt
@@ -305,12 +300,6 @@ enum TestHelpers {
             contactService: contactSvc,
             messageDecryptor: messageDecryptor,
             fileDecryptor: fileDecryptor
-        )
-        let passwordMessageSvc = PasswordMessageService(
-            messageAdapter: messageAdapter,
-            keyManagement: keyMgmt,
-            contactService: contactSvc,
-            passwordEncryptor: passwordMessageEncryptor
         )
         let cleartextSigner = makeCleartextSigner(
             engine: engine,
@@ -350,7 +339,6 @@ enum TestHelpers {
             fileEncryptor: fileEncryptor,
             encryptionService: encryptionSvc,
             decryptionService: decryptionSvc,
-            passwordMessageService: passwordMessageSvc,
             signingService: signingSvc,
             certificateSignatureService: certificateSignatureSvc,
             mockSE: mockSE,
@@ -369,7 +357,6 @@ enum TestHelpers {
         let fileEncryptor: any StreamingFileEncrypting
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
-        let passwordMessageService: PasswordMessageService
         let signingService: SigningService
         let certificateSignatureService: CertificateSignatureService
         let mockSE: MockSecureEnclave
@@ -495,31 +482,6 @@ enum TestHelpers {
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyStreamingFileEncryptionService {
         PrivateKeyStreamingFileEncryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
-    }
-
-    static func makePasswordMessageEncryptor(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyPasswordMessageEncryptionService {
-        PrivateKeyPasswordMessageEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: resolver,
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

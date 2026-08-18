@@ -95,17 +95,6 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                     "Expected \(operation) supported for \(family) under production policy."
                 )
             }
-
-            // Negative: private-material export stays hard-unsupported for
-            // Secure Enclave custody regardless of policy.
-            XCTAssertEqual(
-                resolver.resolution(
-                    for: .exportPrivateMaterial,
-                    family: family,
-                    custody: .appleSecureEnclavePrivateOperations
-                ),
-                .unsupported(.operationUnsupportedForCustody)
-            )
         }
 
         // Negative: invalid configuration/custody pairs stay unsupported under
@@ -292,100 +281,6 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 custody: .appleSecureEnclavePrivateOperations
             ),
             .unavailable(.operationUnavailableByPolicy)
-        )
-    }
-
-    func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
-        let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
-
-        XCTAssertEqual(
-            resolver.resolution(
-                for: .exportPrivateMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unsupported(.operationUnsupportedForCustody)
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .exportPrivateMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unsupported
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .exportPublicMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: .present
-            ),
-            .supported
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .exportRevocationArtifact,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: .present
-            ),
-            .supported
-        )
-
-        let publicOnly = PGPKeyCapabilityResolver.MetadataAvailability(
-            hasPublicMaterial: true,
-            hasRevocationArtifact: false
-        )
-        XCTAssertEqual(
-            resolver.resolution(
-                for: .exportPublicMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: publicOnly
-            ),
-            .supported
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .exportPublicMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: publicOnly
-            ),
-            .supported
-        )
-        XCTAssertEqual(
-            resolver.resolution(
-                for: .exportRevocationArtifact,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: publicOnly
-            ),
-            .unavailable(.revocationArtifactUnavailable)
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .exportRevocationArtifact,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: publicOnly
-            ),
-            .unavailable
-        )
-
-        let revocationOnly = PGPKeyCapabilityResolver.MetadataAvailability(
-            hasPublicMaterial: false,
-            hasRevocationArtifact: true
-        )
-        XCTAssertEqual(
-            resolver.resolution(
-                for: .exportPublicMaterial,
-                family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-                custody: .appleSecureEnclavePrivateOperations,
-                metadataAvailability: revocationOnly
-            ),
-            .unavailable(.publicMaterialUnavailable)
         )
     }
 

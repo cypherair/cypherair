@@ -10,7 +10,6 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         mode: AuthenticationMode,
         fingerprint: String,
         privateKey: Data,
-        defaults: UserDefaults,
         reason: String
     ) async throws {
         try await waitForAuthenticationSessionToSettle()
@@ -24,8 +23,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
 
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain,
-            defaults: defaults
+            keychain: keychain
         )
 
         try await waitForAuthenticationSessionToSettle()
@@ -113,14 +111,11 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.standard")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.standard") }
 
         try await authenticateAndUnwrapStoredBundle(
             mode: .standard,
             fingerprint: fingerprint,
             privateKey: Data(repeating: 0x91, count: 32),
-            defaults: testDefaults,
             reason: "Authenticate to validate Standard mode Secure Enclave access."
         )
     }
@@ -129,14 +124,11 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.highsecurity")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.highsecurity") }
 
         try await authenticateAndUnwrapStoredBundle(
             mode: .highSecurity,
             fingerprint: fingerprint,
             privateKey: Data(repeating: 0xA7, count: 57),
-            defaults: testDefaults,
             reason: "Authenticate to validate High Security Secure Enclave access."
         )
     }
@@ -144,15 +136,12 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     // MARK: - Authentication Manager — Private-Key Control State
 
     func test_currentMode_withoutPrivateKeyControlStore_isNil() {
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults,
             authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         XCTAssertNil(authManager.currentMode, "Locked private-key control must not expose a default mode")
-        testDefaults.removePersistentDomain(forName: "com.cypherair.test")
     }
 
     // MARK: - Crash Recovery
@@ -277,9 +266,6 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     }
 
     func test_crashRecovery_retryableFailure_keepsFlagAndDoesNotUpdateAuthMode() {
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.retryable")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.retryable") }
-
         let mockKeychain = MockKeychain()
         let mockSecureEnclave = MockSecureEnclave()
         let fingerprint = uniqueFingerprint()
@@ -295,7 +281,6 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])

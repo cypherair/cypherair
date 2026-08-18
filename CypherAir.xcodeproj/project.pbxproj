@@ -423,7 +423,6 @@
 				Services/KeyManagement/PrivateKeyMessageDecryptionService.swift,
 				Services/KeyManagement/PrivateKeyOperationRouter.swift,
 				Services/KeyManagement/PrivateKeyOperationRouting.swift,
-				Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift,
 				Services/KeyManagement/PrivateKeySelectiveRevocationService.swift,
 				Services/KeyManagement/PrivateKeyStreamingFileDecryptionService.swift,
 				Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift,
@@ -436,7 +435,6 @@
 				Services/KeyManagementService.swift,
 				Services/Messaging/DecryptionService.swift,
 				Services/Messaging/EncryptionService.swift,
-				Services/Messaging/PasswordMessageService.swift,
 				Services/Messaging/SigningService.swift,
 			);
 			target = 8561964DF0A7E2575A3799D6 /* CypherAirTests */;

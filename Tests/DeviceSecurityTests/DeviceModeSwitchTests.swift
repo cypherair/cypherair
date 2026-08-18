@@ -28,13 +28,9 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
     }
 
     func test_switchMode_sameMode_isNoop() async throws {
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test") }
-
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain,
-            defaults: testDefaults
+            keychain: keychain
         )
 
         // Switching to the same mode should return immediately without error.
@@ -54,8 +50,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let account = KeychainConstants.defaultAccount
         let fakePrivateKey = Data(repeating: 0x77, count: 32)
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test") }
         // 1. Initial wrap under Standard mode (no access control for test simplicity).
         // This keeps the test non-interactive and focused on re-wrap mechanics only.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
@@ -74,7 +68,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
         try await authManager.switchMode(to: .highSecurity, fingerprints: [fingerprint], hasBackup: true, authenticator: mockAuth)
@@ -106,8 +99,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let account = KeychainConstants.defaultAccount
         let fakePrivateKey = Data(repeating: 0x77, count: 32)
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.stdtohs")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.stdtohs") }
         let initialBundle = try createWrappedBundle(
             privateKey: fakePrivateKey,
             fingerprint: fingerprint,
@@ -119,7 +110,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
 
@@ -177,8 +167,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let mockSE = MockSecureEnclave()
         let mockAuth = MockAuthenticator()
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.rollback")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.rollback") }
         let fp1 = uniqueFingerprint()
         let fp2 = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
@@ -203,7 +191,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
 
@@ -249,8 +236,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let mockAuth = MockAuthenticator()
         mockAuth.shouldSucceed = false
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.authfail")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.authfail") }
         let fp = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
@@ -263,7 +248,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
 
@@ -300,8 +284,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let account = KeychainConstants.defaultAccount
         let fakePrivateKey = Data(repeating: 0x88, count: 57) // Ed448 size
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.hs2std")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.hs2std") }
         // 1. Initial wrap under High Security mode.
         // No initial ACL so this test stays focused on re-wrap mechanics.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
@@ -319,7 +301,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
         try await authManager.switchMode(to: .standard, fingerprints: [fingerprint], hasBackup: true, authenticator: mockAuth)
@@ -349,8 +330,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let account = KeychainConstants.defaultAccount
         let fakePrivateKey = Data(repeating: 0x88, count: 57)
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.hs2std")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.hs2std") }
         let initialBundle = try createWrappedBundle(
             privateKey: fakePrivateKey,
             fingerprint: fingerprint,
@@ -362,7 +341,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
 
@@ -418,8 +396,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let mockSE = MockSecureEnclave()
         let mockAuth = MockAuthenticator()
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.12keys")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.12keys") }
         let account = KeychainConstants.defaultAccount
         var fingerprints: [String] = []
         var originalKeys: [String: Data] = [:]
@@ -442,7 +418,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
         try await authManager.switchMode(to: .highSecurity, fingerprints: fingerprints, hasBackup: true, authenticator: mockAuth)
@@ -472,8 +447,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let mockSE = MockSecureEnclave()
         let mockAuth = MockAuthenticator()
 
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.12fail")!
-        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.12fail") }
         let account = KeychainConstants.defaultAccount
         var fingerprints: [String] = []
         var originalBundles: [String: WrappedKeyBundle] = [:]
@@ -500,7 +473,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults,
             privateKeyControlStore: privateKeyControlStore
         )
 

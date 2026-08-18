@@ -95,7 +95,6 @@ final class TutorialSandboxContainer {
         self.authManager = AuthenticationManager(
             secureEnclave: keyWrappingCustody,
             keychain: keychain,
-            defaults: defaults,
             authenticationPromptCoordinator: authenticationPromptCoordinator
         )
         self.privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
