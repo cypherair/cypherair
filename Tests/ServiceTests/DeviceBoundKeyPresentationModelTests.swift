@@ -33,7 +33,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
@@ -70,7 +70,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
@@ -88,7 +88,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 
@@ -119,7 +119,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
         let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
 

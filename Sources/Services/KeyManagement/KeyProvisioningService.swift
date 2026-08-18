@@ -56,7 +56,7 @@ final class KeyProvisioningService {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite,
         authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
@@ -64,7 +64,7 @@ final class KeyProvisioningService {
         try await performGenerateKey(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity,
             suite: suite,
             authMode: authMode,
             invalidationToken: token
@@ -74,7 +74,7 @@ final class KeyProvisioningService {
     private func performGenerateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite,
         authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
@@ -85,7 +85,7 @@ final class KeyProvisioningService {
         var generated = try await keyAdapter.generateKey(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity,
             suite: suite
         )
         defer {

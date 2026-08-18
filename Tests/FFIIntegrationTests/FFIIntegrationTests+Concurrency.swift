@@ -7,7 +7,7 @@ extension FFIIntegrationTests {
     /// 10 concurrent encryption tasks must all succeed.
     func test_concurrentEncrypt_threadsafe() async throws {
         let key = try engine.generateKey(
-            name: "Concurrent", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Concurrent", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         try await withThrowingTaskGroup(of: Data.self) { group in
@@ -39,7 +39,7 @@ extension FFIIntegrationTests {
     /// Mixed concurrent encrypt and decrypt operations.
     func test_concurrentEncryptDecrypt_threadsafe() async throws {
         let key = try engine.generateKey(
-            name: "MixedConcurrent", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "MixedConcurrent", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         // Pre-encrypt some messages for decryption tasks
@@ -97,7 +97,7 @@ extension FFIIntegrationTests {
     /// Concurrent operations with Modern High (AEAD).
     func test_concurrentEncryptDecrypt_modernHigh_threadsafe() async throws {
         let key = try engine.generateKey(
-            name: "ConcurrentB", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "ConcurrentB", email: nil, validity: .never, suite: .ed448X448
         )
 
         let preCiphertext = try engine.encrypt(

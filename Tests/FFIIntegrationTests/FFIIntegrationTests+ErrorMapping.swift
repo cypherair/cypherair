@@ -7,10 +7,10 @@ extension FFIIntegrationTests {
     /// NoMatchingKey error when decrypting with wrong key.
     func test_errorMapping_noMatchingKey() throws {
         let keyA = try engine.generateKey(
-            name: "Alice", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Alice", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let keyB = try engine.generateKey(
-            name: "Bob", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Bob", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let ciphertext = try engine.encrypt(
@@ -42,7 +42,7 @@ extension FFIIntegrationTests {
     /// IntegrityCheckFailed / AeadAuthenticationFailed on tampered ciphertext.
     func test_errorMapping_integrityCheckFailed_legacy() throws {
         let key = try engine.generateKey(
-            name: "Tamper A", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Tamper A", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         var ciphertext = try engine.encrypt(
@@ -81,7 +81,7 @@ extension FFIIntegrationTests {
     /// AeadAuthenticationFailed on tampered Modern High (SEIPDv2) ciphertext.
     func test_errorMapping_aeadAuthenticationFailed_modernHigh() throws {
         let key = try engine.generateKey(
-            name: "Tamper B", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Tamper B", email: nil, validity: .never, suite: .ed448X448
         )
 
         var ciphertext = try engine.encrypt(
@@ -120,7 +120,7 @@ extension FFIIntegrationTests {
     /// CorruptData on garbage input.
     func test_errorMapping_corruptData() throws {
         let key = try engine.generateKey(
-            name: "Corrupt", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Corrupt", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let garbage = Data("this is not valid PGP data at all".utf8)
@@ -148,7 +148,7 @@ extension FFIIntegrationTests {
     /// WrongPassphrase on incorrect passphrase.
     func test_errorMapping_wrongPassphrase() throws {
         let key = try engine.generateKey(
-            name: "Export", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Export", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let exported = try engine.exportSecretKey(
@@ -191,7 +191,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Merge Secret Reject",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -216,7 +216,7 @@ extension FFIIntegrationTests {
     /// BadSignature when verifying a tampered cleartext signature.
     func test_errorMapping_badSignature_cleartextVerify() throws {
         let key = try engine.generateKey(
-            name: "Signer", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Signer", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let signed = try engine.signCleartext(
@@ -249,10 +249,10 @@ extension FFIIntegrationTests {
     /// UnknownSigner status when signer key not in verification keys.
     func test_errorMapping_unknownSigner_viaCleartextVerify() throws {
         let signerKey = try engine.generateKey(
-            name: "Unknown Signer", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Unknown Signer", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let otherKey = try engine.generateKey(
-            name: "Other", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Other", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let signed = try engine.signCleartext(
@@ -343,7 +343,7 @@ extension FFIIntegrationTests {
     /// S2kError / WrongPassphrase on Modern High export-import with wrong passphrase.
     func test_errorMapping_s2kError_modernHigh_wrongPassphrase() throws {
         let key = try engine.generateKey(
-            name: "S2K Test", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "S2K Test", email: nil, validity: .never, suite: .ed448X448
         )
 
         let exported = try engine.exportSecretKey(
@@ -372,7 +372,7 @@ extension FFIIntegrationTests {
     /// BadSignature via detached signature verification with tampered data.
     func test_errorMapping_badSignature_detachedVerify() throws {
         let key = try engine.generateKey(
-            name: "DetachedSig", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "DetachedSig", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
 
         let originalData = Data("original data for detached sig".utf8)
@@ -410,14 +410,14 @@ extension FFIIntegrationTests {
 
     // MARK: - KeyExpired Error Mapping
 
-    /// Verify that a key with expirySeconds=1 is detected as expired after waiting.
+    /// Verify that a key with validity=1 is detected as expired after waiting.
     /// Sequoia may or may not reject encryption to an expired key at the API level,
     /// so this test accepts both outcomes: if encryption succeeds, it verifies the key
     /// info shows isExpired; if it throws, it verifies the error type.
     func test_errorMapping_keyExpired_detectsExpiredKey() throws {
         let engine = try XCTUnwrap(self.engine)
-        let key = try engine.generateKey(name: "Expiry Test", email: nil, expirySeconds: 1, suite: .ed25519LegacyCurve25519Legacy)
-        // Parse immediately — with expirySeconds=1, the key may already be expired
+        let key = try engine.generateKey(name: "Expiry Test", email: nil, validity: .expiresIn(seconds: 1), suite: .ed25519LegacyCurve25519Legacy)
+        // Parse immediately — with validity=1, the key may already be expired
         // by the time generation + parsing completes, so we don't assert on this result.
         _ = try engine.parseKeyInfo(keyData: key.publicKeyData)
 
@@ -435,7 +435,7 @@ extension FFIIntegrationTests {
                 encryptToSelf: nil
             )
             // Sequoia allowed encryption — verify the key IS expired via parseKeyInfo
-            XCTAssertTrue(infoAfter.isExpired, "Key with expirySeconds=1 should report isExpired after 2s")
+            XCTAssertTrue(infoAfter.isExpired, "Key with validity=1 should report isExpired after 2s")
         } catch {
             // Sequoia rejected encryption — verify it's a PgpError
             guard let pgpError = error as? PgpError else {

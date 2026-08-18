@@ -67,7 +67,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
             try await made.service.generateKey(
                 name: "Provision Composition",
                 email: nil,
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }
@@ -109,7 +109,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
         let original = try await fixture.service.generateKey(
             name: "Import Composition",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let passphrase = "import-composition-pass"
@@ -168,7 +168,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
             try await made.service.generateKey(
                 name: "Provision Outside Prompt",
                 email: nil,
-                expirySeconds: nil,
+                validity: .never,
                 suite: .ed25519LegacyCurve25519Legacy
             )
         }

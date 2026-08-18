@@ -13,7 +13,7 @@ final class ContactServiceTagTests: ContactServiceTestCase {
         let generated = try engine.generateKey(
             name: "Tagged Contact",
             email: "tagged@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -61,13 +61,13 @@ final class ContactServiceTagTests: ContactServiceTestCase {
         let first = try engine.generateKey(
             name: "Tag Member One",
             email: "tag-member-one@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let second = try engine.generateKey(
             name: "Tag Member Two",
             email: "tag-member-two@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try service.importContact(publicKeyData: first.publicKeyData)
@@ -141,19 +141,19 @@ final class ContactServiceTagTests: ContactServiceTestCase {
         let exact = try engine.generateKey(
             name: "Alpha",
             email: "alpha@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let prefix = try engine.generateKey(
             name: "Alphabet Soup",
             email: "prefix@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let substring = try engine.generateKey(
             name: "Team Alpha Member",
             email: "substring@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -200,13 +200,13 @@ final class ContactServiceTagTests: ContactServiceTestCase {
         let preferred = try engine.generateKey(
             name: "Recipient Preferred",
             email: "recipient-preferred@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let historical = try engine.generateKey(
             name: "Recipient Historical",
             email: "recipient-historical@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 

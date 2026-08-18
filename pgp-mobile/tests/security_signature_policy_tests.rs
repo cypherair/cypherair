@@ -2,7 +2,7 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, GeneratedKey, KeySuite};
+use pgp_mobile::keys::{self, GeneratedKey, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 use pgp_mobile::signature_details::{FileVerifyDetailedResult, SignatureVerificationState};
 use pgp_mobile::streaming;
@@ -39,9 +39,13 @@ fn verify_detached_file_for_test(
 /// Tampered cleartext-signed message must produce an Invalid summary.
 #[test]
 fn test_verify_tampered_cleartext_returns_bad() {
-    let key =
-        keys::generate_key_with_suite("Signer".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Signer".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let text = b"Original cleartext message";
     let signed = sign::sign_cleartext(text, &key.cert_data).expect("Signing should succeed");
@@ -67,9 +71,13 @@ fn test_verify_tampered_cleartext_returns_bad() {
 /// Tampered data with detached signature must produce an Invalid summary.
 #[test]
 fn test_verify_tampered_detached_returns_bad() {
-    let key =
-        keys::generate_key_with_suite("Signer".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Signer".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let data = b"Original file content for detached signing";
     let signature = sign_detached_file_for_test(data, &key.cert_data);
@@ -90,9 +98,13 @@ fn test_verify_tampered_detached_returns_bad() {
 /// Helper: generate a key with 1-second expiry, sign immediately (while valid),
 /// then return the signed artifact and the key. The caller sleeps before verifying.
 fn make_expired_signer(profile: KeySuite) -> (GeneratedKey, Vec<u8>, Vec<u8>) {
-    let signer =
-        keys::generate_key_with_suite("Expiring Signer".to_string(), None, Some(1), profile)
-            .expect("Key gen should succeed");
+    let signer = keys::generate_key_with_suite(
+        "Expiring Signer".to_string(),
+        None,
+        KeyValidity::ExpiresIn { seconds: 1 },
+        profile,
+    )
+    .expect("Key gen should succeed");
 
     let cleartext_signed = sign::sign_cleartext(b"Signed while key was valid", &signer.cert_data)
         .expect("Cleartext signing should succeed while key is valid");
@@ -105,7 +117,8 @@ fn make_expired_signer(profile: KeySuite) -> (GeneratedKey, Vec<u8>, Vec<u8>) {
 /// Verify cleartext signed by an expired Legacy key → an Expired summary.
 #[test]
 fn test_verify_cleartext_expired_signer_legacy() {
-    let (signer, cleartext_signed, _) = make_expired_signer(KeySuite::Ed25519LegacyCurve25519Legacy);
+    let (signer, cleartext_signed, _) =
+        make_expired_signer(KeySuite::Ed25519LegacyCurve25519Legacy);
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
@@ -185,7 +198,7 @@ fn test_decrypt_expired_signer_legacy() {
     let signer = keys::generate_key_with_suite(
         "Expiring Signer A".to_string(),
         None,
-        Some(1),
+        KeyValidity::ExpiresIn { seconds: 1 },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Signer key gen should succeed");
@@ -193,7 +206,7 @@ fn test_decrypt_expired_signer_legacy() {
     let recipient = keys::generate_key_with_suite(
         "Recipient A".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Recipient key gen should succeed");
@@ -228,7 +241,7 @@ fn test_decrypt_expired_signer_modern_high() {
     let signer = keys::generate_key_with_suite(
         "Expiring Signer B".to_string(),
         None,
-        Some(1),
+        KeyValidity::ExpiresIn { seconds: 1 },
         KeySuite::Ed448X448,
     )
     .expect("Signer key gen should succeed");
@@ -236,7 +249,7 @@ fn test_decrypt_expired_signer_modern_high() {
     let recipient = keys::generate_key_with_suite(
         "Recipient B".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Recipient key gen should succeed");
@@ -269,9 +282,13 @@ fn test_decrypt_expired_signer_modern_high() {
 /// Complements test_verify_tampered_cleartext_returns_bad (Legacy only).
 #[test]
 fn test_verify_tampered_cleartext_returns_bad_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Signer".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Signer".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let text = b"Original cleartext message";
     let signed = sign::sign_cleartext(text, &key.cert_data).expect("Signing should succeed");
@@ -298,9 +315,13 @@ fn test_verify_tampered_cleartext_returns_bad_modern_high() {
 /// Complements test_verify_tampered_detached_returns_bad (Modern High only).
 #[test]
 fn test_verify_tampered_detached_returns_bad_legacy() {
-    let key =
-        keys::generate_key_with_suite("Signer".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Signer".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("Key gen should succeed");
 
     let data = b"Original file content for detached signing";
     let signature = sign_detached_file_for_test(data, &key.cert_data);
@@ -328,9 +349,13 @@ fn test_sign_with_expired_key_not_accepted_as_valid() {
         (KeySuite::Ed25519LegacyCurve25519Legacy, "Legacy"),
         (KeySuite::Ed448X448, "Modern High"),
     ] {
-        let key =
-            keys::generate_key_with_suite("Expiring Signer".to_string(), None, Some(1), profile)
-                .expect("Key gen should succeed");
+        let key = keys::generate_key_with_suite(
+            "Expiring Signer".to_string(),
+            None,
+            KeyValidity::ExpiresIn { seconds: 1 },
+            profile,
+        )
+        .expect("Key gen should succeed");
 
         std::thread::sleep(std::time::Duration::from_secs(3));
 
@@ -512,9 +537,13 @@ fn test_sign_cleartext_skips_revoked_signing_subkey_and_uses_live_one() {
 /// key) with the no-valid-signing-key error, even though the recipient is valid.
 #[test]
 fn test_encrypt_sign_rejects_cert_with_only_revoked_signing_subkey() {
-    let recipient =
-        keys::generate_key_with_suite("Recipient".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("recipient key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Recipient".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("recipient key gen should succeed");
     let (signer_tsk, _fingerprints) = signing_subkey_fixture(1, 1);
 
     let result = encrypt::encrypt(
@@ -527,9 +556,9 @@ fn test_encrypt_sign_rejects_cert_with_only_revoked_signing_subkey() {
     match result {
         Err(pgp_mobile::error::PgpError::SigningFailed { .. }) => {}
         Err(other) => panic!("expected SigningFailed, got {other:?}"),
-        Ok(_) => panic!(
-            "encrypt+sign must reject a signing cert whose only signing subkey is revoked"
-        ),
+        Ok(_) => {
+            panic!("encrypt+sign must reject a signing cert whose only signing subkey is revoked")
+        }
     }
 }
 
@@ -542,9 +571,13 @@ fn test_encrypt_sign_skips_revoked_signing_subkey_and_uses_live_one() {
     use openpgp::serialize::Serialize;
     use sequoia_openpgp as openpgp;
 
-    let recipient =
-        keys::generate_key_with_suite("Recipient".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
-            .expect("recipient key gen should succeed");
+    let recipient = keys::generate_key_with_suite(
+        "Recipient".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+    )
+    .expect("recipient key gen should succeed");
     let (signer_tsk, fingerprints) = signing_subkey_fixture(2, 1);
     let revoked_fingerprint = fingerprints[0].clone();
     let live_fingerprint = fingerprints[1].clone();
@@ -563,17 +596,16 @@ fn test_encrypt_sign_skips_revoked_signing_subkey_and_uses_live_one() {
     // revoked-only cert — proving the live subkey issued the signature.
     let signer_cert = openpgp::Cert::from_bytes(&signer_tsk).expect("signer cert should parse");
 
-    let live_only = signer_cert.clone().retain_subkeys(|ka| {
-        ka.key().fingerprint().to_hex().to_lowercase() == live_fingerprint
-    });
+    let live_only = signer_cert
+        .clone()
+        .retain_subkeys(|ka| ka.key().fingerprint().to_hex().to_lowercase() == live_fingerprint);
     let mut live_only_pub = Vec::new();
     live_only
         .serialize(&mut live_only_pub)
         .expect("live-only verification cert should serialize");
 
-    let revoked_only = signer_cert.retain_subkeys(|ka| {
-        ka.key().fingerprint().to_hex().to_lowercase() == revoked_fingerprint
-    });
+    let revoked_only = signer_cert
+        .retain_subkeys(|ka| ka.key().fingerprint().to_hex().to_lowercase() == revoked_fingerprint);
     let mut revoked_only_pub = Vec::new();
     revoked_only
         .serialize(&mut revoked_only_pub)
@@ -615,7 +647,7 @@ fn test_verify_signature_from_revoked_key() {
     let key = keys::generate_key_with_suite(
         "Revoked Signer".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key gen should succeed");

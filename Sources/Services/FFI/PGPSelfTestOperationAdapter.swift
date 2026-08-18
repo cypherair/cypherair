@@ -21,7 +21,7 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
     func generateKey(
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite
     ) async throws -> PGPSelfTestGeneratedKey {
         do {
@@ -29,7 +29,7 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
                 engine: engine,
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 suite: suite
             )
         } catch {
@@ -102,13 +102,13 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
         engine: PgpEngine,
         name: String,
         email: String?,
-        expirySeconds: UInt64?,
+        validity: PGPKeyValidity,
         suite: PGPKeySuite
     ) async throws -> PGPSelfTestGeneratedKey {
         var generated = try engine.generateKey(
             name: name,
             email: email,
-            expirySeconds: expirySeconds,
+            validity: validity.ffiValue,
             suite: suite.ffiValue
         )
         // Self-test never stores the revocation certificate, so per the

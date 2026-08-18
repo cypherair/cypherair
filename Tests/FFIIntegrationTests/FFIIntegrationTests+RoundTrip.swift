@@ -11,7 +11,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Test User A",
             email: "test-a@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -41,7 +41,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Test User B",
             email: "test-b@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -71,7 +71,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Large Data A",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -101,7 +101,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Large Data B",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
 
@@ -140,7 +140,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: "Unicode测试用户🔑",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -174,7 +174,7 @@ extension FFIIntegrationTests {
         let generated = try engine.generateKey(
             name: chineseName,
             email: "zhangsan@例え.jp",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -195,7 +195,7 @@ extension FFIIntegrationTests {
             let key = try engine.generateKey(
                 name: "Complete \(suite)",
                 email: "test@example.com",
-                expirySeconds: 86400 * 365,
+                validity: .expiresIn(seconds: 86400 * 365),
                 suite: suite
             )
 

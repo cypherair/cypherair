@@ -46,7 +46,7 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
         let material = try await adapter.generatePublicCertificate(
             name: "CypherAir Device Custody",
             email: "device-custody@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
             handlePair: loadedPair,
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()

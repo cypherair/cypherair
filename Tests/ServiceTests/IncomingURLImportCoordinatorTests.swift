@@ -46,7 +46,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let generated = try stack.engine.generateKey(
             name: "URL Contact",
             email: "url@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let url = try makeImportURL(publicKeyData: generated.publicKeyData)
@@ -69,13 +69,13 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let firstKey = try stack.engine.generateKey(
             name: "Carol",
             email: "carol@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Carol",
             email: "carol@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
@@ -99,13 +99,13 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let firstKey = try stack.engine.generateKey(
             name: "First Pending",
             email: "first-pending@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Second Pending",
             email: "second-pending@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -140,7 +140,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let firstKey = try stack.engine.generateKey(
             name: "First Pending",
             email: "first-pending@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
@@ -186,13 +186,13 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let firstKey = try stack.engine.generateKey(
             name: "Dana",
             email: "dana@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let secondKey = try stack.engine.generateKey(
             name: "Dana",
             email: "dana@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
@@ -214,7 +214,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let generated = try stack.engine.generateKey(
             name: "Tutorial Blocked",
             email: "blocked@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let url = try makeImportURL(publicKeyData: generated.publicKeyData)
@@ -240,7 +240,7 @@ final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerialized
         let generated = try stack.engine.generateKey(
             name: "Dismissed Tutorial",
             email: "dismissed@example.com",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let url = try makeImportURL(publicKeyData: generated.publicKeyData)

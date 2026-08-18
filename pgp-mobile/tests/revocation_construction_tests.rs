@@ -1,5 +1,5 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite, UserIdSelectorInput};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 use openpgp::packet::signature;
@@ -14,7 +14,7 @@ fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
-        None,
+        KeyValidity::Never,
         profile,
     )
     .expect("key generation should succeed")
@@ -383,7 +383,10 @@ fn test_generate_user_id_revocation_revokes_selected_user_id_only() {
 
 #[test]
 fn test_generate_user_id_revocation_by_selector_accepts_duplicate_occurrence_selector() {
-    let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "SelectorDuplicateUserid");
+    let generated = generate_key(
+        KeySuite::Ed25519LegacyCurve25519Legacy,
+        "SelectorDuplicateUserid",
+    );
     let duplicated = duplicate_userid(
         &generated.cert_data,
         "SelectorDuplicateUserid <selectorduplicateuserid@example.com>",

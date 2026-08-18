@@ -4,16 +4,13 @@ import SwiftUI
 struct ModifyExpiryRequest: Identifiable {
     let id = UUID()
     let fingerprint: String
-    let initialDate: Date
     let onComplete: @MainActor () -> Void
 
     init(
         fingerprint: String,
-        initialDate: Date,
         onComplete: @escaping @MainActor () -> Void = {}
     ) {
         self.fingerprint = fingerprint
-        self.initialDate = initialDate
         self.onComplete = onComplete
     }
 }
@@ -62,7 +59,7 @@ private struct ModifyExpiryScreenHostView: View {
                 DatePicker(
                     String(localized: "keydetail.expiry.newDate", defaultValue: "New Expiry Date"),
                     selection: $model.newExpiryDate,
-                    in: expiryDateRange,
+                    in: KeyExpiryPolicy.settableDateRange(),
                     displayedComponents: .date
                 )
             } header: {
@@ -125,12 +122,6 @@ private struct ModifyExpiryScreenHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
-    }
-
-    private var expiryDateRange: ClosedRange<Date> {
-        let minimum = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-        let maximum = Calendar.current.date(byAdding: .year, value: 10, to: Date()) ?? Date()
-        return minimum...maximum
     }
 
     @Environment(\.dismiss) private var dismiss

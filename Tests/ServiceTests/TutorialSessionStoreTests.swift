@@ -222,7 +222,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let alice = try await container.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
@@ -297,7 +297,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let alice = try await oldContainer.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
@@ -322,7 +322,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let alice = try await container.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
@@ -587,7 +587,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let alice = try await container.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
@@ -654,7 +654,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let alice = try await container.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)
@@ -692,7 +692,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let alice = try await container.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed448X448
         )
         await store.noteAliceGenerated(alice)

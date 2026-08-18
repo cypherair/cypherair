@@ -60,14 +60,14 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         let identity = try await made.service.generateKey(
             name: "Expiry Test",
             email: "expiry@example.com",
-            expirySeconds: 60 * 60 * 24 * 365,
+            validity: .expiresIn(seconds: 60 * 60 * 24 * 365),
             suite: .ed25519LegacyCurve25519Legacy
         )
         XCTAssertEqual(stub.calls, 0, "Generation must not consult the expiry authenticator.")
 
         let updated = try await made.service.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 60 * 60 * 24 * 30
+            newValidity: .expiresIn(seconds: 60 * 60 * 24 * 30)
         )
 
         XCTAssertEqual(stub.calls, 1, "Exactly one authentication context is minted for modify-expiry.")
@@ -99,7 +99,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         let identity = try await made.service.generateKey(
             name: "Expiry Decline",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         let generatesAfterProvisioning = made.mockSE.generateCallCount
@@ -107,7 +107,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         do {
             _ = try await made.service.modifyExpiry(
                 fingerprint: identity.fingerprint,
-                newExpirySeconds: 60 * 60
+                newValidity: .expiresIn(seconds: 60 * 60)
             )
             XCTFail("Expected the declined authentication to abort the flow")
         } catch is TestError {
@@ -128,7 +128,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         stub.errorToThrow = nil
         let updated = try await made.service.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 60 * 60
+            newValidity: .expiresIn(seconds: 60 * 60)
         )
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
         XCTAssertEqual(stub.calls, 2)
@@ -144,13 +144,13 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         let identity = try await made.service.generateKey(
             name: "Expiry Legacy",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
         let updated = try await made.service.modifyExpiry(
             fingerprint: identity.fingerprint,
-            newExpirySeconds: 60 * 60 * 24
+            newValidity: .expiresIn(seconds: 60 * 60 * 24)
         )
 
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
@@ -185,14 +185,14 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         let identity = try await made.service.generateKey(
             name: "Expiry Relock",
             email: nil,
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
 
         do {
             _ = try await made.service.modifyExpiry(
                 fingerprint: identity.fingerprint,
-                newExpirySeconds: 60 * 60
+                newValidity: .expiresIn(seconds: 60 * 60)
             )
             XCTFail("Expected keyMetadataUnavailable when the catalog vanished mid-action")
         } catch CypherAirError.keyMetadataUnavailable {

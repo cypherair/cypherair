@@ -466,7 +466,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         _ = try await keyManagement.generateKey(
             name: "Post Unlock",
             email: "post-unlock@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
@@ -514,7 +514,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         _ = try await keyManagement.generateKey(
             name: "Post Unlock Warning",
             email: "post-unlock-warning@example.invalid",
-            expirySeconds: nil,
+            validity: .never,
             suite: .ed25519LegacyCurve25519Legacy
         )
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)

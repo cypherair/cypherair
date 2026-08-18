@@ -18,7 +18,7 @@ use common::gnupg::{assert_gpg_status_good_signature, gpg_cmd, gpg_import_key, s
 use common::load_fixture;
 use pgp_mobile::armor;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 use pgp_mobile::streaming;
 
@@ -48,7 +48,7 @@ fn test_gpg_imports_sequoia_legacy_pubkey() {
     let key = keys::generate_key_with_suite(
         "Sequoia User".to_string(),
         Some("sequoia@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
@@ -142,7 +142,7 @@ fn test_gpg_verifies_sequoia_cleartext_signature() {
     let signer = keys::generate_key_with_suite(
         "Sequoia Signer".to_string(),
         Some("signer@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
@@ -189,7 +189,7 @@ fn test_gpg_verifies_sequoia_detached_signature() {
     let signer = keys::generate_key_with_suite(
         "Sequoia Signer".to_string(),
         Some("signer@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");
@@ -239,7 +239,7 @@ fn test_gpg_rejects_sequoia_modern_high_pubkey() {
     let key = keys::generate_key_with_suite(
         "Modern High User".to_string(),
         Some("modernhigh@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key generation should succeed");
@@ -283,7 +283,7 @@ fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
     let signer = keys::generate_key_with_suite(
         "Sequoia Signer".to_string(),
         Some("signer@example.com".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("Key generation should succeed");

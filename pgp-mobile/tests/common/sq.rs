@@ -8,6 +8,7 @@
 //! `fixtures/generate_sq_fixtures.sh` keep the committed side deterministic.
 #![allow(dead_code)]
 
+use pgp_mobile::keys::KeyValidity;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -86,7 +87,7 @@ fn sq_imports_engine_pq_key(sq_path: &PathBuf) -> bool {
     let key = pgp_mobile::keys::generate_key_with_suite(
         "CypherAir PQ Capability Probe".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         pgp_mobile::keys::KeySuite::MlDsa65Ed25519MlKem768X25519,
     )
     .unwrap_or_else(|error| {

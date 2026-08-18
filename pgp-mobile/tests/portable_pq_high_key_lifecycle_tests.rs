@@ -7,14 +7,14 @@
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::PublicKeyAlgorithm;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use sequoia_openpgp as openpgp;
 
 fn generate_pq_high() -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         "PQ High Lifecycle".to_string(),
         Some("pqhigh@lifecycle.example".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::MlDsa87Ed448MlKem1024X448,
     )
     .expect("Post-Quantum · High key gen should succeed")
@@ -70,9 +70,8 @@ fn test_detect_suite_classifies_post_quantum_high() {
 fn test_export_import_roundtrip_post_quantum_high_uses_argon2id() {
     let key = generate_pq_high();
 
-    let exported =
-        keys::export_secret_key(&key.cert_data, "correct horse")
-            .expect("PQ-High export should succeed");
+    let exported = keys::export_secret_key(&key.cert_data, "correct horse")
+        .expect("PQ-High export should succeed");
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
     assert_eq!(
@@ -98,7 +97,10 @@ fn test_export_import_roundtrip_post_quantum_high_uses_argon2id() {
             }
         }
     }
-    assert!(secret_packets >= 2, "primary + encryption subkey must be present");
+    assert!(
+        secret_packets >= 2,
+        "primary + encryption subkey must be present"
+    );
 
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ-High import");
     let imported_info = keys::parse_key_info(&imported).expect("info");

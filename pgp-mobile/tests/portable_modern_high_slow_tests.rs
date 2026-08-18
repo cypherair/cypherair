@@ -6,21 +6,25 @@
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::sign;
 
 /// Export key with Argon2id.
 #[test]
 #[ignore = "slow"]
 fn test_export_key_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let passphrase = "strong-passphrase-for-profile-b";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
     assert!(!exported.is_empty());
 }
 
@@ -28,14 +32,18 @@ fn test_export_key_modern_high() {
 #[test]
 #[ignore = "slow"]
 fn test_import_correct_passphrase_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let passphrase = "correct-passphrase-b";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
 
     let imported = keys::import_secret_key(&exported, passphrase)
         .expect("Import with correct passphrase should succeed");
@@ -46,12 +54,16 @@ fn test_import_correct_passphrase_modern_high() {
 #[test]
 #[ignore = "slow"]
 fn test_import_wrong_passphrase_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
-    let exported = keys::export_secret_key(&key.cert_data, "correct")
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, "correct").expect("Export should succeed");
 
     let result = keys::import_secret_key(&exported, "wrong");
     match result {
@@ -65,14 +77,18 @@ fn test_import_wrong_passphrase_modern_high() {
 #[test]
 #[ignore = "slow"]
 fn test_export_produces_encrypted_key_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let passphrase = "test-passphrase-b";
 
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
 
     let sign_result = sign::sign_cleartext(b"test", &exported);
     assert!(
@@ -85,9 +101,13 @@ fn test_export_produces_encrypted_key_modern_high() {
 #[test]
 #[ignore = "slow"]
 fn test_export_import_decrypt_roundtrip_modern_high() {
-    let key =
-        keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed448X448)
-            .expect("Key gen should succeed");
+    let key = keys::generate_key_with_suite(
+        "Alice".to_string(),
+        None,
+        KeyValidity::Never,
+        KeySuite::Ed448X448,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"Modern High export/import chain test.";
 
@@ -95,8 +115,8 @@ fn test_export_import_decrypt_roundtrip_modern_high() {
         .expect("Encryption should succeed");
 
     let passphrase = "roundtrip-profile-b";
-    let exported = keys::export_secret_key(&key.cert_data, passphrase)
-        .expect("Export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, passphrase).expect("Export should succeed");
     let imported = keys::import_secret_key(&exported, passphrase).expect("Import should succeed");
 
     let result = decrypt::decrypt_detailed(&ciphertext, &[imported], &[])
@@ -114,7 +134,7 @@ fn test_unicode_passphrase_export_import_modern_high() {
     let key = keys::generate_key_with_suite(
         "Unicode Test".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed448X448,
     )
     .expect("Key gen should succeed");
@@ -127,10 +147,9 @@ fn test_unicode_passphrase_export_import_modern_high() {
     ];
 
     for passphrase in &passphrases {
-        let exported = keys::export_secret_key(&key.cert_data, passphrase)
-            .unwrap_or_else(|e| {
-                panic!("Export with passphrase '{passphrase}' should succeed: {e}")
-            });
+        let exported = keys::export_secret_key(&key.cert_data, passphrase).unwrap_or_else(|e| {
+            panic!("Export with passphrase '{passphrase}' should succeed: {e}")
+        });
 
         let imported = keys::import_secret_key(&exported, passphrase).unwrap_or_else(|e| {
             panic!("Import with passphrase '{passphrase}' should succeed: {e}")

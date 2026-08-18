@@ -18,7 +18,7 @@ use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
 use openpgp::types::{AEADAlgorithm, PublicKeyAlgorithm, SymmetricAlgorithm};
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{decrypt, PgpEngine};
 use sequoia_openpgp as openpgp;
@@ -56,7 +56,8 @@ fn foreign_stock_encrypt(recipient_cert_data: &[u8], plaintext: &[u8]) -> Vec<u8
 
 #[test]
 fn generates_policy_valid_v6_composite_high_certificate() {
-    let material = SoftwareCompositeHighMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeHighMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     let info = keys::parse_key_info(&material.public_key_data).expect("key info parses");
     assert_eq!(info.key_version, 6);
@@ -93,7 +94,8 @@ fn generates_policy_valid_v6_composite_high_certificate() {
 
 #[test]
 fn inspection_returns_high_component_public_keys() {
-    let material = SoftwareCompositeHighMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeHighMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let inspection = engine()
         .inspect_secure_enclave_composite_high_bindings(material.public_key_data.clone())
         .expect("inspection succeeds");
@@ -121,7 +123,8 @@ fn inspection_returns_high_component_public_keys() {
 
 #[test]
 fn cleartext_signing_round_trips_and_rejects_wrong_classical_component() {
-    let material = SoftwareCompositeHighMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeHighMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     let signed = engine()
         .sign_cleartext_with_external_composite_high_signer(
@@ -157,7 +160,8 @@ fn cleartext_signing_round_trips_and_rejects_wrong_classical_component() {
 
 #[test]
 fn foreign_sequoia_message_decrypts_through_split_custody_path() {
-    let material = SoftwareCompositeHighMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeHighMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let ciphertext = foreign_stock_encrypt(&material.public_key_data, PLAINTEXT);
 
     // PQ-only recipient: SEIPDv2 with the AES-256 floor, PKESK algorithm 36.
@@ -190,7 +194,8 @@ fn foreign_sequoia_message_decrypts_through_split_custody_path() {
 
 #[test]
 fn engine_encrypts_signs_and_decrypts_through_split_custody() {
-    let material = SoftwareCompositeHighMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeHighMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     // Encrypt to and sign with the same · High identity, exercising both the
     // external ML-DSA-87 signer and the external ML-KEM-1024 decapsulator.

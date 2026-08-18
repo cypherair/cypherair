@@ -35,7 +35,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
                 prefilledName: "Alice",
                 prefilledEmail: "alice@example.com",
                 lockedFamily: .portableEd25519X25519,
-                lockedExpiryMonths: 36,
+                lockedExpiryTerm: .years(4),
                 postGenerationBehavior: .suppressPrompt
             )
         )
@@ -45,7 +45,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(model.name, "Alice")
         XCTAssertEqual(model.email, "alice@example.com")
         XCTAssertEqual(model.selectedFamily, .portableEd25519X25519)
-        XCTAssertEqual(model.expiryMonths, 36)
+        XCTAssertEqual(model.expiryTerm, .years(4))
     }
 
     func test_selectFamily_isIgnoredWhenFamilyIsLocked() {
@@ -226,13 +226,13 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertFalse(model.isGenerating)
     }
 
-    func test_generate_softwareFamilyStartsImmediatelyAndPresentsLocalPrompt() async {
+    func test_generate_softwareFamilyStartsImmediatelyAndPresentsLocalPrompt() async throws {
         let identity = makeKeyRouteTestIdentity(fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         var generatedIdentity: PGPKeyIdentity?
         var capturedName: String?
         var capturedEmail: String?
         var capturedFamily: PGPKeyFamily?
-        var capturedExpirySeconds: UInt64?
+        var capturedValidity: PGPKeyValidity?
         var configuration = KeyGenerationView.Configuration()
         configuration.onGenerated = { identity in
             generatedIdentity = identity
@@ -240,10 +240,10 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            generateKeyAction: { name, email, expirySeconds, family in
+            generateKeyAction: { name, email, validity, family in
                 capturedName = name
                 capturedEmail = email
-                capturedExpirySeconds = expirySeconds
+                capturedValidity = validity
                 capturedFamily = family
                 return identity
             }
@@ -264,9 +264,46 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(capturedName, "Alice")
         XCTAssertEqual(capturedEmail, "alice@example.com")
         XCTAssertEqual(capturedFamily, .portableEd25519X25519)
-        XCTAssertNotNil(capturedExpirySeconds)
+        guard case .expiresIn = try XCTUnwrap(capturedValidity) else {
+            return XCTFail("the default term is finite and should reach the engine as a stated expiry")
+        }
         XCTAssertFalse(model.isGenerating)
         XCTAssertFalse(model.showError)
+    }
+
+    /// Choosing Never must reach the engine as `.never`, not as a far-off date.
+    /// The picker offering the row is not the promise; carrying the absence
+    /// through unflattened is.
+    func test_generate_neverTermReachesTheEngineAsNoExpiry() async throws {
+        let identity = makeKeyRouteTestIdentity(fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+        var capturedValidity: PGPKeyValidity?
+        var configuration = KeyGenerationView.Configuration()
+        configuration.postGenerationBehavior = .suppressPrompt
+
+        let model = makeModel(
+            configuration: configuration,
+            generateKeyAction: { _, _, validity, _ in
+                capturedValidity = validity
+                return identity
+            }
+        )
+        model.name = "Alice"
+        model.expiryTerm = .never
+
+        model.generate()
+
+        await waitUntilKeyRoute("key generation to finish") {
+            capturedValidity != nil
+        }
+
+        XCTAssertEqual(capturedValidity, .never)
+    }
+
+    /// Never is offered at creation, and the default is the policy's.
+    func test_offeredTerms_includeNeverAndStartOnTheDefault() {
+        XCTAssertTrue(KeyExpiryPolicy.offeredTerms.contains(.never))
+        XCTAssertTrue(KeyExpiryPolicy.offeredTerms.contains(KeyExpiryPolicy.defaultTerm))
+        XCTAssertEqual(makeModel().expiryTerm, KeyExpiryPolicy.defaultTerm)
     }
 
     func test_generate_routesMacPromptThroughInjectedAction() async {

@@ -164,7 +164,7 @@ enum TestHelpers {
         try await service.generateKey(
             name: name,
             email: email,
-            expirySeconds: nil,
+            validity: .never,
             suite: suite
         )
     }

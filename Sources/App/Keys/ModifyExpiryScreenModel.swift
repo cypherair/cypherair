@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 @Observable
 final class ModifyExpiryScreenModel {
-    typealias ModifyExpiryAction = @MainActor (String, UInt64?) async throws -> PGPKeyIdentity
+    typealias ModifyExpiryAction = @MainActor (String, PGPKeyValidity) async throws -> PGPKeyIdentity
 
     let request: ModifyExpiryRequest
 
@@ -12,7 +12,7 @@ final class ModifyExpiryScreenModel {
     private var modifyTask: Task<Void, Never>?
     private var modifyToken: UInt64 = 0
 
-    var newExpiryDate: Date
+    var newExpiryDate = KeyExpiryPolicy.defaultExpiryDate()
     var isModifyingExpiry = false
     var error: CypherAirError?
     var showError = false
@@ -24,23 +24,21 @@ final class ModifyExpiryScreenModel {
         modifyExpiryAction: ModifyExpiryAction? = nil
     ) {
         self.request = request
-        self.newExpiryDate = request.initialDate
         self.dismissAction = dismissAction
-        self.modifyExpiryAction = modifyExpiryAction ?? { fingerprint, seconds in
+        self.modifyExpiryAction = modifyExpiryAction ?? { fingerprint, validity in
             try await keyManagement.modifyExpiry(
                 fingerprint: fingerprint,
-                newExpirySeconds: seconds
+                newValidity: validity
             )
         }
     }
 
     func saveSelectedExpiryDate() {
-        let seconds = UInt64(max(0, newExpiryDate.timeIntervalSinceNow))
-        performModifyExpiry(seconds: seconds)
+        performModifyExpiry(KeyExpiryPolicy.validity(until: newExpiryDate))
     }
 
     func removeExpiry() {
-        performModifyExpiry(seconds: nil)
+        performModifyExpiry(.never)
     }
 
     func dismissError() {
@@ -55,7 +53,7 @@ final class ModifyExpiryScreenModel {
         isModifyingExpiry = false
     }
 
-    private func performModifyExpiry(seconds: UInt64?) {
+    private func performModifyExpiry(_ validity: PGPKeyValidity) {
         modifyTask?.cancel()
         modifyToken &+= 1
         let token = modifyToken
@@ -74,7 +72,7 @@ final class ModifyExpiryScreenModel {
             }
 
             do {
-                _ = try await self.modifyExpiryAction(fingerprint, seconds)
+                _ = try await self.modifyExpiryAction(fingerprint, validity)
                 try Task.checkCancellation()
                 guard token == self.modifyToken else {
                     return

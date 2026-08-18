@@ -16,7 +16,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::{PublicKeyAlgorithm, RevocationStatus, SymmetricAlgorithm};
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeySuite, SecureEnclaveCompositePublicCertificateInput};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity, SecureEnclaveCompositePublicCertificateInput};
 use pgp_mobile::PgpEngine;
 use sequoia_openpgp as openpgp;
 
@@ -26,7 +26,8 @@ fn engine() -> PgpEngine {
 
 #[test]
 fn generates_policy_valid_v6_composite_certificate() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     let info = keys::parse_key_info(&material.public_key_data).expect("key info parses");
     assert_eq!(info.key_version, 6);
@@ -94,7 +95,8 @@ fn generates_policy_valid_v6_composite_certificate() {
 
 #[test]
 fn inspection_returns_component_public_keys() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let inspection = engine()
         .inspect_secure_enclave_composite_bindings(material.public_key_data.clone())
         .expect("inspection succeeds");
@@ -125,7 +127,8 @@ fn inspection_returns_component_public_keys() {
 
 #[test]
 fn pre_generated_revocation_certificate_verifies() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let reason = keys::parse_revocation_cert(&material.revocation_cert, &material.public_key_data)
         .expect("revocation certificate verifies against its certificate");
     assert!(!reason.is_empty());
@@ -133,7 +136,8 @@ fn pre_generated_revocation_certificate_verifies() {
 
 #[test]
 fn generation_rejects_invalid_component_public_keys() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let provider = material.signing_provider();
 
     let cases: Vec<(Vec<u8>, Vec<u8>)> = vec![
@@ -160,7 +164,7 @@ fn generation_rejects_invalid_component_public_keys() {
             SecureEnclaveCompositePublicCertificateInput {
                 name: "Invalid Component".to_string(),
                 email: None,
-                expiry_seconds: None,
+                validity: KeyValidity::Never,
                 mldsa65_signing_public_key: mldsa_public,
                 mlkem768_key_agreement_public_key: mlkem_public,
             },
@@ -173,7 +177,7 @@ fn generation_rejects_invalid_component_public_keys() {
         SecureEnclaveCompositePublicCertificateInput {
             name: "   ".to_string(),
             email: None,
-            expiry_seconds: None,
+            validity: KeyValidity::Never,
             mldsa65_signing_public_key: material.mldsa65_signing_public_key.clone(),
             mlkem768_key_agreement_public_key: material.mlkem768_key_agreement_public_key.clone(),
         },
@@ -184,8 +188,10 @@ fn generation_rejects_invalid_component_public_keys() {
 
 #[test]
 fn generation_fails_closed_when_provider_key_does_not_match_public() {
-    let material_a = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let material_b = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material_a =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
+    let material_b =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     // Provider B signs with a different ML-DSA key than the supplied public:
     // the self-verify inside the composite signer must fail the first binding.
@@ -193,7 +199,7 @@ fn generation_fails_closed_when_provider_key_does_not_match_public() {
         SecureEnclaveCompositePublicCertificateInput {
             name: "Mismatched Provider".to_string(),
             email: None,
-            expiry_seconds: None,
+            validity: KeyValidity::Never,
             mldsa65_signing_public_key: material_a.mldsa65_signing_public_key.clone(),
             mlkem768_key_agreement_public_key: material_a.mlkem768_key_agreement_public_key.clone(),
         },
@@ -211,12 +217,13 @@ fn generation_fails_closed_when_provider_key_does_not_match_public() {
 
 #[test]
 fn generation_propagates_cancellation() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let result = keys::generate_secure_enclave_composite_public_certificate(
         SecureEnclaveCompositePublicCertificateInput {
             name: "Cancelled".to_string(),
             email: None,
-            expiry_seconds: None,
+            validity: KeyValidity::Never,
             mldsa65_signing_public_key: material.mldsa65_signing_public_key.clone(),
             mlkem768_key_agreement_public_key: material.mlkem768_key_agreement_public_key.clone(),
         },
@@ -227,7 +234,8 @@ fn generation_propagates_cancellation() {
 
 #[test]
 fn cleartext_signing_round_trips_and_rejects_wrong_classical_component() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     let signed = engine()
         .sign_cleartext_with_external_composite_signer(
@@ -265,7 +273,8 @@ fn cleartext_signing_round_trips_and_rejects_wrong_classical_component() {
 
 #[test]
 fn expiry_modification_updates_public_certificate() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let before = keys::parse_key_info(&material.public_key_data).expect("key info parses");
 
     let updated = engine()
@@ -274,7 +283,9 @@ fn expiry_modification_updates_public_certificate() {
             material.signing_key_fingerprint.clone(),
             material.classical_eddsa_secret.clone(),
             material.signing_provider(),
-            Some(90 * 24 * 60 * 60),
+            KeyValidity::ExpiresIn {
+                seconds: 90 * 24 * 60 * 60,
+            },
         )
         .expect("expiry modification succeeds");
 
@@ -286,7 +297,8 @@ fn expiry_modification_updates_public_certificate() {
 
 #[test]
 fn subkey_and_user_id_revocations_apply_to_certificate() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let policy = StandardPolicy::new();
 
     let subkey_revocation = engine()
@@ -344,11 +356,12 @@ fn subkey_and_user_id_revocations_apply_to_certificate() {
 
 #[test]
 fn certifies_another_certificate_user_id() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let target = keys::generate_key_with_suite(
         "Certified Contact".to_string(),
         Some("contact@example.test".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("target key generates");

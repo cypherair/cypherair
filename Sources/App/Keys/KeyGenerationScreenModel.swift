@@ -3,11 +3,11 @@ import Foundation
 @MainActor
 @Observable
 final class KeyGenerationScreenModel {
-    typealias GenerateKeyAction = @MainActor (String, String?, UInt64?, PGPKeyFamily) async throws -> PGPKeyIdentity
+    typealias GenerateKeyAction = @MainActor (String, String?, PGPKeyValidity, PGPKeyFamily) async throws -> PGPKeyIdentity
     typealias PostGenerationPromptAction = @MainActor (PGPKeyIdentity) -> Void
 
     let configuration: KeyGenerationView.Configuration
-    let expiryOptions = [12, 24, 36, 48, 60]
+    let expiryTerms = KeyExpiryPolicy.offeredTerms
 
     private let generateKeyAction: GenerateKeyAction
     private let postGenerationPromptAction: PostGenerationPromptAction?
@@ -20,7 +20,7 @@ final class KeyGenerationScreenModel {
     var email = ""
     var selectedFamily: PGPKeyFamily = .recommendedDefault
     var detailFamily: PGPKeyFamily?
-    var expiryMonths = 24
+    var expiryTerm = KeyExpiryPolicy.defaultTerm
     var isGenerating = false
     var deviceBoundCommitmentPending = false
     var presentedFamilyDetail: PGPKeyFamily?
@@ -41,11 +41,11 @@ final class KeyGenerationScreenModel {
         self.capabilityResolver = capabilityResolver
         self.isSecureEnclaveGenerationAvailable = isSecureEnclaveGenerationAvailable
             ?? keyManagement.isSecureEnclaveCustodyGenerationAvailable
-        self.generateKeyAction = generateKeyAction ?? { name, email, expirySeconds, family in
+        self.generateKeyAction = generateKeyAction ?? { name, email, validity, family in
             try await keyManagement.generateKey(
                 name: name,
                 email: email,
-                expirySeconds: expirySeconds,
+                validity: validity,
                 family: family
             )
         }
@@ -90,8 +90,8 @@ final class KeyGenerationScreenModel {
         if let lockedFamily = configuration.lockedFamily {
             selectedFamily = lockedFamily
         }
-        if let lockedExpiryMonths = configuration.lockedExpiryMonths {
-            expiryMonths = lockedExpiryMonths
+        if let lockedExpiryTerm = configuration.lockedExpiryTerm {
+            expiryTerm = lockedExpiryTerm
         }
     }
 
@@ -198,12 +198,7 @@ final class KeyGenerationScreenModel {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
         let selectedFamily = selectedFamily
-        let expiryDate = Calendar.current.date(
-            byAdding: .month,
-            value: expiryMonths,
-            to: Date()
-        ) ?? Date()
-        let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
+        let validity = KeyExpiryPolicy.validity(for: expiryTerm)
 
         generationTask = Task { @MainActor [weak self, token] in
             guard let self else { return }
@@ -218,7 +213,7 @@ final class KeyGenerationScreenModel {
                 let identity = try await self.generateKeyAction(
                     trimmedName,
                     trimmedEmail.isEmpty ? nil : trimmedEmail,
-                    expirySeconds,
+                    validity,
                     selectedFamily
                 )
                 try Task.checkCancellation()

@@ -6,14 +6,14 @@
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::PublicKeyAlgorithm;
-use pgp_mobile::keys::{self, KeySuite};
+use pgp_mobile::keys::{self, KeySuite, KeyValidity};
 use sequoia_openpgp as openpgp;
 
 fn generate_modern() -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         "Modern Lifecycle".to_string(),
         Some("modern@lifecycle.example".to_string()),
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519X25519,
     )
     .expect("Modern key gen should succeed")

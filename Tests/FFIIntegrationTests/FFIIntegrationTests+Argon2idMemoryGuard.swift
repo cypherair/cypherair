@@ -16,7 +16,7 @@ extension FFIIntegrationTests {
     /// only the memory figure is mocked.
     func test_argon2idGuard_modernHighBackup_onDeviceWithHeadroom_passes() throws {
         let key = try engine.generateKey(
-            name: "Argon2id Test", email: nil, expirySeconds: nil, suite: .ed448X448
+            name: "Argon2id Test", email: nil, validity: .never, suite: .ed448X448
         )
         let exported = try engine.exportSecretKey(
             certData: key.certData,
@@ -148,7 +148,7 @@ extension FFIIntegrationTests {
     /// Legacy (Iterated+Salted) — guard is a no-op even with minimal memory.
     func test_argon2idGuard_legacy_iteratedSalted_alwaysPasses() throws {
         let key = try engine.generateKey(
-            name: "Legacy Test", email: nil, expirySeconds: nil, suite: .ed25519LegacyCurve25519Legacy
+            name: "Legacy Test", email: nil, validity: .never, suite: .ed25519LegacyCurve25519Legacy
         )
         let exported = try engine.exportSecretKey(
             certData: key.certData,

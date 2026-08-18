@@ -1,5 +1,5 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, CertificateMergeOutcome, KeySuite};
+use pgp_mobile::keys::{self, CertificateMergeOutcome, KeySuite, KeyValidity};
 use sequoia_openpgp as openpgp;
 use std::fs;
 use std::path::PathBuf;
@@ -17,7 +17,7 @@ fn generate_key(profile: KeySuite, name: &str) -> keys::GeneratedKey {
     keys::generate_key_with_suite(
         name.to_string(),
         Some(format!("{}@example.com", name.to_lowercase())),
-        None,
+        KeyValidity::Never,
         profile,
     )
     .expect("key generation should succeed")
@@ -159,8 +159,13 @@ fn test_merge_public_certificate_duplicate_no_op_modern_high() {
 #[test]
 fn test_merge_public_certificate_expiry_refresh_legacy() {
     let generated = generate_key(KeySuite::Ed25519LegacyCurve25519Legacy, "ExpiryA");
-    let refreshed = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 365))
-        .expect("expiry refresh should succeed");
+    let refreshed = keys::modify_expiry(
+        &generated.cert_data,
+        KeyValidity::ExpiresIn {
+            seconds: 60 * 60 * 24 * 365,
+        },
+    )
+    .expect("expiry refresh should succeed");
 
     let result = keys::merge_public_certificate_update(
         &generated.public_key_data,
@@ -177,8 +182,13 @@ fn test_merge_public_certificate_expiry_refresh_legacy() {
 #[test]
 fn test_merge_public_certificate_expiry_refresh_modern_high() {
     let generated = generate_key(KeySuite::Ed448X448, "ExpiryB");
-    let refreshed = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 365))
-        .expect("expiry refresh should succeed");
+    let refreshed = keys::modify_expiry(
+        &generated.cert_data,
+        KeyValidity::ExpiresIn {
+            seconds: 60 * 60 * 24 * 365,
+        },
+    )
+    .expect("expiry refresh should succeed");
 
     let result = keys::merge_public_certificate_update(
         &generated.public_key_data,
@@ -287,7 +297,7 @@ fn test_parse_key_info_revoked_cert_uses_relaxed_display_user_id_fallback() {
     let generated = keys::generate_key_with_suite(
         "Expired Display".to_string(),
         Some("expired-display@example.com".to_string()),
-        Some(1),
+        KeyValidity::ExpiresIn { seconds: 1 },
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("short-lived key generation should succeed");
@@ -362,8 +372,8 @@ fn test_merge_public_certificate_adds_encryption_subkey_modern_high_fixture() {
         .expect("modern high subkey merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let merged_info =
-        keys::parse_key_info(&result.merged_cert_data).expect("modern high merged cert should parse");
+    let merged_info = keys::parse_key_info(&result.merged_cert_data)
+        .expect("modern high merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
     assert_eq!(merged_info.suite, KeySuite::Ed448X448);
 }

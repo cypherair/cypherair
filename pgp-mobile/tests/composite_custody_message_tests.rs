@@ -24,7 +24,7 @@ use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
     self, ExternalCompositeKeyAgreementError, ExternalCompositeKeyAgreementFailureCategory,
     ExternalMlKem768DecapsulationProvider, ExternalMlKem768DecapsulationRequest, KeySuite,
-    MlKem768KeyShare,
+    KeyValidity, MlKem768KeyShare,
 };
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::{decrypt, PgpEngine};
@@ -102,11 +102,12 @@ fn encrypt_hidden_recipients(recipient_cert_data: &[&[u8]], plaintext: &[u8]) ->
 
 #[test]
 fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let legacy = keys::generate_key_with_suite(
         "Hidden Legacy Peer".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("legacy generates");
@@ -138,8 +139,10 @@ fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
 
 #[test]
 fn wildcard_other_composite_recipient_pkesk_is_skipped_via_unwrap_failure() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let other = SoftwareCompositeMaterial::generate(None).expect("other generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
+    let other =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("other generation succeeds");
 
     // Hidden (wildcard) recipients; a different composite recipient's PKESK is
     // emitted first. Decapsulating it with our key yields an implicit-rejection
@@ -168,7 +171,8 @@ fn wildcard_other_composite_recipient_pkesk_is_skipped_via_unwrap_failure() {
 
 #[test]
 fn foreign_sequoia_message_decrypts_through_split_custody_path() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let ciphertext = foreign_stock_encrypt(&material.public_key_data, PLAINTEXT);
 
     // PQ-only recipient: SEIPDv2 with the AES-256 floor, PKESK algorithm 35.
@@ -201,7 +205,8 @@ fn foreign_sequoia_message_decrypts_through_split_custody_path() {
 
 #[test]
 fn engine_encrypts_and_signs_to_foreign_pq_recipient() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let (foreign_tsk, foreign_public_armored) = common::pq::generate_foreign_pq();
 
     let ciphertext = engine()
@@ -231,11 +236,12 @@ fn engine_encrypts_and_signs_to_foreign_pq_recipient() {
 
 #[test]
 fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let legacy = keys::generate_key_with_suite(
         "Legacy Peer".to_string(),
         None,
-        None,
+        KeyValidity::Never,
         KeySuite::Ed25519LegacyCurve25519Legacy,
     )
     .expect("legacy generates");
@@ -275,14 +281,15 @@ fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
     assert_eq!(split_custody.plaintext, PLAINTEXT);
 
     let secret_keys = vec![Zeroizing::new(legacy.cert_data)];
-    let software = decrypt::decrypt_detailed(&ciphertext, &secret_keys, &[])
-        .expect("legacy decrypt succeeds");
+    let software =
+        decrypt::decrypt_detailed(&ciphertext, &secret_keys, &[]).expect("legacy decrypt succeeds");
     assert_eq!(software.plaintext, PLAINTEXT);
 }
 
 #[test]
 fn decrypt_fails_closed_on_wrong_key_share() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let ciphertext = foreign_stock_encrypt(&material.public_key_data, PLAINTEXT);
 
     let result = engine().decrypt_detailed_with_external_composite_key_agreement(
@@ -301,7 +308,8 @@ fn decrypt_fails_closed_on_wrong_key_share() {
 
 #[test]
 fn decrypt_propagates_cancellation_and_failure_categories() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let ciphertext = foreign_stock_encrypt(&material.public_key_data, PLAINTEXT);
 
     let cancelled = engine().decrypt_detailed_with_external_composite_key_agreement(
@@ -353,7 +361,8 @@ fn decrypt_propagates_cancellation_and_failure_categories() {
 
 #[test]
 fn password_message_twins_round_trip_with_verified_signature() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
 
     let ciphertext = engine()
         .encrypt_with_password_and_external_composite_signer(
@@ -380,7 +389,8 @@ fn password_message_twins_round_trip_with_verified_signature() {
 
 #[test]
 fn file_streaming_twins_round_trip_with_verified_signature() {
-    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let material =
+        SoftwareCompositeMaterial::generate(KeyValidity::Never).expect("generation succeeds");
     let workdir = tempfile::tempdir().expect("tempdir");
     let input_path = workdir.path().join("plain.txt");
     let encrypted_path = workdir.path().join("cipher.asc");
