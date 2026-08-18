@@ -73,7 +73,8 @@ struct OnboardingView: View {
     }
 }
 
-/// Page 1: Offline Security
+/// Page 0: the offline promise and its device-only consequence — backups do
+/// not restore keys, so the user must keep their own export.
 struct OnboardingOfflinePage: View {
     var body: some View {
         VStack(spacing: 24) {
@@ -93,6 +94,22 @@ struct OnboardingOfflinePage: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
+            VStack(alignment: .leading, spacing: CypherSpacing.compact) {
+                Label(
+                    String(localized: "onboarding.p1.deviceOnly.title", defaultValue: "Only on This Device"),
+                    systemImage: "externaldrive.badge.xmark"
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Text(String(localized: "onboarding.p1.deviceOnly.body", defaultValue: "Your keys and contacts exist only on this device. Restoring an iCloud or computer backup does not bring them back or make your data usable again. To keep a copy of a key, export it as a passphrase-protected .asc file — the guided tutorial shows how."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(CypherSpacing.standard)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cypherSurface(.card)
+            .padding(.horizontal, 40)
+
             Spacer()
             Spacer()
         }
@@ -104,7 +121,7 @@ struct OnboardingOfflinePage: View {
     }
 }
 
-/// Page 2: PGP Introduction
+/// Page 1: OpenPGP standard compatibility.
 struct OnboardingStandardPage: View {
     var body: some View {
         VStack(spacing: 24) {
@@ -135,7 +152,7 @@ struct OnboardingStandardPage: View {
     }
 }
 
-/// Page 3: Key families — Secure Enclave custody and post-quantum options.
+/// Page 2: key families — Secure Enclave custody and post-quantum options.
 struct OnboardingKeyFamiliesPage: View {
     var body: some View {
         VStack(spacing: 24) {
@@ -166,7 +183,7 @@ struct OnboardingKeyFamiliesPage: View {
     }
 }
 
-/// Page 4: Generate Key CTA
+/// Page 3: exit — enter the guided tutorial sandbox or skip into the app.
 struct OnboardingTutorialPage: View {
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(\.dismiss) private var dismiss

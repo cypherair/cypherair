@@ -11477,6 +11477,38 @@
         }
       }
     },
+    "onboarding.p1.deviceOnly.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your keys and contacts exist only on this device. Restoring an iCloud or computer backup does not bring them back or make your data usable again. To keep a copy of a key, export it as a passphrase-protected .asc file — the guided tutorial shows how."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密钥和联系人只存在于这台设备上。恢复 iCloud 或电脑备份无法找回它们，恢复出的数据也无法使用。要保留副本，请将密钥导出为受密码短语保护的 .asc 文件，引导教程会演示如何操作。"
+          }
+        }
+      }
+    },
+    "onboarding.p1.deviceOnly.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only on This Device"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅存于本机"
+          }
+        }
+      }
+    },
     "onboarding.p1.title" : {
       "localizations" : {
         "en" : {
