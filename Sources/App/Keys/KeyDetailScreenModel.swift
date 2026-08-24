@@ -273,15 +273,6 @@ final class KeyDetailScreenModel {
         showError = false
     }
 
-<<<<<<< HEAD
-    func dismissCopiedNotice() {
-        showCopiedNotice = false
-=======
-    func finishExport() {
-        exportController.finish()
->>>>>>> origin/main
-    }
-
     func handleExportError(_ error: Error) {
         presentMappedError(error)
     }
