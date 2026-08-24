@@ -74,16 +74,7 @@ private struct PostGenerationPromptHostView: View {
                 .accessibilityIdentifier("postgen.done")
             }
         }
-        .fileExporter(
-            isPresented: Binding(
-                get: { exportController.isPresented },
-                set: { if !$0 { model.finishExport() } }
-            ),
-            item: exportController.payload,
-            contentTypes: [.data],
-            defaultFilename: exportController.defaultFilename
-        ) { result in
-            model.finishExport()
+        .fileExport(exportController) { result in
             if case .failure(let exportError) = result {
                 model.handleExportError(exportError)
             }

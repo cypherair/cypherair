@@ -526,8 +526,11 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let config = AppConfiguration(defaults: UserDefaults(suiteName: UUID().uuidString)!)
 
         XCTAssertTrue(interceptor.interceptClipboardCopy?("ciphertext", config, .ciphertext) == true)
-        XCTAssertTrue(try interceptor.interceptDataExport?(Data("demo".utf8), "demo.asc", .ciphertext) == true)
-        XCTAssertTrue(interceptor.interceptFileExport?(URL(fileURLWithPath: "/tmp/demo.asc"), "demo.asc", .ciphertext) == true)
+        let filename = ExportFilename("demo.asc")
+        XCTAssertTrue(try interceptor.interceptDataExport?(Data("demo".utf8), filename, .ciphertext) == true)
+        XCTAssertTrue(
+            interceptor.interceptFileExport?(URL(fileURLWithPath: "/tmp/demo.asc"), filename, .ciphertext) == true
+        )
     }
 
     func test_blocklist_blocksUnsafeRoutes_withoutBlockingSignAndVerifyRoots() {

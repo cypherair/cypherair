@@ -557,7 +557,7 @@ final class DecryptScreenModelTests: XCTestCase {
         let detailedVerification = makeDetailedVerification(verificationState: .signerCertificateUnavailable)
 
         var interceptedURL: URL?
-        var interceptedFilename: String?
+        var interceptedFilename: ExportFilename?
         var configuration = DecryptView.Configuration()
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
             interceptFileExport: { url, filename, kind in
@@ -578,7 +578,13 @@ final class DecryptScreenModelTests: XCTestCase {
                 XCTAssertEqual(request.fileURL, inputURL)
                 XCTAssertEqual(request.phase1Result.inputPath, inputURL.path)
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(fileURL: outputURL),
+                    // Deliberately unlike anything derivable from the selected
+                    // ciphertext, so the assertion below can only hold if the
+                    // screen offers the name decryption gave the artifact.
+                    output: AppTemporaryArtifact(
+                        fileURL: outputURL,
+                        exportFilename: ExportFilename("recovered-plaintext.pdf")
+                    ).temporaryFileOutput,
                     verification: detailedVerification
                 )
             }
@@ -608,10 +614,9 @@ final class DecryptScreenModelTests: XCTestCase {
         model.exportDecryptedFile()
 
         XCTAssertEqual(interceptedURL, outputURL)
-        XCTAssertEqual(
-            interceptedFilename,
-            (inputURL.lastPathComponent as NSString).deletingPathExtension
-        )
+        // The name the decryption artifact was given, offered unchanged — the
+        // screen never derives a second one from the input it happens to hold.
+        XCTAssertEqual(interceptedFilename?.value, "recovered-plaintext.pdf")
     }
 
     @MainActor
@@ -640,7 +645,10 @@ final class DecryptScreenModelTests: XCTestCase {
                 await gate.suspend()
                 try Task.checkCancellation()
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(fileURL: inputURL),
+                    output: AppTemporaryArtifact(
+                        fileURL: inputURL,
+                        exportFilename: ExportFilename(inputURL.lastPathComponent)
+                    ).temporaryFileOutput,
                     verification: self.makeDetailedVerification(verificationState: .verified)
                 )
             }
@@ -703,7 +711,10 @@ final class DecryptScreenModelTests: XCTestCase {
             fileDecryptionAction: { _ in
                 operation.cancel()
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(fileURL: outputURL),
+                    output: AppTemporaryArtifact(
+                        fileURL: outputURL,
+                        exportFilename: ExportFilename(outputURL.lastPathComponent)
+                    ).temporaryFileOutput,
                     verification: self.makeDetailedVerification(verificationState: .verified)
                 )
             }
@@ -752,7 +763,10 @@ final class DecryptScreenModelTests: XCTestCase {
             fileDecryptionAction: { _ in
                 await gate.suspend()
                 return DecryptScreenModel.FileDecryptionResult(
-                    output: TemporaryFileOutput(fileURL: outputURL),
+                    output: AppTemporaryArtifact(
+                        fileURL: outputURL,
+                        exportFilename: ExportFilename(outputURL.lastPathComponent)
+                    ).temporaryFileOutput,
                     verification: self.makeDetailedVerification(verificationState: .verified)
                 )
             }
@@ -1052,7 +1066,10 @@ final class DecryptScreenModelTests: XCTestCase {
         signerFingerprint: String? = nil
     ) -> DecryptScreenModel.FileDecryptionResult {
         DecryptScreenModel.FileDecryptionResult(
-            output: TemporaryFileOutput(fileURL: outputURL),
+            output: AppTemporaryArtifact(
+                fileURL: outputURL,
+                exportFilename: ExportFilename(outputURL.lastPathComponent)
+            ).temporaryFileOutput,
             verification: makeDetailedVerification(
                 verificationState: verificationState,
                 signerFingerprint: signerFingerprint

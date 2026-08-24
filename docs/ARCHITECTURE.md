@@ -10,6 +10,7 @@ Boundary rules:
 
 - **App → Security is a narrow edge.** Feature views reach crypto, Keychain, and lock state through the Services layer; only composition, the shell/lock surfaces, and the settings surfaces touch Security types directly.
 - **Services never call the engine directly** — each operation family has a dedicated FFI adapter. **One documented exception:** quantum-safety classification of the produced artifact calls the stateless generated engine directly.
+- **An exported artifact's name is decided once and never recomputed.** A temporary-file artifact carries the name it will be saved under, fixed where the file is produced; an in-memory export is named at the single site that produces it and handed straight to the export controller. No second site derives a name for an artifact that already has one, and the one export presentation reads the file and the name from the same stored value, so the system picker cannot be handed two answers ([PRODUCT.md](PRODUCT.md) §5).
 - **Error normalization has one chokepoint.** Generated `PgpError` is normalized into the app-owned `CypherAirError` vocabulary only at the FFI adapter boundary; Models, ScreenModels, and Views never see `PgpError`. External-seam callback failures travel as sanitized categories, never free-form strings.
 
 ## Rust / FFI contract rules

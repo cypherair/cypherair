@@ -2,28 +2,36 @@ import CoreTransferable
 import Foundation
 import UniformTypeIdentifiers
 
-/// File-based export payload used by `fileExporter`.
+/// What an export offers and the name it is offered under, in one value.
+///
+/// The picker asks twice — once through the transferable item, once through the
+/// exporter's default filename — and both answers read this single stored name,
+/// so they cannot disagree. The URL is a storage detail that never reaches the
+/// user; only `filename` does.
 struct ExportPayload: Transferable {
     let url: URL
+    let filename: ExportFilename
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .data) { payload in
             SentTransferredFile(payload.url)
         }
         .suggestedFileName { payload in
-            payload.url.lastPathComponent
+            payload.filename.value
         }
     }
 }
 
 /// Shared export state for exporting either an existing file or generated data.
+///
+/// The one owner of an exported file's name: every screen hands its artifact
+/// here, and the presentation reads the name back from `payload`.
 @Observable
 final class FileExportController {
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     private(set) var payload: ExportPayload?
-    private(set) var defaultFilename = "export"
-    var isPresented = false
+    private(set) var isPresented = false
 
     private var ownedTemporaryFile: URL?
 
@@ -31,31 +39,39 @@ final class FileExportController {
         self.temporaryArtifactStore = temporaryArtifactStore
     }
 
-    func prepareDataExport(_ data: Data, suggestedFilename: String) throws {
+    /// Offer in-memory data, staged through a temporary file the controller owns
+    /// and erases. The staging file is written under verified complete
+    /// protection, which is why the app writes it rather than letting the picker
+    /// copy the bytes somewhere of its own choosing.
+    func prepareDataExport(_ data: Data, filename: ExportFilename) throws {
         cleanupOwnedTemporaryFile()
 
-        let temporaryURL = try temporaryArtifactStore.writeProtectedExportData(
-            data,
-            suggestedFilename: suggestedFilename
-        )
+        let temporaryURL = try temporaryArtifactStore.writeProtectedExportData(data)
 
         ownedTemporaryFile = temporaryURL
-        payload = ExportPayload(url: temporaryURL)
-        defaultFilename = suggestedFilename
-        isPresented = true
+        present(ExportPayload(url: temporaryURL, filename: filename))
     }
 
-    func prepareFileExport(fileURL: URL, suggestedFilename: String) {
+    /// Offer a file the controller does not own — an operation artifact whose
+    /// lifetime belongs to the workflow that produced it.
+    ///
+    /// Takes the output whole rather than a URL and a name: the artifact already
+    /// pairs them, and splitting the pair at this door would be the one place a
+    /// caller could still put the wrong name on a file.
+    func prepareFileExport(_ output: TemporaryFileOutput) {
         cleanupOwnedTemporaryFile()
-        payload = ExportPayload(url: fileURL)
-        defaultFilename = suggestedFilename
-        isPresented = true
+        present(ExportPayload(url: output.fileURL, filename: output.exportFilename))
     }
 
     func finish() {
         isPresented = false
         payload = nil
         cleanupOwnedTemporaryFile()
+    }
+
+    private func present(_ payload: ExportPayload) {
+        self.payload = payload
+        isPresented = true
     }
 
     private func cleanupOwnedTemporaryFile() {

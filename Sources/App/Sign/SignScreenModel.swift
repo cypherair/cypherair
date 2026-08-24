@@ -8,6 +8,14 @@ final class SignScreenModel {
         let signerFingerprint: String
     }
 
+    /// A detached signature and the name saving it offers, fixed together when
+    /// signing produces the signature — the file it signs is known then, and
+    /// nothing later has to go looking for it again.
+    struct DetachedSignatureOutput: Equatable {
+        let data: Data
+        let exportFilename: ExportFilename
+    }
+
     typealias CleartextSigningAction = @MainActor (String, String) async throws -> Data
     typealias DetachedFileSigningAction = @MainActor (DetachedFileSigningRequest) async throws -> Data
     typealias ClipboardNoticeDecision = @MainActor () async -> Bool
@@ -31,7 +39,7 @@ final class SignScreenModel {
     var text = ""
     var signerFingerprint: String?
     var signedMessage: String?
-    var detachedSignature: Data?
+    var detachedSignature: DetachedSignatureOutput?
     var showFileImporter = false
     var selectedFileURL: URL?
     var selectedFileName: String?
@@ -185,7 +193,13 @@ final class SignScreenModel {
                 progress: progress
             )
             try Task.checkCancellation()
-            self.detachedSignature = signature
+            self.detachedSignature = DetachedSignatureOutput(
+                data: signature,
+                exportFilename: ExportFilename(
+                    base: fileURL.lastPathComponent,
+                    pathExtension: "sig"
+                )
+            )
         }
     }
 
@@ -229,17 +243,15 @@ final class SignScreenModel {
             return
         }
 
+        let filename = ExportFilename("signed.asc")
         do {
             let exportData = Data(signedMessage.utf8)
             if try configuration.outputInterceptionPolicy.interceptDataExport?(
                 exportData,
-                "signed.asc",
+                filename,
                 .generic
             ) != true {
-                try exportController.prepareDataExport(
-                    exportData,
-                    suggestedFilename: "signed.asc"
-                )
+                try exportController.prepareDataExport(exportData, filename: filename)
             }
         } catch {
             operation.present(error: mapSigningError(error))
@@ -253,15 +265,14 @@ final class SignScreenModel {
         }
 
         do {
-            let suggestedFilename = (selectedFileName ?? "file") + ".sig"
             if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                detachedSignature,
-                suggestedFilename,
+                detachedSignature.data,
+                detachedSignature.exportFilename,
                 .generic
             ) != true {
                 try exportController.prepareDataExport(
-                    detachedSignature,
-                    suggestedFilename: suggestedFilename
+                    detachedSignature.data,
+                    filename: detachedSignature.exportFilename
                 )
             }
         } catch {
@@ -281,10 +292,6 @@ final class SignScreenModel {
             }
             self.operation.dismissClipboardNotice()
         }
-    }
-
-    func finishExport() {
-        exportController.finish()
     }
 
     func handleDisappear() {

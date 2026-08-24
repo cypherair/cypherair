@@ -25,10 +25,11 @@ final class SelfTestService {
         case failed(error: Error)
     }
 
-    /// In-memory report prepared for explicit user export.
+    /// Report held in process memory, prepared for explicit user export. Saving
+    /// one stages it through the shared export path like any other artifact.
     struct SelfTestReport: Equatable {
         let data: Data
-        let suggestedFilename: String
+        let exportFilename: ExportFilename
     }
 
     /// Current state of the self-test run.
@@ -408,7 +409,9 @@ final class SelfTestService {
     private static func makeReport(results: [TestResult], date: Date = Date()) -> SelfTestReport {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let filename = "CypherAir-X-SelfTest-Report-\(dateFormatter.string(from: date)).txt"
+        let filename = ExportFilename(
+            "CypherAir-X-SelfTest-Report-\(dateFormatter.string(from: date)).txt"
+        )
 
         var report = String(localized: "selftest.report.title", defaultValue: "CypherAir X Self-Test Report") + "\n"
         let dateString = String(describing: date)
@@ -435,7 +438,7 @@ final class SelfTestService {
 
         return SelfTestReport(
             data: Data(report.utf8),
-            suggestedFilename: filename
+            exportFilename: filename
         )
     }
 

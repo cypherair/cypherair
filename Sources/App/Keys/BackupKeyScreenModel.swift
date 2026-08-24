@@ -8,6 +8,7 @@ final class BackupKeyScreenModel {
 
     let fingerprint: String
     let configuration: BackupKeyView.Configuration
+    let exportController: FileExportController
 
     private let keyManagement: KeyManagementService
     private let exportBackupAction: ExportBackupAction
@@ -22,17 +23,18 @@ final class BackupKeyScreenModel {
     var exportedData: Data?
     var error: CypherAirError?
     var showError = false
-    var showFileExporter = false
 
     init(
         fingerprint: String,
         keyManagement: KeyManagementService,
         configuration: BackupKeyView.Configuration,
+        exportController: FileExportController = FileExportController(),
         exportBackupAction: ExportBackupAction? = nil,
         confirmBackupExportedAction: ConfirmBackupExportedAction? = nil
     ) {
         self.fingerprint = fingerprint
         self.configuration = configuration
+        self.exportController = exportController
         self.keyManagement = keyManagement
         self.exportBackupAction = exportBackupAction ?? { fingerprint, passphrase in
             try await keyManagement.exportKeyBackupData(
@@ -73,8 +75,24 @@ final class BackupKeyScreenModel {
         return String(data: exportedData, encoding: .utf8)
     }
 
-    var defaultFilename: String {
-        "\(fingerprint.prefix(16)).asc"
+    private var exportFilename: ExportFilename {
+        ExportFilename("\(fingerprint.prefix(16)).asc")
+    }
+
+    /// Stage the finished backup for saving. The bytes reach the picker through
+    /// the shared export path, which writes them under verified complete
+    /// protection and erases that staging file however the save ends.
+    func presentFileExporter() {
+        guard let exportedData else {
+            return
+        }
+
+        do {
+            try exportController.prepareDataExport(exportedData, filename: exportFilename)
+        } catch {
+            self.error = CypherAirError.from(error) { .fileIoError(reason: $0) }
+            showError = true
+        }
     }
 
     func exportBackup() {
@@ -185,7 +203,7 @@ final class BackupKeyScreenModel {
     func clearTransientInput() {
         passphrase = ""
         passphraseConfirm = ""
-        showFileExporter = false
+        exportController.finish()
         clearExportedData()
     }
 

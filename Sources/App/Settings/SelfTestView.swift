@@ -1,11 +1,11 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// One-tap self-diagnostic view.
 struct SelfTestView: View {
     @Environment(SelfTestService.self) private var selfTestService
-    @State private var showReportExporter = false
-    @State private var report: SelfTestService.SelfTestReport?
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @State private var exportController = FileExportController()
+    @State private var exportError: CypherAirError?
 
     var body: some View {
         List {
@@ -98,10 +98,7 @@ struct SelfTestView: View {
             if case .completed = selfTestService.state, selfTestService.latestReport != nil {
                 ToolbarItem(placement: .automatic) {
                     Button {
-                        if let latestReport = selfTestService.latestReport {
-                            report = latestReport
-                            showReportExporter = true
-                        }
+                        saveReport()
                     } label: {
                         Label(
                             String(localized: "selftest.share", defaultValue: "Save Report"),
@@ -111,35 +108,47 @@ struct SelfTestView: View {
                 }
             }
         }
-        .fileExporter(
-            isPresented: $showReportExporter,
-            item: report?.data,
-            contentTypes: [.data],
-            defaultFilename: report?.suggestedFilename ?? "CypherAir-X-SelfTest-Report.txt"
-        ) { result in
-            SelfTestReportExportCompletion.finish(
-                result,
-                clearLatestReport: {
-                    selfTestService.clearLatestReport()
-                },
-                clearPresentedReport: {
-                    report = nil
-                }
-            )
+        .fileExport(exportController) { result in
+            // A failed save keeps the report, so the user can try again.
+            if case .success = result {
+                selfTestService.clearLatestReport()
+            }
+        }
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: Binding(
+                get: { exportError != nil },
+                set: { if !$0 { exportError = nil } }
+            ),
+            presenting: exportError
+        ) { _ in
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                exportError = nil
+            }
+        } message: { error in
+            Text(error.localizedDescription)
+        }
+        // A staged report is a file in `tmp/`, so it closes out with the screen
+        // and with a content clear, the way every other export surface does —
+        // not merely when the picker happens to come back.
+        .onDisappear {
+            exportController.finish()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            exportController.finish()
+            exportError = nil
         }
     }
-}
 
-enum SelfTestReportExportCompletion {
-    static func finish(
-        _ result: Result<URL, Error>,
-        clearLatestReport: () -> Void,
-        clearPresentedReport: () -> Void
-    ) {
-        if case .success = result {
-            clearLatestReport()
+    private func saveReport() {
+        guard let report = selfTestService.latestReport else {
+            return
         }
 
-        clearPresentedReport()
+        do {
+            try exportController.prepareDataExport(report.data, filename: report.exportFilename)
+        } catch {
+            exportError = CypherAirError.from(error) { .fileIoError(reason: $0) }
+        }
     }
 }

@@ -166,10 +166,6 @@ final class SelectiveRevocationScreenModel {
         }
     }
 
-    func finishExport() {
-        exportController.finish()
-    }
-
     func handleExportError(_ error: Error) {
         presentMappedError(error)
     }
@@ -239,7 +235,7 @@ final class SelectiveRevocationScreenModel {
 
     private func startExport(
         operation: ExportOperation,
-        filename: String,
+        filename: ExportFilename,
         action: @escaping @MainActor () async throws -> Data
     ) {
         exportTask?.cancel()
@@ -281,13 +277,13 @@ final class SelectiveRevocationScreenModel {
         }
     }
 
-    private func prepareExport(_ data: Data, filename: String) throws {
+    private func prepareExport(_ data: Data, filename: ExportFilename) throws {
         if try configuration.outputInterceptionPolicy.interceptDataExport?(
             data,
             filename,
             .revocation
         ) != true {
-            try exportController.prepareDataExport(data, suggestedFilename: filename)
+            try exportController.prepareDataExport(data, filename: filename)
         }
     }
 
@@ -307,12 +303,14 @@ final class SelectiveRevocationScreenModel {
         return false
     }
 
-    private func subkeyExportFilename(for subkey: SubkeySelectionOption) -> String {
-        "subkey-revocation-\(keyShortKeyId)-\(IdentityPresentation.shortKeyId(from: subkey.fingerprint)).asc"
+    private func subkeyExportFilename(for subkey: SubkeySelectionOption) -> ExportFilename {
+        ExportFilename(
+            "subkey-revocation-\(keyShortKeyId)-\(IdentityPresentation.shortKeyId(from: subkey.fingerprint)).asc"
+        )
     }
 
-    private func userIdExportFilename(for userId: UserIdSelectionOption) -> String {
-        "userid-revocation-\(keyShortKeyId)-\(userId.occurrenceIndex + 1).asc"
+    private func userIdExportFilename(for userId: UserIdSelectionOption) -> ExportFilename {
+        ExportFilename("userid-revocation-\(keyShortKeyId)-\(userId.occurrenceIndex + 1).asc")
     }
 
     private var keyShortKeyId: String {

@@ -59,7 +59,6 @@ final class EncryptScreenModel {
     private let fileEncryptionAction: FileOperationAction<EncryptFileRequest, TemporaryFileOutput>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
     private let clipboardWriter: ClipboardWriter
-    @ObservationIgnored private var encryptedFileOutput: TemporaryFileOutput?
     @ObservationIgnored private var lastAppliedInitialRecipientSelectionSignature: InitialRecipientSelectionSignature?
     /// The last question put to the engine and the answer it gave. Observation
     /// ignores it: it is a record of work already done, never a reason to render.
@@ -83,14 +82,12 @@ final class EncryptScreenModel {
     var showFileImporter = false
     var selectedFileURL: URL?
     var selectedFileName: String?
-    var encryptedFileURL: URL? {
-        didSet {
-            if encryptedFileURL != encryptedFileOutput?.fileURL {
-                encryptedFileOutput?.cleanup()
-                encryptedFileOutput = encryptedFileURL.map { TemporaryFileOutput(fileURL: $0) }
-            }
-        }
-    }
+    /// The encrypted file the last run produced, carrying both where it is and
+    /// the name saving it offers. The output is the stored fact; there is no
+    /// second place to put a URL that would then need a name derived for it.
+    private var encryptedFileOutput: TemporaryFileOutput?
+
+    var encryptedFileURL: URL? { encryptedFileOutput?.fileURL }
     var showUnverifiedRecipientsWarning = false
     var textInputSectionEpoch = 0
 
@@ -716,16 +713,14 @@ final class EncryptScreenModel {
             return
         }
 
+        let filename = ExportFilename("encrypted.asc")
         do {
             if try configuration.outputInterceptionPolicy.interceptDataExport?(
                 ciphertext,
-                "encrypted.asc",
+                filename,
                 .ciphertext
             ) != true {
-                try exportController.prepareDataExport(
-                    ciphertext,
-                    suggestedFilename: "encrypted.asc"
-                )
+                try exportController.prepareDataExport(ciphertext, filename: filename)
             }
         } catch {
             operation.present(error: mapEncryptionError(error))
@@ -734,9 +729,10 @@ final class EncryptScreenModel {
 
     func exportEncryptedFile() {
         guard configuration.allowsFileResultExport,
-              let url = encryptedFileURL else {
+              let output = encryptedFileOutput else {
             return
         }
+        let url = output.fileURL
 
         guard FileManager.default.fileExists(atPath: url.path) else {
             operation.present(
@@ -750,17 +746,12 @@ final class EncryptScreenModel {
             return
         }
 
-        let suggestedFilename = (selectedFileName ?? "file") + ".gpg"
-
         if configuration.outputInterceptionPolicy.interceptFileExport?(
             url,
-            suggestedFilename,
+            output.exportFilename,
             .ciphertext
         ) != true {
-            exportController.prepareFileExport(
-                fileURL: url,
-                suggestedFilename: suggestedFilename
-            )
+            exportController.prepareFileExport(output)
         }
     }
 
@@ -776,10 +767,6 @@ final class EncryptScreenModel {
             }
             self.operation.dismissClipboardNotice()
         }
-    }
-
-    func finishExport() {
-        exportController.finish()
     }
 
     func handleDisappear() {
@@ -877,7 +864,6 @@ final class EncryptScreenModel {
     private func adoptEncryptedFileOutput(_ output: TemporaryFileOutput) {
         cleanupTemporaryEncryptedFile()
         encryptedFileOutput = output
-        encryptedFileURL = output.fileURL
         resultQuantumSafety = classifyEncryptedFileQuantumSafety(at: output.fileURL)
     }
 
@@ -898,7 +884,6 @@ final class EncryptScreenModel {
     private func cleanupTemporaryEncryptedFile() {
         encryptedFileOutput?.cleanup()
         encryptedFileOutput = nil
-        encryptedFileURL = nil
         resultQuantumSafety = nil
     }
 

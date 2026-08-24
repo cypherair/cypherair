@@ -60,7 +60,7 @@ final class PostGenerationPromptScreenModel {
                 }
                 try self.exportController.prepareDataExport(
                     exported,
-                    suggestedFilename: "revocation-\(self.identity.shortKeyId).asc"
+                    filename: ExportFilename("revocation-\(self.identity.shortKeyId).asc")
                 )
             } catch {
                 guard !Self.shouldIgnore(error),
@@ -75,10 +75,6 @@ final class PostGenerationPromptScreenModel {
     func dismissError() {
         error = nil
         showError = false
-    }
-
-    func finishExport() {
-        exportController.finish()
     }
 
     func handleExportError(_ error: Error) {
