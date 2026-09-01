@@ -34,7 +34,7 @@ enum PrivateKeyEnvelopePayloadKind: String, Codable, Equatable, Sendable, CaseIt
     /// A whole exportable OpenPGP secret certificate under software custody.
     case softwareSecretCertificate = "software-secret-certificate"
     /// The concatenated classical component scalars of a Device-Bound
-    /// Post-Quantum split-custody identity (CUSTODY.md §6).
+    /// Post-Quantum split-custody identity (CUSTODY.md §4).
     case splitCustodyClassicalComponent = "split-custody-classical-component"
 }
 

@@ -104,7 +104,7 @@ enum KeychainConstants {
     /// Sealed classical component of a Device-Bound Post-Quantum split-custody
     /// identity. Its own namespace: this payload is never software-custody
     /// material and must never be reachable through the software envelope rows
-    /// (CUSTODY.md §7).
+    /// (CUSTODY.md §4).
     static func splitCustodyClassicalComponentService(fingerprint: String) -> String {
         "\(splitCustodyClassicalComponentServicePrefix)\(fingerprint)"
     }

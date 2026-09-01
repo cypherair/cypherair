@@ -3,7 +3,7 @@ import XCTest
 @testable import CypherAir
 
 /// The namespace boundary around the split-custody classical component
-/// (docs/CUSTODY.md §7): the sealed component lives in exactly one row family
+/// (docs/CUSTODY.md §4): the sealed component lives in exactly one row family
 /// of its own, and no software-custody path can reach or reinterpret it.
 final class SecureEnclaveCompositeClassicalComponentStoreTests: XCTestCase {
     private let fingerprint = "0123456789abcdef0123456789abcdef01234567"

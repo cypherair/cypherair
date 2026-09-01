@@ -37,7 +37,7 @@ printf '%s' "Hello from sq! This is a CypherAir cross-tool interop fixture (issu
 echo "Exported: sq_plaintext.txt"
 
 # ── Per-suite generation ────────────────────────────────────────────────────
-# Suites mirror the portable key families (docs/TESTING.md §3):
+# Suites mirror the portable key families:
 #   legacy      v4 Ed25519/X25519 (sq default profile, RFC 4880)
 #   modern      v6 Ed25519/X25519 (RFC 9580)
 #   modernhigh  v6 Ed448/X448 (RFC 9580)

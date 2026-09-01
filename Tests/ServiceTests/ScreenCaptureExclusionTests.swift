@@ -11,7 +11,7 @@ import XCTest
 /// readable by any process holding the Screen Recording grant.
 ///
 /// These run in the unit lane because that lane is local and hosted by the
-/// real app in a real GUI session (docs/TESTING.md §2.2 — CI runs no
+/// real app in a real GUI session (docs/TESTING.md §1 — CI runs no
 /// `xcodebuild test`), so `install()` has genuinely run, the scene window
 /// genuinely exists, and a process may read its own windows'
 /// `kCGWindowSharingState` through `CGWindowListCopyWindowInfo` with no Screen

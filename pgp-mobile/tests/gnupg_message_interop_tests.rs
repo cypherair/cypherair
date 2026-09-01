@@ -3,7 +3,7 @@
 //! These tests use pre-generated GnuPG fixtures (see `fixtures/generate_gpg_fixtures.sh`).
 //! The fixtures were generated with GnuPG 2.5.18 using Ed25519+Cv25519 keys.
 //!
-//! Test strategy (per TESTING.md §5, fixtures mechanism): Sequoia-to-fixture
+//! Test strategy (per TESTING.md §3, fixtures mechanism): Sequoia-to-fixture
 //! comparison in the Rust test suite — GnuPG cannot run on iOS, so fixture-based
 //! interop validation happens here.
 
