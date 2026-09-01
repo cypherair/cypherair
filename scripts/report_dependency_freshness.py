@@ -12,7 +12,7 @@ repository has, without modifying or weakening any pin:
 - pinned GitHub Actions vs each action's latest release.
 
 Visibility only: exact pins are updated exclusively through their owning
-lanes (repin-arm64e, the fork-release repin flow, tracker dependency PRs).
+lanes (the re-pin rule in docs/BUILD.md §3, the fork-release repin flow, tracker dependency PRs).
 The process always exits 0 -- a freshness report must never fail a pipeline.
 ``--json`` emits a machine-readable document instead of the text summary.
 """
@@ -394,7 +394,7 @@ def check_stage1_pin(repo_root: Path, fetchers: Fetchers) -> list[dict]:
             ]
         latest_tag = str(latest.get("tag_name", ""))
         status = STATUS_CURRENT if latest_tag == pinned_tag else STATUS_UPDATE
-        note = f"pin published {published_at}; rotation owned by repin-arm64e"
+        note = f"pin published {published_at}; rotation owned by the re-pin rule (docs/BUILD.md §3)"
         return [entry("exact-pins", name, status, pinned_tag, latest_tag, note)]
     except Exception as error:  # noqa: BLE001
         return [unavailable("exact-pins", name, error)]

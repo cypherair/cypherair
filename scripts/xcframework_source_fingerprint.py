@@ -57,7 +57,7 @@ SCHEMA_VERSION = 2
 # Inputs that determine the compiled library and the generated UniFFI bindings.
 # pgp-mobile/tests and pgp-mobile/examples are deliberately excluded: they never
 # reach the packaged artifact, and including them would force a rebuild for
-# test-only edits (see .claude/skills/rust-sync).
+# test-only edits (see docs/BUILD.md §6).
 #
 # Only *.rs is collected from the source directories. Anything else there is not
 # a compilation input, and hashing it would let a stray .DS_Store both break

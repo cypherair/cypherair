@@ -34,7 +34,7 @@ The SDK/compliance asset set is fixed by WF1 and re-verified on publication; WF2
 - **App-side Rust or UniFFI changes never require a new stage1 prerelease** — only a change to the Rust compiler fork itself does. The opposite assumption costs a publication cycle.
 - The pinned tag and the never-`latest` red line live in [ARM64E_STATUS.md](ARM64E_STATUS.md); the App Store candidate gate parses that file against `third_party/arm64e-stage1-toolchain.pin.json`.
 
-**Re-pin rule.** A new stage1 prerelease becomes the official input only when every pinned location rotates in the same PR — `.claude/skills/repin-arm64e` enumerates them. Two parts of a rotation are not derivable from the scripts:
+**Re-pin rule.** A new stage1 prerelease becomes the official input only when every pinned location rotates in the same PR. Two parts of a rotation are not derivable from the scripts:
 
 - Refresh **every** per-asset SHA-256 and byte size for **both** host triples. Take them from `gh api`, then confirm them against a real download — an API-reported digest is not evidence on its own — and run `scripts/verify_arm64e_stage1_release.sh` so the attestation chain is proven before the pin lands.
 - Revisit the semantic constants in `scripts/validate_arm64e_stage1_toolchain.py` (tag-family prefix, stable base, schema, bundled-LLVM gitlink and version) **only when the new release changes a semantic contract**, not when it merely rotates the build identity. Telling those two cases apart is the judgment the rule exists for. The prefix names the publishing family and carries no version: the Rust series is pinned solely by the stable-base constants, which is the stronger binding — a prefix can only reject a foreign tag, while the base commit rejects the wrong compiler.
@@ -72,7 +72,7 @@ Rust changes under `pgp-mobile/src` do **not** automatically refresh what Xcode 
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 ```
 
-Force-download matches the GitHub Actions path: it consumes the pinned stage1 prerelease instead of trusting local rustup state. (A plain build ignores rustup-linked arm64e toolchains and downloads the pin anyway.) The sync refreshes the stable `arm64` archives, builds the `arm64e` archives with the stage1 compiler, regenerates the bindings from an `arm64e-apple-darwin` host dylib and whitespace-normalizes them — **never hand-edit generated bindings; rerun the sync** — recreates the XCFramework, and writes the build manifest. Whether a given Rust change needs the rebuild at all is `.claude/skills/rust-sync`.
+Force-download matches the GitHub Actions path: it consumes the pinned stage1 prerelease instead of trusting local rustup state. (A plain build ignores rustup-linked arm64e toolchains and downloads the pin anyway.) The sync refreshes the stable `arm64` archives, builds the `arm64e` archives with the stage1 compiler, regenerates the bindings from an `arm64e-apple-darwin` host dylib and whitespace-normalizes them — **never hand-edit generated bindings; rerun the sync** — recreates the XCFramework, and writes the build manifest.
 
 | Change type | Run |
 |---|---|
