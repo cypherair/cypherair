@@ -1,7 +1,7 @@
 # Workflow
 
 > Status: Canonical current-state.
-> Purpose: How work flows through this repository — the agent-era development loop, what "done" requires, and the documentation contract.
+> Purpose: How work flows through this repository — the development loop, what "done" requires, and the documentation contract.
 > Audience: AI coding tools and human developers.
 > Update triggers: validation commands, doc classes, or the development loop change.
 
@@ -9,15 +9,11 @@ This document assumes a capable model that knows how to write correct, idiomatic
 
 ## 1. The development loop
 
-Most work follows one loop: **discuss the goal → investigate → design → implement → verify → open a PR → merge.**
-
-- **Investigate and design.** Read the relevant code and canonical docs. For a substantial or multi-part feature, settle the shape (invariants, red lines, seam boundaries) before writing code — a short design pass, not a document series. Large designs may land as a design doc when the invariants deserve a durable home (e.g. the storage-rebuild design sections in [STORAGE.md](STORAGE.md)); most work does not need one. When a design needs maintainer decisions, settle them one at a time — options with a recommendation, the choice recorded on the issue — rather than bundling them into one large plan for wholesale approval.
-- **Implement** at the right altitude: architecturally correct for long-term maintainability over the smallest patch. This sets the *depth* of a change, not its *scope* — keep the work focused on the request; do not fold in unrelated cleanup, and do not hide new behavior in the wrong place to shrink a diff. Shared components live in their own files in the right area, with Xcode file-system sync, target membership, and test-target exclusions reflecting that structure.
-- **Verify** before calling it done (§2).
-- **Multi-phase work.** When a feature lands as several PR-sized stages against a written plan, run a fresh-context adversarial verification after each stage and resolve its findings before the next stage builds on the seam. Keep campaign state outside the session as it accrues — decisions as issue comments, a worklog, the PR opened early — so any fresh session can resume the work mid-flight.
-- **Review depth scales with blast radius — importance, not diff size.** The §2 validation lanes are the floor for every change. A PR skips the independent fresh-context verification only when the lanes fully cover it and it touches no canonical-doc surface; the main session makes that call and, when in doubt, runs the verification.
-- **Verdicts are evidence-based in both directions.** A reported defect needs its failure path traced end to end; a "refuted" or "this code is live" verdict needs the same standard — cite the reference or the guard, not the absence of proof. A verdict that oscillates across review rounds is the signal that nobody has traced the whole chain yet; run one decisive full-trace investigation rather than another round of judgment.
-- **PR and merge.** Git, merge, and governance-review rules live in CLAUDE.md.
+- **Design decisions go to the maintainer one at a time** — options with a recommendation, the choice recorded on the issue — not bundled into one large plan for wholesale approval. A design doc is for the rare design whose invariants deserve a durable home (e.g. the storage-rebuild sections in [STORAGE.md](STORAGE.md)).
+- **Shared components live in their own files in the right area**, with Xcode file-system sync, target membership, and test-target exclusions reflecting that structure.
+- **Multi-phase work.** When a feature lands as several PR-sized stages against a written plan, a fresh-context subagent verifies each stage adversarially against the plan before the next stage builds on it. Keep the work's state outside the session as it accrues — decisions as issue comments, a worklog, the PR opened early — so any fresh session can resume it.
+- **Verification depth follows blast radius, not diff size.** The §2 lanes are the floor for every change. A PR skips the independent fresh-context verification only when the lanes fully cover it and it touches no canonical doc; the main session makes that call and, when in doubt, runs it.
+- **PR and merge** rules live in CLAUDE.md.
 
 ## 2. What "done" requires
 
