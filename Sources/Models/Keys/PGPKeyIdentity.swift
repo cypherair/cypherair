@@ -74,7 +74,7 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     }
 
     /// Fingerprints of software-custody identities — the only keys the
-    /// auth-mode re-wrap and its recovery may enumerate (docs/CUSTODY.md §4).
+    /// auth-mode re-wrap and its recovery may enumerate (docs/CUSTODY.md §2).
     /// No device-bound key has an envelope the re-wrap can open: the
     /// pure-enclave families have none at all, and split custody keeps its
     /// classical component in its own namespace under its own payload kind.

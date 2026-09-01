@@ -1435,7 +1435,7 @@ final class AppContainer: @unchecked Sendable {
         // device-bound exemption is enforced structurally — the classical
         // component lives in its own Keychain namespace and its envelope's
         // authenticated payloadKind is not the one this workflow pins
-        // (docs/CUSTODY.md §4) — so the filter's remaining job is accuracy:
+        // (docs/CUSTODY.md §2) — so the filter's remaining job is accuracy:
         // unfiltered, a pure-enclave key (no bundle) classifies as
         // unrecoverable and would block target-mode persistence while the
         // recovery journal is destroyed (silent mode/ACL desync).

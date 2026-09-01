@@ -5,7 +5,7 @@ name: Dependency Freshness Report
 # there is deliberately no schedule. The report never modifies a pin, never
 # opens issues, and never fails: scripts/report_dependency_freshness.py always
 # exits 0. Exact pins are updated exclusively through their owning lanes
-# (repin-arm64e, the fork-release repin flow, tracker dependency PRs).
+# (the re-pin rule in docs/BUILD.md §3, the fork-release repin flow, tracker dependency PRs).
 
 on:
   workflow_dispatch:

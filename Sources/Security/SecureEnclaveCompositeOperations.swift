@@ -5,7 +5,7 @@ import Foundation
 /// mirroring `SecureEnclaveCustodyDigestSigning` / `SecureEnclaveCustodyKeyAgreement`
 /// for the post-quantum components. Rust owns everything else: the Ed25519 and
 /// X25519 classical halves, the RFC 9980 KEM combiner, key unwrap, packet
-/// assembly, and composite signature verification (docs/CUSTODY.md §6).
+/// assembly, and composite signature verification (docs/CUSTODY.md §5).
 protocol SecureEnclaveCompositeSigning: Sendable {
     /// Produce the 3309-byte pure ML-DSA-65 signature over an OpenPGP
     /// signature digest with the Secure Enclave-resident signing component.

@@ -5,7 +5,7 @@
 //! the shared software-P256 stand-in. v6 carries no GnuPG interop gate (GnuPG does
 //! not support v6 keys); the documented gpg-rejection and the third-party-AEAD
 //! interop limitation are recorded in
-//! docs/CUSTODY.md §8–§9. These tests need no gpg and run in
+//! docs/CUSTODY.md §6–§7. These tests need no gpg and run in
 //! the default lane.
 
 mod common;

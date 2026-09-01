@@ -306,7 +306,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///   - newMode: The target authentication mode.
     ///   - fingerprints: Software-custody identity fingerprints (lowercase hex)
     ///     that have SE-wrapped private-key bundles, selected by
-    ///     `PGPKeyIdentity.softwareCustodyFingerprints` (docs/CUSTODY.md §4).
+    ///     `PGPKeyIdentity.softwareCustodyFingerprints` (docs/CUSTODY.md §2).
     ///     A device-bound fingerprint has no bundle the re-wrap can open, so
     ///     passing one aborts the switch rather than downgrading its custody.
     ///     A device-bound-only population yields an empty list and the switch

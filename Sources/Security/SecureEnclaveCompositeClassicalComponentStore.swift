@@ -8,7 +8,7 @@ import Security
 /// (`SecureEnclaveCustodyHandleStore`); this store holds the classical
 /// halves, which alone can neither sign nor decrypt anything — every composite
 /// operation additionally requires the enclave-resident ML-DSA/ML-KEM component
-/// (docs/CUSTODY.md §6).
+/// (docs/CUSTODY.md §4).
 ///
 /// The two component scalars are concatenated and sealed as a
 /// `.splitCustodyClassicalComponent` envelope (ephemeral×static ECDH →
@@ -21,7 +21,7 @@ import Security
 /// Nothing outside this store can reach the component: it is the only writer
 /// and reader of its namespace, and the payload kind is authenticated in the
 /// envelope binding, so a software-custody consumer handed one of these rows
-/// fails closed instead of opening it (docs/CUSTODY.md §7).
+/// fails closed instead of opening it (docs/CUSTODY.md §4).
 ///
 /// SECURITY-CRITICAL: raw component secrets pass through here. Every plaintext
 /// this store holds — the two halves on the way in, the concatenation either
