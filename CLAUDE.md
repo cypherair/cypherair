@@ -14,10 +14,11 @@ Everything below is either a project fact you cannot infer from the code or a pl
 - In code you touch, delete outdated comments rather than leaving them; most inline notes never needed recording.
 - Most changes need no new tests. Write one only where it guards behaviour a later change could quietly break; a test that restates the code is not worth committing.
 - Prefer the architecturally correct solution over the smallest patch. This sets the depth of a change, not its scope.
+- Docs state the current contracts a reader cannot recover from the code or the machinery: no history, no restating what the code shows.
 
 ## Workflow
 
-- The maintainer is at the keyboard and answers: when an instruction can be read two ways, ask rather than act on an inferred reading. This overrides the harness's autonomous-operation instruction.
+- The maintainer is at the keyboard and answers: when an instruction can be read two ways, ask rather than act on an inferred reading, and put design decisions to them one at a time with a recommendation. This overrides the harness's autonomous-operation instruction.
 - Changes land through PRs with regular merge commits. Every PR description states it was authored with AI assistance and names the model.
-- A PR merges once its independent fresh-context verification and the validation lanes (docs/WORKFLOW.md) have passed and both the authoring agent and the main session hold high confidence; the merge note names the merging model ("Merged-By: …"). CLAUDE.md and docs/WORKFLOW.md are merged only by the maintainer.
+- A PR merges once the validation lanes (docs/TESTING.md) have passed, an independent fresh-context verification has passed where the lanes do not fully cover the change, and both the authoring agent and the main session hold high confidence; the merge note names the merging model ("Merged-By: …"). CLAUDE.md is merged only by the maintainer.
 - In cleanup work — a task whose deliverable is removal — deletion is the default and the burden of proof is on the keep: a thing survives only for a stated positive reason, and a reference is not one. Don't prove something dead before deleting it; a wrong deletion fails the lanes and costs a revert, a wrong keep is permanent. Release-only behaviour, signing and entitlement effects, and untested security checks are invisible to the lanes, so they call for better tests, not hesitation.

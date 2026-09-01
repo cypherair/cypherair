@@ -52,7 +52,6 @@ Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple S
 - [ARCHITECTURE](docs/ARCHITECTURE.md) — layer boundaries and the Rust/FFI contract rules
 - [BUILD](docs/BUILD.md) — stable release flow, published artifacts, arm64e toolchain contract, carry chains, and the Rust↔Xcode sync contract
 - [TESTING](docs/TESTING.md) — test layers, plans, and CI lanes
-- [WORKFLOW](docs/WORKFLOW.md) — development loop, "done" requirements, documentation contract
 - [ARM64E_STATUS](docs/ARM64E_STATUS.md) — the machine-parsed arm64e stage1 pin
 
 ## License
