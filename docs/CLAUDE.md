@@ -1,6 +1,6 @@
 # Documentation Map
 
-Which document owns which facts. Pointer lines only — this file states no facts itself. Doc classes and the update-triggers table: docs/WORKFLOW.md §4.
+Which document owns which facts. Pointer lines only — this file states no facts itself. Doc classes and the update-triggers table: docs/WORKFLOW.md §3.
 
 - docs/PRODUCT.md — product promises: deployment targets and the minimum-RAM floor (build-settings side: `CypherAir.xcodeproj`), key-family promises, message-format selection (§5), compatibility promises (§6).
 - docs/SECURITY.md — the security model: authentication modes (§4), MIE (§8).
