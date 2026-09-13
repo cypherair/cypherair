@@ -463,6 +463,29 @@ jobs:
             --draft=false \
             --prerelease \
             --latest=false
+      - name: Prune superseded edge prereleases
+        if: ${{ startsWith(needs.build-edge-release-assets.outputs.release_tag, 'pgpmobile-edge-') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KEEP_EDGE_PRERELEASES: "3"
+        run: |
+          set -euo pipefail
+
+          # Edge prereleases are one per push to main. Keep the newest few (the
+          # one just published among them) and delete the rest with their tags.
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
+            --jq '.[] | select(.prerelease and (.draft | not) and (.tag_name | startswith("pgpmobile-edge-"))) | [.published_at, .tag_name] | @tsv' \
+            | sort -r \
+            | tail -n +"$((KEEP_EDGE_PRERELEASES + 1))" \
+            | cut -f2 \
+            | while IFS= read -r tag; do
+                [ -n "$tag" ] || continue
+                if gh release delete "$tag" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag; then
+                  echo "pruned $tag"
+                else
+                  echo "::warning::could not prune $tag"
+                fi
+              done
       - name: Cleanup failed draft release/tag
         if: ${{ failure() }}
         env:
