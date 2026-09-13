@@ -40,6 +40,7 @@ SQLCipher.xcframework.release.json
 .claude/worktrees/
 .claude/settings.local.json
 CLAUDE.local.md
+.mcp.json
 
 # Local Codex/agent helper config
 .codex/
