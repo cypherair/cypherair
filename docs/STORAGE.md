@@ -1,7 +1,5 @@
 # Local Storage
 
-*The storage posture, the promises attached to persisted state, and the documented exceptions. Lifecycle and fail-closed invariants: [SECURITY.md](SECURITY.md). Row-name constants: `Sources/Security/KeychainManageable.swift`.*
-
 ## 1. Posture
 
 **Protect every CypherAir-owned local data surface unless a documented technical or security reason keeps it outside a protected domain.** Default-protect, explicit exceptions (§3) — a new persisted surface either joins a protected domain or names its reason here.

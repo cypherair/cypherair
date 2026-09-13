@@ -1,7 +1,5 @@
 # Architecture
 
-*Layer and boundary rules only. The directory listing is the source of truth for structure — this document never inventories modules, files, or flows. Security invariants: [SECURITY.md](SECURITY.md); custody: [CUSTODY.md](CUSTODY.md); storage: [STORAGE.md](STORAGE.md); the artifact decision: [BUILD.md](BUILD.md).*
-
 ## Boundary rules
 
 - **App → Security is a narrow edge.** Feature views reach crypto, Keychain, and lock state through the Services layer; only composition, the shell/lock surfaces, and the settings surfaces touch Security types directly. UI is SwiftUI; `UIKit`/`AppKit` imports are narrow platform bridges.
