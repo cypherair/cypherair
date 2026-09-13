@@ -2,10 +2,9 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-private final class OpenSourceNoticeBundleMarker {}
-
 final class OpenSourceNoticeStoreTests: XCTestCase {
-    private lazy var bundle = Bundle(for: OpenSourceNoticeBundleMarker.self)
+    // The unit tests are hosted by the app, so Bundle.main is the app bundle that ships the notices.
+    private lazy var bundle = Bundle.main
     private lazy var store = OpenSourceNoticeStore(bundle: bundle)
 
     func test_loadLicenseText_everyNoticeHasReadableText() throws {
