@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,20 +16,20 @@ module = load_script_module(
 
 class BuildComplianceReleaseAssetsTests(unittest.TestCase):
     def test_external_binary_dependency_entry_records_sqlcipher_pin(self) -> None:
-        entries = module.external_binary_dependency_entries(
-            [REPO_ROOT / "third_party" / "sqlcipher-xcframework.pin.json"]
-        )
+        pin_path = REPO_ROOT / "third_party" / "sqlcipher-xcframework.pin.json"
+        pin = json.loads(pin_path.read_text(encoding="utf-8"))
+        entries = module.external_binary_dependency_entries([pin_path])
 
         self.assertEqual(len(entries), 1)
         entry = entries[0]
         self.assertEqual(entry["name"], "SQLCipher.xcframework")
         self.assertEqual(entry["repository"], "cypherair/sqlcipher-xcframework")
-        self.assertEqual(entry["releaseTag"], "sqlcipher-xcframework-v4.17.0-cypherair.1")
+        self.assertEqual(entry["releaseTag"], pin["release"]["tag"])
         self.assertEqual(entry["releaseChannel"], "stable")
         self.assertTrue(entry["releaseIsImmutable"])
         self.assertFalse(entry["releaseIsPrerelease"])
         self.assertFalse(entry["mirroredInCypherAirRelease"])
-        self.assertEqual(entry["upstreamTag"], "v4.17.0")
+        self.assertEqual(entry["upstreamTag"], pin["upstream"]["tag"])
         self.assertIn("SQLCipher.xcframework.zip", entry["assetHashes"])
         self.assertIn("ios-arm64_arm64e", entry["sliceHashes"])
 

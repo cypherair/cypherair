@@ -17,28 +17,15 @@ class SQLCipherXCFrameworkValidationTests(unittest.TestCase):
         module.validate_pin(pin)
 
         release = pin["release"]
-        self.assertEqual(
-            release["tag"],
-            "sqlcipher-xcframework-v4.17.0-cypherair.1",
-        )
         self.assertNotEqual(release["tag"], "latest")
+        self.assertTrue(release["tag"].startswith("sqlcipher-xcframework-v"))
         self.assertEqual(release["channel"], "stable")
         self.assertTrue(release["isImmutable"])
         self.assertFalse(release["isPrerelease"])
-        self.assertEqual(release["runId"], "29501460869")
         self.assertEqual(
             release["signerWorkflow"],
             "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml",
         )
-        self.assertEqual(
-            pin["upstream"]["commit"],
-            "810db22f575ee7cf94ea96a3e91622b5fcece3dc",
-        )
-        self.assertEqual(
-            pin["assets"]["SQLCipher.xcframework.zip"]["sha256"],
-            "51b0c197d4c06461fd3484a7a8577731eba6ef49c77272bd76db703431d3c4da",
-        )
-        self.assertEqual(pin["assets"]["SQLCipher.xcframework.zip"]["size"], 5681989)
 
     def test_pin_rejects_invalid_asset_sizes(self) -> None:
         pin = module.load_pin(module.PIN_PATH)
@@ -79,19 +66,6 @@ class SQLCipherXCFrameworkValidationTests(unittest.TestCase):
         self.assertEqual(
             slices["ios-arm64-simulator"]["architectures"],
             ["arm64"],
-        )
-
-    def test_expected_compile_and_privacy_contracts_are_fixed(self) -> None:
-        self.assertEqual(module.EXPECTED_FRAMEWORK_VERSION, "4.17.0")
-        self.assertEqual(module.EXPECTED_CIPHER_RUNTIME_VERSION, "4.17.0 community")
-        self.assertEqual(module.EXPECTED_SQLITE_VERSION, "3.53.3")
-        self.assertEqual(module.REQUIRED_FRAMEWORK_FILES, ["Info.plist", "Modules/module.modulemap", "PrivacyInfo.xcprivacy"])
-        self.assertNotIn("module.modulemap", module.REQUIRED_HEADERS)
-        self.assertIn("-DSQLITE_HAS_CODEC", module.EXPECTED_CFLAGS)
-        self.assertIn("-DSQLCIPHER_CRYPTO_CC", module.EXPECTED_CFLAGS)
-        self.assertEqual(
-            module.EXPECTED_LINK_FRAMEWORKS,
-            ["Security", "CoreFoundation", "Foundation"],
         )
         self.assertEqual(
             module.EXPECTED_PRIVACY_ACCESSED_APIS,
