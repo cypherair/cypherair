@@ -59,6 +59,12 @@ jobs:
         run: |
           cargo +stable install cargo-audit --version 0.22.2 --locked
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+      - name: arm64e dependency-chain freshness gate
+        run: |
+          python3 scripts/arm64e_release_metadata.py \
+            --cargo-lock pgp-mobile/Cargo.lock \
+            --output arm64e-dependency-chain.json \
+            --freshness-level error
 
   rust-full-tests:
     runs-on: xcode-27

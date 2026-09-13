@@ -138,11 +138,58 @@ source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-a
                     "d228bf84",
                 ]
                 with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
-                    chain = module.collect_dependency_chain(lock_path, "warn")
+                    with mock.patch.object(
+                        module, "changed_paths", return_value=["src/lib.rs", ".github/workflows/ci.yml"]
+                    ):
+                        chain = module.collect_dependency_chain(lock_path, "warn")
 
         self.assertFalse(chain["freshness"]["isFresh"])
         self.assertTrue(chain["freshness"]["lookupPerformed"])
         self.assertIn("Cargo.lock commit aaaaaaaaaa", chain["freshness"]["messages"][0])
+        self.assertIn("shipped files changed: src/lib.rs", chain["freshness"]["messages"][0])
+        self.assertEqual(chain["opensslSrc"]["shippedPathsChanged"], ["src/lib.rs"])
+
+    def test_collect_dependency_chain_accepts_head_that_differs_only_in_non_shipped_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            lock_path = Path(temp_dir_name) / "Cargo.lock"
+            lock_path.write_text(
+                """
+[[package]]
+name = "openssl-src"
+version = "300.6.2+3.6.2"
+source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+""",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(module, "remote_branch_head") as remote_branch_head:
+                remote_branch_head.side_effect = [
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "d228bf84",
+                ]
+                with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
+                    with mock.patch.object(
+                        module,
+                        "changed_paths",
+                        return_value=[".github/workflows/ci.yml", "ci/check.sh", "ARM64E_STATUS.md", ".gitignore"],
+                    ):
+                        chain = module.collect_dependency_chain(lock_path, "error")
+
+        self.assertTrue(chain["freshness"]["isFresh"])
+        self.assertEqual(chain["freshness"]["messages"], [])
+        self.assertTrue(chain["opensslSrc"]["isFresh"])
+        self.assertEqual(chain["opensslSrc"]["shippedPathsChanged"], [])
+
+    def test_shipped_paths_keeps_crate_and_build_inputs(self) -> None:
+        self.assertEqual(
+            module.shipped_paths(
+                ["src/lib.rs", "Cargo.toml", "openssl", ".gitmodules", "Configurations/10-main.conf",
+                 "crypto/poly1305/asm/poly1305-armv8.pl", ".github/workflows/x.yml", "README.md",
+                 "docs/notes.md", "ci/check.sh", "testcrate/Cargo.toml", ".gitignore"]
+            ),
+            ["src/lib.rs", "Cargo.toml", "openssl", ".gitmodules", "Configurations/10-main.conf",
+             "crypto/poly1305/asm/poly1305-armv8.pl"],
+        )
 
     def test_collect_dependency_chain_skips_remote_lookups_when_freshness_off(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -197,8 +244,9 @@ source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-a
                     "d228bf84",
                 ]
                 with mock.patch.object(module, "openssl_submodule_pointer", return_value="d228bf84"):
-                    with self.assertRaisesRegex(module.MetadataError, "Cargo.lock commit aaaaaaaaaa"):
-                        module.collect_dependency_chain(lock_path, "error")
+                    with mock.patch.object(module, "changed_paths", return_value=["src/lib.rs"]):
+                        with self.assertRaisesRegex(module.MetadataError, "Cargo.lock commit aaaaaaaaaa"):
+                            module.collect_dependency_chain(lock_path, "error")
 
 
 if __name__ == "__main__":
