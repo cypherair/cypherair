@@ -130,6 +130,46 @@ def remote_branch_head(repository: str, branch: str) -> str:
     return output.split()[0]
 
 
+# Files a carry branch can change without changing what the packaged crate or
+# the OpenSSL build ships. A head that differs from the pinned commit only in
+# these is not stale.
+NON_SHIPPED_PATH_PATTERNS = (
+    re.compile(r"^\.github/"),
+    re.compile(r"^ci/"),
+    re.compile(r"^testcrate/"),
+    re.compile(r"^\.gitignore$"),
+    re.compile(r"(^|/)[^/]+\.md$"),
+)
+
+
+def changed_paths(repository: str, base_commit: str, head_commit: str) -> list[str]:
+    """Paths that differ between two commits of a public repository, fetched token-free."""
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        temp_dir = Path(temp_dir_name)
+        run_git("init", cwd=temp_dir)
+        run_git("remote", "add", "origin", repository, cwd=temp_dir)
+        run_git("fetch", "--depth=1", "origin", base_commit, cwd=temp_dir)
+        run_git("fetch", "--depth=1", "origin", head_commit, cwd=temp_dir)
+        output = run_git("diff", "--name-only", base_commit, head_commit, cwd=temp_dir)
+    return [line for line in output.splitlines() if line]
+
+
+def shipped_paths(paths: list[str]) -> list[str]:
+    return [
+        path
+        for path in paths
+        if not any(pattern.search(path) for pattern in NON_SHIPPED_PATH_PATTERNS)
+    ]
+
+
+def freshness_against_head(repository: str, pinned_commit: str, head_commit: str) -> dict[str, object]:
+    """Fresh when the pinned commit is the head, or differs from it only in non-shipped files."""
+    if pinned_commit == head_commit:
+        return {"isFresh": True, "shippedPathsChanged": []}
+    changed = shipped_paths(changed_paths(repository, pinned_commit, head_commit))
+    return {"isFresh": not changed, "shippedPathsChanged": changed}
+
+
 def openssl_submodule_pointer(openssl_src_repository: str, openssl_src_commit: str) -> str:
     with tempfile.TemporaryDirectory() as temp_dir_name:
         temp_dir = Path(temp_dir_name)
@@ -170,21 +210,29 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
         openssl_src["repository"],
         openssl_src["branch"],
     )
-    openssl_src["isFresh"] = (
-        openssl_src["resolvedCommit"] == openssl_src["remoteBranchHead"]
+    openssl_src_freshness = freshness_against_head(
+        openssl_src["repository"],
+        openssl_src["resolvedCommit"],
+        openssl_src["remoteBranchHead"],
     )
+    openssl_src["isFresh"] = openssl_src_freshness["isFresh"]
+    openssl_src["shippedPathsChanged"] = openssl_src_freshness["shippedPathsChanged"]
 
     openssl_submodule_commit = openssl_submodule_pointer(
         openssl_src["repository"],
         openssl_src["resolvedCommit"],
     )
     openssl_remote_head = remote_branch_head(DEFAULT_OPENSSL_REPO, DEFAULT_OPENSSL_BRANCH)
+    openssl_freshness = freshness_against_head(
+        DEFAULT_OPENSSL_REPO, openssl_submodule_commit, openssl_remote_head
+    )
     openssl = {
         "repository": DEFAULT_OPENSSL_REPO,
         "branch": DEFAULT_OPENSSL_BRANCH,
         "submoduleCommit": openssl_submodule_commit,
         "remoteBranchHead": openssl_remote_head,
-        "isFresh": openssl_submodule_commit == openssl_remote_head,
+        "isFresh": openssl_freshness["isFresh"],
+        "shippedPathsChanged": openssl_freshness["shippedPathsChanged"],
     }
 
     stale_messages = []
@@ -192,13 +240,15 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
         stale_messages.append(
             "openssl-src-rs Cargo.lock commit "
             f"{openssl_src['resolvedCommit']} is not the current "
-            f"{openssl_src['branch']} head {openssl_src['remoteBranchHead']}"
+            f"{openssl_src['branch']} head {openssl_src['remoteBranchHead']}; "
+            "shipped files changed: " + ", ".join(openssl_src["shippedPathsChanged"][:8])
         )
     if not openssl["isFresh"]:
         stale_messages.append(
             "openssl-src-rs submodule commit "
             f"{openssl_submodule_commit} is not the current "
-            f"{DEFAULT_OPENSSL_BRANCH} head {openssl_remote_head}"
+            f"{DEFAULT_OPENSSL_BRANCH} head {openssl_remote_head}; "
+            "shipped files changed: " + ", ".join(openssl["shippedPathsChanged"][:8])
         )
 
     if stale_messages and freshness_level != "off":
