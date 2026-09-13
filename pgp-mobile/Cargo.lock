@@ -982,7 +982,7 @@ dependencies = [
 [[package]]
 name = "openssl-src"
 version = "300.5.8+3.5.8"
-source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#4359882fed57a34a839d1088ec28568e04616692"
+source = "git+https://github.com/cypherair/openssl-src-rs?branch=carry%2Fapple-arm64e-openssl-fork#8534eba2d7065d7cbb9459a619d7fc90e80c5414"
 dependencies = [
  "cc",
 ]
