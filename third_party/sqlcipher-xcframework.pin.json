@@ -3,75 +3,88 @@
   "dependencyName": "SQLCipher.xcframework",
   "repository": "cypherair/sqlcipher-xcframework",
   "release": {
-    "tag": "sqlcipher-xcframework-v4.17.0-cypherair.1",
-    "url": "https://github.com/cypherair/sqlcipher-xcframework/releases/tag/sqlcipher-xcframework-v4.17.0-cypherair.1",
+    "tag": "sqlcipher-xcframework-v4.19.0-cypherair.2",
+    "url": "https://github.com/cypherair/sqlcipher-xcframework/releases/tag/sqlcipher-xcframework-v4.19.0-cypherair.2",
     "channel": "stable",
     "isImmutable": true,
     "isPrerelease": false,
-    "sourceRef": "refs/tags/sqlcipher-xcframework-v4.17.0-cypherair.1",
-    "commitSha": "9d8c3627ad67b521a5bd5145bdea98632c80a22b",
-    "publishedAt": "2026-07-16T13:17:06Z",
+    "sourceRef": "refs/tags/sqlcipher-xcframework-v4.19.0-cypherair.2",
+    "commitSha": "1b24a34f6e159296b4b7ce76dccc1416ced7120b",
+    "publishedAt": "2026-09-13T05:12:47Z",
     "signerWorkflow": "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml",
-    "runId": "29501460869"
+    "runId": "34739577253"
   },
   "upstream": {
     "repository": "https://github.com/sqlcipher/sqlcipher.git",
-    "tag": "v4.17.0",
-    "commit": "810db22f575ee7cf94ea96a3e91622b5fcece3dc",
-    "sqliteVersion": "3.53.3"
+    "tag": "v4.19.0",
+    "commit": "c4b275a47932888216bade83aff2bbc73df0ff85",
+    "sqliteVersion": "3.53.4"
   },
   "assets": {
     "SQLCipher.xcframework.zip": {
-      "sha256": "51b0c197d4c06461fd3484a7a8577731eba6ef49c77272bd76db703431d3c4da",
-      "size": 5681989
+      "sha256": "da855269f54ffc65ad844fc296845db59db233b24a44c045c812a8ec95c1d376",
+      "size": 5691028
     },
     "SQLCipher.xcframework.sha256": {
-      "sha256": "6bc5236f65e96d885f20c3beb961fe62e403d31f484ab23ab903051dc2c54940",
+      "sha256": "579b23d411db2047b229f33b6a33b1731fcc9af27be977e147a7ae5f4088e724",
       "size": 92
     },
     "SQLCipher.arm64e-build-manifest.json": {
-      "sha256": "aaaa3ae67b113c9393583ad847ecc6e4f4cadbaa2a8c3d63820afc030f73bff1",
-      "size": 4689
+      "sha256": "3e7b08ac44ce02112a52812e2af6cf1132da5fcc5fda8b2fca6283040823dd81",
+      "size": 4691
     },
     "SQLCipher-PrivacyInfo.xcprivacy": {
       "sha256": "9362796ba800a7b4169834eff8bde990866f40114ff7baac002b8bae543e8dd1",
       "size": 840
     },
     "SQLCipher.xcframework.release.json": {
-      "sha256": "3a9656587de4f981ad3c99d37ca271d9def00cb64c85a4eb0d8d1fba9aa4e1a2",
-      "size": 1084
+      "sha256": "ba1bd89f3378cfd22212b6ff37cb97b0291b5d362a37b343a0a5d03e9621a622",
+      "size": 1087
     }
   },
   "slices": {
     "ios-arm64_arm64e": {
       "platform": "ios",
       "variant": null,
-      "architectures": ["arm64", "arm64e"],
-      "sha256": "267ae5dc3de0a8a53d1e9a8816c0dc97de63fded83ac9c098b2b3967cc8d66d2"
+      "architectures": [
+        "arm64",
+        "arm64e"
+      ],
+      "sha256": "eaf1dd78e4deed5d9ba8735860333467f64bd151433e887c49eff8b1a9b5aef9"
     },
     "macos-arm64_arm64e": {
       "platform": "macos",
       "variant": null,
-      "architectures": ["arm64", "arm64e"],
-      "sha256": "e26b39ae353426221ddc0008495ec5859e9f3ea44267dc0063c62db663c869ce"
+      "architectures": [
+        "arm64",
+        "arm64e"
+      ],
+      "sha256": "0279b71ace094a0b26c1c4ee0965a832603d465780a19f1057d0972a72f2dbcb"
     },
     "xros-arm64_arm64e": {
       "platform": "xros",
       "variant": null,
-      "architectures": ["arm64", "arm64e"],
-      "sha256": "3277f9cea1f9ffd871e7f4061bbf6868903b4fafe2539b6d3c885d5c3b1639fa"
+      "architectures": [
+        "arm64",
+        "arm64e"
+      ],
+      "sha256": "d0cd83459fb57ad1d91d27881107a1e285b23c9fbcfa8c0b7d4557c006410e9d"
     },
     "ios-arm64-simulator": {
       "platform": "ios",
       "variant": "simulator",
-      "architectures": ["arm64"],
-      "sha256": "0516715d5eb37d051edc383bac841660ecf98a7c0761d4165a4d28d766964b95"
+      "architectures": [
+        "arm64"
+      ],
+      "sha256": "cb2345724712d3aade748b38c37681e01d306e1ce2ef6e2338f76840e1d5e457"
     },
     "xros-arm64-simulator": {
       "platform": "xros",
       "variant": "simulator",
-      "architectures": ["arm64"],
-      "sha256": "452e73512f312ba721dda478637667acfa67cb13d695de2781357c91162ceb80"
+      "architectures": [
+        "arm64"
+      ],
+      "sha256": "1cde53572fe6dcb112ffde7963289fd9d12b6c2ea0fffd17ad58e6dd2b205366"
     }
   }
 }

@@ -41,7 +41,7 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
         )
         (root / "third_party").mkdir()
         (root / "third_party/sqlcipher-xcframework.pin.json").write_text(
-            '{"release": {"tag": "sqlcipher-xcframework-v4.17.0-cypherair.1"}}\n', encoding="utf-8"
+            '{"release": {"tag": "sqlcipher-xcframework-v4.19.0-cypherair.1"}}\n', encoding="utf-8"
         )
         (root / "pgp-mobile").mkdir()
         (root / module.CARGO_LOCK).write_text(CARGO_LOCK, encoding="utf-8")
@@ -75,14 +75,14 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
                 "licenseFileResourceName": "zeroize-1.8.2.txt",
             },
             {
-                "id": "sqlcipher@4.17.0",
+                "id": "sqlcipher@4.19.0",
                 "kind": "thirdParty",
-                "licenseFileResourceName": "SQLCipher-4.17.0.txt",
+                "licenseFileResourceName": "SQLCipher-4.19.0.txt",
             },
             {
-                "id": "sqlite@3.53.3",
+                "id": "sqlite@3.53.4",
                 "kind": "thirdParty",
-                "licenseFileResourceName": "SQLite-3.53.3.txt",
+                "licenseFileResourceName": "SQLite-3.53.4.txt",
             },
         ]
 

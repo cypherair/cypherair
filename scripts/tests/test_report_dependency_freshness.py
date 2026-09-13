@@ -76,7 +76,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 SQLCIPHER_PIN = {
     "repository": "cypherair/sqlcipher-xcframework",
-    "release": {"tag": "sqlcipher-xcframework-v4.17.0-cypherair.1"},
+    "release": {"tag": "sqlcipher-xcframework-v4.19.0-cypherair.1"},
 }
 
 STAGE1_PIN = {
@@ -183,7 +183,7 @@ class ReportTests(unittest.TestCase):
             crates_latest={"sequoia-openpgp": "2.4.1", "uniffi": "0.33.0"}.__getitem__,
             latest_release=lambda repository: {
                 "cypherair/sqlcipher-xcframework": {
-                    "tag_name": "sqlcipher-xcframework-v4.17.0-cypherair.1"
+                    "tag_name": "sqlcipher-xcframework-v4.19.0-cypherair.1"
                 },
                 "actions/checkout": {"tag_name": "v7.0.0"},
                 "actions/upload-artifact": {"tag_name": "v7.1.0"},

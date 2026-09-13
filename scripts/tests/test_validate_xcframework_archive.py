@@ -171,9 +171,9 @@ class SQLCipherRestoreCallSiteTests(unittest.TestCase):
                     {
                         "repository": "cypherair/sqlcipher-xcframework",
                         "release": {
-                            "tag": "sqlcipher-xcframework-v4.17.0-cypherair.1",
-                            "commitSha": "9d8c3627ad67b521a5bd5145bdea98632c80a22b",
-                            "sourceRef": "refs/tags/sqlcipher-xcframework-v4.17.0-cypherair.1",
+                            "tag": "sqlcipher-xcframework-v4.19.0-cypherair.1",
+                            "commitSha": "d5622e9ed78329a3e451ae07e156eb9bd621e48c",
+                            "sourceRef": "refs/tags/sqlcipher-xcframework-v4.19.0-cypherair.1",
                             "signerWorkflow": "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml",
                             "channel": "stable",
                         },

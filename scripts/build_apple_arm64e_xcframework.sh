@@ -257,7 +257,10 @@ bindgen_clang_args_for_target() {
         aarch64-apple-visionos-sim) sdk=xrsimulator;     clang_target=arm64-apple-xros-simulator ;;
         *) return 0 ;;
     esac
-    printf -- '--target=%s -isysroot %s' "$clang_target" "$(xcrun --sdk "$sdk" --show-sdk-path)"
+    # bindgen splits this variable with shell quoting rules; %q keeps an SDK
+    # path containing spaces (for example an Xcode bundle named "Xcode 2.app")
+    # as one argument.
+    printf -- '--target=%s -isysroot %q' "$clang_target" "$(xcrun --sdk "$sdk" --show-sdk-path)"
 }
 
 build_rust_artifact() {
