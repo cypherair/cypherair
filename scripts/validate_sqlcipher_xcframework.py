@@ -16,11 +16,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PIN_PATH = ROOT / "third_party" / "sqlcipher-xcframework.pin.json"
 SOURCE_REPOSITORY = "https://github.com/sqlcipher/sqlcipher.git"
-SOURCE_TAG = "v4.17.0"
-SOURCE_COMMIT = "810db22f575ee7cf94ea96a3e91622b5fcece3dc"
-EXPECTED_FRAMEWORK_VERSION = "4.17.0"
-EXPECTED_CIPHER_RUNTIME_VERSION = "4.17.0 community"
-EXPECTED_SQLITE_VERSION = "3.53.3"
+SOURCE_TAG = "v4.19.0"
+SOURCE_COMMIT = "c4b275a47932888216bade83aff2bbc73df0ff85"
+EXPECTED_FRAMEWORK_VERSION = "4.19.0"
+EXPECTED_CIPHER_RUNTIME_VERSION = "4.19.0 community"
+EXPECTED_SQLITE_VERSION = "3.53.4"
 RELEASE_METADATA_NAME = "SQLCipher.xcframework.release.json"
 EXPECTED_ASSET_NAMES = [
     "SQLCipher.xcframework.zip",
