@@ -397,7 +397,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "python3 \"${SRCROOT}/scripts/validate_sqlcipher_xcframework.py\" --root \"${SRCROOT}\" --skip-release-assets --skip-smoke\n";
+			shellScript = "python3 \"${SRCROOT}/scripts/validate_sqlcipher_xcframework.py\" --root \"${SRCROOT}\" --skip-release-assets\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
