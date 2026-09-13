@@ -9,39 +9,9 @@
 
 ## Build
 
-### Prerequisites
-
-- macOS on Apple Silicon with Xcode.
-- Rust stable with the five Apple targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
-- **Steps 2 and 3 need network access** — they download and verify pinned prebuilt artifacts. Zero-network is a property of the shipped app, not of its build toolchain.
-
-### Xcode MCP
-
-The repository ships a project-level `.mcp.json` configuring an `xcode` MCP server (`/usr/bin/xcrun mcpbridge`), which gives agent sessions Apple Developer Documentation search and build/diagnostic tools. Other MCP-capable agents configure the equivalent server command.
-
-### Commands
-
-```bash
-# 1. Validate Rust behavior
-cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-
-# 2. Refresh the XCFramework and generated bindings that Xcode links (git-ignored
-# build outputs; a fresh clone cannot build until this runs). The script defaults
-# to the current arm64e stage1 pin (docs/ARM64E_STATUS.md), never `latest`.
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
-
-# 3. Restore the pinned SQLCipher dependency (git-ignored artifact, attested on fetch)
-scripts/restore_sqlcipher_xcframework.sh
-
-# 4. Validate Swift unit + FFI behavior locally
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS,arch=arm64e'
-
-# 5. Probe the native visionOS app build
-xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS'
-```
-
-Secure Enclave, biometric, and MIE coverage runs on real hardware — an Apple Silicon Mac or a physical device — via the `CypherAir-DeviceTests` plan; macOS UI smoke coverage via `CypherAir-MacUITests`. Lanes and plans: [docs/TESTING.md](docs/TESTING.md). Release flow, published artifacts, and stale-artifact troubleshooting: [docs/BUILD.md](docs/BUILD.md).
+- macOS on Apple Silicon with a current Xcode.
+- Rust stable with the Apple targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
+- A fresh clone cannot build until the sync in [docs/BUILD.md](docs/BUILD.md) has run. The sync downloads pinned, attested artifacts, so the build toolchain needs network access even though the app never does.
 
 ## Documentation
 
