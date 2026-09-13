@@ -25,6 +25,10 @@ env:
 
 jobs:
   rust-dependency-audit:
+    # A newer push supersedes this job; the publish job is never cancelled mid-release.
+    concurrency:
+      group: edge-audit-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +48,10 @@ jobs:
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
   build-edge-release-assets:
+    # A newer push supersedes this job; the publish job is never cancelled mid-release.
+    concurrency:
+      group: edge-build-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: xcode-27
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}

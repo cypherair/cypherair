@@ -21,6 +21,10 @@ env:
   ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
   ARM64E_STAGE1_RELEASE_TAG: rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1
 
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sqlcipher-release-input:
     name: SQLCipher immutable release input
