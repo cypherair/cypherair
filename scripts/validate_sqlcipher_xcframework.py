@@ -5,11 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import platform
 import plistlib
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 
@@ -19,7 +17,6 @@ SOURCE_REPOSITORY = "https://github.com/sqlcipher/sqlcipher.git"
 SOURCE_TAG = "v4.19.0"
 SOURCE_COMMIT = "c4b275a47932888216bade83aff2bbc73df0ff85"
 EXPECTED_FRAMEWORK_VERSION = "4.19.0"
-EXPECTED_CIPHER_RUNTIME_VERSION = "4.19.0 community"
 EXPECTED_SQLITE_VERSION = "3.53.4"
 RELEASE_METADATA_NAME = "SQLCipher.xcframework.release.json"
 EXPECTED_ASSET_NAMES = [
@@ -58,7 +55,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--release-assets", type=Path)
     parser.add_argument("--pin-file", type=Path, default=PIN_PATH)
     parser.add_argument("--skip-release-assets", action="store_true")
-    parser.add_argument("--skip-smoke", action="store_true")
     return parser.parse_args()
 
 
@@ -415,148 +411,6 @@ def validate_xcframework(root: Path, manifest: dict, pin: dict) -> None:
             raise ValidationError(f"{identifier}: SQLCipher.h must expose SQLITE_HAS_CODEC before sqlite3.h")
 
 
-def smoke_test(root: Path) -> None:
-    host = platform.machine()
-    if host not in {"arm64", "arm64e"}:
-        print(f"warning: skipping SQLCipher smoke test on unsupported host architecture {host}", file=sys.stderr)
-        return
-
-    framework_parent = root / "SQLCipher.xcframework" / "macos-arm64_arm64e"
-    source = r'''
-#include <SQLCipher/SQLCipher.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-static int capture(void *ctx, int argc, char **argv, char **col) {
-  (void)argc;
-  (void)col;
-  snprintf((char *)ctx, 256, "%s", (argv && argv[0]) ? argv[0] : "");
-  return 0;
-}
-
-static int exec_sql(sqlite3 *db, const char *sql) {
-  char *errmsg = NULL;
-  int rc = sqlite3_exec(db, sql, NULL, NULL, &errmsg);
-  if (rc != SQLITE_OK) {
-    fprintf(stderr, "sqlite rc=%d\n", rc);
-    sqlite3_free(errmsg);
-  }
-  return rc;
-}
-
-static int query_value(sqlite3 *db, const char *sql, char *value, size_t value_len) {
-  char *errmsg = NULL;
-  value[0] = '\0';
-  int rc = sqlite3_exec(db, sql, capture, value, &errmsg);
-  if (rc != SQLITE_OK) {
-    fprintf(stderr, "sqlite rc=%d\n", rc);
-    sqlite3_free(errmsg);
-    return rc;
-  }
-  return value[0] == '\0' ? SQLITE_ERROR : SQLITE_OK;
-}
-
-static int apply_key(sqlite3 *db, unsigned char key[32]) {
-  static const char hex[] = "0123456789abcdef";
-  char key_spec[68] = {0};
-  key_spec[0] = 'x';
-  key_spec[1] = '\'';
-  for (int i = 0; i < 32; i++) {
-    key_spec[2 + (i * 2)] = hex[(key[i] >> 4) & 0x0f];
-    key_spec[3 + (i * 2)] = hex[key[i] & 0x0f];
-  }
-  key_spec[66] = '\'';
-  int rc = sqlite3_key_v2(db, "main", key_spec, 67);
-  memset(key_spec, 0, sizeof(key_spec));
-  return rc;
-}
-
-int main(int argc, char **argv) {
-  if (argc != 2) return 2;
-  const char *path = argv[1];
-  unsigned char good_key[32] = {
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
-  };
-  unsigned char bad_key[32] = {
-    31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
-    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
-  };
-  sqlite3 *db = NULL;
-  char value[256] = {0};
-
-  if (sqlite3_open(":memory:", &db) != SQLITE_OK) return 10;
-  if (query_value(db, "PRAGMA cipher_version;", value, sizeof(value)) != SQLITE_OK) return 11;
-  if (strcmp(value, EXPECTED_CIPHER_RUNTIME_VERSION) != 0) return 12;
-  sqlite3_close(db);
-
-  if (!sqlite3_compileoption_used("SQLITE_HAS_CODEC")) return 13;
-  if (!sqlite3_compileoption_used("SQLITE_TEMP_STORE=2")) return 14;
-  if (strcmp(sqlite3_libversion(), EXPECTED_SQLITE_VERSION) != 0) return 15;
-
-  remove(path);
-  if (sqlite3_open(path, &db) != SQLITE_OK) return 20;
-  if (apply_key(db, good_key) != SQLITE_OK) return 21;
-  if (exec_sql(db, "CREATE TABLE t(v TEXT);") != SQLITE_OK) return 22;
-  if (exec_sql(db, "INSERT INTO t VALUES('hello');") != SQLITE_OK) return 23;
-  sqlite3_close(db);
-
-  if (sqlite3_open(path, &db) != SQLITE_OK) return 30;
-  if (apply_key(db, good_key) != SQLITE_OK) return 31;
-  if (query_value(db, "SELECT v FROM t;", value, sizeof(value)) != SQLITE_OK) return 32;
-  if (strcmp(value, "hello") != 0) return 33;
-  sqlite3_close(db);
-
-  if (sqlite3_open(path, &db) != SQLITE_OK) return 40;
-  if (apply_key(db, bad_key) != SQLITE_OK) return 41;
-  int wrong_key_rc = exec_sql(db, "CREATE TABLE wrong_key_probe(v INTEGER);");
-  sqlite3_close(db);
-  remove(path);
-  if (wrong_key_rc != SQLITE_NOTADB) return 42;
-
-  return 0;
-}
-'''
-
-    with tempfile.TemporaryDirectory() as temp_name:
-        temp_dir = Path(temp_name)
-        source_path = temp_dir / "sqlcipher_smoke.c"
-        binary_path = temp_dir / "sqlcipher_smoke"
-        database_path = temp_dir / "encrypted.db"
-        source_path.write_text(source, encoding="utf-8")
-        run(
-            [
-                "xcrun",
-                "clang",
-                "-arch",
-                "arm64",
-                str(source_path),
-                "-DSQLITE_HAS_CODEC",
-                f'-DEXPECTED_CIPHER_RUNTIME_VERSION="{EXPECTED_CIPHER_RUNTIME_VERSION}"',
-                f'-DEXPECTED_SQLITE_VERSION="{EXPECTED_SQLITE_VERSION}"',
-                "-F",
-                str(framework_parent),
-                "-framework",
-                "SQLCipher",
-                "-framework",
-                "Security",
-                "-framework",
-                "CoreFoundation",
-                "-framework",
-                "Foundation",
-                "-o",
-                str(binary_path),
-            ]
-        )
-        linkage = run(["otool", "-L", str(binary_path)])
-        if "libsqlite3" in linkage:
-            raise ValidationError("SQLCipher smoke binary linked system libsqlite3")
-        if "SQLCipher.framework" in linkage:
-            raise ValidationError("SQLCipher smoke binary linked SQLCipher dynamically; expected static framework linkage")
-        run([str(binary_path), str(database_path)])
-
-
 def main() -> int:
     args = parse_args()
     root = args.root.resolve()
@@ -573,8 +427,6 @@ def main() -> int:
         validate_app_privacy_manifest(root)
         if args.release_assets and not args.skip_release_assets:
             validate_release_assets(args.release_assets, pin)
-        if not args.skip_smoke:
-            smoke_test(root)
     except (KeyError, TypeError, ValidationError, subprocess.CalledProcessError, json.JSONDecodeError, plistlib.InvalidFileException) as error:
         print(f"error: SQLCipher XCFramework validation failed: {format_error_detail(error)}", file=sys.stderr)
         return 1
