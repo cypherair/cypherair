@@ -13,17 +13,6 @@
 - Rust stable with the Apple targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
 - A fresh clone cannot build until the sync in [docs/BUILD.md](docs/BUILD.md) has run. The sync downloads pinned, attested artifacts, so the build toolchain needs network access even though the app never does.
 
-## Documentation
-
-- [PRODUCT](docs/PRODUCT.md) — product promises, deliberate non-features, consent gates, compatibility
-- [SECURITY](docs/SECURITY.md) — threat model, fail-closed rules, authentication, coding red lines
-- [CUSTODY](docs/CUSTODY.md) — per-family custody, access control, split custody, interop position
-- [STORAGE](docs/STORAGE.md) — storage posture, protected domains, documented exceptions, envelope version map
-- [ARCHITECTURE](docs/ARCHITECTURE.md) — layer boundaries and the Rust/FFI contract rules
-- [BUILD](docs/BUILD.md) — stable release flow, published artifacts, arm64e toolchain contract, carry chains, and the Rust↔Xcode sync contract
-- [TESTING](docs/TESTING.md) — test layers, plans, and CI lanes
-- [ARM64E_STATUS](docs/ARM64E_STATUS.md) — the machine-parsed arm64e stage1 pin
-
 ## License
 
 Unless otherwise noted, first-party CypherAir source code in this repository is
