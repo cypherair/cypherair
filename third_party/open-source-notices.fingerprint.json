@@ -4,7 +4,7 @@
     "pgp-mobile/Cargo.lock": "33305d916b8af2b4b05307cfa5613c1e8326c0768725a743eec2951b6bb3ee99",
     "pgp-mobile/Cargo.toml": "f010081295b42d211d3f12ba6345d95f3a0eff0e954601531fc5855e34e29f62",
     "scripts/generate_open_source_notices.py": "12dcb90996549943ae03f52f03d5c527121ebdf1aa6d8a15d5a6da0dd5832fa4",
-    "third_party/sqlcipher-xcframework.pin.json": "9f33350e2d728820c9dde9e239b2e13a35c7d0d88677a46db1a7a144871a17ea"
+    "third_party/sqlcipher-xcframework.pin.json": "3450917ba154a2f8ed6500de215c4816b4b546d3bf75a9ebbdec1a55392b45eb"
   },
   "licenseTexts": {
     "fileCount": 124,
