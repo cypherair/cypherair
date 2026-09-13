@@ -1,7 +1,5 @@
 # Product Promises
 
-*The product's promises, deliberate absences, consent gates, and user-facing consequences. UI copy is owned by the String Catalog; algorithm and family definitions are owned by the code.*
-
 ## 1. What CypherAir X is
 
 CypherAir X is a fully offline OpenPGP encryption tool for people who want to communicate securely without cryptographic knowledge — encrypt, decrypt, sign, and verify with keys and contacts managed on device. It never touches the network and asks for no permissions beyond the Face ID / Touch ID usage description; the iOS memory entitlements are resource entitlements for Argon2id headroom, not privacy permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.

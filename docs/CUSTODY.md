@@ -1,7 +1,5 @@
 # Key Custody
 
-*Custody promises for the Device-Bound key families, the split-custody design and its red lines, the interop position, and the evidence rules. Family taxonomy is owned by `Sources/Models/Keys/PGPKeyFamily.swift`; app-wide fail-closed and sanitization rules by [SECURITY.md](SECURITY.md).*
-
 ## 1. The custody model
 
 Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates OpenPGP **configuration** (version/algorithms/format), private-key **custody** (software secret certificate vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state) — validity is decided by *family*, never by suite alone. All four device-bound families are exposed wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risks: §7).

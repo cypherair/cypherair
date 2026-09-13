@@ -1,7 +1,5 @@
 # Testing
 
-*Lanes, plans, and the cross-tool interop policy — the parts of validation the suites and the project cannot state themselves. The files under `pgp-mobile/tests/` and `Tests/` are the source of truth for what is covered. The Rust↔Xcode artifact contract and the sync command: [BUILD.md](BUILD.md).*
-
 ## 1. Lanes
 
 **The Swift unit and FFI lane runs on macOS only.** The iOS Simulator compiles it, but the unit-test host app dies at launch: the ProtectedData storage root requires the volume to report file-protection support and re-reads the `.complete` attribute it just wrote, failing closed when either check fails, which is what the simulator's volume does.

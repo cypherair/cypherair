@@ -1,7 +1,5 @@
 # Build and Release
 
-*The build, release, and artifact contract — the parts a reader cannot recover from the machinery itself. `ci_scripts/`, `.github/workflows/`, and `scripts/` carry their own header comments and error strings; this document never mirrors them. Test lanes: [TESTING.md](TESTING.md). The machine-parsed stage1 pin: [ARM64E_STATUS.md](ARM64E_STATUS.md).*
-
 ## 1. Stable release
 
 **Tag-first.** Pushing an annotated, SSH-signed `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>` tag on the release commit is the trigger. A `workflow_dispatch` is never a substitute, and lightweight or unsigned stable tags are not allowed — both Xcode Cloud and `stable-release-attest.yml` re-verify the tag object, its signature, and the commit it peels to.

@@ -1,7 +1,5 @@
 # Security Model
 
-*Threat model, fail-closed rules, authentication contracts, and storage invariants. Custody promises: [CUSTODY.md](CUSTODY.md). Storage promises and exceptions: [STORAGE.md](STORAGE.md).*
-
 ## 1. Threat model
 
 Four statements an auditor needs that the code cannot make:
