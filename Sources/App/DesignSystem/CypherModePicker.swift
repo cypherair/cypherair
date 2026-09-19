@@ -41,9 +41,7 @@ struct CypherModePicker<SelectionValue: Hashable, PickerContent: View>: View {
         Picker(title, selection: $selection) {
             pickerContent
         }
-        // Xcode 26.5 does not expose SwiftUI's TabsPickerStyle yet. Keep the
-        // segmented fallback centralized and leave toolbar visuals platform-owned.
-        .pickerStyle(.segmented)
+        .pickerStyle(.tabs)
         .labelsHidden()
         .disabled(isDisabled)
         .accessibilityLabel(Text(title))
