@@ -40,7 +40,7 @@ final class ContactDetailScreenModel {
     }
 
     var allowsProtectedIdentityActions: Bool {
-        contactsAvailability == .availableProtectedDomain
+        contactsAvailability.isAvailable
     }
 
     var allowsProtectedCertificationPersistence: Bool {

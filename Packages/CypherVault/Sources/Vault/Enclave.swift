@@ -52,8 +52,8 @@ public protocol EnclaveKeyAgreementKey {
     func sharedSecret(withEphemeralPublicKeyX963 x963: Data) throws -> SharedSecret
 }
 
-/// The enclave as the vault sees it. The production implementation is CryptoKit;
-/// tests use a software fake that records every policy it is asked for.
+/// The enclave as the vault sees it. The production implementation is CryptoKit,
+/// the sandbox and the tests use `SoftwareEnclave`.
 public protocol Enclave: Sendable {
     var isAvailable: Bool { get }
 

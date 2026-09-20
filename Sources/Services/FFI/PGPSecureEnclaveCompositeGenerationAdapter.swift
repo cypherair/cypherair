@@ -18,7 +18,7 @@ protocol SecureEnclaveCompositeCertificateBuilding: Sendable {
         name: String,
         email: String?,
         validity: PGPKeyValidity,
-        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        handlePair: LoadedCustodyHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial
 }
@@ -39,7 +39,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         name: String,
         email: String?,
         validity: PGPKeyValidity,
-        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        handlePair: LoadedCustodyHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
         do {

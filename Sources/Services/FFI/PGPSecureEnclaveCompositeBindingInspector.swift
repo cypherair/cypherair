@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 /// Component public keys parsed from a Device-Bound Post-Quantum certificate,
 /// used to locate and verify the split-custody handles. `signingComponentPublicKey`
@@ -18,7 +19,7 @@ struct PGPSecureEnclaveCompositeBindingInspection: Equatable, Sendable {
 protocol SecureEnclaveCompositeBindingInspecting: Sendable {
     func inspectCompositeBindings(
         publicKeyData: Data,
-        tier: SecureEnclaveCustodyTier
+        tier: CustodyTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection
 }
 
@@ -32,7 +33,7 @@ final class PGPSecureEnclaveCompositeBindingInspector: SecureEnclaveCompositeBin
 
     func inspectCompositeBindings(
         publicKeyData: Data,
-        tier: SecureEnclaveCustodyTier
+        tier: CustodyTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection {
         do {
             switch tier {

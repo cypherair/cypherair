@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 /// Bridges a loaded Secure Enclave composite signing handle into the Rust
 /// engine's `ExternalMlDsa87SigningProvider` callback. The callback performs
@@ -6,11 +7,11 @@ import Foundation
 /// signature digest; the Ed448 half and all composite assembly stay in Rust
 /// (Device-Bound Post-Quantum · High).
 final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvider, @unchecked Sendable {
-    private let handle: SecureEnclaveCustodyLoadedHandle
+    private let handle: LoadedCustodyHandle
     private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
-        handle: SecureEnclaveCustodyLoadedHandle,
+        handle: LoadedCustodyHandle,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.handle = handle
@@ -23,7 +24,7 @@ final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvi
             return MlDsa87Signature(raw: signature)
         } catch is CancellationError {
             throw ExternalCompositeSigningError.OperationCancelled
-        } catch let error as SecureEnclaveCustodyHandleError {
+        } catch let error as CustodyError {
             throw ExternalCompositeSigningError.Failed(
                 category: Self.callbackCategory(for: error.failureCategory)
             )

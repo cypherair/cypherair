@@ -5,9 +5,9 @@ final class ContactServiceTagTests: ContactServiceTestCase {
     // MARK: - Tags
 
     func test_pr8ProtectedTagsNormalizeDedupePersistAndRetainEmptyTags() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Tags")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -31,12 +31,9 @@ final class ContactServiceTagTests: ContactServiceTestCase {
             [contactId]
         )
 
-        try await service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        let reopenedService = reopened.service
+        try await service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        let reopenedService = reopened
         XCTAssertEqual(reopenedService.contactTagSummaries().map(\.displayName), ["Work Legal"])
 
         try reopenedService.removeTag(tagId: firstTag.tagId, fromContactId: contactId)
@@ -53,9 +50,9 @@ final class ContactServiceTagTests: ContactServiceTestCase {
     }
 
     func test_tagManagementCreatesRenamesDeletesAndReplacesMembership() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagement")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let first = try engine.generateKey(
@@ -118,7 +115,7 @@ final class ContactServiceTagTests: ContactServiceTestCase {
     }
 
     func test_tagManagementOperationsRequireProtectedContacts() async throws {
-        await contactService.resetInMemoryStateAfterLocalDataReset()
+        contactService.resetInMemoryStateAfterLocalDataReset()
 
         XCTAssertThrowsError(try contactService.createTag(named: "Locked Tag")) { error in
             guard case .contactsUnavailable(.locked) = error as? CypherAirError else {
@@ -126,16 +123,16 @@ final class ContactServiceTagTests: ContactServiceTestCase {
             }
         }
 
-        try await contactService.openProtectedContactsForTests()
+        await contactService.openContacts(ownSignerKeys: [])
         XCTAssertNoThrow(try contactService.createTag(named: "Protected Tag"))
     }
 
     // MARK: - Search
 
     func test_pr8SearchRanksAndMatchesTagsFingerprintAndShortKeyId() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Search")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let exact = try engine.generateKey(
@@ -192,9 +189,9 @@ final class ContactServiceTagTests: ContactServiceTestCase {
     }
 
     func test_pr8RecipientSearchMatchesOnlyPreferredEncryptableKeyIdentifiers() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8RecipientSearch")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let preferred = try engine.generateKey(

@@ -4,9 +4,9 @@ import XCTest
 final class ContactDetailScreenModelTests: ContactServiceTestCase {
     @MainActor
     func test_pr3bContactDetailScreenModelProjectsCurrentDomainState() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR3BDetailProjection")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let alpha = try engine.generateKey(
@@ -30,7 +30,7 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
 
         let model = ContactDetailScreenModel(contactId: alphaContactId, contactService: service)
 
-        XCTAssertEqual(model.contactsAvailability, .availableProtectedDomain)
+        XCTAssertEqual(model.contactsAvailability, .available)
         XCTAssertTrue(model.allowsProtectedIdentityActions)
         XCTAssertTrue(model.allowsProtectedCertificationPersistence)
         XCTAssertEqual(model.contact?.contactId, alphaContactId)
@@ -42,9 +42,9 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_pr3bContactDetailScreenModelDeletesContactAndReportsSuccess() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR3BDetailDelete")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -65,9 +65,9 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_pr3bContactDetailScreenModelOwnsMergeTagAndKeyMutations() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR3BDetailMutations")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let first = try engine.generateKey(
@@ -128,9 +128,9 @@ final class ContactDetailScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_pr3bContactDetailScreenModelPresentsMutationErrors() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR3BDetailError")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(

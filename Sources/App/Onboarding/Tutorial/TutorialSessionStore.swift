@@ -5,9 +5,9 @@ import SwiftUI
 @Observable
 final class TutorialSessionStore {
     @ObservationIgnored
-    private weak var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator?
+    private weak var appSettings: AppSettingsCoordinator?
     @ObservationIgnored
-    private let openTutorialContacts: @MainActor (TutorialSandboxContainer) async throws -> Void
+    private let openTutorialSandbox: @MainActor (TutorialSandboxContainer) async throws -> Void
 
     private(set) var session = TutorialSessionState()
     private(set) var container: TutorialSandboxContainer?
@@ -19,7 +19,6 @@ final class TutorialSessionStore {
     private var openingModuleToken: UUID?
     #if DEBUG
     private var didPrepareUITestCompletionSurface = false
-    private var didPrepareUITestAuthModeConfirmation = false
     #endif
 
     var selectedTab: AppShellTab { navigation.selectedTab }
@@ -32,11 +31,11 @@ final class TutorialSessionStore {
     var blocklist = TutorialUnsafeRouteBlocklist()
 
     init(
-        openTutorialContacts: @escaping @MainActor (TutorialSandboxContainer) async throws -> Void = { container in
-            try await container.openContactsIfNeeded()
+        openTutorialSandbox: @escaping @MainActor (TutorialSandboxContainer) async throws -> Void = { container in
+            try await container.openIfNeeded()
         }
     ) {
-        self.openTutorialContacts = openTutorialContacts
+        self.openTutorialSandbox = openTutorialSandbox
     }
 
     var nextModule: TutorialModuleID? {
@@ -67,14 +66,14 @@ final class TutorialSessionStore {
         if session.lifecycleState == .finished {
             return true
         }
-        return protectedOrdinarySettings?.hasCompletedGuidedTutorial ?? false
+        return appSettings?.hasCompletedGuidedTutorial ?? false
     }
 
     var outputInterceptionPolicy: OutputInterceptionPolicy? {
         guard session.hasStartedSession else { return nil }
 
         return OutputInterceptionPolicy(
-            interceptClipboardCopy: { _, _, _ in
+            interceptClipboardCopy: { _, _ in
                 true
             },
             interceptDataExport: { _, _, _ in
@@ -104,8 +103,8 @@ final class TutorialSessionStore {
         return previousModules.allSatisfy { isCompleted($0) }
     }
 
-    func configurePersistence(protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator) {
-        self.protectedOrdinarySettings = protectedOrdinarySettings
+    func configurePersistence(appSettings: AppSettingsCoordinator) {
+        self.appSettings = appSettings
     }
 
     func setTutorialPresentationActive(_ isActive: Bool) {
@@ -140,7 +139,7 @@ final class TutorialSessionStore {
               let activeSessionID = session.sessionID else {
             return
         }
-        guard await openContactsIfNeeded(
+        guard await openSandboxIfNeeded(
             for: activeContainer,
             sessionID: activeSessionID
         ) else {
@@ -223,7 +222,7 @@ final class TutorialSessionStore {
         guard let promptModule = session.pendingCompletionPromptModule else { return }
         session.pendingCompletionPromptModule = nil
 
-        if promptModule == .enableHighSecurity {
+        if promptModule == TutorialModuleID.allCases.last {
             showCompletionView()
         } else {
             returnToOverview()
@@ -240,7 +239,7 @@ final class TutorialSessionStore {
     }
 
     func markFinishedTutorial() {
-        protectedOrdinarySettings?.markGuidedTutorialCompleted()
+        appSettings?.markGuidedTutorialCompleted()
         session.lifecycleState = .finished
     }
 
@@ -292,10 +291,6 @@ final class TutorialSessionStore {
         }
         navigation.activeModal = .importConfirmation(request)
         return true
-    }
-
-    func presentAuthModeConfirmation(_ request: AuthModeChangeConfirmationRequest) {
-        navigation.activeModal = .authModeConfirmation(request)
     }
 
     func presentLeaveConfirmation(onLeave: @escaping @MainActor () -> Void) {
@@ -354,10 +349,6 @@ final class TutorialSessionStore {
 
     func noteBackupExported(_ backupData: Data) {
         complete(.backupKey)
-    }
-
-    func noteHighSecurityEnabled(_ mode: AuthenticationMode) {
-        complete(.enableHighSecurity)
     }
 
     #if DEBUG
@@ -430,32 +421,6 @@ final class TutorialSessionStore {
         return true
     }
 
-    func prepareUITestAuthModeConfirmationIfRequested(
-        processInfo: ProcessInfo = .processInfo
-    ) async -> Bool {
-        guard processInfo.environment["UITEST_TUTORIAL_AUTHMODE_CONFIRMATION"] == "1",
-              !didPrepareUITestAuthModeConfirmation else {
-            return false
-        }
-
-        didPrepareUITestAuthModeConfirmation = true
-        ensureSession()
-        for module in TutorialModuleID.allCases where module.rawValue < TutorialModuleID.enableHighSecurity.rawValue {
-            markCompletedForTesting(module)
-        }
-        await openModule(.enableHighSecurity)
-        presentAuthModeConfirmation(
-            SettingsAuthModeRequestBuilder.makeRequest(
-                for: .highSecurity,
-                hasBackup: false,
-                onConfirm: { [weak self] in
-                    self?.noteHighSecurityEnabled(.highSecurity)
-                },
-                onCancel: {}
-            )
-        )
-        return true
-    }
     #endif
 
     func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {
@@ -511,7 +476,7 @@ final class TutorialSessionStore {
         }
     }
 
-    private func openContactsIfNeeded(
+    private func openSandboxIfNeeded(
         for activeContainer: TutorialSandboxContainer,
         sessionID activeSessionID: TutorialSessionID
     ) async -> Bool {
@@ -523,7 +488,7 @@ final class TutorialSessionStore {
         }
 
         do {
-            try await openTutorialContacts(activeContainer)
+            try await openTutorialSandbox(activeContainer)
             guard isCurrentTutorialSession(
                 container: activeContainer,
                 sessionID: activeSessionID

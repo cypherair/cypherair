@@ -301,7 +301,7 @@ final class SelfTestService {
             verificationKeys: [],
             contactKeys: [],
             ownKeys: [],
-            contactsAvailability: .availableProtectedDomain
+            contactsAvailability: .available
         )
         let plaintext = Data("Tamper test".utf8)
         let ciphertext = try await messageAdapter.encrypt(
@@ -346,7 +346,7 @@ final class SelfTestService {
             verificationKeys: [generated.publicKeyData],
             contactKeys: [],
             ownKeys: [],
-            contactsAvailability: .availableProtectedDomain
+            contactsAvailability: .available
         )
     }
 

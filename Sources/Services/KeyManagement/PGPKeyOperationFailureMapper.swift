@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 /// Normalizes lower-layer errors into stable, non-identifying operation categories.
 enum PGPKeyOperationFailureMapper {
@@ -6,8 +7,11 @@ enum PGPKeyOperationFailureMapper {
         for error: Error,
         fallback: PGPKeyOperationFailureCategory = .externalOperationFailed
     ) -> PGPKeyOperationFailureCategory {
-        if let handleError = error as? SecureEnclaveCustodyHandleError {
-            return handleError.failureCategory
+        if let custodyError = error as? CustodyError {
+            return custodyError.failureCategory
+        }
+        if let storeError = error as? StoreError {
+            return category(for: CypherAirError.fromStore(storeError), fallback: fallback)
         }
 
         if let cypherAirError = error as? CypherAirError {

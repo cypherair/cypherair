@@ -163,20 +163,6 @@ struct TutorialGuidanceResolver {
                 target: nil
             )
 
-        case .enableHighSecurity:
-            if selectedTab != .settings {
-                return payload(
-                    module,
-                    body: String(localized: "guidedTutorial.nav.settings", defaultValue: "Open the Settings tab to continue."),
-                    target: nil
-                )
-            }
-            return payload(
-                module,
-                body: String(localized: "guidedTutorial.settings.auth", defaultValue: "Switch the authentication mode to High Security and confirm the warning."),
-                target: .settingsAuthModePicker
-            )
-
         case .sandbox:
             return payload(
                 module,
@@ -219,15 +205,13 @@ struct TutorialGuidanceResolver {
     private func modalModule(for session: TutorialSessionState) -> TutorialModuleID? {
         session.activeModule
             ?? session.nextIncompleteModule
-            ?? (session.hasCompletedAllModules ? .enableHighSecurity : nil)
+            ?? (session.hasCompletedAllModules ? TutorialModuleID.allCases.last : nil)
     }
 
     private func modalBody(for modal: TutorialModal) -> String {
         switch modal {
         case .importConfirmation:
             String(localized: "guidedTutorial.contacts.form", defaultValue: "Confirm Bob's key details and add the contact.")
-        case .authModeConfirmation:
-            String(localized: "guidedTutorial.settings.auth", defaultValue: "Switch the authentication mode to High Security and confirm the warning.")
         case .leaveConfirmation:
             String(
                 localized: "guidedTutorial.leave.body",
@@ -238,8 +222,6 @@ struct TutorialGuidanceResolver {
 
     private func modalTarget(for modal: TutorialModal) -> TutorialAnchorID? {
         switch modal {
-        case .authModeConfirmation:
-            .settingsModeConfirmButton
         case .importConfirmation, .leaveConfirmation:
             nil
         }
@@ -255,7 +237,7 @@ struct TutorialGuidanceResolver {
     }
 
     private func completionMessage(for module: TutorialModuleID) -> String {
-        if module == .enableHighSecurity {
+        if module == TutorialModuleID.allCases.last {
             return String(
                 localized: "guidedTutorial.task.complete.final",
                 defaultValue: "This task is complete. Return to the tutorial overview to review completion and finish the tutorial."

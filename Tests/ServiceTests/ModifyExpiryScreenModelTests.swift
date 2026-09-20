@@ -152,7 +152,7 @@ final class ModifyExpiryScreenModelTests: XCTestCase {
             request: request ?? ModifyExpiryRequest(
                 fingerprint: fingerprint
             ),
-            keyManagement: TestHelpers.makeKeyManagement().service,
+            keyManagement: TestHelpers.makeLockedKeyManagement(),
             dismissAction: dismissAction,
             modifyExpiryAction: modifyExpiryAction ?? { fingerprint, _ in
                 makeKeyRouteTestIdentity(fingerprint: fingerprint)

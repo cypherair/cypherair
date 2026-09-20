@@ -2,11 +2,13 @@
 
 ## 1. Lanes
 
-**The Swift unit and FFI lane runs on macOS only.** The iOS Simulator compiles it, but the unit-test host app dies at launch: the ProtectedData storage root requires the volume to report file-protection support and re-reads the `.complete` attribute it just wrote, failing closed when either check fails, which is what the simulator's volume does.
+**The Swift unit and FFI lane runs on macOS only.** The iOS Simulator compiles it, but the unit-test host app dies at launch: the vault's protected-data directory requires the volume to report file-protection support and re-reads the `.complete` attribute it just wrote, failing closed when either check fails, which is what the simulator's volume does.
 
 **CI runs no `xcodebuild test` at all.** The local macOS unit lane is the source of truth for Swift validation, in every case. Hosted runners carry no CypherAir signing material by policy — signed app builds stay local and on Xcode Cloud — and a hosted-image mismatch skips the affected Apple platform probe rather than failing; **a skipped probe never stands in for release validation.**
 
-**The vault package's tests are part of the unit lane** and run through the package scheme on macOS. They use a fake enclave that records the access-control flags it is handed and never reach LocalAuthentication, so they never prompt.
+**The vault package's tests are part of the unit lane** and run through the package scheme on macOS. They run on the package's sandbox composition — the software enclave, rows in memory, no prompt — behind a recording wrapper that keeps every access policy it is handed, and never reach LocalAuthentication.
+
+**Service tests run over a real sandbox vault, never a mock of it.** `TestHelpers.makeSandbox()` opens the same composition under a known passphrase in a temporary directory; `reopen()` locks and unlocks it through that passphrase, which is how a test proves something survived to disk. The UI-test container is the same composition: under `UITEST_REQUIRE_MANUAL_AUTH=1` the app boots locked and the test types `UITEST_VAULT_PASSPHRASE`, and nothing prompts.
 
 **The device lane needs a real Secure Enclave.** An Apple Silicon Mac runs the whole lane locally; SE-capable iPhones and iPads work too; the simulator cannot. The MIE subset additionally needs memory-tagging hardware (§5).
 
@@ -28,7 +30,7 @@ Not written: tests of initializers and accessors, tests that assert a mock was c
 - **Every `XCTestCase` class under `Tests/DeviceSecurityTests/` that declares test methods must be listed in the unit plan's `skippedTests`**, or it runs in the unit lane and stops the run at a biometric prompt. The rule is scoped to that directory, not to a `Device*` name; `scripts/check_device_test_skip_list.py` enforces it in CI, but a local run bites first.
 - **The application-password probes are two classes with different needs.** `DeviceApplicationPasswordProbeTests` uses password-only access control and runs unattended in the device lane; `DeviceApplicationPasswordBiometricProbeTests` combines the biometric constraint and needs exactly one Touch ID or Face ID approval, so it is run with a person present. Their printed reports are the evidence behind the platform facts in [SECURITY.md](SECURITY.md); a change in what they observe re-opens the design decision that rests on it.
 - **`CypherAir-DangerousDeviceTests` is destructive.** Its Reset All Local Data cleanup proof deletes every app-owned Secure Enclave custody handle for the bundle, not only the handles it created. Run it against a disposable install or device state, never a real one.
-- **ProtectedData device tests use test-only shared-right identifiers, never the production one, and never call `removeAllRightsWithCompletion()`.**
+- **Device tests never write under the app's own Keychain services** (`com.cypherair.vault.*`); the probes tag their rows with their own names, so a run leaves the real vault untouched.
 - **Build phases read only what they declare, and a declared parent directory is not recursive access.** Adding a test fixture means adding it to `Tests/FixtureResources.xcfilelist` and its `.outputs` companion. Local validation must never depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`.
 - **Tutorial or UI-test launch-gating changes** additionally need the Mac UI plan plus Release and `AppStore Candidate Release` macOS build probes — the proof that the `UITEST_*` launch overrides stay Debug-only.
 - **Every crypto operation** needs a round-trip test per family it supports, a targeted tamper test proving hard-fail with no partial output, and format assertions wherever the format rule applies.

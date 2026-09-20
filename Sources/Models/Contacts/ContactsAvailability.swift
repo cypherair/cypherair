@@ -1,22 +1,15 @@
 import Foundation
 
 enum ContactsAvailability: String, Codable, Equatable, Sendable {
-    case availableProtectedDomain
+    case available
     case opening
     case locked
-    case recoveryNeeded
-    case frameworkUnavailable
-    case restartRequired
+    case damaged
 }
 
 extension ContactsAvailability {
     var isAvailable: Bool {
-        switch self {
-        case .availableProtectedDomain:
-            true
-        case .opening, .locked, .recoveryNeeded, .frameworkUnavailable, .restartRequired:
-            false
-        }
+        self == .available
     }
 
     var allowsContactsVerification: Bool {
@@ -24,6 +17,6 @@ extension ContactsAvailability {
     }
 
     var allowsProtectedCertificationPersistence: Bool {
-        self == .availableProtectedDomain
+        isAvailable
     }
 }

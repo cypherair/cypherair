@@ -46,11 +46,16 @@ public final class UnlockedSession: @unchecked Sendable {
         return try body(box.buffer)
     }
 
-    /// A fresh context for one private operation: no biometric reuse, and the
-    /// enclave prompts for the key's constraint when the operation runs.
-    public func operationContext() -> LAContext {
+    /// A fresh context for one private operation: no biometric reuse, no
+    /// passcode fallback, and the enclave prompts for the key's constraint with
+    /// `reason` when the operation runs.
+    public func operationContext(reason: String? = nil) -> LAContext {
         let context = LAContext()
         context.touchIDAuthenticationAllowableReuseDuration = 0
+        context.localizedFallbackTitle = ""
+        if let reason {
+            context.localizedReason = reason
+        }
         return context
     }
 

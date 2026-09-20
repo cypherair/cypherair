@@ -5,7 +5,7 @@ struct TutorialView: View {
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
+    @Environment(AppSettingsCoordinator.self) private var appSettings
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     let presentationContext: TutorialPresentationContext
@@ -39,13 +39,10 @@ struct TutorialView: View {
             .task {
                 guard !hasPreparedPresentation else { return }
                 hasPreparedPresentation = true
-                tutorialStore.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
+                tutorialStore.configurePersistence(appSettings: appSettings)
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
                 #if DEBUG
                 if tutorialStore.prepareUITestCompletionSurfaceIfRequested() {
-                    return
-                }
-                if await tutorialStore.prepareUITestAuthModeConfirmationIfRequested() {
                     return
                 }
                 if await tutorialStore.prepareUITestContactDetailSurfaceIfRequested() {
@@ -305,7 +302,7 @@ struct TutorialView: View {
                 ? String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
                 : String(localized: "guidedTutorial.continue", defaultValue: "Continue Tutorial")
         case .notStarted, .finished:
-            if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
+            if appSettings.hasCompletedGuidedTutorial ?? false {
                 return String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
             }
             return String(localized: "guidedTutorial.start", defaultValue: "Start Guided Tutorial")
@@ -332,7 +329,7 @@ struct TutorialView: View {
                 tutorialStore.showCompletionView()
             }
         case .notStarted, .finished:
-            if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
+            if appSettings.hasCompletedGuidedTutorial ?? false {
                 tutorialStore.resetTutorial()
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
             }
@@ -402,18 +399,6 @@ struct TutorialView: View {
                     }
                 )
             }
-        case .authModeConfirmation(let request):
-            TutorialModalGuidanceHost(guidance: modalGuidance(for: modal)) {
-                NavigationStack {
-                    TutorialAuthModeConfirmationView(request: request)
-                }
-            }
-            #if os(macOS)
-            .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
-            #endif
-            #if canImport(UIKit)
-            .presentationDetents([.medium, .large])
-            #endif
         case .leaveConfirmation(let request):
             TutorialModalGuidanceHost(guidance: modalGuidance(for: modal)) {
                 NavigationStack {

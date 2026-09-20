@@ -1,159 +1,143 @@
 import Foundation
+import Sealing
+import Stores
+import Vault
 import XCTest
 @testable import CypherAir
 
-/// Shared test infrastructure for Services layer tests.
-/// Creates mock-backed service instances for integration-style testing.
 enum TestHelpers {
-    // MARK: - KeyManagementService Factory
+    /// A sandbox vault opened under a known passphrase in its own temporary
+    /// directory. Software keys, rows in memory, no prompts.
+    struct Sandbox {
+        static let passphrase = "correct horse battery staple"
 
-    /// Create a KeyManagementService backed by mock SE, Keychain, and Authenticator.
-    /// Returns the service and all three mocks for verification.
+        let vault: AppVault
+        let directory: URL
+
+        /// Locks the vault and opens it again through its passphrase, the way
+        /// a relaunch would; every cached domain is re-read from disk.
+        func reopen() async throws {
+            vault.relock()
+            let attempt = vault.beginUnlock(reason: "")
+            let session = try await attempt.submit(passphrase: SensitiveBuffer.utf8(Self.passphrase))
+            _ = vault.adopt(session: session)
+        }
+
+        func cleanup() {
+            vault.relock()
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    static func makeSandbox() async throws -> Sandbox {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
+        let vault = try AppVault.sandbox(directory: directory)
+        try await vault.bootstrap(passphrase: SensitiveBuffer.utf8(Sandbox.passphrase), reason: "")
+        return Sandbox(vault: vault, directory: directory)
+    }
+
     static func makeKeyManagement(
         engine: PgpEngine = PgpEngine(),
+        sandbox givenSandbox: Sandbox? = nil,
         memoryInfo: (any MemoryInfoProvidable)? = nil,
-        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
-        metadataPersistence: (any KeyMetadataPersistence)? = nil,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
-        secureEnclaveOverride: (any SecureEnclaveManageable)? = nil,
-        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
-        secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
+        custodyGeneration: Bool = true,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        provisioningWrappingPromptCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
-    ) -> (
-        service: KeyManagementService,
-        mockSE: MockSecureEnclave,
-        mockKC: MockKeychain,
-        mockAuth: MockAuthenticator,
-        metadataPersistence: any KeyMetadataPersistence
-    ) {
-        let mockSE = MockSecureEnclave()
-        let mockKC = MockKeychain()
-        let mockAuth = MockAuthenticator()
-        let privateKeyControlStore = privateKeyControlStore ?? InMemoryPrivateKeyControlStore(mode: .standard)
-        let metadataPersistence = metadataPersistence ?? InMemoryKeyMetadataStore()
+        afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        afterPermanentStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+    ) async throws -> (service: KeyManagementService, sandbox: Sandbox) {
+        let sandbox: Sandbox
+        if let given = givenSandbox {
+            sandbox = given
+        } else {
+            sandbox = try await makeSandbox()
+        }
+        let vault = sandbox.vault
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let publicBindingInspector = PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)
+        let compositeBindingInspector = PGPSecureEnclaveCompositeBindingInspector(engine: engine)
         let promptCoordinator = authenticationPromptCoordinator ?? AuthenticationPromptCoordinator()
-        let secureEnclave = secureEnclaveOverride ?? mockSE
-
-        let service: KeyManagementService
-        if let memInfo = memoryInfo {
-            service = KeyManagementService(
-                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
-                keychain: mockKC,
-                memoryInfo: memInfo,
-                authenticationPromptCoordinator: promptCoordinator,
-                privateKeyControlStore: privateKeyControlStore,
-                expiryAuthenticator: expiryAuthenticator,
-                secureEnclaveCustodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
-                metadataPersistence: metadataPersistence,
-                provisioningCheckpoint: provisioningCheckpoint,
-                provisioningWrappingPromptCheckpoint: provisioningWrappingPromptCheckpoint
-            )
-        } else {
-            service = KeyManagementService(
-                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
-                keychain: mockKC,
-                authenticationPromptCoordinator: promptCoordinator,
-                privateKeyControlStore: privateKeyControlStore,
-                expiryAuthenticator: expiryAuthenticator,
-                secureEnclaveCustodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
-                metadataPersistence: metadataPersistence,
-                provisioningCheckpoint: provisioningCheckpoint,
-                provisioningWrappingPromptCheckpoint: provisioningWrappingPromptCheckpoint
-            )
-        }
-
-        return (service, mockSE, mockKC, mockAuth, metadataPersistence)
-    }
-
-    // MARK: - ContactService Factory
-
-    /// Create a ContactService using a temporary directory for contacts storage.
-    /// Returns the service and the temp directory URL (caller should clean up in tearDown).
-    static func makeContactService(
-        engine: PgpEngine = PgpEngine()
-    ) async -> (service: ContactService, tempDir: URL) {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
-        let wrappingRootKey = Data(repeating: 0xA4, count: 32)
-        let contactsDomainStore = try? makeContactsDomainStore(
-            engine: engine,
-            contactsDirectory: tempDir,
-            wrappingRootKey: wrappingRootKey
-        )
-
-        let service = ContactService(
-            contactImportAdapter: contactImportAdapter,
+        let service = KeyManagementService(
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDomainStore: contactsDomainStore
-        )
-        await openContactsForTests(
-            service,
-            wrappingRootKey: wrappingRootKey
-        )
-        return (service, tempDir)
-    }
-
-    static func makeContactsDomainStore(
-        engine: PgpEngine,
-        contactsDirectory: URL,
-        wrappingRootKey: Data = Data(repeating: 0xA4, count: 32)
-    ) throws -> ContactsDomainStore {
-        let storageRoot = ProtectedDataStorageRoot(
-            baseDirectory: contactsDirectory.appendingPathComponent(
-                "protected-contacts",
-                isDirectory: true
+            vault: vault,
+            memoryInfo: memoryInfo ?? SystemMemoryInfo(),
+            authenticationPromptCoordinator: promptCoordinator,
+            compositeCustodyRouterContext: CompositeCustodyRouterContext(bindingInspector: compositeBindingInspector),
+            secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
+                publicBindingInspector: publicBindingInspector,
+                compositeBindingInspector: compositeBindingInspector
+            ),
+            metadataPersistence: VaultKeyMetadataStore(vault: vault),
+            provisioningCheckpoint: provisioningCheckpoint,
+            afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
+            afterPermanentStoreCheckpoint: afterPermanentStoreCheckpoint,
+            identityStoreCheckpoint: identityStoreCheckpoint,
+            postProvisioningCheckpoint: postProvisioningCheckpoint,
+            commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint,
+            relockInvalidationCheckpoint: relockInvalidationCheckpoint,
+            secureEnclaveCustodyGenerationServiceFactory: custodyGeneration
+                ? { catalogStore, invalidationGate, commitCoordinator in
+                    SecureEnclaveCustodyGenerationService(
+                        certificateBuilder: PGPSecureEnclaveCustodyGenerationAdapter(engine: engine),
+                        vault: vault,
+                        digestSigner: CustodyOperations(),
+                        compositeCertificateBuilder: PGPSecureEnclaveCompositeGenerationAdapter(engine: engine),
+                        compositeSigner: CustodyOperations(),
+                        catalogStore: catalogStore,
+                        resolver: PGPKeyCapabilityResolver(),
+                        invalidationGate: invalidationGate,
+                        commitCoordinator: commitCoordinator,
+                        authenticationPromptCoordinator: promptCoordinator
+                    )
+                }
+                : nil,
+            secureEnclaveCustodyRecoveryService: SecureEnclaveCustodyGenerationRecoveryService(
+                publicBindingInspector: publicBindingInspector,
+                vault: vault,
+                compositeBindingInspector: compositeBindingInspector
             )
         )
-        let keychain = MockKeychain()
-        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot, keychain: keychain)
-        let registryStore = ProtectedDataRegistryStore(
-            storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.contacts.\(UUID().uuidString)",
-            hasExternalProtectedDataArtifacts: {
-                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
-            }
+        try service.loadKeys()
+        return (service, sandbox)
+    }
+
+    /// A key-management service over a sandbox vault that was never opened:
+    /// for screen models that inject their own key actions.
+    static func makeLockedKeyManagement(engine: PgpEngine = PgpEngine()) -> KeyManagementService {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
+        let vault = try! AppVault.sandbox(directory: directory)
+        return KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            vault: vault,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
+            metadataPersistence: VaultKeyMetadataStore(vault: vault)
         )
-        _ = try registryStore.performSynchronousBootstrap()
-        var registry = try registryStore.loadRegistry()
-        if registry.committedMembership.isEmpty,
-           registry.sharedResourceLifecycleState == .absent {
-            registry.sharedResourceLifecycleState = .ready
-            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
-            try registryStore.saveRegistry(registry)
+    }
+
+    static func makeContactService(
+        engine: PgpEngine = PgpEngine(),
+        sandbox givenSandbox: Sandbox? = nil
+    ) async throws -> (service: ContactService, sandbox: Sandbox) {
+        let sandbox: Sandbox
+        if let given = givenSandbox {
+            sandbox = given
+        } else {
+            sandbox = try await makeSandbox()
         }
-
-        return ContactsDomainStore(
-            storageRoot: storageRoot,
-            registryStore: registryStore,
-            domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey }
-        )
+        let service = ContactService(engine: engine, vault: sandbox.vault)
+        await service.openContacts(ownSignerKeys: [])
+        return (service, sandbox)
     }
 
-    @discardableResult
-    static func openContactsForTests(
-        _ service: ContactService,
-        wrappingRootKey: Data = Data(repeating: 0xA4, count: 32)
-    ) async -> ContactsAvailability {
-        await service.openContactsAfterPostUnlock(
-            gateDecision: ContactsPostAuthGateDecision(
-                postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
-                frameworkState: .sessionAuthorized
-            ),
-            wrappingRootKey: { wrappingRootKey }
-        )
-    }
-
-    // MARK: - Key Generation Helpers
-
-    /// Generate a key pair and store it in the mock-backed KeyManagementService.
-    /// Returns the PGPKeyIdentity of the generated key.
     @discardableResult
     static func generateAndStoreKey(
         service: KeyManagementService,
@@ -169,7 +153,6 @@ enum TestHelpers {
         )
     }
 
-    /// Generate a Legacy key and return its identity.
     @discardableResult
     static func generateLegacyKey(
         service: KeyManagementService,
@@ -179,7 +162,6 @@ enum TestHelpers {
         try await generateAndStoreKey(service: service, suite: .ed25519LegacyCurve25519Legacy, name: name, email: email)
     }
 
-    /// Generate a Modern High key and return its identity.
     @discardableResult
     static func generateModernHighKey(
         service: KeyManagementService,
@@ -189,451 +171,102 @@ enum TestHelpers {
         try await generateAndStoreKey(service: service, suite: .ed448X448, name: name, email: email)
     }
 
-    /// Provision an unencrypted secret-cert fixture into the mock-backed key management stack
-    /// by SE-wrapping it, persisting the wrapped bundle and metadata, then reloading the service.
-    ///
-    /// This intentionally does not go through `KeyManagementService.importKey(...)`, because
-    /// test fixtures such as `ffi_detailed_recipient_secret.gpg` are not passphrase-protected.
+    /// Imports a fixture secret certificate as a portable key. Fixtures carry
+    /// unprotected secrets and import refuses those, so the engine re-protects
+    /// the key under a throwaway passphrase first.
     @discardableResult
     static func provisionFixtureBackedIdentity(
         secretCertData: Data,
         engine: PgpEngine,
         service: KeyManagementService,
-        mockSE: MockSecureEnclave,
-        mockKC: MockKeychain,
-        metadataPersistence: any KeyMetadataPersistence,
         isDefault: Bool = false
-    ) throws -> PGPKeyIdentity {
-        let info = try engine.parseKeyInfo(keyData: secretCertData)
-        let metadata = PGPKeyMetadataAdapter.metadata(from: info)
-        let armoredPublicKey = try engine.armorPublicKey(certData: secretCertData)
-        let publicKeyData = try engine.dearmor(armored: armoredPublicKey)
-
-        let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let bundle = try mockSE.wrap(
-            privateKey: SensitiveBuffer(copying: secretCertData),
-            using: handle,
-            fingerprint: metadata.fingerprint,
-            payloadKind: .softwareSecretCertificate
-        )
-
-        let bundleStore = KeyBundleStore(keychain: mockKC)
-        try bundleStore.saveBundle(bundle, fingerprint: metadata.fingerprint)
-
-        let identity = PGPKeyIdentity(
-            fingerprint: metadata.fingerprint,
-            userId: metadata.userId,
-            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
-            isRevoked: metadata.isRevoked,
-            isExpired: metadata.isExpired,
-            isDefault: isDefault,
-            isBackedUp: false,
-            publicKeyData: publicKeyData,
-            revocationCert: Data(),
-            primaryAlgo: metadata.primaryAlgo,
-            subkeyAlgo: metadata.subkeyAlgo,
-            expiryDate: metadata.expiryDate,
-            keyFamily: try XCTUnwrap(metadata.suite).portableFamily,
-            privateKeyCustodyKind: .softwareSecretCertificate
-        )
-
-        try metadataPersistence.save(identity)
-        try service.loadKeys()
-
-        return identity
+    ) async throws -> PGPKeyIdentity {
+        let passphrase = "fixture-passphrase-\(UUID().uuidString)"
+        let protected = try engine.exportSecretKey(certData: secretCertData, passphrase: passphrase)
+        let identity = try await service.importKey(armoredData: protected, passphrase: passphrase)
+        if isDefault {
+            try service.setDefaultKey(fingerprint: identity.fingerprint)
+        }
+        return try XCTUnwrap(service.keys.first { $0.fingerprint == identity.fingerprint })
     }
 
-    // MARK: - Full Service Stack Factory
-
-    /// Create a complete service stack (KeyManagement + Contact + Encryption + Decryption
-    /// + PasswordMessage + Signing)
-    /// backed by mocks. Useful for end-to-end integration tests.
     static func makeServiceStack(
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil
-    ) async -> ServiceStack {
-        let (keyMgmt, mockSE, mockKC, _, metadataPersistence) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
-        let (contactSvc, tempDir) = await makeContactService(engine: engine)
-        // Rooted in the per-stack directory so operation artifacts stay isolated
-        // from other test processes sharing the user temp directory, and die with
-        // the stack in `cleanup()`.
-        let temporaryArtifactStore = AppTemporaryArtifactStore(temporaryDirectory: tempDir)
-        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
-        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        let textEncryptor = makeTextEncryptor(
+    ) async throws -> ServiceStack {
+        let sandbox = try await makeSandbox()
+        let (keyMgmt, _) = try await makeKeyManagement(engine: engine, sandbox: sandbox, memoryInfo: memoryInfo)
+        let (contactSvc, _) = try await makeContactService(engine: engine, sandbox: sandbox)
+        let temporaryArtifactStore = AppTemporaryArtifactStore(temporaryDirectory: sandbox.directory)
+        let services = AppContainer.makePgpServiceGraph(
             engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
-        let fileEncryptor = makeFileEncryptor(
-            engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
-        let expiryMutator = makeExpiryMutator(
-            engine: engine,
-            keyManagement: keyMgmt
-        )
-        keyMgmt.configurePrivateKeyExpiryMutationService(expiryMutator)
-        keyMgmt.configurePrivateKeySelectiveRevocationService(
-            makeSelectiveRevocationService(
-                engine: engine,
-                keyManagement: keyMgmt
-            )
-        )
-
-        let encryptionSvc = EncryptionService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            contactImportAdapter: PGPContactImportAdapter(engine: engine),
+            selfTestAdapter: PGPSelfTestOperationAdapter(engine: engine),
             keyManagement: keyMgmt,
             contactService: contactSvc,
-            textEncryptor: textEncryptor,
-            fileEncryptor: fileEncryptor,
             temporaryArtifactStore: temporaryArtifactStore
         )
-        let messageDecryptor = makeMessageDecryptor(
-            engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
-        let fileDecryptor = makeFileDecryptor(
-            engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
-        let decryptionSvc = DecryptionService(
-            messageAdapter: messageAdapter,
-            keyManagement: keyMgmt,
-            contactService: contactSvc,
-            messageDecryptor: messageDecryptor,
-            fileDecryptor: fileDecryptor,
-            temporaryArtifactStore: temporaryArtifactStore
-        )
-        let cleartextSigner = makeCleartextSigner(
-            engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
-        let detachedFileSigner = makeDetachedFileSigner(
-            engine: engine,
-            keyManagement: keyMgmt,
-            messageAdapter: messageAdapter
-        )
-        let contactCertificationSigner = makeContactCertificationSigner(
-            engine: engine,
-            keyManagement: keyMgmt,
-            certificateAdapter: certificateAdapter
-        )
-        let signingSvc = SigningService(
-            messageAdapter: messageAdapter,
-            keyManagement: keyMgmt,
-            contactService: contactSvc,
-            cleartextSigner: cleartextSigner,
-            detachedFileSigner: detachedFileSigner
-        )
-        let certificateSignatureSvc = CertificateSignatureService(
-            certificateAdapter: certificateAdapter,
-            keyManagement: keyMgmt,
-            contactService: contactSvc,
-            certificationSigner: contactCertificationSigner
-        )
-
         return ServiceStack(
             engine: engine,
+            sandbox: sandbox,
             keyManagement: keyMgmt,
-            metadataPersistence: metadataPersistence,
             contactService: contactSvc,
-            textEncryptor: textEncryptor,
-            fileEncryptor: fileEncryptor,
-            encryptionService: encryptionSvc,
-            decryptionService: decryptionSvc,
-            signingService: signingSvc,
-            certificateSignatureService: certificateSignatureSvc,
-            mockSE: mockSE,
-            mockKC: mockKC,
-            tempDir: tempDir
+            encryptionService: services.encryptionService,
+            decryptionService: services.decryptionService,
+            signingService: services.signingService,
+            certificateSignatureService: services.certificateSignatureService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
     }
 
-    /// Holds all services and mocks for a complete test environment.
     struct ServiceStack {
         let engine: PgpEngine
+        let sandbox: Sandbox
         let keyManagement: KeyManagementService
-        let metadataPersistence: any KeyMetadataPersistence
         let contactService: ContactService
-        let textEncryptor: any TextMessageEncrypting
-        let fileEncryptor: any StreamingFileEncrypting
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
         let signingService: SigningService
         let certificateSignatureService: CertificateSignatureService
-        let mockSE: MockSecureEnclave
-        let mockKC: MockKeychain
-        let tempDir: URL
+        let temporaryArtifactStore: AppTemporaryArtifactStore
 
-        /// Clean up temporary files. Call in tearDown.
+        var tempDir: URL { sandbox.directory }
+
         func cleanup() {
-            try? FileManager.default.removeItem(at: tempDir)
+            sandbox.cleanup()
         }
-    }
-
-    static func makeCleartextSigner(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyCleartextSigningService {
-        PrivateKeyCleartextSigningService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
-    }
-
-    static func makeMessageDecryptor(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SoftwareP256CustodyProvider.shared.keyAgreement,
-        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyMessageDecryptionService {
-        PrivateKeyMessageDecryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            keyAgreement: keyAgreement,
-            compositeDecapsulator: compositeDecapsulator
-        )
-    }
-
-    static func makeFileDecryptor(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SoftwareP256CustodyProvider.shared.keyAgreement,
-        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyStreamingFileDecryptionService {
-        PrivateKeyStreamingFileDecryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            keyAgreement: keyAgreement,
-            compositeDecapsulator: compositeDecapsulator
-        )
-    }
-
-    static func makeTextEncryptor(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyTextEncryptionService {
-        PrivateKeyTextEncryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
-    }
-
-    static func makeFileEncryptor(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyStreamingFileEncryptionService {
-        PrivateKeyStreamingFileEncryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
-    }
-
-    static func makeDetachedFileSigner(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        messageAdapter: PGPMessageOperationAdapter,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyDetachedFileSigningService {
-        PrivateKeyDetachedFileSigningService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
-    }
-
-    static func makeExpiryMutator(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        keyAdapter: PGPKeyOperationAdapter? = nil,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeyExpiryMutationService {
-        PrivateKeyExpiryMutationService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            keyAdapter: keyAdapter ?? PGPKeyOperationAdapter(engine: engine),
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
-    }
-
-    static func makeSelectiveRevocationService(
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        certificateAdapter: PGPCertificateOperationAdapter? = nil,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
-    ) -> PrivateKeySelectiveRevocationService {
-        PrivateKeySelectiveRevocationService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
-            ),
-            certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
-        )
     }
 
     static func makeContactCertificationSigner(
         engine: PgpEngine,
         keyManagement: KeyManagementService,
-        certificateAdapter: PGPCertificateOperationAdapter? = nil,
-        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
-        ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
+        certificateAdapter: PGPCertificateOperationAdapter? = nil
     ) -> PrivateKeyContactCertificationService {
         PrivateKeyContactCertificationService(
             router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: resolver,
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: handleStore
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)
             ),
             softwarePrivateKeyAccess: keyManagement,
             certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
-            digestSigner: digestSigner,
-            compositeSigner: compositeSigner
+            digestSigner: CustodyOperations(),
+            compositeSigner: CustodyOperations()
         )
     }
 
-    // MARK: - Cleanup
-
-    /// Remove a temporary directory created by makeContactService.
     static func cleanupTempDir(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
     }
 }
 
 extension ContactService {
-    convenience init(
-        engine: PgpEngine,
-        contactsDirectory: URL? = nil,
-        contactsDomainStore: ContactsDomainStore? = nil
-    ) {
-        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
-        let resolvedContactsDomainStore = contactsDomainStore ?? contactsDirectory.flatMap {
-            try? TestHelpers.makeContactsDomainStore(
-                engine: engine,
-                contactsDirectory: $0
-            )
-        }
+    convenience init(engine: PgpEngine, vault: AppVault) {
         self.init(
-            contactImportAdapter: contactImportAdapter,
-            certificateAdapter: certificateAdapter,
-            contactsDomainStore: resolvedContactsDomainStore
+            contactImportAdapter: PGPContactImportAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            vault: vault
         )
-    }
-
-    @discardableResult
-    func openProtectedContactsForTests() async throws -> ContactsAvailability {
-        let availability = await TestHelpers.openContactsForTests(self)
-        guard availability == .availableProtectedDomain else {
-            throw CypherAirError.contactsUnavailable(availability)
-        }
-        return availability
     }
 
     var testContactKeyRecords: [ContactKeyRecord] {
