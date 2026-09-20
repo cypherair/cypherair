@@ -1,17 +1,14 @@
 {
   "generatedBy": "scripts/generate_open_source_notices.py",
   "generationInputs": {
-    "pgp-mobile/Cargo.lock": "11184b2eb35318a04243232761ed7f2679acabfd37e19902952092f1bd2a0d1a",
-    "pgp-mobile/Cargo.toml": "f010081295b42d211d3f12ba6345d95f3a0eff0e954601531fc5855e34e29f62",
-    "scripts/generate_open_source_notices.py": "12dcb90996549943ae03f52f03d5c527121ebdf1aa6d8a15d5a6da0dd5832fa4",
-    "third_party/sqlcipher-xcframework.pin.json": "3450917ba154a2f8ed6500de215c4816b4b546d3bf75a9ebbdec1a55392b45eb"
+    "pgp-mobile/Cargo.lock": "e917005cd4d8f689ed8235426fd1709ba8eebdbf8ae56ee970664b7f3c5a101f",
+    "pgp-mobile/Cargo.toml": "ab86861c1cd6cf7487f9445ce15f84d042e286b72d3bb0f514cc9c7bb078a58d",
+    "scripts/generate_open_source_notices.py": "b5c7354a9c35a2935f593979fb59a8247aa969ec292350ddf650b54c3904fc20"
   },
   "licenseTexts": {
-    "fileCount": 124,
+    "fileCount": 122,
     "files": {
       "CypherAir-DUAL-LICENSE.txt": "2200e29757d6cfbddb341ff4f195cc4e54e73d490d0f4c759f6695d9807bd5d6",
-      "SQLCipher-4.19.0.txt": "4e5202d5b0defa7f1cbde226cde5d3548983aec9ccf583701bb6e6db2cb1f6f9",
-      "SQLite-3.53.4.txt": "5c208df5940d9f1a87ab91513ab787575618f821ceab6ea0219af39e72ed18e2",
       "adler2-2.0.1.txt": "73765f494eec7abdfee033d51833ecee5a55ba7fdefeeb3fd8c96a71480a3cfb",
       "aho-corasick-1.1.5.txt": "71fbbd3bd1d53008e8e0c23b073c9c26e998924f9efed338ac100ec5f4461028",
       "anstyle-1.0.14.txt": "cc6dfc567a4d69d1735c891cdf00b18a4a35eb8e5f3e8e6006ebfeeb0b47e663",
@@ -138,8 +135,8 @@
   },
   "notices": {
     "path": "Sources/Resources/OpenSourceNotices/open_source_notices.json",
-    "recordCount": 124,
-    "sha256": "1b3a48da2a7b59d9ccb8a88c0d552c3e88f9be2b6d50cda664030a885b8d07c4"
+    "recordCount": 122,
+    "sha256": "1fbf9f26c03633fa031e673fe40fbee795f4416636ef77e7571176ba7acd98c2"
   },
   "regenerateCommand": "python3 scripts/generate_open_source_notices.py",
   "schemaVersion": 2

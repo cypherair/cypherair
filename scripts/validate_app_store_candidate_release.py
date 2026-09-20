@@ -32,7 +32,6 @@ CANDIDATE_VERDICT_SCHEMA_VERSION = 1
 ARM64E_MANIFEST_ASSET_NAME = "PgpMobile.arm64e-build-manifest.json"
 ARM64E_STATUS_RELATIVE_PATH = Path("docs/ARM64E_STATUS.md")
 ARM64E_STAGE1_PIN_RELATIVE_PATH = Path("third_party/arm64e-stage1-toolchain.pin.json")
-SQLCIPHER_PIN_RELATIVE_PATH = Path("third_party/sqlcipher-xcframework.pin.json")
 PINNED_RUST_STAGE1_TAG_PATTERN = re.compile(
     r"^- \*\*Pinned prerelease tag:\*\* `([^`\r\n]+)`\s*$",
     flags=re.MULTILINE,
@@ -61,10 +60,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--require-arm64e-release-manifest",
         default=os.environ.get("SOURCE_COMPLIANCE_REQUIRE_ARM64E_RELEASE_MANIFEST", "YES"),
-    )
-    parser.add_argument(
-        "--require-sqlcipher-release-pin",
-        default=os.environ.get("SOURCE_COMPLIANCE_REQUIRE_SQLCIPHER_RELEASE_PIN", "YES"),
     )
     return parser.parse_args()
 
@@ -487,41 +482,6 @@ def validate_stable_release_arm64e_manifest(
     validate_arm64e_manifest_payload(payload, expected_rust_stage1_release)
 
 
-def validate_sqlcipher_dependency(repo_root: Path) -> None:
-    pin_path = repo_root / SQLCIPHER_PIN_RELATIVE_PATH
-    if not pin_path.is_file():
-        raise CandidateValidationError(f"SQLCipher pin file is missing: {pin_path}")
-
-    validator = repo_root / "scripts" / "validate_sqlcipher_xcframework.py"
-    if not validator.is_file():
-        raise CandidateValidationError(f"SQLCipher validator is missing: {validator}")
-
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(validator),
-            "--root",
-            str(repo_root),
-            "--pin-file",
-            str(pin_path),
-            "--skip-release-assets",
-        ],
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-    if completed.returncode != 0:
-        detail = "\n".join(
-            part.strip()
-            for part in (completed.stdout, completed.stderr)
-            if part.strip()
-        )
-        raise CandidateValidationError(
-            "SQLCipher restored artifact does not match the pinned formal dependency."
-            + (f"\n{detail}" if detail else "")
-        )
-
-
 def validate_candidate_release(
     repo_root: Path,
     marketing_version: str,
@@ -529,7 +489,6 @@ def validate_candidate_release(
     repository_full_name: str,
     require_stable_release: bool,
     require_arm64e_release_manifest: bool = True,
-    require_sqlcipher_release_pin: bool = False,
     trust_verdict_file: Path | None = None,
 ) -> str:
     if not require_stable_release:
@@ -605,9 +564,6 @@ def validate_candidate_release(
             "re-run the authenticated candidate validation with the manifest check enabled."
         )
 
-    if require_sqlcipher_release_pin:
-        validate_sqlcipher_dependency(repo_root)
-
     local_head_sha = head_commit_sha(repo_root)
     remote_tag_sha = remote_tag_commit_sha(
         repo_root,
@@ -637,9 +593,6 @@ def main() -> None:
             require_stable_release=stable_release_required,
             require_arm64e_release_manifest=requires_stable_release(
                 args.require_arm64e_release_manifest
-            ),
-            require_sqlcipher_release_pin=requires_stable_release(
-                args.require_sqlcipher_release_pin
             ),
             trust_verdict_file=args.trust_verdict_file,
         )

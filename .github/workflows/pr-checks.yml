@@ -3,9 +3,8 @@ name: PR Checks
 # Pull requests only. Pushes to main used to run this whole pipeline a second
 # time, in parallel with xcframework-edge-release.yml, which already rebuilds
 # the XCFramework from source, runs the full Rust suite (including the ignored
-# slow lanes), verifies the arm64e stage1 provenance, restores the attested
-# SQLCipher release, and probes the iOS and visionOS app builds off the same
-# commit. The lighter checks that only live here (text hygiene, the script
+# slow lanes), verifies the arm64e stage1 provenance, and probes the iOS and
+# visionOS app builds off the same commit. The lighter checks that only live here (text hygiene, the script
 # gates, GnuPG/sq interop) run on every PR before the merge and again in
 # nightly-full.yml.
 on:
@@ -26,22 +25,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  sqlcipher-release-input:
-    name: SQLCipher immutable release input
-    runs-on: xcode-27
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Test SQLCipher pin and restore gates
-        run: |
-          python3 -m unittest discover -s scripts/tests -p 'test_sqlcipher_xcframework_validation.py'
-          python3 -m unittest discover -s scripts/tests -p 'test_restore_sqlcipher_xcframework.py'
-      - name: Restore and validate attested SQLCipher XCFramework
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
-
   rust-dependency-audit:
     runs-on: xcode-27
     steps:
@@ -224,11 +207,6 @@ jobs:
           # This job links the packaged artifact instead of building it, so the
           # generated bindings the app compiles come out of the bundle.
           scripts/restore_generated_bindings.sh
-      - name: Restore SQLCipher XCFramework
-        if: steps.platform_preflight.outputs.ready == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
       # GitHub-hosted runners do not carry CypherAir signing material; these
       # generic probes are unsigned compile/link checks. Local and Xcode Cloud
       # app validation use signing and must not copy CODE_SIGNING_ALLOWED=NO.

@@ -21,11 +21,6 @@ build/
 # XCFramework (built artifact, not source)
 *.xcframework/
 PgpMobile.arm64e-build-manifest.json
-SQLCipher.arm64e-build-manifest.json
-SQLCipher-PrivacyInfo.xcprivacy
-SQLCipher.xcframework.sha256
-SQLCipher.xcframework.zip
-SQLCipher.xcframework.release.json
 
 # Staging directory for a validated PgpMobile.xcframework extraction; only ever
 # exists mid-restore, but must never be mistaken for a worktree change
