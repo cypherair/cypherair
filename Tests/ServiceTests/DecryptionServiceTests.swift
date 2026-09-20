@@ -539,6 +539,7 @@ final class DecryptionServiceTests: XCTestCase {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let protectedRecipientSecret = try loadFixture("ffi_detailed_recipient_secret_protected", ext: "asc")
         let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
 
         let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
@@ -546,9 +547,9 @@ final class DecryptionServiceTests: XCTestCase {
         try stack.contactService.importContact(publicKeyData: signerA)
         try stack.contactService.importContact(publicKeyData: signerB)
 
-        let identity = try await TestHelpers.provisionFixtureBackedIdentity(
-            secretCertData: recipientSecret,
-            engine: stack.engine,
+        let identity = try await TestHelpers.importFixtureKey(
+            protectedSecret: protectedRecipientSecret,
+            passphrase: TestHelpers.ffiDetailedRecipientPassphrase,
             service: stack.keyManagement,
             isDefault: true
         )
@@ -726,13 +727,14 @@ final class DecryptionServiceTests: XCTestCase {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let protectedRecipientSecret = try loadFixture("ffi_detailed_recipient_secret_protected", ext: "asc")
         let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
 
         try stack.contactService.importContact(publicKeyData: signerA)
         try stack.contactService.importContact(publicKeyData: signerB)
-        let identity = try await TestHelpers.provisionFixtureBackedIdentity(
-            secretCertData: recipientSecret,
-            engine: stack.engine,
+        let identity = try await TestHelpers.importFixtureKey(
+            protectedSecret: protectedRecipientSecret,
+            passphrase: TestHelpers.ffiDetailedRecipientPassphrase,
             service: stack.keyManagement,
             isDefault: true
         )
@@ -828,14 +830,14 @@ final class DecryptionServiceTests: XCTestCase {
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
-        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let protectedRecipientSecret = try loadFixture("ffi_detailed_recipient_secret_protected", ext: "asc")
         let ciphertext = try loadFixture("ffi_detailed_repeated_encrypted")
         let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
 
         try stack.contactService.importContact(publicKeyData: signerA)
-        _ = try await TestHelpers.provisionFixtureBackedIdentity(
-            secretCertData: recipientSecret,
-            engine: stack.engine,
+        _ = try await TestHelpers.importFixtureKey(
+            protectedSecret: protectedRecipientSecret,
+            passphrase: TestHelpers.ffiDetailedRecipientPassphrase,
             service: stack.keyManagement,
             isDefault: true
         )

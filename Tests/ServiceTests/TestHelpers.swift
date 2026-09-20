@@ -171,19 +171,20 @@ enum TestHelpers {
         try await generateAndStoreKey(service: service, suite: .ed448X448, name: name, email: email)
     }
 
-    /// Imports a fixture secret certificate as a portable key. Fixtures carry
-    /// unprotected secrets and import refuses those, so the engine re-protects
-    /// the key under a throwaway passphrase first.
+    /// The passphrase `generate_detailed_signature_fixtures.rs` protects the
+    /// detailed-signature recipient secret under.
+    static let ffiDetailedRecipientPassphrase = "ffi-detailed-recipient"
+
+    /// Imports a passphrase-protected fixture secret certificate the way a
+    /// user would.
     @discardableResult
-    static func provisionFixtureBackedIdentity(
-        secretCertData: Data,
-        engine: PgpEngine,
+    static func importFixtureKey(
+        protectedSecret: Data,
+        passphrase: String,
         service: KeyManagementService,
         isDefault: Bool = false
     ) async throws -> PGPKeyIdentity {
-        let passphrase = "fixture-passphrase-\(UUID().uuidString)"
-        let protected = try engine.exportSecretKey(certData: secretCertData, passphrase: passphrase)
-        let identity = try await service.importKey(armoredData: protected, passphrase: passphrase)
+        let identity = try await service.importKey(armoredData: protectedSecret, passphrase: passphrase)
         if isDefault {
             try service.setDefaultKey(fingerprint: identity.fingerprint)
         }

@@ -13,6 +13,7 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_m
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_multisig_detached.sig
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_multisig_encrypted.gpg
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_recipient_secret.gpg
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_recipient_secret_protected.asc
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_repeated_detached.sig
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_repeated_encrypted.gpg
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures/ffi_detailed_signer_a.gpg
