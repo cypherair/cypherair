@@ -21,7 +21,7 @@ public enum VaultError: Error, Equatable, Sendable {
 
     /// Maps an error thrown by the enclave or by local authentication during an
     /// operation on a password-protected key.
-    static func fromEnclaveOperation(_ error: any Error) -> VaultError {
+    public static func fromEnclaveOperation(_ error: any Error) -> VaultError {
         let nsError = error as NSError
         if nsError.domain == LAError.errorDomain, let code = LAError.Code(rawValue: nsError.code) {
             return fromLocalAuthentication(code)
@@ -32,7 +32,7 @@ public enum VaultError: Error, Equatable, Sendable {
         return .internalFailure("enclave operation failed")
     }
 
-    static func fromLocalAuthentication(_ code: LAError.Code) -> VaultError {
+    public static func fromLocalAuthentication(_ code: LAError.Code) -> VaultError {
         switch code {
         case .userCancel, .appCancel, .systemCancel:
             .authenticationCancelled

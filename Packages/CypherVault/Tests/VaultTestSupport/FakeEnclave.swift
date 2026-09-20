@@ -42,6 +42,44 @@ public final class FakeEnclave: Enclave, @unchecked Sendable {
         return FakeKey(key: try P256.KeyAgreement.PrivateKey(rawRepresentation: decoded.raw), blob: blob)
     }
 
+    // MARK: Custody keys, in software
+
+    struct CustodyBlob: Codable {
+        let type: CustodyKeyType
+        let key: Data
+        let credentialHash: Data?
+    }
+
+    public func makeCustodyKey(type: CustodyKeyType, credential: borrowing SensitiveBuffer, context: LAContext) throws -> any EnclaveCustodyKey {
+        guard type.policy.requiresCredential else { throw VaultError.internalFailure("this key type carries no credential") }
+        let key = try FakeCustodyKey(type: type, credentialHash: Self.hash(credential))
+        state.withLock { $0.created.append(type.policy) }
+        return key
+    }
+
+    public func makeCredentialFreeCustodyKey(type: CustodyKeyType, context: LAContext) throws -> any EnclaveCustodyKey {
+        guard !type.policy.requiresCredential else { throw VaultError.internalFailure("this key type requires a credential") }
+        let key = try FakeCustodyKey(type: type, credentialHash: nil)
+        state.withLock { $0.created.append(type.policy) }
+        return key
+    }
+
+    public func custodyKey(type: CustodyKeyType, from blob: Data, credential: borrowing SensitiveBuffer, context: LAContext) throws -> any EnclaveCustodyKey {
+        let decoded = try JSONDecoder().decode(CustodyBlob.self, from: blob)
+        guard decoded.type == type, decoded.credentialHash == Self.hash(credential) else {
+            throw NSError(domain: "CryptoTokenKit", code: -3, userInfo: [NSDebugDescriptionErrorKey: "fake enclave: refused"])
+        }
+        return try FakeCustodyKey(type: type, serialized: decoded.key, credentialHash: decoded.credentialHash)
+    }
+
+    public func credentialFreeCustodyKey(type: CustodyKeyType, from blob: Data, context: LAContext) throws -> any EnclaveCustodyKey {
+        let decoded = try JSONDecoder().decode(CustodyBlob.self, from: blob)
+        guard decoded.type == type, decoded.credentialHash == nil else {
+            throw NSError(domain: "CryptoTokenKit", code: -3, userInfo: [NSDebugDescriptionErrorKey: "fake enclave: refused"])
+        }
+        return try FakeCustodyKey(type: type, serialized: decoded.key, credentialHash: nil)
+    }
+
     private static func hash(_ credential: borrowing SensitiveBuffer) -> Data {
         credential.withUnsafeBytes { Data(SHA256.hash(data: $0)) }
     }
@@ -100,5 +138,99 @@ public extension SensitiveBuffer {
     static func text(_ string: String) -> SensitiveBuffer {
         let bytes = Array(string.utf8)
         return SensitiveBuffer(count: bytes.count) { $0.copyBytes(from: bytes) }
+    }
+}
+
+struct FakeCustodyKey: EnclaveCustodyKey {
+    enum Key {
+        case p256Signing(P256.Signing.PrivateKey)
+        case p256KeyAgreement(P256.KeyAgreement.PrivateKey)
+        case mldsa65(MLDSA65.PrivateKey)
+        case mldsa87(MLDSA87.PrivateKey)
+        case mlkem768(MLKEM768.PrivateKey)
+        case mlkem1024(MLKEM1024.PrivateKey)
+    }
+
+    let type: CustodyKeyType
+    let key: Key
+    let credentialHash: Data?
+
+    init(type: CustodyKeyType, credentialHash: Data?) throws {
+        self.type = type
+        self.credentialHash = credentialHash
+        switch type {
+        case .p256Signing: key = .p256Signing(P256.Signing.PrivateKey())
+        case .p256KeyAgreement: key = .p256KeyAgreement(P256.KeyAgreement.PrivateKey())
+        case .mldsa65: key = .mldsa65(try MLDSA65.PrivateKey())
+        case .mldsa87: key = .mldsa87(try MLDSA87.PrivateKey())
+        case .mlkem768: key = .mlkem768(try MLKEM768.PrivateKey())
+        case .mlkem1024: key = .mlkem1024(try MLKEM1024.PrivateKey())
+        }
+    }
+
+    init(type: CustodyKeyType, serialized: Data, credentialHash: Data?) throws {
+        self.type = type
+        self.credentialHash = credentialHash
+        switch type {
+        case .p256Signing: key = .p256Signing(try P256.Signing.PrivateKey(rawRepresentation: serialized))
+        case .p256KeyAgreement: key = .p256KeyAgreement(try P256.KeyAgreement.PrivateKey(rawRepresentation: serialized))
+        case .mldsa65: key = .mldsa65(try MLDSA65.PrivateKey(integrityCheckedRepresentation: serialized))
+        case .mldsa87: key = .mldsa87(try MLDSA87.PrivateKey(integrityCheckedRepresentation: serialized))
+        case .mlkem768: key = .mlkem768(try MLKEM768.PrivateKey(integrityCheckedRepresentation: serialized))
+        case .mlkem1024: key = .mlkem1024(try MLKEM1024.PrivateKey(integrityCheckedRepresentation: serialized))
+        }
+    }
+
+    private var serialized: Data {
+        switch key {
+        case .p256Signing(let k): k.rawRepresentation
+        case .p256KeyAgreement(let k): k.rawRepresentation
+        case .mldsa65(let k): k.integrityCheckedRepresentation
+        case .mldsa87(let k): k.integrityCheckedRepresentation
+        case .mlkem768(let k): k.integrityCheckedRepresentation
+        case .mlkem1024(let k): k.integrityCheckedRepresentation
+        }
+    }
+
+    var dataRepresentation: Data {
+        try! JSONEncoder().encode(FakeEnclave.CustodyBlob(type: type, key: serialized, credentialHash: credentialHash))
+    }
+
+    var publicKeyRaw: Data {
+        switch key {
+        case .p256Signing(let k): k.publicKey.x963Representation
+        case .p256KeyAgreement(let k): k.publicKey.x963Representation
+        case .mldsa65(let k): k.publicKey.rawRepresentation
+        case .mldsa87(let k): k.publicKey.rawRepresentation
+        case .mlkem768(let k): k.publicKey.rawRepresentation
+        case .mlkem1024(let k): k.publicKey.rawRepresentation
+        }
+    }
+
+    func signature(for input: Data) throws -> Data {
+        switch key {
+        case .p256Signing(let k):
+            guard let digest = RawSHA256Digest(input) else { throw VaultError.internalFailure("digest length") }
+            return try k.signature(for: digest).rawRepresentation
+        case .mldsa65(let k): return try k.signature(for: input)
+        case .mldsa87(let k): return try k.signature(for: input)
+        default: throw VaultError.internalFailure("key type cannot sign")
+        }
+    }
+
+    func sharedSecret(withEphemeralPublicKeyX963 x963: Data) throws -> SensitiveBuffer {
+        guard case .p256KeyAgreement(let k) = key else { throw VaultError.internalFailure("key type cannot agree") }
+        let secret = try k.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: x963))
+        return SensitiveBuffer(count: 32) { destination in secret.withUnsafeBytes { destination.copyMemory(from: $0) } }
+    }
+
+    func decapsulate(_ ciphertext: Data) throws -> SensitiveBuffer {
+        let secret: SymmetricKey
+        switch key {
+        case .mlkem768(let k): secret = try k.decapsulate(ciphertext)
+        case .mlkem1024(let k): secret = try k.decapsulate(ciphertext)
+        default: throw VaultError.internalFailure("key type cannot decapsulate")
+        }
+        return SensitiveBuffer(count: secret.bitCount / 8) { destination in secret.withUnsafeBytes { destination.copyMemory(from: $0) } }
     }
 }

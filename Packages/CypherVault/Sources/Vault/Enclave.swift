@@ -72,6 +72,13 @@ public protocol Enclave: Sendable {
         credential: borrowing SensitiveBuffer,
         context: LAContext
     ) throws -> any EnclaveKeyAgreementKey
+
+    /// Creates a custody key whose policy requires a credential.
+    func makeCustodyKey(type: CustodyKeyType, credential: borrowing SensitiveBuffer, context: LAContext) throws -> any EnclaveCustodyKey
+    /// Creates a custody key whose policy carries no credential: ML-KEM only.
+    func makeCredentialFreeCustodyKey(type: CustodyKeyType, context: LAContext) throws -> any EnclaveCustodyKey
+    func custodyKey(type: CustodyKeyType, from blob: Data, credential: borrowing SensitiveBuffer, context: LAContext) throws -> any EnclaveCustodyKey
+    func credentialFreeCustodyKey(type: CustodyKeyType, from blob: Data, context: LAContext) throws -> any EnclaveCustodyKey
 }
 
 extension LAContext {
