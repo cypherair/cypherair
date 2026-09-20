@@ -17,7 +17,6 @@ build/
 
 # Swift Package Manager
 .build/
-Packages/
 
 # XCFramework (built artifact, not source)
 *.xcframework/

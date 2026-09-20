@@ -19,6 +19,8 @@
 		CEA0C0072FA0000000000001 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0062FA0000000000001 /* Foundation.framework */; };
 		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
 		CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */ = {isa = PBXBuildFile; fileRef = CEF297612F7612DF00DB6BF6 /* AppIconD.icon */; };
+		117C8F33D1BE474BABE78FE5 /* Vault in Frameworks */ = {isa = PBXBuildFile; productRef = C3B83948B3514C77928F5F96 /* Vault */; };
+		AE919D0D577E4A259CCD4260 /* Stores in Frameworks */ = {isa = PBXBuildFile; productRef = 6A822FC90A3B4ED294589288 /* Stores */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +85,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				117C8F33D1BE474BABE78FE5 /* Vault in Frameworks */,
+				AE919D0D577E4A259CCD4260 /* Stores in Frameworks */,
 				CEA0C0072FA0000000000001 /* Foundation.framework in Frameworks */,
 				CEA0C0052FA0000000000001 /* CoreFoundation.framework in Frameworks */,
 				CEA0C0032FA0000000000001 /* Security.framework in Frameworks */,
@@ -154,6 +158,8 @@
 			);
 			name = CypherAir;
 			packageProductDependencies = (
+				C3B83948B3514C77928F5F96 /* Vault */,
+				6A822FC90A3B4ED294589288 /* Stores */,
 			);
 			productName = CypherAir;
 			productReference = 9379668011500E781695A4AC /* CypherAir.app */;
@@ -226,6 +232,9 @@
 				Base,
 				en,
 				"zh-Hans",
+			);
+			packageReferences = (
+				7F65F761F7A6488EA209A5E9 /* XCLocalSwiftPackageReference "Packages/CypherVault" */,
 			);
 			mainGroup = 7C9F769E62E925ECA46373E6;
 			minimizedProjectReferenceProxies = 1;
@@ -1094,6 +1103,25 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		7F65F761F7A6488EA209A5E9 /* XCLocalSwiftPackageReference "Packages/CypherVault" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CypherVault;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C3B83948B3514C77928F5F96 /* Vault */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Vault;
+		};
+		6A822FC90A3B4ED294589288 /* Stores */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Stores;
+		};
+/* End XCSwiftPackageProductDependency section */
+
 
 /* Begin XCConfigurationList section */
 		04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */ = {
