@@ -29,7 +29,9 @@
         "DeviceProtectedDataRootSecretStoreTests",
         "DeviceMIETests",
         "DeviceSystemMemoryTests",
-        "DevicePerformanceTests"
+        "DevicePerformanceTests",
+        "DeviceApplicationPasswordProbeTests",
+        "DeviceApplicationPasswordBiometricProbeTests"
       ],
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",
