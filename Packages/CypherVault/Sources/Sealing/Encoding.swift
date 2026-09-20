@@ -21,8 +21,8 @@ extension Data {
     }
 }
 
-enum Randomness {
-    static func bytes(count: Int) throws(SealingError) -> Data {
+public enum Randomness {
+    public static func bytes(count: Int) throws(SealingError) -> Data {
         var data = Data(count: count)
         let status = data.withUnsafeMutableBytes { buffer in
             SecRandomCopyBytes(kSecRandomDefault, count, buffer.baseAddress!)
@@ -37,8 +37,8 @@ enum Randomness {
 /// Binary property-list encoding whose decoder accepts exactly one set of keys.
 /// Every envelope goes through this, so an unknown or missing field is rejected
 /// before any payload is trusted.
-enum StrictPropertyList {
-    static func encode<T: Encodable>(_ value: T) throws(SealingError) -> Data {
+public enum StrictPropertyList {
+    public static func encode<T: Encodable>(_ value: T) throws(SealingError) -> Data {
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
         do {
@@ -48,7 +48,7 @@ enum StrictPropertyList {
         }
     }
 
-    static func decode<T: Decodable>(
+    public static func decode<T: Decodable>(
         _ type: T.Type,
         from data: Data,
         allowedKeys: Set<String>

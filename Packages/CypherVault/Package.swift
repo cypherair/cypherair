@@ -18,6 +18,8 @@ let package = Package(
         .target(name: "Sealing", swiftSettings: swiftSettings),
         .target(name: "Vault", dependencies: ["Sealing"], swiftSettings: swiftSettings),
         .target(name: "Stores", dependencies: ["Vault", "Sealing"], swiftSettings: swiftSettings),
+        .target(name: "VaultTestSupport", dependencies: ["Vault", "Sealing"], path: "Tests/VaultTestSupport", swiftSettings: swiftSettings),
         .testTarget(name: "SealingTests", dependencies: ["Sealing"], swiftSettings: swiftSettings),
+        .testTarget(name: "VaultTests", dependencies: ["Vault", "Sealing", "VaultTestSupport"], swiftSettings: swiftSettings),
     ]
 )
