@@ -1,18 +1,15 @@
 import Foundation
 import LocalAuthentication
+import Stores
 
-/// Manages the full key lifecycle: generation, import, export, deletion, and default selection.
-/// Coordinates OpenPGP adapters and Security layer for SE wrapping/Keychain storage.
-///
-/// All private key material is SE-wrapped before storage and zeroized from memory after use.
 @Observable
 final class KeyManagementService: @unchecked Sendable {
-
-    /// All key identities stored on this device.
     private(set) var keys: [PGPKeyIdentity] = []
     private(set) var metadataLoadState: KeyMetadataLoadState = .locked
+    private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
     private let certificateAdapter: PGPCertificateOperationAdapter
+    private let vault: AppVault
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
@@ -21,20 +18,14 @@ final class KeyManagementService: @unchecked Sendable {
     private let exportService: KeyExportService
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
-    private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
     private let provisioningCommitCoordinator: KeyProvisioningCommitCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
-    private let secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let compositeCustodyRouterContext: CompositeCustodyRouterContext?
-    private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
-    /// Whether device-bound Secure Enclave custody generation is wired for this
-    /// container. UI uses this to decide whether device-bound families are offered.
     var isSecureEnclaveCustodyGenerationAvailable: Bool {
         secureEnclaveCustodyGenerationService != nil
     }
@@ -42,21 +33,15 @@ final class KeyManagementService: @unchecked Sendable {
     init(
         keyAdapter: PGPKeyOperationAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,
-        secureEnclave: any SecureEnclaveManageable,
-        keychain: any KeychainManageable,
+        vault: AppVault,
         memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        privateKeyControlStore: any PrivateKeyControlStoreProtocol,
-        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
-        secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         compositeCustodyRouterContext: CompositeCustodyRouterContext? = nil,
         secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil,
         metadataPersistence: any KeyMetadataPersistence,
-        beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        provisioningWrappingPromptCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        afterPermanentBundleStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        afterPermanentStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -68,44 +53,35 @@ final class KeyManagementService: @unchecked Sendable {
         ) -> SecureEnclaveCustodyGenerationService)? = nil,
         secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)? = nil
     ) {
-        let bundleStore = KeyBundleStore(keychain: keychain)
-        let rewrapRecoveryStrategy = PrivateKeyRewrapRecoveryStrategy(bundleStore: bundleStore)
         let catalogStore = KeyCatalogStore(metadataStore: metadataPersistence)
         let privateKeyAccessService = PrivateKeyAccessService(
-            secureEnclave: secureEnclave,
-            bundleStore: bundleStore,
+            vault: vault,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             certificatePrimaryFingerprint: keyAdapter.certificatePrimaryFingerprintInspector()
         )
-        let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
         let provisioningCommitCoordinator = KeyProvisioningCommitCoordinator()
         self.certificateAdapter = certificateAdapter
+        self.vault = vault
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
-        self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningInvalidationGate = provisioningInvalidationGate
         self.provisioningCommitCoordinator = provisioningCommitCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.beforeAuthModeReadCheckpoint = beforeAuthModeReadCheckpoint
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
         self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
-        self.secureEnclaveCustodyOperationAuthenticator = secureEnclaveCustodyOperationAuthenticator
         self.compositeCustodyRouterContext = compositeCustodyRouterContext
         self.provisioningService = KeyProvisioningService(
             keyAdapter: keyAdapter,
-            secureEnclave: secureEnclave,
+            vault: vault,
             memoryInfo: memoryInfo,
-            bundleStore: bundleStore,
             catalogStore: catalogStore,
             invalidationGate: provisioningInvalidationGate,
             commitCoordinator: provisioningCommitCoordinator,
-            authenticationPromptCoordinator: authenticationPromptCoordinator,
             beforePermanentStorageCheckpoint: provisioningCheckpoint,
-            wrappingPromptCheckpoint: provisioningWrappingPromptCheckpoint,
             afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
-            afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,
+            afterPermanentStoreCheckpoint: afterPermanentStoreCheckpoint,
             afterIdentityStoreCheckpoint: identityStoreCheckpoint
         )
         self.secureEnclaveCustodyGenerationService = secureEnclaveCustodyGenerationServiceFactory?(
@@ -128,22 +104,13 @@ final class KeyManagementService: @unchecked Sendable {
         )
         self.mutationService = KeyMutationService(
             keyAdapter: keyAdapter,
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            bundleStore: bundleStore,
-            rewrapRecoveryStrategy: rewrapRecoveryStrategy,
+            vault: vault,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService,
-            privateKeyControlStore: effectivePrivateKeyControlStore,
-            authenticationPromptCoordinator: authenticationPromptCoordinator,
-            expiryAuthenticator: expiryAuthenticator,
             secureEnclaveCustodyDeletionContext: secureEnclaveCustodyDeletionContext
         )
     }
 
-    // MARK: - Key Enumeration
-
-    /// Load all key identities from the configured metadata persistence layer.
     func loadKeys() throws {
         metadataLoadState = .loading
         do {
@@ -157,10 +124,6 @@ final class KeyManagementService: @unchecked Sendable {
             metadataLoadState = .recoveryNeeded
             throw error
         }
-    }
-
-    func beginKeyMetadataLoad() {
-        metadataLoadState = .loading
     }
 
     func markKeyMetadataLocked() {
@@ -177,91 +140,23 @@ final class KeyManagementService: @unchecked Sendable {
         metadataLoadState = .recoveryNeeded
     }
 
-    func completeKeyMetadataLoad() throws {
-        try loadKeys()
-    }
-
     func resetInMemoryStateAfterLocalDataReset() {
         provisioningInvalidationGate.invalidate()
-        catalogStore.clearInMemoryIdentities()
-        keys = []
-        secureEnclaveCustodyRecoveryReport = .empty
-        metadataLoadState = .locked
+        markKeyMetadataLocked()
     }
 
-    // MARK: - Key Generation
-
-    /// Single generation entry point: dispatches to the portable software
-    /// path or the Secure Enclave custody path by the family's custody model
-    /// (portable families carry their generation suite; device-bound families
-    /// carry none and take the custody path).
-    func generateKey(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        family: PGPKeyFamily
-    ) async throws -> PGPKeyIdentity {
+    func generateKey(name: String, email: String?, validity: PGPKeyValidity, family: PGPKeyFamily) async throws -> PGPKeyIdentity {
         if let suite = family.softwareGenerationSuite {
-            return try await generateKey(
-                name: name,
-                email: email,
-                validity: validity,
-                suite: suite
-            )
+            return try await generateKey(name: name, email: email, validity: validity, suite: suite)
         }
-        return try await generateSecureEnclaveCustodyKey(
-            name: name,
-            email: email,
-            validity: validity,
-            family: family
-        )
+        return try await generateSecureEnclaveCustodyKey(name: name, email: email, validity: validity, family: family)
     }
 
-    /// Generate a new key pair with the specified software suite.
-    /// The private key is immediately SE-wrapped and stored in Keychain.
-    ///
-    /// Uses the unlocked private-key control domain for the SE access-control mode.
-    func generateKey(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        suite: PGPKeySuite
-    ) async throws -> PGPKeyIdentity {
+    func generateKey(name: String, email: String?, validity: PGPKeyValidity, suite: PGPKeySuite) async throws -> PGPKeyIdentity {
         let token = provisioningInvalidationGate.makeToken()
-        if let beforeAuthModeReadCheckpoint {
-            await beforeAuthModeReadCheckpoint()
-        }
         try Task.checkCancellation()
         try provisioningInvalidationGate.checkValid(token)
-        let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
-        try Task.checkCancellation()
-        try provisioningInvalidationGate.checkValid(token)
-        return try await generateKeyWithValidatedAuthMode(
-            name: name,
-            email: email,
-            validity: validity,
-            suite: suite,
-            authMode: authMode,
-            token: token
-        )
-    }
-
-    private func generateKeyWithValidatedAuthMode(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        suite: PGPKeySuite,
-        authMode: AuthenticationMode,
-        token: KeyProvisioningInvalidationGate.Token
-    ) async throws -> PGPKeyIdentity {
-        let identity = try await provisioningService.generateKey(
-            name: name,
-            email: email,
-            validity: validity,
-            suite: suite,
-            authMode: authMode,
-            invalidationToken: token
-        )
+        let identity = try await provisioningService.generateKey(name: name, email: email, validity: validity, suite: suite, invalidationToken: token)
         if let postProvisioningCheckpoint {
             await postProvisioningCheckpoint()
         }
@@ -270,28 +165,15 @@ final class KeyManagementService: @unchecked Sendable {
         return identity
     }
 
-    func generateSecureEnclaveCustodyKey(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        family: PGPKeyFamily
-    ) async throws -> PGPKeyIdentity {
+    func generateSecureEnclaveCustodyKey(name: String, email: String?, validity: PGPKeyValidity, family: PGPKeyFamily) async throws -> PGPKeyIdentity {
         guard let secureEnclaveCustodyGenerationService else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)
         }
         let token = provisioningInvalidationGate.makeToken()
         let identity: PGPKeyIdentity
         do {
-            identity = try await secureEnclaveCustodyGenerationService.generateKey(
-                name: name,
-                email: email,
-                validity: validity,
-                family: family,
-                invalidationToken: token
-            )
-        } catch let error as SecureEnclaveCustodyHandleError {
-            // Normalize handle-store failures to the sanitized category
-            // vocabulary so the per-category presentation copy survives.
+            identity = try await secureEnclaveCustodyGenerationService.generateKey(name: name, email: email, validity: validity, family: family, invalidationToken: token)
+        } catch let error as CustodyError {
             throw CypherAirError.keyOperationUnavailable(category: error.failureCategory)
         }
         if let postProvisioningCheckpoint {
@@ -302,45 +184,11 @@ final class KeyManagementService: @unchecked Sendable {
         return identity
     }
 
-    // MARK: - Key Import
-
-    /// Import a passphrase-protected secret key.
-    /// Validates Argon2id memory requirements before import.
-    ///
-    /// Uses the unlocked private-key control domain for the SE access-control mode.
-    func importKey(
-        armoredData: Data,
-        passphrase: String
-    ) async throws -> PGPKeyIdentity {
+    func importKey(armoredData: Data, passphrase: String) async throws -> PGPKeyIdentity {
         let token = provisioningInvalidationGate.makeToken()
-        if let beforeAuthModeReadCheckpoint {
-            await beforeAuthModeReadCheckpoint()
-        }
         try Task.checkCancellation()
         try provisioningInvalidationGate.checkValid(token)
-        let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
-        try Task.checkCancellation()
-        try provisioningInvalidationGate.checkValid(token)
-        return try await importKeyWithValidatedAuthMode(
-            armoredData: armoredData,
-            passphrase: passphrase,
-            authMode: authMode,
-            token: token
-        )
-    }
-
-    private func importKeyWithValidatedAuthMode(
-        armoredData: Data,
-        passphrase: String,
-        authMode: AuthenticationMode,
-        token: KeyProvisioningInvalidationGate.Token
-    ) async throws -> PGPKeyIdentity {
-        let identity = try await provisioningService.importKey(
-            armoredData: armoredData,
-            passphrase: passphrase,
-            authMode: authMode,
-            invalidationToken: token
-        )
+        let identity = try await provisioningService.importKey(armoredData: armoredData, passphrase: passphrase, invalidationToken: token)
         if let postProvisioningCheckpoint {
             await postProvisioningCheckpoint()
         }
@@ -349,23 +197,8 @@ final class KeyManagementService: @unchecked Sendable {
         return identity
     }
 
-    // MARK: - Key Export (Backup)
-
-    /// Export a secret key protected with a passphrase for backup.
-    /// Requires device authentication to access the SE-wrapped key.
-    ///
-    /// The key is not marked backed up here: only `confirmKeyBackupExported` —
-    /// called once the exported bytes have actually reached the user — records that.
-    ///
-    /// - Parameters:
-    ///   - fingerprint: Fingerprint of the key to export.
-    ///   - passphrase: User-provided passphrase for S2K protection.
-    /// - Returns: ASCII-armored passphrase-protected secret key data.
     func exportKeyBackupData(fingerprint: String, passphrase: String) async throws -> Data {
-        try await exportService.exportKey(
-            fingerprint: fingerprint,
-            passphrase: passphrase
-        )
+        try await exportService.exportKey(fingerprint: fingerprint, passphrase: passphrase)
     }
 
     func confirmKeyBackupExported(fingerprint: String) throws {
@@ -373,148 +206,39 @@ final class KeyManagementService: @unchecked Sendable {
         syncKeysAndSecureEnclaveRecoveryReport()
     }
 
-    /// Export the key's revocation signature as an ASCII-armored signature.
-    /// Fails closed with `revocationArtifactUnavailable` when no revocation artifact is
-    /// stored for the key; no secret-key access or persistence side effect occurs.
     func exportRevocationCertificate(fingerprint: String) async throws -> Data {
-        let armoredRevocation = try await exportService.exportRevocationCertificate(
-            fingerprint: fingerprint
-        )
+        let armoredRevocation = try await exportService.exportRevocationCertificate(fingerprint: fingerprint)
         syncKeysAndSecureEnclaveRecoveryReport()
         return armoredRevocation
     }
 
-    // MARK: - Selective Revocation Export (Subkey / User ID)
-
-    /// Generate and armor a subkey-scoped revocation signature for an existing key.
-    ///
-    /// Selector validation happens against the stored public certificate *before* SE unwrap —
-    /// an invalid `subkeySelection` throws `CypherAirError.invalidKeyData(...)` without
-    /// triggering device authentication. Requires device authentication only when the
-    /// selector matches the stored certificate.
-    ///
-    /// This operation is export-on-demand. It does not persist a new revocation
-    /// artifact on `PGPKeyIdentity` or in the Keychain, and it does not mutate catalog state.
-    ///
-    /// - Parameters:
-    ///   - fingerprint: Fingerprint of the key whose subkey is being revoked.
-    ///   - subkeySelection: Selector-bearing option obtained from `loadSelectionCatalog(fingerprint:)`.
-    /// - Returns: ASCII-armored subkey revocation signature bytes.
-    func exportSubkeyRevocationCertificate(
-        fingerprint: String,
-        subkeySelection: SubkeySelectionOption
-    ) async throws -> Data {
-        try await selectiveRevocationService.exportSubkeyRevocationCertificate(
-            fingerprint: fingerprint,
-            subkeySelection: subkeySelection
-        )
+    func exportSubkeyRevocationCertificate(fingerprint: String, subkeySelection: SubkeySelectionOption) async throws -> Data {
+        try await selectiveRevocationService.exportSubkeyRevocationCertificate(fingerprint: fingerprint, subkeySelection: subkeySelection)
     }
 
-    /// Generate and armor a User ID-scoped revocation signature for an existing key.
-    ///
-    /// Selector validation happens against the stored public certificate *before* SE unwrap —
-    /// an invalid `userIdSelection` throws `CypherAirError.invalidKeyData(...)` without
-    /// triggering device authentication. Requires device authentication only when the
-    /// selector matches the stored certificate.
-    ///
-    /// This operation is export-on-demand. It does not persist a new revocation
-    /// artifact on `PGPKeyIdentity` or in the Keychain, and it does not mutate catalog state.
-    ///
-    /// - Parameters:
-    ///   - fingerprint: Fingerprint of the key whose User ID is being revoked.
-    ///   - userIdSelection: Selector-bearing option obtained from `loadSelectionCatalog(fingerprint:)`.
-    /// - Returns: ASCII-armored User ID revocation signature bytes.
-    func exportUserIdRevocationCertificate(
-        fingerprint: String,
-        userIdSelection: UserIdSelectionOption
-    ) async throws -> Data {
-        try await selectiveRevocationService.exportUserIdRevocationCertificate(
-            fingerprint: fingerprint,
-            userIdSelection: userIdSelection
-        )
+    func exportUserIdRevocationCertificate(fingerprint: String, userIdSelection: UserIdSelectionOption) async throws -> Data {
+        try await selectiveRevocationService.exportUserIdRevocationCertificate(fingerprint: fingerprint, userIdSelection: userIdSelection)
     }
 
-    // MARK: - Key Expiry Modification
-
-    /// Modify the expiration time of an existing certificate.
-    ///
-    /// Software custody unwraps the SE-wrapped secret certificate using the unlocked
-    /// private-key control domain. Secure Enclave custody uses the public-only
-    /// external signer route and does not create a pending bundle or recovery journal.
-    func modifyExpiry(
-        fingerprint: String,
-        newValidity: PGPKeyValidity
-    ) async throws -> PGPKeyIdentity {
-        defer {
-            syncKeysAndSecureEnclaveRecoveryReport()
-        }
-        return try await mutationService.modifyExpiry(
-            fingerprint: fingerprint,
-            newValidity: newValidity
-        )
+    func modifyExpiry(fingerprint: String, newValidity: PGPKeyValidity) async throws -> PGPKeyIdentity {
+        defer { syncKeysAndSecureEnclaveRecoveryReport() }
+        return try await mutationService.modifyExpiry(fingerprint: fingerprint, newValidity: newValidity)
     }
 
-    /// Modify the expiration time of an existing certificate.
-    ///
-    /// SECURITY: Software custody needs the full certificate to re-sign binding
-    /// signatures, then re-wraps and promotes the updated secret certificate through
-    /// the pending-item recovery pattern. Secure Enclave custody keeps the secret key
-    /// non-exportable and mutates only the public certificate via the external signer
-    /// route, without pending software bundles or modify-expiry recovery journal entries.
-    ///
-    /// - Parameters:
-    ///   - fingerprint: Fingerprint of the key to modify.
-    ///   - newValidity: The validity to set — a finite term from now, or `.never`.
-    ///   - authMode: Current authentication mode for SE key access control.
-    /// - Returns: The updated key identity with new expiry information.
-    func modifyExpiry(
-        fingerprint: String,
-        newValidity: PGPKeyValidity,
-        authMode: AuthenticationMode
-    ) async throws -> PGPKeyIdentity {
-        defer {
-            syncKeysAndSecureEnclaveRecoveryReport()
-        }
-        return try await mutationService.modifyExpiry(
-            fingerprint: fingerprint,
-            newValidity: newValidity,
-            authMode: authMode
-        )
-    }
-
-    // MARK: - Key Deletion
-
-    /// Permanently delete a key and all of its Keychain items, including
-    /// any pending rewrap bundles and related crash-recovery state.
-    /// Keychain deletions are best-effort: `itemNotFound` is benign (idempotent delete),
-    /// but other errors are collected and reported after all items are attempted.
     func deleteKey(fingerprint: String) throws {
         defer { syncKeysAndSecureEnclaveRecoveryReport() }
         try mutationService.deleteKey(fingerprint: fingerprint)
     }
 
-    // MARK: - Default Key
-
-    /// Set a key as the default signing/encryption identity.
-    /// Persists the change to Keychain metadata so it survives cold restart.
     func setDefaultKey(fingerprint: String) throws {
         defer { syncKeysAndSecureEnclaveRecoveryReport() }
         try mutationService.setDefaultKey(fingerprint: fingerprint)
     }
 
-    /// The current default key identity.
     var defaultKey: PGPKeyIdentity? {
         keys.first(where: \.isDefault)
     }
 
-    /// The identity an Encrypt to Self copy goes to: the key the user picked in
-    /// the "Encrypt to Self With" menu, or the default key when they picked
-    /// none.
-    ///
-    /// One home for the resolution, so the pre-send format preview and the send
-    /// path address the same key. A chosen fingerprint that no longer resolves
-    /// fails loudly — silently re-targeting the self copy to the default key
-    /// would contradict the selection still shown in the UI.
     func encryptToSelfIdentity(fingerprint: String?) throws -> PGPKeyIdentity {
         if let fingerprint {
             guard let key = keys.first(where: { $0.fingerprint == fingerprint }) else {
@@ -533,21 +257,14 @@ final class KeyManagementService: @unchecked Sendable {
         return defaultKey
     }
 
-    // MARK: - Public Key Export
-
-    /// Export the public key in ASCII-armored format for sharing.
-    /// Does NOT require authentication (public key only).
     func exportPublicKey(fingerprint: String) throws -> Data {
         try exportService.exportPublicKey(fingerprint: fingerprint)
     }
 
-    /// Discover selector-bearing subkey and User ID metadata off the main actor.
-    /// This is a read-only operation that uses stored public key bytes only.
     func loadSelectionCatalog(fingerprint: String) async throws -> CertificateSelectionCatalog {
         guard let identity = catalogStore.identity(for: fingerprint) else {
             throw CypherAirError.keyMetadataUnavailable
         }
-
         return try await Self.discoverSelectionCatalogOffMainActor(
             certificateAdapter: certificateAdapter,
             certData: identity.publicKeyData,
@@ -555,41 +272,20 @@ final class KeyManagementService: @unchecked Sendable {
         )
     }
 
-    // MARK: - Crash Recovery
-
-    /// Check for an interrupted modifyExpiry operation and recover.
-    /// Call from the app's initialization path, after loadKeys().
-    ///
-    /// Recovery logic mirrors AuthenticationManager.checkAndRecoverFromInterruptedRewrap:
-    /// - Old + pending both exist: interrupted before old deletion. Delete pending. Originals intact.
-    /// - Only pending exists: interrupted after old deletion. Promote pending to permanent.
-    /// - Neither exists: catastrophic loss. Clear flag. User must restore from backup.
-    func checkAndRecoverFromInterruptedModifyExpiry() -> PrivateKeyRewrapRecoveryOutcome? {
-        mutationService.checkAndRecoverFromInterruptedModifyExpiry()
-    }
-
-    /// Triggers device authentication (Face ID / Touch ID) and returns the unwrapped
-    /// secret certificate material for the selected key.
-    /// The caller MUST zeroize the returned data after use.
     func unwrapPrivateKey(fingerprint: String) async throws -> Data {
         try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
     }
 
     func makePrivateKeyOperationRouter(
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
-        publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
-        handleStore: SecureEnclaveCustodyHandleStore
+        publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     ) -> PrivateKeyOperationRouter {
         PrivateKeyOperationRouter(
             catalogStore: catalogStore,
             resolver: resolver,
+            vault: vault,
             publicBindingInspector: publicBindingInspector,
-            handleStore: handleStore,
             compositeBindingInspector: compositeCustodyRouterContext?.bindingInspector,
-            compositeHandleStore: compositeCustodyRouterContext?.handleStore,
-            compositeHighHandleStore: compositeCustodyRouterContext?.highHandleStore,
-            compositeClassicalComponentStore: compositeCustodyRouterContext?.classicalComponentStore,
-            custodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
             authenticationPromptCoordinator: authenticationPromptCoordinator
         )
     }
@@ -598,9 +294,7 @@ final class KeyManagementService: @unchecked Sendable {
         mutationService.configureExpiryMutationService(service)
     }
 
-    func configurePrivateKeySelectiveRevocationService(
-        _ service: any PrivateKeySelectiveRevocationRouting
-    ) {
+    func configurePrivateKeySelectiveRevocationService(_ service: any PrivateKeySelectiveRevocationRouting) {
         selectiveRevocationService.configureRevocationRoutingService(service)
     }
 
@@ -610,10 +304,7 @@ final class KeyManagementService: @unchecked Sendable {
         certData: Data,
         expectedFingerprint: String
     ) async throws -> CertificateSelectionCatalog {
-        try certificateAdapter.validatedCatalog(
-            certData: certData,
-            expectedFingerprint: expectedFingerprint
-        )
+        try certificateAdapter.validatedCatalog(certData: certData, expectedFingerprint: expectedFingerprint)
     }
 
     private func syncKeysAndSecureEnclaveRecoveryReport() {
@@ -622,14 +313,12 @@ final class KeyManagementService: @unchecked Sendable {
             secureEnclaveCustodyRecoveryReport = .empty
             return
         }
-        secureEnclaveCustodyRecoveryReport = secureEnclaveCustodyRecoveryService.classify(
-            identities: keys
-        )
+        secureEnclaveCustodyRecoveryReport = secureEnclaveCustodyRecoveryService.classify(identities: keys)
     }
 }
 
-extension KeyManagementService: ProtectedDataRelockParticipant {
-    func relockProtectedData() async throws {
+extension KeyManagementService: VaultRelockParticipant {
+    func relockVault() async throws {
         provisioningInvalidationGate.invalidate()
         if let relockInvalidationCheckpoint {
             await relockInvalidationCheckpoint()

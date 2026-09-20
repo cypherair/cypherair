@@ -26,7 +26,7 @@ final class TagDetailScreenModel {
     }
 
     var canManageTag: Bool {
-        contactsAvailability == .availableProtectedDomain
+        contactsAvailability.isAvailable
     }
 
     var tag: ContactTagSummary? {

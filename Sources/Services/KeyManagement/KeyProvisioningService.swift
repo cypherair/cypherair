@@ -1,111 +1,64 @@
 import Foundation
-import Security
+import Sealing
+import Vault
 
-/// Owns key generation and import workflows behind the key-management facade.
+/// Generates and imports portable keys: the engine produces the secret
+/// certificate, the vault seals it against the identity wrapping key, and the
+/// key list records it. Sealing is software, so provisioning never prompts.
 final class KeyProvisioningService {
     typealias ProvisioningCheckpoint = @Sendable () async -> Void
 
     private let keyAdapter: PGPKeyOperationAdapter
-    private let secureEnclave: any SecureEnclaveManageable
+    private let vault: AppVault
     private let memoryInfo: any MemoryInfoProvidable
-    private let bundleStore: KeyBundleStore
     private let catalogStore: KeyCatalogStore
     private let invalidationGate: KeyProvisioningInvalidationGate
-    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
-    private let wrappingPromptCheckpoint: ProvisioningCheckpoint?
-    private let afterImportOffMainActorCheckpoint: ProvisioningCheckpoint?
-    private let afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint?
-    private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
     private let commitCoordinator: KeyProvisioningCommitCoordinator
+    private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
+    private let afterImportOffMainActorCheckpoint: ProvisioningCheckpoint?
+    private let afterPermanentStoreCheckpoint: ProvisioningCheckpoint?
+    private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
 
     init(
         keyAdapter: PGPKeyOperationAdapter,
-        secureEnclave: any SecureEnclaveManageable,
+        vault: AppVault,
         memoryInfo: any MemoryInfoProvidable,
-        bundleStore: KeyBundleStore,
         catalogStore: KeyCatalogStore,
         invalidationGate: KeyProvisioningInvalidationGate,
         commitCoordinator: KeyProvisioningCommitCoordinator,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil,
-        wrappingPromptCheckpoint: ProvisioningCheckpoint? = nil,
         afterImportOffMainActorCheckpoint: ProvisioningCheckpoint? = nil,
-        afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint? = nil,
+        afterPermanentStoreCheckpoint: ProvisioningCheckpoint? = nil,
         afterIdentityStoreCheckpoint: ProvisioningCheckpoint? = nil
     ) {
         self.keyAdapter = keyAdapter
-        self.secureEnclave = secureEnclave
+        self.vault = vault
         self.memoryInfo = memoryInfo
-        self.bundleStore = bundleStore
         self.catalogStore = catalogStore
         self.invalidationGate = invalidationGate
-        self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
-        self.wrappingPromptCheckpoint = wrappingPromptCheckpoint
-        self.afterImportOffMainActorCheckpoint = afterImportOffMainActorCheckpoint
-        self.afterPermanentBundleStoreCheckpoint = afterPermanentBundleStoreCheckpoint
-        self.afterIdentityStoreCheckpoint = afterIdentityStoreCheckpoint
         self.commitCoordinator = commitCoordinator
+        self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
+        self.afterImportOffMainActorCheckpoint = afterImportOffMainActorCheckpoint
+        self.afterPermanentStoreCheckpoint = afterPermanentStoreCheckpoint
+        self.afterIdentityStoreCheckpoint = afterIdentityStoreCheckpoint
     }
 
-    /// Only the Secure Enclave wrapping window is enrolled in an
-    /// operation-prompt session. Long Rust generation and durable storage stay
-    /// outside that window so a genuine macOS away still locks immediately when
-    /// grace period is 0.
     func generateKey(
         name: String,
         email: String?,
         validity: PGPKeyValidity,
         suite: PGPKeySuite,
-        authMode: AuthenticationMode,
-        invalidationToken token: KeyProvisioningInvalidationGate.Token
-    ) async throws -> PGPKeyIdentity {
-        try await performGenerateKey(
-            name: name,
-            email: email,
-            validity: validity,
-            suite: suite,
-            authMode: authMode,
-            invalidationToken: token
-        )
-    }
-
-    private func performGenerateKey(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        suite: PGPKeySuite,
-        authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
-
-        var generated = try await keyAdapter.generateKey(
-            name: name,
-            email: email,
-            validity: validity,
-            suite: suite
-        )
-        // Take the raw certificate out of the engine's result the moment it
-        // arrives: wrapping is the only thing that reads it, and moving it here
-        // means no exit from this function — cancellation included — can free it.
-        let secretCertificate = SensitiveBuffer(consuming: &generated.certData)
-
+        var generated = try await keyAdapter.generateKey(name: name, email: email, validity: validity, suite: suite)
+        // The raw certificate leaves the engine's result the moment it arrives, so
+        // no exit from this function, cancellation included, can free it intact.
+        let secretCertificate = SensitiveKeyBox(SensitiveBuffer(consuming: &generated.certData))
         try await prepareForPermanentStorage(token: token)
-        let accessControl = try authMode.createAccessControl()
-        let bundle = try await wrapForProvisioning(
-            privateKey: secretCertificate,
-            fingerprint: generated.metadata.fingerprint,
-            accessControl: accessControl
-        )
-        try Task.checkCancellation()
-        try invalidationGate.checkValid(token)
-
-        let fingerprint = generated.metadata.fingerprint
         let identity = PGPKeyIdentity(
-            fingerprint: fingerprint,
+            fingerprint: generated.metadata.fingerprint,
             userId: generated.metadata.userId,
             hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -120,83 +73,37 @@ final class KeyProvisioningService {
             keyFamily: suite.portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
-
-        try await commitIdentity(identity, bundle: bundle, token: token)
-
+        try await commitIdentity(identity, secret: secretCertificate, token: token)
         return identity
     }
 
-    /// See `generateKey` — import parsing stays outside the prompt session; the
-    /// Secure Enclave wrap is the only enrolled window.
     func importKey(
         armoredData: Data,
         passphrase: String,
-        authMode: AuthenticationMode,
-        invalidationToken token: KeyProvisioningInvalidationGate.Token
-    ) async throws -> PGPKeyIdentity {
-        try await performImportKey(
-            armoredData: armoredData,
-            passphrase: passphrase,
-            authMode: authMode,
-            invalidationToken: token
-        )
-    }
-
-    private func performImportKey(
-        armoredData: Data,
-        passphrase: String,
-        authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
-
         let protectionInfo = try keyAdapter.importProtectionInfo(armoredData: armoredData)
-
-        let memoryGuard = Argon2idMemoryGuard(memoryInfo: memoryInfo)
-        try memoryGuard.validate(protectionInfo: protectionInfo)
+        try Argon2idMemoryGuard(memoryInfo: memoryInfo).validate(protectionInfo: protectionInfo)
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
-
-        var imported = try await keyAdapter.importSecretKey(
-            armoredData: armoredData,
-            passphrase: passphrase
-        )
-        // As in generation: the imported secret certificate is wrapping's alone,
-        // so it moves into a buffer that erases it on every exit path.
-        let secretCertificate = SensitiveBuffer(consuming: &imported.secretKeyData)
+        var imported = try await keyAdapter.importSecretKey(armoredData: armoredData, passphrase: passphrase)
+        let secretCertificate = SensitiveKeyBox(SensitiveBuffer(consuming: &imported.secretKeyData))
         if let afterImportOffMainActorCheckpoint {
             await afterImportOffMainActorCheckpoint()
         }
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
-
         if catalogStore.containsKey(fingerprint: imported.metadata.fingerprint) {
             throw CypherAirError.duplicateKey
         }
-
         try await prepareForPermanentStorage(token: token)
-        let accessControl = try authMode.createAccessControl()
-        let bundle = try await wrapForProvisioning(
-            privateKey: secretCertificate,
-            fingerprint: imported.metadata.fingerprint,
-            accessControl: accessControl
-        )
-        try Task.checkCancellation()
-        try invalidationGate.checkValid(token)
-
-        let fingerprint = imported.metadata.fingerprint
-        // Imports are always portable software certificates, so the engine's
-        // detected suite must be present; its absence means the certificate
-        // has no software suite classification and cannot become an owned
-        // software key.
         guard let detectedSuite = imported.metadata.suite else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Imported certificate has no software suite classification."
-            )
+            throw CypherAirError.invalidKeyData(reason: "Imported certificate has no software suite classification.")
         }
         let identity = PGPKeyIdentity(
-            fingerprint: fingerprint,
+            fingerprint: imported.metadata.fingerprint,
             userId: imported.metadata.userId,
             hasEncryptionSubkey: imported.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -211,37 +118,11 @@ final class KeyProvisioningService {
             keyFamily: detectedSuite.portableFamily,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
-
-        try await commitIdentity(identity, bundle: bundle, token: token)
-
+        try await commitIdentity(identity, secret: secretCertificate, token: token)
         return identity
     }
 
-    private func wrapForProvisioning(
-        privateKey: borrowing SensitiveBuffer,
-        fingerprint: String,
-        accessControl: SecAccessControl
-    ) async throws -> WrappedKeyBundle {
-        try await authenticationPromptCoordinator.withOperationPrompt {
-            if let wrappingPromptCheckpoint {
-                await wrappingPromptCheckpoint()
-            }
-            let seHandle = try secureEnclave.generateWrappingKey(
-                accessControl: accessControl,
-                authenticationContext: nil
-            )
-            return try secureEnclave.wrap(
-                privateKey: privateKey,
-                using: seHandle,
-                fingerprint: fingerprint,
-                payloadKind: .softwareSecretCertificate
-            )
-        }
-    }
-
-    private func prepareForPermanentStorage(
-        token: KeyProvisioningInvalidationGate.Token
-    ) async throws {
+    private func prepareForPermanentStorage(token: KeyProvisioningInvalidationGate.Token) async throws {
         if let beforePermanentStorageCheckpoint {
             await beforePermanentStorageCheckpoint()
         }
@@ -249,20 +130,27 @@ final class KeyProvisioningService {
         try invalidationGate.checkValid(token)
     }
 
+    /// Seals the secret, then records the identity; either failure undoes the
+    /// other so no half-provisioned key survives.
     private func commitIdentity(
         _ identity: PGPKeyIdentity,
-        bundle: WrappedKeyBundle,
+        secret: SensitiveKeyBox,
         token: KeyProvisioningInvalidationGate.Token
     ) async throws {
         try await commitCoordinator.performCommit {
-            var bundleReceipt: KeyBundleWriteReceipt?
+            var didSeal = false
             var didStoreIdentity = false
             do {
                 try Task.checkCancellation()
                 try invalidationGate.checkValid(token)
-                bundleReceipt = try bundleStore.saveNewBundle(bundle, fingerprint: identity.fingerprint)
-                if let afterPermanentBundleStoreCheckpoint {
-                    await afterPermanentBundleStoreCheckpoint()
+                do {
+                    try vault.portableKeys.seal(secret.buffer, fingerprint: identity.fingerprint, session: try vault.requireSession())
+                } catch {
+                    throw CypherAirError.fromStore(error)
+                }
+                didSeal = true
+                if let afterPermanentStoreCheckpoint {
+                    await afterPermanentStoreCheckpoint()
                 }
                 try Task.checkCancellation()
                 try invalidationGate.checkValid(token)
@@ -277,12 +165,11 @@ final class KeyProvisioningService {
                 if didStoreIdentity {
                     try catalogStore.discardCommittedIdentity(fingerprint: identity.fingerprint)
                 }
-                if let bundleReceipt {
-                    bundleStore.rollback(bundleReceipt)
+                if didSeal {
+                    try? vault.portableKeys.delete(fingerprint: identity.fingerprint)
                 }
                 throw error
             }
         }
     }
-
 }

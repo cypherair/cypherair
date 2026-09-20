@@ -1,21 +1,15 @@
 import Foundation
+import Sealing
+import Stores
+import Vault
 
-/// Centralized dependency container for the application.
+/// The production object graph: one vault, the services over it, and the
+/// lock controller that opens and closes them.
 final class AppContainer: @unchecked Sendable {
+    let vault: AppVault
     let appLockController: AppLockController
     let authPromptCoordinator: AuthenticationPromptCoordinator
-    let keychain: any KeychainManageable
-    let authManager: AuthenticationManager
-    let config: AppConfiguration
-    let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
-    let protectedDataStorageRoot: ProtectedDataStorageRoot
-    let protectedDomainKeyManager: ProtectedDomainKeyManager
-    let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
-    let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
-    let privateKeyControlStore: PrivateKeyControlStore
-    let keyMetadataDomainStore: KeyMetadataDomainStore?
-    let contactsDomainStore: ContactsDomainStore?
-    let protectedSettingsStore: ProtectedSettingsStore
+    let appSettings: AppSettingsCoordinator
     let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
     let keyManagement: KeyManagementService
@@ -28,79 +22,10 @@ final class AppContainer: @unchecked Sendable {
     let selfTestService: SelfTestService
     let temporaryArtifactStore: AppTemporaryArtifactStore
     let localDataResetService: LocalDataResetService
-    let defaultsSuiteName: String?
-    private var uiTestContactsBootstrap: UITestContactsBootstrap?
+    let localDataResetRestartCoordinator: LocalDataResetRestartCoordinator
+    private let loadServicesAfterUnlock: @MainActor () async -> Void
 
-    init(
-        appLockController: AppLockController,
-        authPromptCoordinator: AuthenticationPromptCoordinator,
-        keychain: any KeychainManageable,
-        authManager: AuthenticationManager,
-        config: AppConfiguration,
-        protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator,
-        protectedDataStorageRoot: ProtectedDataStorageRoot,
-        protectedDomainKeyManager: ProtectedDomainKeyManager,
-        protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        privateKeyControlStore: PrivateKeyControlStore,
-        keyMetadataDomainStore: KeyMetadataDomainStore? = nil,
-        contactsDomainStore: ContactsDomainStore? = nil,
-        protectedSettingsStore: ProtectedSettingsStore,
-        appSessionOrchestrator: AppSessionOrchestrator,
-        engine: PgpEngine,
-        keyManagement: KeyManagementService,
-        contactService: ContactService,
-        encryptionService: EncryptionService,
-        decryptionService: DecryptionService,
-        signingService: SigningService,
-        certificateSignatureService: CertificateSignatureService,
-        qrService: QRService,
-        selfTestService: SelfTestService,
-        temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
-        localDataResetService: LocalDataResetService,
-        defaultsSuiteName: String? = nil
-    ) {
-        self.appLockController = appLockController
-        self.authPromptCoordinator = authPromptCoordinator
-        self.keychain = keychain
-        self.authManager = authManager
-        self.config = config
-        self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
-        self.protectedDataStorageRoot = protectedDataStorageRoot
-        self.protectedDomainKeyManager = protectedDomainKeyManager
-        self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
-        self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
-        self.privateKeyControlStore = privateKeyControlStore
-        self.keyMetadataDomainStore = keyMetadataDomainStore
-        self.contactsDomainStore = contactsDomainStore
-        self.protectedSettingsStore = protectedSettingsStore
-        self.appSessionOrchestrator = appSessionOrchestrator
-        self.engine = engine
-        self.keyManagement = keyManagement
-        self.contactService = contactService
-        self.encryptionService = encryptionService
-        self.decryptionService = decryptionService
-        self.signingService = signingService
-        self.certificateSignatureService = certificateSignatureService
-        self.qrService = qrService
-        self.selfTestService = selfTestService
-        self.temporaryArtifactStore = temporaryArtifactStore
-        self.localDataResetService = localDataResetService
-        self.defaultsSuiteName = defaultsSuiteName
-        uiTestContactsBootstrap = nil
-    }
-
-    private struct UITestContactsBootstrap {
-        let wrappingRootKey: Data
-        let preloadContact: Bool
-        var didPreloadContact: Bool = false
-        var isPreparing: Bool = false
-        var cachedAvailability: ContactsAvailability?
-        var waiters: [CheckedContinuation<ContactsAvailability, Never>] = []
-    }
-
-    private struct PgpServiceGraph {
-        let temporaryArtifactStore: AppTemporaryArtifactStore
+    struct PgpServiceGraph {
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
         let signingService: SigningService
@@ -109,14 +34,243 @@ final class AppContainer: @unchecked Sendable {
         let selfTestService: SelfTestService
     }
 
+    private init(
+        vault: AppVault,
+        appLockController: AppLockController,
+        authPromptCoordinator: AuthenticationPromptCoordinator,
+        appSettings: AppSettingsCoordinator,
+        appSessionOrchestrator: AppSessionOrchestrator,
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        contactService: ContactService,
+        pgpServices: PgpServiceGraph,
+        temporaryArtifactStore: AppTemporaryArtifactStore,
+        localDataResetService: LocalDataResetService,
+        localDataResetRestartCoordinator: LocalDataResetRestartCoordinator,
+        loadServicesAfterUnlock: @escaping @MainActor () async -> Void
+    ) {
+        self.vault = vault
+        self.appLockController = appLockController
+        self.authPromptCoordinator = authPromptCoordinator
+        self.appSettings = appSettings
+        self.appSessionOrchestrator = appSessionOrchestrator
+        self.engine = engine
+        self.keyManagement = keyManagement
+        self.contactService = contactService
+        encryptionService = pgpServices.encryptionService
+        decryptionService = pgpServices.decryptionService
+        signingService = pgpServices.signingService
+        certificateSignatureService = pgpServices.certificateSignatureService
+        qrService = pgpServices.qrService
+        selfTestService = pgpServices.selfTestService
+        self.temporaryArtifactStore = temporaryArtifactStore
+        self.localDataResetService = localDataResetService
+        self.localDataResetRestartCoordinator = localDataResetRestartCoordinator
+        self.loadServicesAfterUnlock = loadServicesAfterUnlock
+    }
+
+    var lockSurfaceServices: AppLockSurfaceServices {
+        AppLockSurfaceServices(
+            keyManagement: keyManagement,
+            appSessionOrchestrator: appSessionOrchestrator,
+            localDataReset: localDataResetService,
+            restartCoordinator: localDataResetRestartCoordinator
+        )
+    }
+
+    @MainActor
+    static func makeDefault() -> AppContainer {
+        let engine = PgpEngine()
+        let vault: AppVault
+        do {
+            vault = try AppVault.production(engine: engine)
+        } catch {
+            fatalError("The protected data directory is unavailable: \(error)")
+        }
+        return compose(vault: vault, engine: engine, custodyGeneration: vault.vault.enclave.isAvailable)
+    }
+
+    #if DEBUG
+    /// The sandbox vault in a fresh temporary directory; `startUITestSession`
+    /// opens it.
+    @MainActor
+    static func makeUITest() -> AppContainer {
+        let engine = PgpEngine()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirUITestVault-\(UUID().uuidString)", isDirectory: true)
+        let vault: AppVault
+        do {
+            vault = try AppVault.sandbox(directory: directory)
+        } catch {
+            fatalError("The UI-test vault directory is unavailable: \(error)")
+        }
+        return compose(vault: vault, engine: engine, custodyGeneration: true)
+    }
+
+    /// Creates the sandbox vault under `passphrase`, then either opens the
+    /// session as if unlocked or leaves the lock surface waiting for it.
+    @MainActor
+    func startUITestSession(passphrase: String, startsUnlocked: Bool, preloadContact: Bool) {
+        Task { @MainActor in
+            do {
+                try await vault.bootstrap(passphrase: SensitiveBuffer.utf8(passphrase), reason: "")
+            } catch {
+                return
+            }
+            guard startsUnlocked else {
+                vault.relock()
+                appLockController.noteVaultReady()
+                return
+            }
+            await loadServicesAfterUnlock()
+            appSessionOrchestrator.recordAuthentication()
+            appLockController.noteSessionOpened()
+            if preloadContact {
+                try? Self.preloadUITestContact(engine: engine, contactService: contactService)
+            }
+        }
+    }
+
+    private static func preloadUITestContact(
+        engine: PgpEngine,
+        contactService: ContactService
+    ) throws {
+        let generated = try engine.generateKey(
+            name: "UITest Contact",
+            email: "uitest-contact@example.invalid",
+            validity: .never,
+            suite: .ed25519LegacyCurve25519Legacy
+        )
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
+    }
+    #endif
+
+    func sweepTemporaryArtifactsAtLaunch() {
+        let temporaryArtifactStore = temporaryArtifactStore
+        Task.detached(priority: .utility) {
+            _ = temporaryArtifactStore.sweepAbandonedArtifacts()
+        }
+    }
+
+    @MainActor
+    private static func compose(vault: AppVault, engine: PgpEngine, custodyGeneration: Bool) -> AppContainer {
+        let authPromptCoordinator = AuthenticationPromptCoordinator()
+        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
+        let publicBindingInspector = PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)
+        let compositeBindingInspector = PGPSecureEnclaveCompositeBindingInspector(engine: engine)
+        let temporaryArtifactStore = AppTemporaryArtifactStore()
+
+        let appSettings = AppSettingsCoordinator(persistence: VaultSettingsPersistence(vault: vault))
+        let appSessionOrchestrator = AppSessionOrchestrator()
+
+        let keyManagement = KeyManagementService(
+            keyAdapter: keyAdapter,
+            certificateAdapter: certificateAdapter,
+            vault: vault,
+            authenticationPromptCoordinator: authPromptCoordinator,
+            compositeCustodyRouterContext: CompositeCustodyRouterContext(bindingInspector: compositeBindingInspector),
+            secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
+                publicBindingInspector: publicBindingInspector,
+                compositeBindingInspector: compositeBindingInspector
+            ),
+            metadataPersistence: VaultKeyMetadataStore(vault: vault),
+            secureEnclaveCustodyGenerationServiceFactory: custodyGeneration
+                ? { catalogStore, invalidationGate, commitCoordinator in
+                    SecureEnclaveCustodyGenerationService(
+                        certificateBuilder: PGPSecureEnclaveCustodyGenerationAdapter(engine: engine),
+                        vault: vault,
+                        digestSigner: CustodyOperations(),
+                        compositeCertificateBuilder: PGPSecureEnclaveCompositeGenerationAdapter(engine: engine),
+                        compositeSigner: CustodyOperations(),
+                        catalogStore: catalogStore,
+                        resolver: PGPKeyCapabilityResolver(),
+                        invalidationGate: invalidationGate,
+                        commitCoordinator: commitCoordinator,
+                        authenticationPromptCoordinator: authPromptCoordinator
+                    )
+                }
+                : nil,
+            secureEnclaveCustodyRecoveryService: SecureEnclaveCustodyGenerationRecoveryService(
+                publicBindingInspector: publicBindingInspector,
+                vault: vault,
+                compositeBindingInspector: compositeBindingInspector
+            )
+        )
+        let contactService = ContactService(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
+            vault: vault
+        )
+        let pgpServices = makePgpServiceGraph(
+            engine: engine,
+            keyAdapter: keyAdapter,
+            certificateAdapter: certificateAdapter,
+            contactImportAdapter: contactImportAdapter,
+            selfTestAdapter: selfTestAdapter,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
+        )
+
+        let loadServicesAfterUnlock: @MainActor () async -> Void = {
+            try? keyManagement.loadKeys()
+            await contactService.openContacts(ownSignerKeys: keyManagement.keys)
+            appSettings.load()
+        }
+        let appLockController = AppLockController(
+            vault: vault,
+            gracePeriodProvider: { appSettings.gracePeriodForSession },
+            lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
+            recordSuccessfulAuthentication: { appSessionOrchestrator.recordAuthentication() },
+            loadServices: loadServicesAfterUnlock,
+            relockServices: {
+                try await keyManagement.relockVault()
+                try await contactService.relockVault()
+                appSettings.relock()
+            },
+            contentClearHandler: {
+                appSettings.relock()
+                appSessionOrchestrator.requestContentClear()
+            },
+            operationPromptInProgressProvider: {
+                authPromptCoordinator.isOperationPromptInProgress
+            }
+        )
+        #if os(macOS)
+        wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
+        #endif
+
+        let localDataResetService = LocalDataResetService(
+            vault: vault,
+            appSettings: appSettings,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            selfTestService: pgpServices.selfTestService,
+            appSessionOrchestrator: appSessionOrchestrator,
+            appLockController: appLockController,
+            temporaryArtifactStore: temporaryArtifactStore
+        )
+        return AppContainer(
+            vault: vault,
+            appLockController: appLockController,
+            authPromptCoordinator: authPromptCoordinator,
+            appSettings: appSettings,
+            appSessionOrchestrator: appSessionOrchestrator,
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            pgpServices: pgpServices,
+            temporaryArtifactStore: temporaryArtifactStore,
+            localDataResetService: localDataResetService,
+            localDataResetRestartCoordinator: LocalDataResetRestartCoordinator(),
+            loadServicesAfterUnlock: loadServicesAfterUnlock
+        )
+    }
+
     #if os(macOS)
-    /// Wire the operation-prompt lifecycle hooks to the lock controller's
-    /// main-actor mirror (the `.authenticating` rule). The controller also gets
-    /// the coordinator's live depth as an injected closure: live depth catches a
-    /// resign that beats the began-hop, while a false live depth prevents a stale
-    /// ended-hop mirror from swallowing a real away after the prompt has ended.
-    /// The coordinator's hooks are write-once; every `AppLockController`
-    /// construction site must call this on macOS.
     @MainActor
     private static func wireOperationPromptLifecycle(
         from coordinator: AuthenticationPromptCoordinator,
@@ -135,146 +289,9 @@ final class AppContainer: @unchecked Sendable {
     }
     #endif
 
-    /// The production modify-expiry pre-authenticator: one system access-control
-    /// authentication whose context is threaded into the short SE unwrap/rewrap
-    /// windows. Bypass containers (UI test, tutorial) stay nil.
-    static var productionExpiryAuthenticator: KeyMutationService.ExpiryAuthenticator? {
-        KeyMutationService.systemAccessControlExpiryAuthenticator
-    }
-
-    /// The custody pre-authenticator: one biometric system-sheet evaluation per
-    /// Secure Enclave custody private operation, threaded into the handle-loading
-    /// keychain query via kSecUseAuthenticationContext.
-    /// Bypass containers (UI test, tutorial) stay nil.
-    private static var productionSecureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? {
-        PrivateKeyOperationRouter.systemBiometricCustodyOperationAuthenticator
-    }
-
-    /// Builds the App Access Protection policy-switch workflow over the
-    /// container's live dependencies. The workflow enrolls only its authentication
-    /// and immediate root-secret re-protection window in an operation-prompt
-    /// session.
-    @MainActor
-    func makeAppAccessPolicySwitchWorkflow() -> AppAccessPolicySwitchWorkflow {
-        let config = config
-        let protectedDataSessionCoordinator = protectedDataSessionCoordinator
-        let authManager = authManager
-        let appSessionOrchestrator = appSessionOrchestrator
-        return AppAccessPolicySwitchWorkflow(
-            currentPolicy: {
-                config.appSessionAuthenticationPolicy
-            },
-            hasPersistedRootSecret: {
-                protectedDataSessionCoordinator.hasPersistedRootSecret()
-            },
-            canEvaluate: { policy in
-                authManager.canEvaluate(appSessionPolicy: policy)
-            },
-            evaluateAppSession: { policy, reason in
-                try await authManager.evaluateAppSession(
-                    policy: policy,
-                    reason: reason
-                )
-            },
-            beginPolicySwitchJournal: { target in
-                config.beginAppSessionAuthenticationPolicySwitch(to: target)
-            },
-            reprotectPersistedRootSecret: { from, to, context in
-                try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
-                    from: from,
-                    to: to,
-                    authenticationContext: context
-                )
-            },
-            commitPolicySwitch: { target in
-                config.completeAppSessionAuthenticationPolicySwitch(to: target)
-            },
-            discardHandoffContextForPolicyChange: {
-                appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
-            },
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-    }
-
-    private static func makeProtectedDataSessionCoordinator(
-        rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
-        domainKeyManager: ProtectedDomainKeyManager,
-        config: AppConfiguration,
-        authPromptCoordinator: AuthenticationPromptCoordinator
-    ) -> ProtectedDataSessionCoordinator {
-        ProtectedDataSessionCoordinator(
-            rootSecretStore: rootSecretStore,
-            domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-    }
-
-    private static func makeFirstDomainSharedRightCleaner(
-        storageRoot: ProtectedDataStorageRoot,
-        domainKeyManager: ProtectedDomainKeyManager,
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
-    ) -> ProtectedDataFirstDomainSharedRightCleaner {
-        ProtectedDataFirstDomainSharedRightCleaner(
-            storageRoot: storageRoot,
-            hasPersistedSharedRight: { identifier in
-                protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
-            },
-            hasExternalProtectedDataArtifacts: {
-                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
-            },
-            removePersistedSharedRight: { identifier in
-                try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
-            }
-        )
-    }
-
-    private static func makePrivateKeyControlPostUnlockOpener(
-        privateKeyControlStore: PrivateKeyControlStore
-    ) -> ProtectedDataPostUnlockDomainOpener {
-        ProtectedDataPostUnlockDomainOpener(
-            domainID: PrivateKeyControlStore.domainID,
-            ensureCommittedIfNeeded: { wrappingRootKey in
-                try await privateKeyControlStore.ensureCommittedIfNeeded(
-                    wrappingRootKey: wrappingRootKey
-                )
-            },
-            open: { wrappingRootKey in
-                _ = try await privateKeyControlStore.openDomainIfNeeded(
-                    wrappingRootKey: wrappingRootKey
-                )
-            }
-        )
-    }
-
-    private static func makeProtectedSettingsPostUnlockOpener(
-        protectedSettingsStore: ProtectedSettingsStore,
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner
-    ) -> ProtectedDataPostUnlockDomainOpener {
-        ProtectedDataPostUnlockDomainOpener(
-            domainID: ProtectedSettingsStore.domainID,
-            ensureCommittedIfNeeded: { wrappingRootKey in
-                try await protectedSettingsStore.ensureCommittedIfNeeded(
-                    persistSharedRight: { secret in
-                        try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                    },
-                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
-                    currentWrappingRootKey: {
-                        wrappingRootKey
-                    }
-                )
-            },
-            open: { wrappingRootKey in
-                _ = try await protectedSettingsStore.openDomainIfNeeded(
-                    wrappingRootKey: wrappingRootKey
-                )
-            }
-        )
-    }
-
-    private static func makePgpServiceGraph(
+    /// The message, key, and self-test services over one key-management
+    /// service. Every private operation routes through the vault's custody.
+    static func makePgpServiceGraph(
         engine: PgpEngine,
         keyAdapter: PGPKeyOperationAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,
@@ -282,115 +299,101 @@ final class AppContainer: @unchecked Sendable {
         selfTestAdapter: PGPSelfTestOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeOperations: any SecureEnclaveCompositeSigning & SecureEnclaveCompositeDecapsulating
+        temporaryArtifactStore: AppTemporaryArtifactStore
     ) -> PgpServiceGraph {
-        let temporaryArtifactStore = AppTemporaryArtifactStore()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let custody = CustodyOperations()
+        let router = {
+            keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)
+            )
+        }
         keyManagement.configurePrivateKeyExpiryMutationService(
-            makePrivateKeyExpiryMutationService(
-                engine: engine,
+            PrivateKeyExpiryMutationService(
+                router: router(),
                 keyAdapter: keyAdapter,
-                keyManagement: keyManagement,
-                secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-                secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-                secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
+                digestSigner: custody,
+                compositeSigner: custody
             )
         )
         keyManagement.configurePrivateKeySelectiveRevocationService(
-            makePrivateKeySelectiveRevocationService(
-                engine: engine,
+            PrivateKeySelectiveRevocationService(
+                router: router(),
                 certificateAdapter: certificateAdapter,
-                keyManagement: keyManagement,
-                secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-                secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-                secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
+                digestSigner: custody,
+                compositeSigner: custody
             )
         )
-        let textEncryptor = makePrivateKeyTextEncryptionService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
-        )
-        let fileEncryptor = makePrivateKeyStreamingFileEncryptionService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
-        )
-        let cleartextSigner = makePrivateKeyCleartextSigningService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
-        )
-        let detachedFileSigner = makePrivateKeyDetachedFileSigningService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
-        )
-        let contactCertificationSigner = makePrivateKeyContactCertificationService(
-            engine: engine,
-            certificateAdapter: certificateAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
-            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
-        )
-        let messageDecryptor = makePrivateKeyMessageDecryptionService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveCompositeDecapsulator: secureEnclaveCompositeOperations
-        )
-        let fileDecryptor = makePrivateKeyStreamingFileDecryptionService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveCompositeDecapsulator: secureEnclaveCompositeOperations
-        )
         return PgpServiceGraph(
-            temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
                 keyManagement: keyManagement,
                 contactService: contactService,
-                textEncryptor: textEncryptor,
-                fileEncryptor: fileEncryptor,
+                textEncryptor: PrivateKeyTextEncryptionService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    messageAdapter: messageAdapter,
+                    digestSigner: custody,
+                    compositeSigner: custody
+                ),
+                fileEncryptor: PrivateKeyStreamingFileEncryptionService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    messageAdapter: messageAdapter,
+                    digestSigner: custody,
+                    compositeSigner: custody
+                ),
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             decryptionService: DecryptionService(
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
-                messageDecryptor: messageDecryptor,
-                fileDecryptor: fileDecryptor,
+                messageDecryptor: PrivateKeyMessageDecryptionService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    messageAdapter: messageAdapter,
+                    keyAgreement: custody,
+                    compositeDecapsulator: custody
+                ),
+                fileDecryptor: PrivateKeyStreamingFileDecryptionService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    messageAdapter: messageAdapter,
+                    keyAgreement: custody,
+                    compositeDecapsulator: custody
+                ),
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             signingService: SigningService(
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
-                cleartextSigner: cleartextSigner,
-                detachedFileSigner: detachedFileSigner
+                cleartextSigner: PrivateKeyCleartextSigningService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    messageAdapter: messageAdapter,
+                    digestSigner: custody,
+                    compositeSigner: custody
+                ),
+                detachedFileSigner: PrivateKeyDetachedFileSigningService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    messageAdapter: messageAdapter,
+                    digestSigner: custody,
+                    compositeSigner: custody
+                )
             ),
             certificateSignatureService: CertificateSignatureService(
                 certificateAdapter: certificateAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
-                certificationSigner: contactCertificationSigner
+                certificationSigner: PrivateKeyContactCertificationService(
+                    router: router(),
+                    softwarePrivateKeyAccess: keyManagement,
+                    certificateAdapter: certificateAdapter,
+                    digestSigner: custody,
+                    compositeSigner: custody
+                )
             ),
             qrService: QRService(contactImportAdapter: contactImportAdapter),
             selfTestService: SelfTestService(
@@ -398,1072 +401,5 @@ final class AppContainer: @unchecked Sendable {
                 messageAdapter: messageAdapter
             )
         )
-    }
-
-    private static func makePrivateKeyTextEncryptionService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeyTextEncryptionService {
-        PrivateKeyTextEncryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    private static func makePrivateKeyStreamingFileEncryptionService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeyStreamingFileEncryptionService {
-        PrivateKeyStreamingFileEncryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    private static func makePrivateKeyCleartextSigningService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeyCleartextSigningService {
-        PrivateKeyCleartextSigningService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    private static func makePrivateKeyMessageDecryptionService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveCompositeDecapsulator: any SecureEnclaveCompositeDecapsulating
-    ) -> PrivateKeyMessageDecryptionService {
-        PrivateKeyMessageDecryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
-            compositeDecapsulator: secureEnclaveCompositeDecapsulator
-        )
-    }
-
-    private static func makePrivateKeyStreamingFileDecryptionService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveCompositeDecapsulator: any SecureEnclaveCompositeDecapsulating
-    ) -> PrivateKeyStreamingFileDecryptionService {
-        PrivateKeyStreamingFileDecryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
-            compositeDecapsulator: secureEnclaveCompositeDecapsulator
-        )
-    }
-
-    private static func makePrivateKeyDetachedFileSigningService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeyDetachedFileSigningService {
-        PrivateKeyDetachedFileSigningService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    private static func makePrivateKeyExpiryMutationService(
-        engine: PgpEngine,
-        keyAdapter: PGPKeyOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeyExpiryMutationService {
-        PrivateKeyExpiryMutationService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            keyAdapter: keyAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    private static func makePrivateKeySelectiveRevocationService(
-        engine: PgpEngine,
-        certificateAdapter: PGPCertificateOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeySelectiveRevocationService {
-        PrivateKeySelectiveRevocationService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            certificateAdapter: certificateAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    private static func makePrivateKeyContactCertificationService(
-        engine: PgpEngine,
-        certificateAdapter: PGPCertificateOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
-        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
-    ) -> PrivateKeyContactCertificationService {
-        PrivateKeyContactCertificationService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            certificateAdapter: certificateAdapter,
-            digestSigner: secureEnclaveDigestSigner,
-            compositeSigner: secureEnclaveCompositeSigner
-        )
-    }
-
-    // `@MainActor`: this composition root constructs `AppSessionOrchestrator`,
-    // which is main-actor-isolated. Called from `CypherAirApp.init` (App is
-    // main-actor) and from `@MainActor` test cases.
-    @MainActor
-    static func makeDefault() -> AppContainer {
-        let authPromptCoordinator = AuthenticationPromptCoordinator()
-        let secureEnclave = HardwareSecureEnclave()
-        let keychain = SystemKeychain()
-        let authManager = AuthenticationManager(
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-        let defaults = UserDefaults.standard
-        let config = AppConfiguration(defaults: defaults)
-        let protectedDataStorageRoot = ProtectedDataStorageRoot()
-        let protectedDomainKeyManager = ProtectedDomainKeyManager(
-            storageRoot: protectedDataStorageRoot,
-            keychain: keychain
-        )
-        let protectedDataRegistryStore = ProtectedDataRegistryStore(
-            storageRoot: protectedDataStorageRoot,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            hasExternalProtectedDataArtifacts: {
-                try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
-            }
-        )
-        let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
-            registryStore: protectedDataRegistryStore
-        )
-        let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
-            rootSecretStore: KeychainProtectedDataRootSecretStore(),
-            domainKeyManager: protectedDomainKeyManager,
-            config: config,
-            authPromptCoordinator: authPromptCoordinator
-        )
-        let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
-            storageRoot: protectedDataStorageRoot,
-            domainKeyManager: protectedDomainKeyManager,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
-        )
-        let privateKeyControlStore = PrivateKeyControlStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
-        let protectedSettingsStore = ProtectedSettingsStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
-        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: ProtectedSettingsOrdinarySettingsPersistence(
-                protectedSettingsStore: protectedSettingsStore
-            )
-        )
-        let keyMetadataDomainStore = KeyMetadataDomainStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
-        let engine = PgpEngine()
-        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
-        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        // One key store backs every device-bound tier (its keychain rows are
-        // namespaced per tier/role); each tier gets its own handle store so a
-        // create/load shape-checks against the correct parameter set.
-        let secureEnclaveCustodyKeyStore = SystemSecureEnclaveCustodyKeyStore()
-        let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: secureEnclaveCustodyKeyStore,
-            tier: .classicalP256
-        )
-        let secureEnclaveCustodyPublicBindingInspector = PGPSecureEnclaveCustodyPublicBindingInspector(
-            engine: engine
-        )
-        let secureEnclaveCustodyDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
-        // Device-Bound Post-Quantum split custody:
-        // per-identity classical component envelope and the composite binding
-        // inspector, shared by routing, generation, and deletion.
-        let secureEnclaveCompositeHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: secureEnclaveCustodyKeyStore,
-            tier: .postQuantum
-        )
-        let secureEnclaveCompositeHighHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: secureEnclaveCustodyKeyStore,
-            tier: .postQuantumHigh
-        )
-        let secureEnclaveCompositeBindingInspector = PGPSecureEnclaveCompositeBindingInspector(
-            engine: engine
-        )
-        let secureEnclaveCompositeClassicalComponentStore = SecureEnclaveCompositeClassicalComponentStore(
-            secureEnclave: secureEnclave,
-            keychain: keychain
-        )
-        let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()
-        let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
-            publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
-            handleStore: secureEnclaveCustodyHandleStore,
-            compositeBindingInspector: secureEnclaveCompositeBindingInspector,
-            compositeHandleStore: secureEnclaveCompositeHandleStore,
-            compositeHighHandleStore: secureEnclaveCompositeHighHandleStore,
-            compositeClassicalComponentStore: secureEnclaveCompositeClassicalComponentStore
-        )
-        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
-        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
-        let contactsDomainStore = ContactsDomainStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
-        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
-        let keyManagement = KeyManagementService(
-            keyAdapter: keyAdapter,
-            certificateAdapter: certificateAdapter,
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            privateKeyControlStore: privateKeyControlStore,
-            // Short-window modify-expiry pre-auth: wired in production only.
-            // The UI-test container stays nil (mock Secure Enclave under the
-            // authentication bypass must not drive real LocalAuthentication).
-            expiryAuthenticator: Self.productionExpiryAuthenticator,
-            secureEnclaveCustodyOperationAuthenticator: Self.productionSecureEnclaveCustodyOperationAuthenticator,
-            compositeCustodyRouterContext: CompositeCustodyRouterContext(
-                bindingInspector: secureEnclaveCompositeBindingInspector,
-                handleStore: secureEnclaveCompositeHandleStore,
-                highHandleStore: secureEnclaveCompositeHighHandleStore,
-                classicalComponentStore: secureEnclaveCompositeClassicalComponentStore
-            ),
-            secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
-                publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
-                handleStore: secureEnclaveCustodyHandleStore,
-                compositeBindingInspector: secureEnclaveCompositeBindingInspector,
-                compositeHandleStore: secureEnclaveCompositeHandleStore
-            ),
-            metadataPersistence: keyMetadataDomainStore,
-            // Device-bound Secure Enclave custody generation. Hardware-guarded
-            // at the composition root; on hardware without a Secure Enclave the
-            // factory stays nil and the UI hides the device-bound families. The
-            // prompt coordinator enrolls only the custody authorization and
-            // immediate handle-load window.
-            secureEnclaveCustodyGenerationServiceFactory: HardwareSecureEnclave.isAvailable
-                ? { catalogStore, invalidationGate, commitCoordinator in
-                    SecureEnclaveCustodyGenerationService(
-                        certificateBuilder: PGPSecureEnclaveCustodyGenerationAdapter(engine: engine),
-                        handleStore: secureEnclaveCustodyHandleStore,
-                        digestSigner: secureEnclaveCustodyDigestSigner,
-                        compositeCertificateBuilder: PGPSecureEnclaveCompositeGenerationAdapter(engine: engine),
-                        compositeHandleStore: secureEnclaveCompositeHandleStore,
-                        compositeHighHandleStore: secureEnclaveCompositeHighHandleStore,
-                        compositeSigner: secureEnclaveCompositeOperations,
-                        compositeClassicalComponentStore: secureEnclaveCompositeClassicalComponentStore,
-                        catalogStore: catalogStore,
-                        resolver: PGPKeyCapabilityResolver(),
-                        invalidationGate: invalidationGate,
-                        commitCoordinator: commitCoordinator,
-                        authenticationPromptCoordinator: authPromptCoordinator,
-                        custodyOperationAuthenticator: Self.productionSecureEnclaveCustodyOperationAuthenticator
-                    )
-                }
-                : nil,
-            secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService
-        )
-        protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
-        protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(contactsDomainStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
-        let contactService = ContactService(
-            contactImportAdapter: contactImportAdapter,
-            certificateAdapter: certificateAdapter,
-            contactsDomainStore: contactsDomainStore
-        )
-        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
-        let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
-            currentRegistryProvider: {
-                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
-            },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            domainOpeners: [
-                makePrivateKeyControlPostUnlockOpener(
-                    privateKeyControlStore: privateKeyControlStore
-                ),
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: KeyMetadataDomainStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        keyManagement.beginKeyMetadataLoad()
-                        do {
-                            try await keyMetadataDomainStore.ensureCommittedIfNeeded(
-                                wrappingRootKey: wrappingRootKey
-                            )
-                        } catch {
-                            keyManagement.markKeyMetadataRecoveryNeeded()
-                            throw error
-                        }
-                    },
-                    open: { wrappingRootKey in
-                        keyManagement.beginKeyMetadataLoad()
-                        do {
-                            _ = try await keyMetadataDomainStore.openDomainIfNeeded(
-                                wrappingRootKey: wrappingRootKey
-                            )
-                            try keyManagement.completeKeyMetadataLoad()
-                        } catch {
-                            keyManagement.markKeyMetadataRecoveryNeeded()
-                            throw error
-                        }
-                    }
-                ),
-                makeProtectedSettingsPostUnlockOpener(
-                    protectedSettingsStore: protectedSettingsStore,
-                    protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
-                )
-            ]
-        )
-        let appSessionOrchestrator = AppSessionOrchestrator(
-            currentRegistryProvider: {
-                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
-            },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
-        )
-        let appLockController = AppLockController(
-            gracePeriodProvider: {
-                protectedOrdinarySettingsCoordinator.gracePeriodForSession
-            },
-            lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason in
-                try await authManager.evaluateAppSession(
-                    policy: config.appSessionAuthenticationPolicy,
-                    reason: reason
-                )
-            },
-            recordSuccessfulAuthentication: { context in
-                appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
-            },
-            discardHandoffContext: {
-                appSessionOrchestrator.discardAuthorizationHandoffContext()
-            },
-            relockProtectedData: {
-                await protectedDataSessionCoordinator.relockCurrentSession()
-            },
-            postAuthenticationHandler: { authenticationContext in
-                do {
-                    _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
-                        authenticationContext: authenticationContext,
-                        persistSharedRight: { secret in
-                            try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                        },
-                        firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
-                    )
-                } catch {
-                    config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-                }
-                let postUnlockOutcome = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
-                    authenticationContext: authenticationContext,
-                    localizedReason: String(
-                        localized: "protectedData.postUnlock.reason",
-                        defaultValue: "Authenticate to unlock protected app data."
-                    )
-                )
-                _ = await contactService.openContactsAfterPostUnlock(
-                    gateDecision: ContactsPostAuthGateDecision(
-                        postUnlockOutcome: postUnlockOutcome,
-                        frameworkState: protectedDataSessionCoordinator.frameworkState
-                    ),
-                    wrappingRootKey: {
-                        try protectedDataSessionCoordinator.wrappingRootKeyData()
-                    },
-                    // The key-metadata domain opened above, so a certification
-                    // the user signed themselves can be re-checked against the
-                    // key that signed it.
-                    ownSignerKeys: keyManagement.keys
-                )
-                protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
-                    availability: Self.protectedOrdinarySettingsAvailability(
-                        postUnlockOutcome: postUnlockOutcome,
-                        protectedSettingsStore: protectedSettingsStore
-                    )
-                )
-                config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-                Self.recoverPrivateKeyControlJournalsAfterPostUnlock(
-                    authManager: authManager,
-                    keyManagement: keyManagement,
-                    config: config,
-                    privateKeyControlStore: privateKeyControlStore
-                )
-                // Must stay AFTER the first-domain bootstrap and the post-unlock
-                // domain open: re-protection sets `interactionNotAllowed = true`
-                // on this shared handoff `LAContext`
-                // (`ProtectedDataRootSecretCoordinator`), and that mutation
-                // sticks for every later consumer of the context in this unlock.
-                AppAccessPolicySwitchRecovery.recover(
-                    config: config,
-                    authenticationContext: authenticationContext,
-                    reprotectPersistedRootSecretIfPresent: { from, to, context in
-                        try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
-                            from: from,
-                            to: to,
-                            authenticationContext: context
-                        )
-                    }
-                )
-                appSessionOrchestrator.recordPostAuthenticationCompletion()
-            },
-            contentClearHandler: {
-                protectedOrdinarySettingsCoordinator.relock()
-                appSessionOrchestrator.requestContentClear()
-            },
-            operationPromptInProgressProvider: {
-                authPromptCoordinator.isOperationPromptInProgress
-            }
-        )
-        #if os(macOS)
-        wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
-        #endif
-        let pgpServices = makePgpServiceGraph(
-            engine: engine,
-            keyAdapter: keyAdapter,
-            certificateAdapter: certificateAdapter,
-            contactImportAdapter: contactImportAdapter,
-            selfTestAdapter: selfTestAdapter,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveCustodyDigestSigner,
-            secureEnclaveCompositeOperations: secureEnclaveCompositeOperations
-        )
-        let localDataResetService = LocalDataResetService(
-            keychain: keychain,
-            protectedDataStorageRoot: protectedDataStorageRoot,
-            defaults: defaults,
-            defaultsDomainName: Bundle.main.bundleIdentifier,
-            config: config,
-            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            selfTestService: pgpServices.selfTestService,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            appSessionOrchestrator: appSessionOrchestrator,
-            appLockController: appLockController,
-            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            protectedDataRootSecretExists: {
-                protectedDataSessionCoordinator.hasPersistedRootSecret()
-            },
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
-        )
-
-        return AppContainer(
-            appLockController: appLockController,
-            authPromptCoordinator: authPromptCoordinator,
-            keychain: keychain,
-            authManager: authManager,
-            config: config,
-            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
-            protectedDataStorageRoot: protectedDataStorageRoot,
-            protectedDomainKeyManager: protectedDomainKeyManager,
-            protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            privateKeyControlStore: privateKeyControlStore,
-            keyMetadataDomainStore: keyMetadataDomainStore,
-            contactsDomainStore: contactsDomainStore,
-            protectedSettingsStore: protectedSettingsStore,
-            appSessionOrchestrator: appSessionOrchestrator,
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            encryptionService: pgpServices.encryptionService,
-            decryptionService: pgpServices.decryptionService,
-            signingService: pgpServices.signingService,
-            certificateSignatureService: pgpServices.certificateSignatureService,
-            qrService: pgpServices.qrService,
-            selfTestService: pgpServices.selfTestService,
-            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            localDataResetService: localDataResetService
-        )
-    }
-
-    #if DEBUG
-    @MainActor
-    static func makeUITest(
-        requiresManualAuthentication: Bool = false,
-        manualAuthStartsUnlocked: Bool = false,
-        preloadContact: Bool = false
-    ) -> AppContainer {
-        let authPromptCoordinator = AuthenticationPromptCoordinator()
-        let secureEnclave = EphemeralKeyWrappingCustody()
-        let keychain = EphemeralKeychainStore()
-        let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
-        defaults.removePersistentDomain(forName: suiteName)
-
-        let authManager = AuthenticationManager(
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-        let config = AppConfiguration(defaults: defaults)
-        let engine = PgpEngine()
-        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
-        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
-        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
-        let documentDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
-        let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let protectedDataBaseDirectory = applicationSupportDirectory
-            .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: documentDirectory,
-            withIntermediateDirectories: true
-        )
-        try? FileManager.default.createDirectory(
-            at: protectedDataBaseDirectory,
-            withIntermediateDirectories: true
-        )
-        let protectedDataStorageRoot = ProtectedDataStorageRoot(
-            baseDirectory: protectedDataBaseDirectory,
-            validationMode: .enforceAppSupportContainment
-        )
-        let protectedDomainKeyManager = ProtectedDomainKeyManager(
-            storageRoot: protectedDataStorageRoot,
-            keychain: keychain
-        )
-        let protectedDataRegistryStore = ProtectedDataRegistryStore(
-            storageRoot: protectedDataStorageRoot,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            hasExternalProtectedDataArtifacts: {
-                try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
-            }
-        )
-        let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
-            registryStore: protectedDataRegistryStore
-        )
-        let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
-            rootSecretStore: EphemeralProtectedDataRootSecretStore(),
-            domainKeyManager: protectedDomainKeyManager,
-            config: config,
-            authPromptCoordinator: authPromptCoordinator
-        )
-        let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
-            storageRoot: protectedDataStorageRoot,
-            domainKeyManager: protectedDomainKeyManager,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
-        )
-        let privateKeyControlStore = PrivateKeyControlStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
-        privateKeyControlStore.seedUnlockedForTesting(.standard)
-        config.privateKeyControlState = .unlocked(.standard)
-        let protectedSettingsStore = ProtectedSettingsStore(
-            storageRoot: protectedDataStorageRoot,
-            registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager,
-            currentWrappingRootKey: {
-                try protectedDataSessionCoordinator.wrappingRootKeyData()
-            }
-        )
-        let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
-        if requiresManualAuthentication && !manualAuthStartsUnlocked {
-            // Plain manual-auth container: ordinary settings stay behind the
-            // real gate — protected-settings-backed persistence, LOCKED until
-            // a genuine unlock's post-auth fan-out loads them, exactly like
-            // production.
-            protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-                persistence: ProtectedSettingsOrdinarySettingsPersistence(
-                    protectedSettingsStore: protectedSettingsStore
-                )
-            )
-        } else {
-            // Every pre-authenticated boot: the launch seam settles the
-            // session as already authenticated, so the post-auth fan-out that
-            // loads ordinary settings through the protected-settings domain
-            // never ran. Give it the ungated ephemeral persistence so the boot
-            // state is, for UI purposes, indistinguishable from a genuinely
-            // authenticated one — otherwise every settings-gated control (e.g.
-            // the Guided Tutorial entry, which requires
-            // `isProtectedOrdinarySettingsEditable`) boots disabled. This
-            // loosens no production gating: DEBUG-only container, and every
-            // later away event and unlock runs the real path.
-            protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-                persistence: InMemoryOrdinarySettingsStore()
-            )
-            protectedOrdinarySettingsCoordinator.loadFromUngatedEphemeralPersistence()
-        }
-        let contactsWrappingRootKey: Data
-        do {
-            contactsWrappingRootKey = try EphemeralWrappingRootKey.generate()
-        } catch {
-            fatalError("Failed to generate the UI-test contacts wrapping root key: \(error)")
-        }
-        let contactsDomainStore: ContactsDomainStore
-        do {
-            contactsDomainStore = try makeSandboxContactsDomainStore(
-                baseDirectory: protectedDataBaseDirectory.appendingPathComponent(
-                    "contacts-sandbox",
-                    isDirectory: true
-                ),
-                wrappingRootKey: contactsWrappingRootKey,
-                keychain: keychain
-            )
-        } catch {
-            fatalError("Failed to create UI-test Contacts protected domain: \(error)")
-        }
-        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
-        let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
-            currentRegistryProvider: {
-                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
-            },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            domainOpeners: [
-                makePrivateKeyControlPostUnlockOpener(
-                    privateKeyControlStore: privateKeyControlStore
-                ),
-                makeProtectedSettingsPostUnlockOpener(
-                    protectedSettingsStore: protectedSettingsStore,
-                    protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
-                )
-            ]
-        )
-        let keyManagement = KeyManagementService(
-            keyAdapter: keyAdapter,
-            certificateAdapter: certificateAdapter,
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            privateKeyControlStore: privateKeyControlStore,
-            metadataPersistence: InMemoryKeyMetadataStore()
-        )
-        try? keyManagement.loadKeys()
-        let contactService = ContactService(
-            contactImportAdapter: contactImportAdapter,
-            certificateAdapter: certificateAdapter,
-            contactsDomainStore: contactsDomainStore
-        )
-        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
-        let appSessionOrchestrator = AppSessionOrchestrator(
-            currentRegistryProvider: {
-                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
-            },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
-        )
-        let appLockController = AppLockController(
-            gracePeriodProvider: {
-                protectedOrdinarySettingsCoordinator.gracePeriodForSession
-            },
-            lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason in
-                try await authManager.evaluateAppSession(
-                    policy: config.appSessionAuthenticationPolicy,
-                    reason: reason
-                )
-            },
-            recordSuccessfulAuthentication: { context in
-                appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
-            },
-            discardHandoffContext: {
-                appSessionOrchestrator.discardAuthorizationHandoffContext()
-            },
-            relockProtectedData: {
-                await protectedDataSessionCoordinator.relockCurrentSession()
-            },
-            postAuthenticationHandler: { authenticationContext in
-                do {
-                    _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
-                        authenticationContext: authenticationContext,
-                        persistSharedRight: { secret in
-                            try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                        },
-                        firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
-                    )
-                } catch {
-                    config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-                }
-                let postUnlockOutcome = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
-                    authenticationContext: authenticationContext,
-                    localizedReason: String(
-                        localized: "protectedData.postUnlock.reason",
-                        defaultValue: "Authenticate to unlock protected app data."
-                    )
-                )
-                _ = await contactService.openContactsAfterPostUnlock(
-                    gateDecision: ContactsPostAuthGateDecision(
-                        postUnlockOutcome: postUnlockOutcome,
-                        frameworkState: protectedDataSessionCoordinator.frameworkState
-                    ),
-                    wrappingRootKey: { contactsWrappingRootKey },
-                    ownSignerKeys: keyManagement.keys
-                )
-                protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
-                    availability: Self.protectedOrdinarySettingsAvailability(
-                        postUnlockOutcome: postUnlockOutcome,
-                        protectedSettingsStore: protectedSettingsStore
-                    )
-                )
-                config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-                Self.recoverPrivateKeyControlJournalsAfterPostUnlock(
-                    authManager: authManager,
-                    keyManagement: keyManagement,
-                    config: config,
-                    privateKeyControlStore: privateKeyControlStore
-                )
-                // Must stay AFTER the first-domain bootstrap and the post-unlock
-                // domain open: re-protection sets `interactionNotAllowed = true`
-                // on this shared handoff `LAContext`
-                // (`ProtectedDataRootSecretCoordinator`), and that mutation
-                // sticks for every later consumer of the context in this unlock.
-                AppAccessPolicySwitchRecovery.recover(
-                    config: config,
-                    authenticationContext: authenticationContext,
-                    reprotectPersistedRootSecretIfPresent: { from, to, context in
-                        try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
-                            from: from,
-                            to: to,
-                            authenticationContext: context
-                        )
-                    }
-                )
-                appSessionOrchestrator.recordPostAuthenticationCompletion()
-            },
-            contentClearHandler: {
-                protectedOrdinarySettingsCoordinator.relock()
-                appSessionOrchestrator.requestContentClear()
-            },
-            operationPromptInProgressProvider: {
-                authPromptCoordinator.isOperationPromptInProgress
-            }
-        )
-        #if os(macOS)
-        wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
-        #endif
-        let pgpServices = makePgpServiceGraph(
-            engine: engine,
-            keyAdapter: keyAdapter,
-            certificateAdapter: certificateAdapter,
-            contactImportAdapter: contactImportAdapter,
-            selfTestAdapter: selfTestAdapter,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore(
-                keyStore: SystemSecureEnclaveCustodyKeyStore(),
-                tier: .classicalP256
-            ),
-            secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner(),
-            secureEnclaveCompositeOperations: SystemSecureEnclaveCompositeOperations()
-        )
-        let localDataResetService = LocalDataResetService(
-            keychain: keychain,
-            protectedDataStorageRoot: protectedDataStorageRoot,
-            defaults: defaults,
-            defaultsDomainName: suiteName,
-            config: config,
-            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            selfTestService: pgpServices.selfTestService,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            appSessionOrchestrator: appSessionOrchestrator,
-            appLockController: appLockController,
-            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            protectedDataRootSecretExists: {
-                protectedDataSessionCoordinator.hasPersistedRootSecret()
-            }
-        )
-
-        let container = AppContainer(
-            appLockController: appLockController,
-            authPromptCoordinator: authPromptCoordinator,
-            keychain: keychain,
-            authManager: authManager,
-            config: config,
-            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
-            protectedDataStorageRoot: protectedDataStorageRoot,
-            protectedDomainKeyManager: protectedDomainKeyManager,
-            protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            privateKeyControlStore: privateKeyControlStore,
-            contactsDomainStore: nil,
-            protectedSettingsStore: protectedSettingsStore,
-            appSessionOrchestrator: appSessionOrchestrator,
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            encryptionService: pgpServices.encryptionService,
-            decryptionService: pgpServices.decryptionService,
-            signingService: pgpServices.signingService,
-            certificateSignatureService: pgpServices.certificateSignatureService,
-            qrService: pgpServices.qrService,
-            selfTestService: pgpServices.selfTestService,
-            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            localDataResetService: localDataResetService,
-            defaultsSuiteName: suiteName
-        )
-        if !requiresManualAuthentication {
-            container.uiTestContactsBootstrap = UITestContactsBootstrap(
-                wrappingRootKey: contactsWrappingRootKey,
-                preloadContact: preloadContact
-            )
-        }
-        return container
-    }
-    #endif
-
-    @MainActor
-    @discardableResult
-    func prepareUITestContactsIfNeeded() async -> ContactsAvailability {
-        guard var bootstrap = uiTestContactsBootstrap else {
-            return contactService.contactsAvailability
-        }
-        if let cachedAvailability = bootstrap.cachedAvailability {
-            guard cachedAvailability != contactService.contactsAvailability else {
-                return cachedAvailability
-            }
-            bootstrap.cachedAvailability = nil
-            uiTestContactsBootstrap = bootstrap
-        }
-        if bootstrap.isPreparing {
-            return await withCheckedContinuation { continuation in
-                uiTestContactsBootstrap?.waiters.append(continuation)
-            }
-        }
-
-        bootstrap.isPreparing = true
-        uiTestContactsBootstrap = bootstrap
-        let availability = await contactService.openContactsAfterPostUnlock(
-            gateDecision: ContactsPostAuthGateDecision(
-                postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
-                frameworkState: .sessionAuthorized
-            ),
-            wrappingRootKey: { bootstrap.wrappingRootKey },
-            ownSignerKeys: keyManagement.keys
-        )
-        var didPreloadContact = bootstrap.didPreloadContact
-        if availability == .availableProtectedDomain,
-           bootstrap.preloadContact,
-           !bootstrap.didPreloadContact {
-            do {
-                try Self.preloadUITestContact(
-                    engine: engine,
-                    contactService: contactService
-                )
-                didPreloadContact = true
-            } catch {
-                didPreloadContact = false
-            }
-        }
-        let waiters = uiTestContactsBootstrap?.waiters ?? []
-        uiTestContactsBootstrap?.didPreloadContact = didPreloadContact
-        uiTestContactsBootstrap?.cachedAvailability = availability
-        uiTestContactsBootstrap?.isPreparing = false
-        uiTestContactsBootstrap?.waiters.removeAll()
-        for waiter in waiters {
-            waiter.resume(returning: availability)
-        }
-        return availability
-    }
-
-    private static func preloadUITestContact(
-        engine: PgpEngine,
-        contactService: ContactService
-    ) throws {
-        let generated = try engine.generateKey(
-            name: "UITest Contact",
-            email: "uitest-contact@example.invalid",
-            validity: .never,
-            suite: .ed25519LegacyCurve25519Legacy
-        )
-        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
-    }
-
-    private static func makeSandboxContactsDomainStore(
-        baseDirectory: URL,
-        wrappingRootKey: Data,
-        keychain: any KeychainManageable
-    ) throws -> ContactsDomainStore {
-        let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let domainKeyManager = ProtectedDomainKeyManager(
-            storageRoot: storageRoot,
-            keychain: keychain
-        )
-        let registryStore = ProtectedDataRegistryStore(
-            storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.uitests.contacts.\(UUID().uuidString)",
-            hasExternalProtectedDataArtifacts: {
-                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
-            }
-        )
-        _ = try registryStore.performSynchronousBootstrap()
-        var registry = try registryStore.loadRegistry()
-        if registry.committedMembership.isEmpty,
-           registry.sharedResourceLifecycleState == .absent {
-            registry.sharedResourceLifecycleState = .ready
-            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
-            try registryStore.saveRegistry(registry)
-        }
-
-        return ContactsDomainStore(
-            storageRoot: storageRoot,
-            registryStore: registryStore,
-            domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey }
-        )
-    }
-
-    private static func protectedOrdinarySettingsAvailability(
-        postUnlockOutcome: ProtectedDataPostUnlockOutcome,
-        protectedSettingsStore: ProtectedSettingsStore
-    ) -> ProtectedOrdinarySettingsAvailability {
-        switch postUnlockOutcome {
-        case .opened, .noProtectedDomainPresent, .noRegisteredDomainPresent:
-            protectedSettingsStore.syncPreAuthorizationState()
-            return protectedSettingsStore.domainState == .unlocked ? .available : .unavailable
-        case .domainOpenFailed(let domainID) where domainID == ProtectedSettingsStore.domainID:
-            protectedSettingsStore.syncPreAuthorizationState()
-            return protectedSettingsStore.domainState == .unlocked ? .available : .unavailable
-        case .noRegisteredOpeners,
-             .noAuthenticatedContext,
-             .pendingMutationRecoveryRequired,
-             .frameworkRecoveryNeeded,
-             .authorizationDenied,
-             .domainOpenFailed:
-            return .unavailable
-        }
-    }
-
-    static func recoverPrivateKeyControlJournalsAfterPostUnlock(
-        authManager: AuthenticationManager,
-        keyManagement: KeyManagementService,
-        config: AppConfiguration,
-        privateKeyControlStore: any PrivateKeyControlStoreProtocol
-    ) {
-        guard privateKeyControlStore.privateKeyControlState.isUnlocked else {
-            return
-        }
-
-        // Re-wrap recovery enumerates software-custody keys only. The
-        // device-bound exemption is enforced structurally — the classical
-        // component lives in its own Keychain namespace and its envelope's
-        // authenticated payloadKind is not the one this workflow pins
-        // (docs/CUSTODY.md §2) — so the filter's remaining job is accuracy:
-        // unfiltered, a pure-enclave key (no bundle) classifies as
-        // unrecoverable and would block target-mode persistence while the
-        // recovery journal is destroyed (silent mode/ACL desync).
-        let rewrapSummary = authManager.checkAndRecoverFromInterruptedRewrap(
-            fingerprints: PGPKeyIdentity.softwareCustodyFingerprints(in: keyManagement.keys)
-        )
-        let modifyExpiryOutcome = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
-        config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-        if let warning = postUnlockRecoveryLoadWarning(
-            rewrapSummary: rewrapSummary,
-            modifyExpiryOutcome: modifyExpiryOutcome
-        ) {
-            config.appendPostUnlockRecoveryLoadWarning(warning)
-        }
-    }
-
-    static func postUnlockRecoveryLoadWarning(
-        rewrapSummary: PrivateKeyRewrapRecoverySummary?,
-        modifyExpiryOutcome: PrivateKeyRewrapRecoveryOutcome?
-    ) -> String? {
-        var diagnostics: [String] = []
-        for diagnostic in rewrapSummary?.startupDiagnostics ?? [] where !diagnostics.contains(diagnostic) {
-            diagnostics.append(diagnostic)
-        }
-        if let diagnostic = modifyExpiryOutcome?.startupDiagnostic,
-           !diagnostics.contains(diagnostic) {
-            diagnostics.append(diagnostic)
-        }
-        return diagnostics.isEmpty ? nil : diagnostics.joined(separator: "\n")
     }
 }

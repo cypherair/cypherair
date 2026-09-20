@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 /// Bridges a loaded Secure Enclave composite key-agreement handle into the
 /// Rust engine's `ExternalMlKem1024DecapsulationProvider` callback. The
@@ -7,11 +8,11 @@ import Foundation
 /// AES key unwrap stay in Rust (Device-Bound Post-Quantum · High).
 final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024DecapsulationProvider,
     @unchecked Sendable {
-    private let handle: SecureEnclaveCustodyLoadedHandle
+    private let handle: LoadedCustodyHandle
     private let decapsulator: any SecureEnclaveCompositeDecapsulating
 
     init(
-        handle: SecureEnclaveCustodyLoadedHandle,
+        handle: LoadedCustodyHandle,
         decapsulator: any SecureEnclaveCompositeDecapsulating
     ) {
         self.handle = handle
@@ -29,7 +30,7 @@ final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024De
             return keyShare.withUnsafeBytes { MlKem1024KeyShare(raw: Data($0)) }
         } catch is CancellationError {
             throw ExternalCompositeKeyAgreementError.OperationCancelled
-        } catch let error as SecureEnclaveCustodyHandleError {
+        } catch let error as CustodyError {
             throw ExternalCompositeKeyAgreementError.Failed(
                 category: Self.callbackCategory(for: error.failureCategory)
             )

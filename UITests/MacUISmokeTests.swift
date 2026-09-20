@@ -6,6 +6,8 @@ final class MacUISmokeTests: XCTestCase {
     private let manualAuthenticationTimeout: TimeInterval = 45
     private let requiresManualAuthentication =
         ProcessInfo.processInfo.environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
+    private let uiTestVaultPassphrase =
+        ProcessInfo.processInfo.environment["UITEST_VAULT_PASSPHRASE"] ?? "cypherair-uitest-passphrase"
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -209,14 +211,6 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("license.ready")
     }
 
-    func test_settingsRoot_opensAuthModeConfirmation() throws {
-        launchMain(extraEnvironment: ["UITEST_OPEN_AUTHMODE_CONFIRMATION": "1"])
-        openSettingsTab()
-
-        waitForScreenReady("settings.authmode.ready")
-        XCTAssertTrue(element("settings.mode.confirm").exists)
-    }
-
     func test_tutorial_generateAlice_opensKeyDetailFromKeyReady() throws {
         launchTutorial(task: "createDemoIdentity")
         generateTutorialKey()
@@ -332,22 +326,6 @@ final class MacUISmokeTests: XCTestCase {
         element("settings.tutorial").tap()
         waitForScreenReady("tutorial.hub.ready")
         XCTAssertTrue(element("tutorial.primaryAction").exists)
-    }
-
-    func test_tutorial_authModeConfirmation_exposesGuidanceAndActions() throws {
-        launchTutorial(
-            task: "enableHighSecurity",
-            extraEnvironment: ["UITEST_TUTORIAL_AUTHMODE_CONFIRMATION": "1"]
-        )
-
-        waitForScreenReady("tutorial.authMode.ready")
-        XCTAssertTrue(element("tutorial.modalGuidance").exists)
-        XCTAssertTrue(element("tutorial.authMode.riskAcknowledgement").exists)
-        XCTAssertFalse(element("tutorial.authMode.confirm").isEnabled)
-
-        element("tutorial.authMode.riskAcknowledgement").tap()
-        waitForElementEnabled(element("tutorial.authMode.confirm"))
-        XCTAssertTrue(element("tutorial.authMode.cancel").exists)
     }
 
     func test_tutorial_workspaceGuidance_usesSingleReturnSurface() throws {
@@ -579,18 +557,22 @@ final class MacUISmokeTests: XCTestCase {
             && rowFrame.maxY <= visibleFrame.maxY
     }
 
+    /// Under manual authentication the app boots locked; the sandbox vault
+    /// takes the UI-test passphrase and prompts for nothing else.
     private func waitForLaunchReadiness(rootReadyID: String) {
-        let timeout = requiresManualAuthentication ? manualAuthenticationTimeout : 10
-        let unlocked = element(rootReadyID).waitForExistence(timeout: timeout)
-        let failureMessage: String
         if requiresManualAuthentication {
-            failureMessage = "Timed out waiting for launch ready marker \(rootReadyID) to appear, or for manual Touch ID / Face ID authentication to complete."
-        } else {
-            failureMessage = "Expected launch ready marker \(rootReadyID) to appear."
+            let passphraseField = element("appLock.passphrase")
+            XCTAssertTrue(
+                passphraseField.waitForExistence(timeout: manualAuthenticationTimeout),
+                "Expected the lock surface to ask for the passphrase."
+            )
+            passphraseField.tap()
+            passphraseField.typeText(uiTestVaultPassphrase)
+            element("appLock.unlock").tap()
         }
         XCTAssertTrue(
-            unlocked,
-            failureMessage
+            element(rootReadyID).waitForExistence(timeout: requiresManualAuthentication ? manualAuthenticationTimeout : 10),
+            "Expected launch ready marker \(rootReadyID) to appear."
         )
     }
 

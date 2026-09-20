@@ -1,11 +1,12 @@
 import Foundation
+import Stores
 
 final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @unchecked Sendable {
-    private let handle: SecureEnclaveCustodyLoadedHandle
+    private let handle: LoadedCustodyHandle
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
 
     init(
-        handle: SecureEnclaveCustodyLoadedHandle,
+        handle: LoadedCustodyHandle,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) {
         self.handle = handle
@@ -18,7 +19,7 @@ final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @
             return P256EcdsaSignature(r: signature.r, s: signature.s)
         } catch is CancellationError {
             throw ExternalP256SigningError.OperationCancelled
-        } catch let error as SecureEnclaveCustodyHandleError {
+        } catch let error as CustodyError {
             throw ExternalP256SigningError.Failed(
                 category: Self.callbackCategory(for: error.failureCategory)
             )

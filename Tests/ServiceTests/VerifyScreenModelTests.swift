@@ -26,7 +26,7 @@ final class VerifyScreenModelTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        stack = await TestHelpers.makeServiceStack()
+        stack = try await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {

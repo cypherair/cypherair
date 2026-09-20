@@ -16,20 +16,11 @@
   "testTargets" : [
     {
       "skippedTests" : [
-        "DeviceSecureEnclaveTests",
-        "DeviceDangerousSecureEnclaveCustodyResetCleanupTests",
-        "DeviceSecureEnclaveCustodyHiddenGenerationTests",
-        "DeviceSecureEnclaveCustodyHandleStoreTests",
-        "DeviceSecureEnclaveCustodyDecryptTests",
-        "DeviceSecureEnclaveCompositeCustodyTests",
+        "DeviceApplicationPasswordProbeTests",
+        "DeviceApplicationPasswordBiometricProbeTests",
+        "DevicePerformanceTests",
         "DeviceSecureEnclavePqcHighProbeTests",
-        "DeviceSecureEnclaveGnuPGInteropEvidenceTests",
-        "DeviceAuthenticationManagerTests",
-        "DeviceModeSwitchTests",
-        "DeviceProtectedDataRootSecretStoreTests",
-        "DeviceMIETests",
-        "DeviceSystemMemoryTests",
-        "DevicePerformanceTests"
+        "DeviceSystemMemoryTests"
       ],
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",

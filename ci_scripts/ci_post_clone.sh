@@ -25,8 +25,7 @@
 # same way: the token is written only to a throwaway GH_CONFIG_DIR, and WF1
 # wipes it after the pre-build stage1 verification, so the PAT is neither in
 # the environment nor on disk while the stage1 compiler and cargo build
-# subprocesses execute. WF1 re-authenticates after the build for the SQLCipher
-# restore, matching the pre-verification flow where gh auth was post-build only.
+# subprocesses execute.
 
 set -euo pipefail
 
@@ -134,7 +133,7 @@ ensure_homebrew_formula() {
 
 require_gh_auth() {
     ensure_homebrew_formula gh
-    [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required for stage1/SQLCipher release verification"
+    [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required for stage1 release verification"
     if [ -z "$GH_SCOPED_CONFIG_DIR" ]; then
         GH_SCOPED_CONFIG_DIR="$(mktemp -d)"
         export GH_CONFIG_DIR="$GH_SCOPED_CONFIG_DIR"
@@ -207,9 +206,6 @@ build_xcframework_workflow() {
 
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "xcframework build did not produce PgpMobile.xcframework"
     [ -f "$ARM64E_MANIFEST" ] || fail "xcframework build did not produce $ARM64E_MANIFEST"
-    log "WF1: restoring pinned SQLCipher.xcframework for app link preflight"
-    require_gh_auth
-    scripts/restore_sqlcipher_xcframework.sh --require-attestation
     log "WF1: xcframework build complete"
 }
 
@@ -235,7 +231,7 @@ release_consumer_workflow() {
     # with full filesystem privileges: validate entry containment before any
     # byte lands, extract into a staging directory on the same volume, and move
     # the bundle into place only once the extracted symlinks are known to stay
-    # inside it. Same rules as the SQLCipher restore.
+    # inside it.
     python3 scripts/validate_xcframework_archive.py \
         --zip "$XCFRAMEWORK_ZIP" \
         --expected-root PgpMobile.xcframework
@@ -254,9 +250,6 @@ release_consumer_workflow() {
     # passed its checksum.
     log "WF2: placing the generated bindings the artifact carries"
     scripts/restore_generated_bindings.sh
-
-    log "WF2: restoring pinned SQLCipher.xcframework for app archive"
-    scripts/restore_sqlcipher_xcframework.sh --require-attestation
 
     local marketing_version build_number
     marketing_version="$(project_setting MARKETING_VERSION)"

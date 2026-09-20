@@ -51,9 +51,7 @@ final class EncryptScreenModel {
 
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
-    private let appConfiguration: AppConfiguration
-    private let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
-    private let protectedSettingsHost: ProtectedSettingsHost?
+    private let appSettings: AppSettingsCoordinator
     private let textEncryptionAction: TextEncryptionAction
     private let messageQuantumSafetyAction: MessageQuantumSafetyAction
     private let fileEncryptionAction: FileOperationAction<EncryptFileRequest, TemporaryFileOutput>
@@ -102,9 +100,7 @@ final class EncryptScreenModel {
         encryptionService: EncryptionService,
         keyManagement: KeyManagementService,
         contactService: ContactService,
-        config: AppConfiguration,
-        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
-        protectedSettingsHost: ProtectedSettingsHost? = nil,
+        appSettings: AppSettingsCoordinator,
         configuration: EncryptView.Configuration,
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
@@ -120,11 +116,9 @@ final class EncryptScreenModel {
         self.exportController = exportController
         self.keyManagement = keyManagement
         self.contactService = contactService
-        self.appConfiguration = config
-        self.protectedOrdinarySettings = protectedOrdinarySettings
-        self.protectedSettingsHost = protectedSettingsHost
+        self.appSettings = appSettings
         self.clipboardNoticeDecision = clipboardNoticeDecision ?? {
-            await protectedSettingsHost?.clipboardNoticeDecision() ?? true
+            appSettings.clipboardNotice ?? true
         }
         self.clipboardWriter = clipboardWriter ?? { string, shouldShowNotice in
             operationController.copyToClipboard(string, shouldShowNotice: shouldShowNotice)
@@ -394,11 +388,11 @@ final class EncryptScreenModel {
     /// the app default is still unreadable — the screen states no value rather
     /// than inventing one, and encryption stays blocked until it can.
     var resolvedEncryptToSelf: Bool? {
-        encryptToSelf ?? protectedOrdinarySettings.encryptToSelf
+        encryptToSelf ?? appSettings.encryptToSelf
     }
 
     var resolvedSignMessage: Bool? {
-        signMessage ?? protectedOrdinarySettings.signMessages
+        signMessage ?? appSettings.signMessages
     }
 
     var encryptToSelfToggleValue: Bool {
@@ -602,7 +596,7 @@ final class EncryptScreenModel {
         }
         guard let signMessage = resolvedSignMessage,
               let encryptToSelf = resolvedEncryptToSelf else {
-            presentProtectedOrdinarySettingsLockedError()
+            presentSettingsLockedError()
             return
         }
         let signerFingerprint = signMessage ? self.signerFingerprint : nil
@@ -644,7 +638,7 @@ final class EncryptScreenModel {
         }
         guard let signMessage = resolvedSignMessage,
               let encryptToSelf = resolvedEncryptToSelf else {
-            presentProtectedOrdinarySettingsLockedError()
+            presentSettingsLockedError()
             return
         }
         let signerFingerprint = signMessage ? self.signerFingerprint : nil
@@ -688,7 +682,6 @@ final class EncryptScreenModel {
 
         guard configuration.outputInterceptionPolicy.interceptClipboardCopy?(
             ciphertextString,
-            appConfiguration,
             .ciphertext
         ) != true else {
             return false
@@ -763,7 +756,7 @@ final class EncryptScreenModel {
         Task { @MainActor [weak self] in
             guard let self else { return }
             if disableFutureNotices {
-                await self.protectedSettingsHost?.disableClipboardNotice()
+                self.appSettings.setClipboardNotice(false)
             }
             self.operation.dismissClipboardNotice()
         }
@@ -811,12 +804,12 @@ final class EncryptScreenModel {
     /// relocks, or is edited. Each policy gates only its own assignment: a host
     /// that pins one toggle must keep receiving refreshes for the other, which a
     /// single shared guard would deny it.
-    func refreshProtectedOrdinarySettings() {
+    func refreshSettings() {
         if configuration.signingPolicy == .appDefault {
-            signMessage = protectedOrdinarySettings.signMessages
+            signMessage = appSettings.signMessages
         }
         if configuration.encryptToSelfPolicy == .appDefault {
-            encryptToSelf = protectedOrdinarySettings.encryptToSelf
+            encryptToSelf = appSettings.encryptToSelf
         }
     }
 
@@ -940,17 +933,17 @@ final class EncryptScreenModel {
 
     private func applySigningPolicy(from configuration: EncryptView.Configuration) {
         signMessage = configuration.signingPolicy.initialValue(
-            appDefault: protectedOrdinarySettings.signMessages
+            appDefault: appSettings.signMessages
         )
     }
 
     private func applyEncryptToSelfPolicy(from configuration: EncryptView.Configuration) {
         encryptToSelf = configuration.encryptToSelfPolicy.initialValue(
-            appDefault: protectedOrdinarySettings.encryptToSelf
+            appDefault: appSettings.encryptToSelf
         )
     }
 
-    private func presentProtectedOrdinarySettingsLockedError() {
+    private func presentSettingsLockedError() {
         operation.present(
             error: .encryptionFailed(
                 reason: String(

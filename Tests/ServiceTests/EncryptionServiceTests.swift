@@ -9,7 +9,7 @@ final class EncryptionServiceTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        stack = await TestHelpers.makeServiceStack()
+        stack = try await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -378,7 +378,7 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_encryptText_signingRequested_noDefaultEncryptToSelf_doesNotUnwrapSigner() async throws {
+    func test_encryptText_signingRequested_noDefaultEncryptToSelf_failsBeforeSigning() async throws {
         let signer = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             suite: .ed25519LegacyCurve25519Legacy,
@@ -388,8 +388,6 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertNil(stack.keyManagement.defaultKey)
 
         let recipientContactId = try importExternalRecipientContact()
-        let unwrapCountBefore = stack.mockSE.unwrapCallCount
-
         do {
             _ = try await stack.encryptionService.encryptText(
                 "test",
@@ -408,10 +406,9 @@ final class EncryptionServiceTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore)
     }
 
-    func test_encryptFileStreaming_signingRequested_noDefaultEncryptToSelf_doesNotUnwrapSigner() async throws {
+    func test_encryptFileStreaming_signingRequested_noDefaultEncryptToSelf_failsBeforeSigning() async throws {
         let signer = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             suite: .ed25519LegacyCurve25519Legacy,
@@ -423,8 +420,6 @@ final class EncryptionServiceTests: XCTestCase {
         let recipientContactId = try importExternalRecipientContact(name: "Streaming Recipient")
         let inputURL = stack.tempDir.appendingPathComponent("encrypt-input.txt")
         try Data("streaming test".utf8).write(to: inputURL)
-        let unwrapCountBefore = stack.mockSE.unwrapCallCount
-
         do {
             _ = try await stack.encryptionService.encryptFileStreaming(
                 inputURL: inputURL,
@@ -444,7 +439,6 @@ final class EncryptionServiceTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore)
     }
 
     // MARK: - Encrypt-to-Self: Key Selection

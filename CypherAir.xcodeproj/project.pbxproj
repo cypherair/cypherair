@@ -7,13 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		117C8F33D1BE474BABE78FE5 /* Vault in Frameworks */ = {isa = PBXBuildFile; productRef = C3B83948B3514C77928F5F96 /* Vault */; };
+		AE919D0D577E4A259CCD4260 /* Stores in Frameworks */ = {isa = PBXBuildFile; productRef = 6A822FC90A3B4ED294589288 /* Stores */; };
 		CE0065172F652334008604AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065122F651C44008604AB /* AppIcon.icon */; };
 		CE0065252F676EBC008604AB /* AppIconB.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065232F676EBC008604AB /* AppIconB.icon */; };
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
 		CE5181B12FBB9EAA00D21B02 /* AppIconE.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE5181B02FBB9EAA00D21B02 /* AppIconE.icon */; };
 		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
-		CEA0C0012FA0000000000001 /* SQLCipher.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0002FA0000000000001 /* SQLCipher.xcframework */; };
 		CEA0C0032FA0000000000001 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0022FA0000000000001 /* Security.framework */; };
 		CEA0C0052FA0000000000001 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0042FA0000000000001 /* CoreFoundation.framework */; };
 		CEA0C0072FA0000000000001 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0062FA0000000000001 /* Foundation.framework */; };
@@ -51,7 +52,6 @@
 		CE58C0062F96000000000001 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAir.entitlements; sourceTree = "<group>"; };
 		CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAirMacOS.entitlements; sourceTree = "<group>"; };
-		CEA0C0002FA0000000000001 /* SQLCipher.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = SQLCipher.xcframework; sourceTree = "<group>"; };
 		CEA0C0022FA0000000000001 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		CEA0C0042FA0000000000001 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		CEA0C0062FA0000000000001 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -83,10 +83,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				117C8F33D1BE474BABE78FE5 /* Vault in Frameworks */,
+				AE919D0D577E4A259CCD4260 /* Stores in Frameworks */,
 				CEA0C0072FA0000000000001 /* Foundation.framework in Frameworks */,
 				CEA0C0052FA0000000000001 /* CoreFoundation.framework in Frameworks */,
 				CEA0C0032FA0000000000001 /* Security.framework in Frameworks */,
-				CEA0C0012FA0000000000001 /* SQLCipher.xcframework in Frameworks */,
 				CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -98,7 +99,6 @@
 			isa = PBXGroup;
 			children = (
 				CE58C0002F96000000000001 /* PgpMobile.xcframework */,
-				CEA0C0002FA0000000000001 /* SQLCipher.xcframework */,
 				CEA0C0022FA0000000000001 /* Security.framework */,
 				CEA0C0042FA0000000000001 /* CoreFoundation.framework */,
 				CEA0C0062FA0000000000001 /* Foundation.framework */,
@@ -138,7 +138,6 @@
 			buildConfigurationList = 04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */;
 			buildPhases = (
 				CE58C0032F96000000000001 /* Check PgpMobile XCFramework */,
-				CEA0C0082FA0000000000001 /* Check SQLCipher XCFramework */,
 				CE58C0042F96000000000001 /* Generate Source Compliance Info */,
 				C1FB1E6897EF4454B406EDAF /* Sources */,
 				CE58C0022F96000000000001 /* Frameworks */,
@@ -154,6 +153,8 @@
 			);
 			name = CypherAir;
 			packageProductDependencies = (
+				C3B83948B3514C77928F5F96 /* Vault */,
+				6A822FC90A3B4ED294589288 /* Stores */,
 			);
 			productName = CypherAir;
 			productReference = 9379668011500E781695A4AC /* CypherAir.app */;
@@ -229,6 +230,9 @@
 			);
 			mainGroup = 7C9F769E62E925ECA46373E6;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7F65F761F7A6488EA209A5E9 /* XCLocalSwiftPackageReference "Packages/CypherVault" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 87A0C373A5702D60FD4DC48F /* Products */;
 			projectDirPath = "";
@@ -329,7 +333,6 @@
 				"$(SRCROOT)/scripts/generate_source_compliance_build_phase.sh",
 				"$(SRCROOT)/scripts/generate_source_compliance_info.py",
 				"$(SRCROOT)/pgp-mobile/Cargo.lock",
-				"$(SRCROOT)/third_party/sqlcipher-xcframework.pin.json",
 				"$(TARGET_TEMP_DIR)/SourceComplianceOverrides.json",
 				"$(SRCROOT)/.git/HEAD",
 				"$(SRCROOT)/.git/logs/HEAD",
@@ -376,28 +379,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "python3 \"${SRCROOT}/scripts/sync_settings_bundle.py\"\n";
-		};
-		CEA0C0082FA0000000000001 /* Check SQLCipher XCFramework */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"$(SRCROOT)/SQLCipherArtifactInputs.xcfilelist",
-			);
-			inputPaths = (
-				"$(SRCROOT)/scripts/validate_sqlcipher_xcframework.py",
-				"$(SRCROOT)/SQLCipherArtifactInputs.xcfilelist",
-			);
-			name = "Check SQLCipher XCFramework";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "python3 \"${SRCROOT}/scripts/validate_sqlcipher_xcframework.py\" --root \"${SRCROOT}\" --skip-release-assets\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -538,7 +519,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16600;
+				CURRENT_PROJECT_VERSION = 16700;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -570,7 +551,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -768,7 +749,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16600;
+				CURRENT_PROJECT_VERSION = 16700;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -800,7 +781,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -917,7 +898,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16600;
+				CURRENT_PROJECT_VERSION = 16700;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -949,7 +930,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1137,6 +1118,24 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		7F65F761F7A6488EA209A5E9 /* XCLocalSwiftPackageReference "Packages/CypherVault" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CypherVault;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6A822FC90A3B4ED294589288 /* Stores */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Stores;
+		};
+		C3B83948B3514C77928F5F96 /* Vault */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Vault;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 987D9FF41AF85DBF5445FC9C /* Project object */;
 }
