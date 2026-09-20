@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ • %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
+          }
+        }
+      }
+    },
     "about.cypherAirX.description" : {
       "localizations" : {
         "en" : {
@@ -925,54 +941,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未知"
-          }
-        }
-      }
-    },
-    "contactKey.compatible.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GnuPG Compatible"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兼容 GnuPG"
-          }
-        }
-      }
-    },
-    "contactKey.modern.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modern (RFC 9580)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "现代（RFC 9580）"
-          }
-        }
-      }
-    },
-    "contactKey.postQuantum.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Post-Quantum (RFC 9980)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后量子（RFC 9980）"
           }
         }
       }
@@ -1953,6 +1921,22 @@
         }
       }
     },
+    "contactdetail.additionalKeys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Additional Active Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他活跃密钥"
+          }
+        }
+      }
+    },
     "contactdetail.addTag" : {
       "localizations" : {
         "en" : {
@@ -2061,22 +2045,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加标签"
-          }
-        }
-      }
-    },
-    "contactdetail.additionalKeys" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Additional Active Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "其他活跃密钥"
           }
         }
       }
@@ -2877,6 +2845,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "撤销我对该指纹的核对"
+          }
+        }
+      }
+    },
+    "contactKey.compatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "contactKey.modern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modern (RFC 9580)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现代（RFC 9580）"
+          }
+        }
+      }
+    },
+    "contactKey.postQuantum.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post-Quantum (RFC 9980)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后量子（RFC 9980）"
           }
         }
       }
@@ -4725,6 +4741,22 @@
         }
       }
     },
+    "error.keychain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to access secure storage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法访问安全存储。"
+          }
+        }
+      }
+    },
     "error.keyExpired" : {
       "localizations" : {
         "en" : {
@@ -5205,22 +5237,6 @@
         }
       }
     },
-    "error.keychain" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Failed to access secure storage."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法访问安全存储。"
-          }
-        }
-      }
-    },
     "error.messageLimitsExceeded" : {
       "localizations" : {
         "en" : {
@@ -5573,22 +5589,6 @@
         }
       }
     },
-    "fileDecrypt.selectFile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select Encrypted File"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择加密文件"
-          }
-        }
-      }
-    },
     "fileDecrypt.selectedFile" : {
       "localizations" : {
         "en" : {
@@ -5601,6 +5601,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已选择"
+          }
+        }
+      }
+    },
+    "fileDecrypt.selectFile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select Encrypted File"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择加密文件"
           }
         }
       }
@@ -5685,22 +5701,6 @@
         }
       }
     },
-    "fileEncrypt.selectFile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select File"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择文件"
-          }
-        }
-      }
-    },
     "fileEncrypt.selectedFile" : {
       "localizations" : {
         "en" : {
@@ -5713,6 +5713,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已选择"
+          }
+        }
+      }
+    },
+    "fileEncrypt.selectFile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select File"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择文件"
           }
         }
       }
@@ -7381,22 +7397,6 @@
         }
       }
     },
-    "home.defaultKey.backUpNow" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back up now"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "立即备份"
-          }
-        }
-      }
-    },
     "home.defaultKey.backedUp" : {
       "localizations" : {
         "en" : {
@@ -7409,6 +7409,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.backUpNow" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back up now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即备份"
           }
         }
       }
@@ -7717,22 +7733,6 @@
         }
       }
     },
-    "import.canEncrypt" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Can Encrypt To"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可用于加密"
-          }
-        }
-      }
-    },
     "import.cancel" : {
       "localizations" : {
         "en" : {
@@ -7745,6 +7745,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "import.canEncrypt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can Encrypt To"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用于加密"
           }
         }
       }
@@ -8193,6 +8209,726 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加前请与密钥所有者核实此指纹。"
+          }
+        }
+      }
+    },
+    "keydetail.actions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        }
+      }
+    },
+    "keydetail.algo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algorithm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "算法"
+          }
+        }
+      }
+    },
+    "keydetail.backed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backed Up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已备份"
+          }
+        }
+      }
+    },
+    "keydetail.backup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份状态"
+          }
+        }
+      }
+    },
+    "keydetail.copyPublicKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Public Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝公钥"
+          }
+        }
+      }
+    },
+    "keydetail.delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除密钥"
+          }
+        }
+      }
+    },
+    "keydetail.delete.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Permanently"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久删除"
+          }
+        }
+      }
+    },
+    "keydetail.delete.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This will permanently delete this key from your device. This action cannot be undone. Make sure you have a backup."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这将从你的设备上永久删除此密钥。此操作无法撤销。请确保你有备份。"
+          }
+        }
+      }
+    },
+    "keydetail.delete.message.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This will permanently delete this key from your device. Device-bound keys cannot be exported or backed up, so this cannot be undone and the key cannot be recovered."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这将从你的设备上永久删除此密钥。设备绑定密钥无法导出或备份，因此此操作无法撤销，且密钥无法恢复。"
+          }
+        }
+      }
+    },
+    "keydetail.delete.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除密钥"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key lives in this device's Secure Enclave. Signing and decryption happen inside the Secure Enclave; the app never sees the private key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保存在本设备的安全隔区中。签名和解密都在安全隔区内完成；App 永远不会接触私钥。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.custodySplit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key uses split custody. The post-quantum half lives in this device's Secure Enclave; the classical half is sealed to this device and used briefly in app memory during operations. Every signature and decryption requires the Secure Enclave — neither half works alone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥采用拆分托管。后量子部分保存在本设备的安全隔区中；经典部分密封绑定于本设备，在操作期间会短暂进入 App 内存。每次签名和解密都必须经过安全隔区——任何一部分都无法单独使用。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key cannot be exported or backed up. The public key and revocation certificate can be exported."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥无法导出或备份。公钥和吊销证书可以导出。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.recovery" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If this device is lost or erased, or its biometric access is removed, this key's signing and decryption capability is permanently lost."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果此设备丢失或被抹掉，或其生物识别访问被移除，此密钥的签名和解密能力将永久丧失。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.noBackup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.status.degraded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some private-key operations are currently unavailable on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上的部分私钥操作目前不可用。"
+          }
+        }
+      }
+    },
+    "keydetail.expiry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expiry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期时间"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.cancel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.expired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expired"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已过期"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.never" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.newDate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Expiry Date"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新到期日期"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.removeExpiry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Expiry (Never Expire)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消到期（永不过期）"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.save" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.setDate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Expiry Date"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置到期日期"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modify Expiry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改到期时间"
+          }
+        }
+      }
+    },
+    "keydetail.exportBackup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出备份"
+          }
+        }
+      }
+    },
+    "keydetail.exportRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Revocation Certificate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出吊销证书"
+          }
+        }
+      }
+    },
+    "keydetail.fingerprint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fingerprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指纹"
+          }
+        }
+      }
+    },
+    "keydetail.info" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Information"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥信息"
+          }
+        }
+      }
+    },
+    "keydetail.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
+    "keydetail.modifyExpiry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modify Expiry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改到期时间"
+          }
+        }
+      }
+    },
+    "keydetail.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称"
+          }
+        }
+      }
+    },
+    "keydetail.notBacked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Backed Up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未备份"
+          }
+        }
+      }
+    },
+    "keydetail.notFound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Not Found"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到密钥"
+          }
+        }
+      }
+    },
+    "keydetail.publicKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公钥"
+          }
+        }
+      }
+    },
+    "keydetail.security" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Security Level"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全级别"
+          }
+        }
+      }
+    },
+    "keydetail.selectiveRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selective Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择性吊销"
+          }
+        }
+      }
+    },
+    "keydetail.setDefault" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set as Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设为默认"
+          }
+        }
+      }
+    },
+    "keydetail.sharePublicKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share Public Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享公钥"
+          }
+        }
+      }
+    },
+    "keydetail.shortKeyId" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short Key ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短密钥 ID"
+          }
+        }
+      }
+    },
+    "keydetail.showQR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show QR Code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示二维码"
+          }
+        }
+      }
+    },
+    "keydetail.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Detail"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥详情"
+          }
+        }
+      }
+    },
+    "keydetail.validity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效性"
+          }
+        }
+      }
+    },
+    "keydetail.version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥版本"
           }
         }
       }
@@ -9457,726 +10193,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "v6"
-          }
-        }
-      }
-    },
-    "keydetail.actions" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actions"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "操作"
-          }
-        }
-      }
-    },
-    "keydetail.algo" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Algorithm"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "算法"
-          }
-        }
-      }
-    },
-    "keydetail.backed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Backed Up"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已备份"
-          }
-        }
-      }
-    },
-    "keydetail.backup" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Backup Status"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "备份状态"
-          }
-        }
-      }
-    },
-    "keydetail.copyPublicKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy Public Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拷贝公钥"
-          }
-        }
-      }
-    },
-    "keydetail.delete" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除密钥"
-          }
-        }
-      }
-    },
-    "keydetail.delete.confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete Permanently"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "永久删除"
-          }
-        }
-      }
-    },
-    "keydetail.delete.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This will permanently delete this key from your device. This action cannot be undone. Make sure you have a backup."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这将从你的设备上永久删除此密钥。此操作无法撤销。请确保你有备份。"
-          }
-        }
-      }
-    },
-    "keydetail.delete.message.deviceBound" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This will permanently delete this key from your device. Device-bound keys cannot be exported or backed up, so this cannot be undone and the key cannot be recovered."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这将从你的设备上永久删除此密钥。设备绑定密钥无法导出或备份，因此此操作无法撤销，且密钥无法恢复。"
-          }
-        }
-      }
-    },
-    "keydetail.delete.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除密钥"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.explainer.custody" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The private key lives in this device's Secure Enclave. Signing and decryption happen inside the Secure Enclave; the app never sees the private key."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保存在本设备的安全隔区中。签名和解密都在安全隔区内完成；App 永远不会接触私钥。"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.explainer.custodySplit" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This key uses split custody. The post-quantum half lives in this device's Secure Enclave; the classical half is sealed to this device and used briefly in app memory during operations. Every signature and decryption requires the Secure Enclave — neither half works alone."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此密钥采用拆分托管。后量子部分保存在本设备的安全隔区中；经典部分密封绑定于本设备，在操作期间会短暂进入 App 内存。每次签名和解密都必须经过安全隔区——任何一部分都无法单独使用。"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.explainer.export" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The private key cannot be exported or backed up. The public key and revocation certificate can be exported."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥无法导出或备份。公钥和吊销证书可以导出。"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.explainer.recovery" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If this device is lost or erased, or its biometric access is removed, this key's signing and decryption capability is permanently lost."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "如果此设备丢失或被抹掉，或其生物识别访问被移除，此密钥的签名和解密能力将永久丧失。"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.explainer.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Device-Bound Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设备绑定密钥"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.noBackup" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This key cannot be exported or backed up."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此密钥无法导出或备份。"
-          }
-        }
-      }
-    },
-    "keydetail.deviceBound.status.degraded" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some private-key operations are currently unavailable on this device."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此设备上的部分私钥操作目前不可用。"
-          }
-        }
-      }
-    },
-    "keydetail.expiry" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expiry"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "到期时间"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.expired" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expired"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已过期"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.never" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Never"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "永不"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.newDate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New Expiry Date"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新到期日期"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.removeExpiry" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove Expiry (Never Expire)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消到期（永不过期）"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.save" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.setDate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Set Expiry Date"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设置到期日期"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modify Expiry"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "修改到期时间"
-          }
-        }
-      }
-    },
-    "keydetail.exportBackup" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export Backup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导出备份"
-          }
-        }
-      }
-    },
-    "keydetail.exportRevocation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export Revocation Certificate"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导出吊销证书"
-          }
-        }
-      }
-    },
-    "keydetail.fingerprint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fingerprint"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "指纹"
-          }
-        }
-      }
-    },
-    "keydetail.info" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Information"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥信息"
-          }
-        }
-      }
-    },
-    "keydetail.keyType" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Type"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥类型"
-          }
-        }
-      }
-    },
-    "keydetail.modifyExpiry" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modify Expiry"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "修改到期时间"
-          }
-        }
-      }
-    },
-    "keydetail.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Name"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "名称"
-          }
-        }
-      }
-    },
-    "keydetail.notBacked" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not Backed Up"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未备份"
-          }
-        }
-      }
-    },
-    "keydetail.notFound" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Not Found"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到密钥"
-          }
-        }
-      }
-    },
-    "keydetail.publicKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Public Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公钥"
-          }
-        }
-      }
-    },
-    "keydetail.security" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Security Level"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安全级别"
-          }
-        }
-      }
-    },
-    "keydetail.selectiveRevocation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selective Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择性吊销"
-          }
-        }
-      }
-    },
-    "keydetail.setDefault" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Set as Default"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设为默认"
-          }
-        }
-      }
-    },
-    "keydetail.sharePublicKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share Public Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "分享公钥"
-          }
-        }
-      }
-    },
-    "keydetail.shortKeyId" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Short Key ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "短密钥 ID"
-          }
-        }
-      }
-    },
-    "keydetail.showQR" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show QR Code"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示二维码"
-          }
-        }
-      }
-    },
-    "keydetail.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Detail"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥详情"
-          }
-        }
-      }
-    },
-    "keydetail.validity" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Validity"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "有效性"
-          }
-        }
-      }
-    },
-    "keydetail.version" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Version"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥版本"
           }
         }
       }
@@ -12695,6 +12711,22 @@
         }
       }
     },
+    "settings.appearance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外观"
+          }
+        }
+      }
+    },
     "settings.appIcon" : {
       "localizations" : {
         "en" : {
@@ -12823,22 +12855,6 @@
         }
       }
     },
-    "settings.appearance" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appearance"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "外观"
-          }
-        }
-      }
-    },
     "settings.changePassphrase" : {
       "localizations" : {
         "en" : {
@@ -12887,22 +12903,6 @@
         }
       }
     },
-    "settings.encryptToSelf" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypt to Self"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同时加密给自己"
-          }
-        }
-      }
-    },
     "settings.encryption" : {
       "localizations" : {
         "en" : {
@@ -12915,6 +12915,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "加密"
+          }
+        }
+      }
+    },
+    "settings.encryptToSelf" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypt to Self"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时加密给自己"
           }
         }
       }
@@ -13447,22 +13463,6 @@
         }
       }
     },
-    "sign.selectFile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select File"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择文件"
-          }
-        }
-      }
-    },
     "sign.selectedFile" : {
       "localizations" : {
         "en" : {
@@ -13475,6 +13475,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已选择"
+          }
+        }
+      }
+    },
+    "sign.selectFile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select File"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择文件"
           }
         }
       }
