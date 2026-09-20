@@ -1069,6 +1069,7 @@ dependencies = [
 name = "pgp-mobile"
 version = "0.1.0"
 dependencies = [
+ "argon2",
  "base64 0.23.1",
  "openssl",
  "ossl",
