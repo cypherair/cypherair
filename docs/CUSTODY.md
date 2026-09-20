@@ -11,18 +11,20 @@ Secure Enclave custody is a **custody model, not an algorithm suite**: long-term
 - **A Keychain handle, public key, or locator is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
 - **Never weaken portable software-key behavior to make custody integration easier** — the second stop-and-review condition.
 - **Rust owns all OpenPGP semantics**; the enclave performs only the private primitive through narrow callbacks that never carry secret certificate material (§5).
-- **Device-bound keys always require biometrics**, fixed at creation, with no passcode fallback and never the mode-dependent app policy. Keys survive a change of the enrolled biometric set, and biometric-set invalidation must **never** be offered as a user option — for a non-exportable key it is permanent key loss.
-- **A Standard ↔ High Security mode switch never re-wraps device-bound custody state.**
+- **Device-bound keys always require biometrics**, fixed at creation, with no passcode fallback. Keys survive a change of the enrolled biometric set, and biometric-set invalidation must **never** be offered as a user option — for a non-exportable key it is permanent key loss.
+- **Device-bound keys also require the passphrase.** Every enclave custody key is created with the identity credential as its application password, so a borrowed biometric alone cannot use one — with the single exception of the ML-KEM half (§4), which the enclave cannot decapsulate under the option. A passphrase change never touches custody keys, and there is no mode or policy switch that could.
 
 ## 3. Operation routing
 
 - **Locate before authentication.** Handle lookup by the certificate's public-key bindings is non-prompting; a missing or mismatched handle blocks the operation **without ever showing a biometric sheet**.
-- **One approval per operation.** A single authenticated window covers the enclave-handle load and, for split custody, the classical-component unwrap.
+- **One approval per operation.** A single authenticated window covers the enclave-handle load and, for split custody, the classical-component unwrap; the operation context carries the identity credential silently.
 - **Roles are distinct handles.** Signing and key agreement route by required role; wrong-role or wrong-public-binding requests fail closed. A Secure Enclave route never falls back to software material.
 
 ## 4. Split custody
 
-CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classical curves, so a whole RFC 9980 composite key cannot be enclave-resident. Device-Bound Post-Quantum therefore splits custody: the PQ components are generated in and never leave the enclave; the classical components are sealed under a fixed-access envelope in their own Keychain namespace with their own payload kind, so a software-custody consumer handed one fails closed rather than opening it. **The custody invariant:** every composite signature and decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt, and is never independently reachable through any export or backup path. Split custody needs both halves: an intact enclave handle pair says nothing about the sealed component.
+CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classical curves, so a whole RFC 9980 composite key cannot be enclave-resident. Device-Bound Post-Quantum therefore splits custody: the PQ components are generated in and never leave the enclave; the classical components are sealed against the identity wrapping key in their own Keychain namespace with their own payload kind, so a software-custody consumer handed one fails closed rather than opening it. **The custody invariant:** every composite signature and decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt, and is never independently reachable through any export or backup path. Split custody needs both halves: an intact enclave handle pair says nothing about the sealed component.
+
+**The ML-KEM exception.** The enclave cannot decapsulate with an ML-KEM key created under the application-password option ([SECURITY.md](SECURITY.md) §10), so the ML-KEM half is the one enclave key created without it, under the biometric constraint alone. The passphrase still gates every composite decryption, because the classical half is sealed against the identity wrapping key, which demands it. The ML-DSA half carries the password like every other enclave key. The probe that records the limitation is written to fail the day the enclave starts honouring the option for ML-KEM, which is when this exception goes.
 
 ## 5. Structural red lines
 

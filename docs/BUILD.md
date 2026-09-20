@@ -39,15 +39,16 @@
 
 ## 6. The sync contract
 
-Rust changes under `pgp-mobile/src` do **not** refresh what Xcode links. Three build inputs are never produced by a Swift build and are not in git — the XCFramework with its build manifest, the generated UniFFI outputs carried inside it, and the pinned `SQLCipher.xcframework` — so **a fresh clone runs the sync before Xcode can build at all**:
+Rust changes under `pgp-mobile/src` do **not** refresh what Xcode links. Two build inputs are never produced by a Swift build and are not in git — the XCFramework with its build manifest, and the generated UniFFI outputs carried inside it — so **a fresh clone runs the sync before Xcode can build at all**:
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
-scripts/restore_sqlcipher_xcframework.sh
 ```
 
 **Staleness is machine-checked, not remembered.** Every Xcode build re-hashes the crate inputs, the packaged slices, and the generated bindings against the fingerprint the sync recorded, and fails with the command that fixes it. The gate is content-based, so **any** edit to a fingerprinted input — comments included — requires the sync, and a hand-edit to the generated Swift is a build failure: **never hand-edit generated bindings; rerun the sync**. `PgpMobileSourceInputs.xcfilelist` is generated but tracked, and is committed whenever it changes.
 
 **Stale-artifact symptom:** the Rust tests show the new behavior but the Swift/FFI tests still show the old one, or new UniFFI symbols are missing at link time. Suspect a stale artifact or stale bindings before suspecting Swift source. A stale target-specific `libpgp_mobile.dylib` beside the release archives can shadow the static archive that was meant to be linked.
 
-To move the SQLCipher pin, publish a new stable immutable release from `cypherair/sqlcipher-xcframework` first, then rotate the pin file, the notices, and the tests together.
+## 7. Swift packages
+
+`Packages/CypherVault` is a local package the app links. Two rules keep it whole across all three device slices ([ARCHITECTURE.md](ARCHITECTURE.md)): the shared workspace setting `iOSPackagesShouldBuildARM64e` stays committed in the project's embedded workspace, and the manifest mirrors the project's Swift language mode and upcoming features. Both are Apple's mechanisms; neither is a workaround.
