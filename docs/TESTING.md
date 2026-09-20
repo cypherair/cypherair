@@ -17,7 +17,7 @@
 A test exists only if its name states the contract it guards and a later change could break that contract silently. If the regression it would catch cannot be named, it is not written. Four kinds meet that bar:
 
 - **Known-answer vectors** for the sealing layer, so drift in a derivation label or in authenticated data is caught.
-- **Adversarial tests:** flip each public field of an envelope, open a blob as the wrong payload kind, replay an older generation, inject a failure between a staged write and its promotion, remove the sealed root while domain files remain.
+- **Adversarial tests:** flip each public field of an envelope and expect failure, open a blob as the wrong payload kind, leave a stray temporary file beside a domain, remove one domain file, remove the sealed root while domain files remain. The last three must land in the integrity-failure state, never in defaults.
 - **Invariant tests** against the fake enclave: no enclave key is ever created without the application-password option, every session buffer reads as zeros after relock, no path reuses a context after invalidation.
 - **Device tests** on real hardware: the application-password probes, plus one unlock and one private operation end to end.
 
