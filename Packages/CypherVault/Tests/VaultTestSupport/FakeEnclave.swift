@@ -57,14 +57,19 @@ public final class FakeEnclave: Enclave, @unchecked Sendable {
     }
 }
 
-public final class InMemorySealedRootStorage: SealedRootStorage, @unchecked Sendable {
-    private let data = OSAllocatedUnfairLock<Data?>(initialState: nil)
+public final class InMemoryRowStore: RowStore, @unchecked Sendable {
+    private let rows = OSAllocatedUnfairLock<[String: (data: Data, attribute: Data?)]>(initialState: [:])
     public init() {}
-    public func load() throws(VaultError) -> Data? { data.withLock { $0 } }
-    public func replace(_ new: Data) throws(VaultError) { data.withLock { $0 = new } }
-    public func delete() throws(VaultError) { data.withLock { $0 = nil } }
-    /// Flips one byte of the stored row, for damage tests.
-    public func corrupt() { data.withLock { if var d = $0, !d.isEmpty { d[d.count / 2] ^= 0xFF; $0 = d } } }
+    public func read(account: String) throws(VaultError) -> Data? { rows.withLock { $0[account]?.data } }
+    public func write(account: String, data: Data, attribute: Data?) throws(VaultError) { rows.withLock { $0[account] = (data, attribute) } }
+    public func delete(account: String) throws(VaultError) { rows.withLock { $0[account] = nil } }
+    public func accounts() throws(VaultError) -> [(account: String, attribute: Data?)] {
+        rows.withLock { $0.map { ($0.key, $0.value.attribute) }.sorted { $0.0 < $1.0 } }
+    }
+    /// Flips one byte of a row's value, for damage tests.
+    public func corrupt(account: String) {
+        rows.withLock { if var row = $0[account], !row.data.isEmpty { row.data[row.data.count / 2] ^= 0xFF; $0[account] = row } }
+    }
 }
 
 /// SHA-256 over passphrase and salt: deterministic and instant, for tests only.

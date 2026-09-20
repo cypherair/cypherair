@@ -12,26 +12,30 @@ import Security
 /// that can prompt runs off the caller's actor.
 public struct Vault: Sendable {
     public let enclave: any Enclave
-    public let storage: any SealedRootStorage
+    public let rootRows: any RowStore
     public let stretcher: any PassphraseStretcher
     public let authenticator: any Authenticator
 
     public init(
         enclave: any Enclave,
-        storage: any SealedRootStorage,
+        rootRows: any RowStore,
         stretcher: any PassphraseStretcher,
         authenticator: any Authenticator
     ) {
         self.enclave = enclave
-        self.storage = storage
+        self.rootRows = rootRows
         self.stretcher = stretcher
         self.authenticator = authenticator
     }
 
+    /// The one row that holds the sealed root.
+    public static let sealedRootService = "com.cypherair.vault.sealed-root"
+    public static let sealedRootAccount = "com.cypherair"
+
     /// Whether onboarding has completed on this device. Reads no secret and
     /// shows no prompt.
     public func sealedRootExists() throws(VaultError) -> Bool {
-        try storage.load() != nil
+        try rootRows.read(account: Self.sealedRootAccount) != nil
     }
 
     /// Onboarding: one presence prompt, then a fresh root sealed under a new
@@ -39,7 +43,7 @@ public struct Vault: Sendable {
     /// identity wrapping key whose password is the identity credential.
     public func bootstrap(passphrase: consuming SensitiveBuffer, reason: String) async throws(VaultError) -> UnlockedSession {
         guard enclave.isAvailable else { throw .enclaveUnavailable }
-        guard try storage.load() == nil else { throw .internalFailure("a sealed root already exists") }
+        guard try rootRows.read(account: Self.sealedRootAccount) == nil else { throw .internalFailure("a sealed root already exists") }
         let context = LAContext()
         defer { context.invalidate() }
         try await authenticator.authenticate(context: context, reason: reason)
@@ -48,7 +52,7 @@ public struct Vault: Sendable {
             passphrase: SensitiveKeyBox(passphrase),
             context: ContextCarrier(context: context)
         )
-        try storage.replace(result.encodedEnvelope)
+        try rootRows.write(account: Self.sealedRootAccount, data: result.encodedEnvelope)
         return result.session
     }
 
@@ -78,13 +82,13 @@ public struct Vault: Sendable {
             new: SensitiveKeyBox(new),
             context: ContextCarrier(context: context)
         )
-        try storage.replace(encoded)
+        try rootRows.write(account: Self.sealedRootAccount, data: encoded)
     }
 
     /// Deletes the sealed root. Every identity key on the device is unusable
     /// afterwards by construction; callers delete the rest.
     public func reset() throws(VaultError) {
-        try storage.delete()
+        try rootRows.delete(account: Self.sealedRootAccount)
     }
 
     // MARK: - Chain
@@ -95,7 +99,7 @@ public struct Vault: Sendable {
     }
 
     func loadSealedRoot() throws(VaultError) -> SealedRoot {
-        guard let data = try storage.load() else { throw .noSealedRoot }
+        guard let data = try rootRows.read(account: Self.sealedRootAccount) else { throw .noSealedRoot }
         let envelope: EnclaveSealedEnvelope
         do {
             envelope = try EnclaveSealedEnvelopeCodec.decode(data, expectedKind: .rootSecret)

@@ -8,16 +8,16 @@ import XCTest
 
 final class VaultTests: XCTestCase {
     private var enclave: FakeEnclave!
-    private var storage: InMemorySealedRootStorage!
+    private var storage: InMemoryRowStore!
     private var authenticator: CountingAuthenticator!
     private var vault: Vault!
 
     override func setUp() {
         super.setUp()
         enclave = FakeEnclave()
-        storage = InMemorySealedRootStorage()
+        storage = InMemoryRowStore()
         authenticator = CountingAuthenticator()
-        vault = Vault(enclave: enclave, storage: storage, stretcher: FakeStretcher(), authenticator: authenticator)
+        vault = Vault(enclave: enclave, rootRows: storage, stretcher: FakeStretcher(), authenticator: authenticator)
     }
 
     private func bootstrap(_ passphrase: String = "correct horse") async throws -> UnlockedSession {
@@ -97,14 +97,14 @@ final class VaultTests: XCTestCase {
 
     func test_changePassphrase_withWrongCurrent_changesNothing() async throws {
         _ = try await bootstrap("old one")
-        let stored = try storage.load()
+        let stored = try storage.read(account: Vault.sealedRootAccount)
         do {
             try await vault.changePassphrase(current: .text("nope"), new: .text("new one"), reason: "test")
             XCTFail("change accepted a wrong current passphrase")
         } catch {
             XCTAssertEqual(error as? VaultError, .passphraseRejected)
         }
-        XCTAssertEqual(try storage.load(), stored)
+        XCTAssertEqual(try storage.read(account: Vault.sealedRootAccount), stored)
     }
 
     func test_relock_erasesTheSession() async throws {
@@ -136,7 +136,7 @@ final class VaultTests: XCTestCase {
             XCTAssertEqual(error as? VaultError, .noSealedRoot)
         }
         _ = try await bootstrap()
-        storage.corrupt()
+        storage.corrupt(account: Vault.sealedRootAccount)
         do {
             _ = try await unlock("correct horse")
             XCTFail("corrupt root opened")

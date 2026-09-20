@@ -30,26 +30,3 @@ public struct SealedRootMetadata: Codable, Equatable, Sendable {
         return metadata
     }
 }
-
-/// Where the sealed root row lives. Production is one Keychain row; tests keep
-/// it in memory.
-public protocol SealedRootStorage: Sendable {
-    func load() throws(VaultError) -> Data?
-    func replace(_ data: Data) throws(VaultError)
-    func delete() throws(VaultError)
-}
-
-public struct KeychainSealedRootStorage: SealedRootStorage {
-    public static let service = "com.cypherair.vault.sealed-root"
-    public static let account = "com.cypherair"
-
-    private let rows: KeychainRows
-
-    public init(service: String = KeychainSealedRootStorage.service) {
-        rows = KeychainRows(service: service)
-    }
-
-    public func load() throws(VaultError) -> Data? { try rows.read(account: Self.account) }
-    public func replace(_ data: Data) throws(VaultError) { try rows.write(account: Self.account, data: data) }
-    public func delete() throws(VaultError) { try rows.delete(account: Self.account) }
-}

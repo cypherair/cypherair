@@ -21,5 +21,6 @@ let package = Package(
         .target(name: "VaultTestSupport", dependencies: ["Vault", "Sealing"], path: "Tests/VaultTestSupport", swiftSettings: swiftSettings),
         .testTarget(name: "SealingTests", dependencies: ["Sealing"], swiftSettings: swiftSettings),
         .testTarget(name: "VaultTests", dependencies: ["Vault", "Sealing", "VaultTestSupport"], swiftSettings: swiftSettings),
+        .testTarget(name: "StoresTests", dependencies: ["Stores", "Vault", "Sealing", "VaultTestSupport"], swiftSettings: swiftSettings),
     ]
 )
