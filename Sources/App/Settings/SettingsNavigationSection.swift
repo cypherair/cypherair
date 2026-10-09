@@ -37,7 +37,7 @@ struct SettingsNavigationSection: View {
             .buttonStyle(.plain)
             .disabled(
                 !model.configuration.isGuidedTutorialEntryEnabled
-                    || !model.isProtectedOrdinarySettingsEditable
+                    || !model.isSettingsEditable
             )
 
             NavigationLink(value: AppRoute.license) {

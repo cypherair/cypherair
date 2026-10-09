@@ -37,9 +37,8 @@ struct SignView: View {
 
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
+    @Environment(AppSettingsCoordinator.self) private var appSettings
 
     let configuration: Configuration
 
@@ -51,9 +50,8 @@ struct SignView: View {
         SignScreenHostView(
             signingService: signingService,
             keyManagement: keyManagement,
-            config: config,
             appSessionOrchestrator: appSessionOrchestrator,
-            protectedSettingsHost: protectedSettingsHost,
+            appSettings: appSettings,
             configuration: configuration
         )
     }
@@ -68,9 +66,8 @@ private struct SignScreenHostView: View {
     init(
         signingService: SigningService,
         keyManagement: KeyManagementService,
-        config: AppConfiguration,
         appSessionOrchestrator: AppSessionOrchestrator,
-        protectedSettingsHost: ProtectedSettingsHost?,
+        appSettings: AppSettingsCoordinator,
         configuration: SignView.Configuration
     ) {
         self.appSessionOrchestrator = appSessionOrchestrator
@@ -78,8 +75,7 @@ private struct SignScreenHostView: View {
             initialValue: SignScreenModel(
                 signingService: signingService,
                 keyManagement: keyManagement,
-                config: config,
-                protectedSettingsHost: protectedSettingsHost,
+                appSettings: appSettings,
                 configuration: configuration
             )
         )

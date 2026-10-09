@@ -3,19 +3,9 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// Shared base for device-only Secure Enclave **custody** tests — the device-bound
-/// signing + key-agreement handle model, distinct from the legacy Secure
-/// Enclave software-key wrapping exercised through `DeviceSecurityTestCase`.
-///
-/// It owns the hardware/biometric guards, software cross-verification of real
-/// enclave outputs, failure-category mapping, and the sanitized-output
-/// assertions shared by the custody device tests, so each lives in exactly one
-/// place. Custody test classes inherit from this instead of copying these
-/// helpers per file.
+/// Device tests that drive Secure Enclave custody keys under a real biometric
+/// prompt. Every test costs the operator one Face ID or Touch ID.
 class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
-    // MARK: - Hardware / biometric guards
-
-    /// Skip unless this run has a real Secure Enclave and an enrolled biometric set.
     final func requireSecureEnclaveCustodyHardware() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
         let context = LAContext()
@@ -27,8 +17,6 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         }
     }
 
-    /// Acquire a single authenticated biometric `LAContext`, then forbid further
-    /// interaction so callers can reuse it across private operations with one approval.
     final func authenticatedBiometricsContext(reason: String) async throws -> LAContext {
         let context = LAContext()
         context.localizedFallbackTitle = ""
@@ -38,7 +26,6 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
                 "Biometric authentication is unavailable: \(error?.localizedDescription ?? "unknown")"
             )
         }
-
         try await waitForAuthenticationSessionToSettle()
         let authenticated = try await context.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
@@ -49,109 +36,10 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         return context
     }
 
-    // MARK: - Software cross-verification of real enclave outputs
-
-    /// Verify a raw r‖s ECDSA signature produced by the enclave against the
-    /// handle's public binding with software CryptoKit — independent of the
-    /// production signer's own self-verify.
-    final func assertValidP256Signature(
-        _ signature: SecureEnclaveP256RawSignature,
-        digest: Data,
-        publicKeyX963: Data,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let publicKey = try P256.Signing.PublicKey(x963Representation: publicKeyX963)
-        let ecdsaSignature = try P256.Signing.ECDSASignature(
-            rawRepresentation: signature.r + signature.s
-        )
-        let rawDigest = try XCTUnwrap(SecureEnclaveP256SHA256Digest(digest), file: file, line: line)
-        XCTAssertTrue(
-            publicKey.isValidSignature(ecdsaSignature, for: rawDigest),
-            "Enclave signature failed software verification",
-            file: file,
-            line: line
-        )
-    }
-
-    // MARK: - Failure-category mapping
-
-    /// Sanitized failure categories acceptable when a private operation is denied
-    /// without interaction; none of them carry a fingerprint or locator.
-    var sanitizedPrivateOperationFailureCategories: Set<PGPKeyOperationFailureCategory> {
-        [
-            .localAuthenticationCancelled,
-            .localAuthenticationFailed,
-            .localAuthenticationUnavailable,
-            .localAuthenticationLockedOut,
-            .privateHandleInaccessible,
-            .privateHandleUnauthorized
-        ]
-    }
-
-    final func failureCategory(for error: Error) -> PGPKeyOperationFailureCategory {
-        if let custodyError = error as? SecureEnclaveCustodyHandleError {
-            return custodyError.failureCategory
-        }
-        let nsError = error as NSError
-        if nsError.domain == LAError.errorDomain,
-           let code = LAError.Code(rawValue: nsError.code) {
-            switch code {
-            case .userCancel, .systemCancel, .appCancel:
-                return .localAuthenticationCancelled
-            case .biometryLockout:
-                return .localAuthenticationLockedOut
-            case .biometryNotAvailable, .biometryNotEnrolled:
-                return .localAuthenticationUnavailable
-            case .authenticationFailed:
-                return .localAuthenticationFailed
-            case .notInteractive:
-                return .privateHandleUnauthorized
-            default:
-                return .privateHandleInaccessible
-            }
-        }
-        return .privateHandleInaccessible
-    }
-
-    // MARK: - Sanitized-output assertions
-
-    final func assertDoesNotLeak(
-        _ error: Error,
-        pair: SecureEnclaveCustodyHandlePair,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let text = String(describing: error)
-        assertSanitizedText(text, pair: pair, file: file, line: line)
-    }
-
-    final func assertSanitizedText(
-        _ text: String,
-        pair: SecureEnclaveCustodyHandlePair,
-        file: StaticString,
-        line: UInt
-    ) {
-        XCTAssertFalse(text.contains(pair.handleSetIdentifier), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.signing.publicKeyRaw.base64EncodedString()), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.keyAgreement.publicKeyRaw.base64EncodedString()), file: file, line: line)
-        XCTAssertFalse(text.contains(hex(pair.signing.publicKeyRaw)), file: file, line: line)
-        XCTAssertFalse(text.contains(hex(pair.keyAgreement.publicKeyRaw)), file: file, line: line)
-    }
-
     final func hex(_ data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }
 
-    // MARK: - Evidence
-
-    /// Emit a sanitized Secure Enclave custody evidence line whose `outcome` reflects whether this
-    /// test method has recorded any assertion failure up to this point. XCTest
-    /// assertions are non-fatal, so a literal `.passed` would mislead the evidence
-    /// matrix on a regression (the test goes red, yet the harvested line still
-    /// claimed passed). Deriving the outcome from `testRun?.failureCount` keeps an
-    /// emitted `outcome=passed` honest, and conservatively marks `.failed` once any
-    /// assertion in the method has failed.
     final func recordEvidence(
         _ scenario: SecureEnclaveCustodyEvidenceScenario,
         configuration: SecureEnclaveCustodyEvidenceFamily? = nil,

@@ -74,11 +74,6 @@ version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 """
 
-SQLCIPHER_PIN = {
-    "repository": "cypherair/sqlcipher-xcframework",
-    "release": {"tag": "sqlcipher-xcframework-v4.19.0-cypherair.1"},
-}
-
 STAGE1_PIN = {
     "dependencyName": "rust-arm64e-stage1-toolchain",
     "repository": "cypherair/rust",
@@ -164,9 +159,6 @@ class ReportTests(unittest.TestCase):
         (root / "pgp-mobile" / "Cargo.toml").write_text(CARGO_TOML, encoding="utf-8")
         (root / "pgp-mobile" / "Cargo.lock").write_text(CARGO_LOCK, encoding="utf-8")
         (root / "third_party").mkdir()
-        (root / "third_party" / "sqlcipher-xcframework.pin.json").write_text(
-            json.dumps(SQLCIPHER_PIN), encoding="utf-8"
-        )
         (root / "third_party" / "arm64e-stage1-toolchain.pin.json").write_text(
             json.dumps(STAGE1_PIN), encoding="utf-8"
         )
@@ -182,9 +174,6 @@ class ReportTests(unittest.TestCase):
         return freshness.Fetchers(
             crates_latest={"sequoia-openpgp": "2.4.1", "uniffi": "0.33.0"}.__getitem__,
             latest_release=lambda repository: {
-                "cypherair/sqlcipher-xcframework": {
-                    "tag_name": "sqlcipher-xcframework-v4.19.0-cypherair.1"
-                },
                 "actions/checkout": {"tag_name": "v7.0.0"},
                 "actions/upload-artifact": {"tag_name": "v7.1.0"},
             }[repository],
@@ -210,10 +199,6 @@ class ReportTests(unittest.TestCase):
         self.assertIn("3 compatible updates", by_name["cargo update --dry-run"]["latest"])
         self.assertEqual(by_name["sequoia-openpgp (crates.io)"]["status"], "current")
         self.assertEqual(by_name["uniffi (crates.io)"]["status"], "update-available")
-        self.assertEqual(
-            by_name["SQLCipher.xcframework (cypherair/sqlcipher-xcframework)"]["status"],
-            "current",
-        )
         self.assertEqual(by_name["arm64e stage1 toolchain (cypherair/rust)"]["status"], "current")
         self.assertEqual(
             by_name["openssl-src carry (cypherair/openssl-src-rs)"]["status"], "drift"

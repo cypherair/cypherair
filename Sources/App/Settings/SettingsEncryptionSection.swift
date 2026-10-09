@@ -12,7 +12,7 @@ struct SettingsEncryptionSection: View {
                     set: { model.setEncryptToSelf($0) }
                 )
             )
-            .disabled(!model.isProtectedOrdinarySettingsEditable)
+            .disabled(!model.isSettingsEditable)
 
             Toggle(
                 String(localized: "settings.signMessages", defaultValue: "Sign Messages"),
@@ -21,7 +21,7 @@ struct SettingsEncryptionSection: View {
                     set: { model.setSignMessages($0) }
                 )
             )
-            .disabled(!model.isProtectedOrdinarySettingsEditable)
+            .disabled(!model.isSettingsEditable)
         } header: {
             Text(String(localized: "settings.encryption", defaultValue: "Encryption"))
         } footer: {

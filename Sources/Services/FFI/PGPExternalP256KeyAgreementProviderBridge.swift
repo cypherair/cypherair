@@ -1,11 +1,12 @@
 import Foundation
+import Stores
 
 final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementProvider, @unchecked Sendable {
-    private let handle: SecureEnclaveCustodyLoadedHandle
+    private let handle: LoadedCustodyHandle
     private let keyAgreement: any SecureEnclaveCustodyKeyAgreement
 
     init(
-        handle: SecureEnclaveCustodyLoadedHandle,
+        handle: LoadedCustodyHandle,
         keyAgreement: any SecureEnclaveCustodyKeyAgreement
     ) {
         self.handle = handle
@@ -27,7 +28,7 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
             return sharedSecret.raw.withUnsafeBytes { P256RawSharedSecret(raw: Data($0)) }
         } catch is CancellationError {
             throw ExternalP256KeyAgreementError.OperationCancelled
-        } catch let error as SecureEnclaveCustodyHandleError {
+        } catch let error as CustodyError {
             throw ExternalP256KeyAgreementError.Failed(
                 category: Self.callbackCategory(for: error.failureCategory)
             )

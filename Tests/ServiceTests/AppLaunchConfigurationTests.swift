@@ -7,7 +7,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             environment: [
                 "UITEST_ROOT": "tutorial",
                 "UITEST_SKIP_ONBOARDING": "1",
-                "UITEST_TUTORIAL_TASK": "enableHighSecurity",
+                "UITEST_TUTORIAL_TASK": "addDemoContact",
                 "UITEST_REQUIRE_MANUAL_AUTH": "1",
                 "UITEST_OPEN_AUTHMODE_CONFIRMATION": "1",
                 "UITEST_PRELOAD_CONTACT": "1"
@@ -21,9 +21,8 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertFalse(configuration.isXCTestHost)
         XCTAssertTrue(configuration.usesUITestAppContainer)
         XCTAssertTrue(configuration.shouldSkipOnboarding)
-        XCTAssertEqual(configuration.tutorialModule, .enableHighSecurity)
+        XCTAssertEqual(configuration.tutorialModule, .addDemoContact)
         XCTAssertTrue(configuration.requiresManualAuthentication)
-        XCTAssertTrue(configuration.opensAuthModeConfirmation)
         XCTAssertTrue(configuration.preloadsUITestContact)
     }
 
@@ -132,7 +131,7 @@ final class AppLaunchConfigurationTests: XCTestCase {
             environment: [
                 "UITEST_ROOT": "tutorial",
                 "UITEST_SKIP_ONBOARDING": "1",
-                "UITEST_TUTORIAL_TASK": "enableHighSecurity",
+                "UITEST_TUTORIAL_TASK": "addDemoContact",
                 "UITEST_REQUIRE_MANUAL_AUTH": "1",
                 "UITEST_OPEN_AUTHMODE_CONFIRMATION": "1",
                 "UITEST_PRELOAD_CONTACT": "1"
@@ -148,7 +147,6 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertFalse(configuration.shouldSkipOnboarding)
         XCTAssertNil(configuration.tutorialModule)
         XCTAssertFalse(configuration.requiresManualAuthentication)
-        XCTAssertFalse(configuration.opensAuthModeConfirmation)
         XCTAssertFalse(configuration.preloadsUITestContact)
     }
 

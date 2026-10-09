@@ -1,41 +1,29 @@
 import XCTest
 @testable import CypherAir
 
+/// A contact service over a sandbox vault, opened before every test.
 class ContactServiceTestCase: XCTestCase {
-    typealias ContactsProtectedHarness = (
-        storageRoot: ProtectedDataStorageRoot,
-        registryStore: ProtectedDataRegistryStore,
-        domainKeyManager: ProtectedDomainKeyManager,
-        keychain: MockKeychain,
-        wrappingRootKey: Data,
-        store: ContactsDomainStore
-    )
-
     var engine: PgpEngine!
+    var sandbox: TestHelpers.Sandbox!
     var contactService: ContactService!
-    var tempDir: URL!
-
-    /// Own key identities that signed certifications made through
-    /// `makeVerifiedCertificationArtifacts`. Reopening the domain supplies them
-    /// the way the app does, so the unlock re-verification can resolve the
-    /// signer of a certification the user made themselves.
+    var tempDir: URL { sandbox.directory }
     private(set) var certificationSignerKeys: [PGPKeyIdentity] = []
 
     override func setUp() async throws {
         try await super.setUp()
         engine = PgpEngine()
         certificationSignerKeys = []
-        let result = await TestHelpers.makeContactService(engine: engine)
-        contactService = result.service
-        tempDir = result.tempDir
+        let opened = try await TestHelpers.makeContactService(engine: engine)
+        contactService = opened.service
+        sandbox = opened.sandbox
     }
 
     override func tearDown() {
-        TestHelpers.cleanupTempDir(tempDir)
+        sandbox?.cleanup()
         certificationSignerKeys = []
         contactService = nil
+        sandbox = nil
         engine = nil
-        tempDir = nil
         super.tearDown()
     }
 
@@ -43,69 +31,24 @@ class ContactServiceTestCase: XCTestCase {
         try FixtureLoader.loadData(name, ext: "gpg")
     }
 
-    func contactsDomainArtifactsExist(in storageRoot: ProtectedDataStorageRoot) -> Bool {
-        // Contacts SQLCipher authority must not recreate legacy snapshot-envelope plists.
-        let fileManager = FileManager.default
-        let urls = ProtectedDomainGenerationSlot.allCases.map {
-            storageRoot.domainEnvelopeURL(for: ContactsDomainStore.domainID, slot: $0)
-        }
-        return urls.contains { fileManager.fileExists(atPath: $0.path) }
+    /// A second contact service over its own sandbox vault.
+    func makeOpenedContactService() async throws -> (service: ContactService, sandbox: TestHelpers.Sandbox) {
+        let opened = try await TestHelpers.makeContactService(engine: engine)
+        XCTAssertEqual(opened.service.contactsAvailability, .available)
+        return opened
     }
 
-    func makeOpenedProtectedContactService(
-        prefix: String,
-        contactsDirectory: URL? = nil
-    ) async throws -> (
-        service: ContactService,
-        harness: ContactsProtectedHarness,
-        contactsDirectory: URL
-    ) {
-        let directory = contactsDirectory ?? tempDir
-            .appendingPathComponent("\(prefix)-contacts-\(UUID().uuidString)", isDirectory: true)
-        let harness = try makeContactsProtectedHarness(
-            prefix: prefix,
-            contactsDirectory: directory
-        )
-        let service = ContactService(
-            engine: engine,
-            contactsDomainStore: harness.store
-        )
-
-        let availability = await service.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-        XCTAssertEqual(availability, .availableProtectedDomain)
-
-        return (service, harness, directory)
-    }
-
-    func reopenProtectedContactService(
-        harness: ContactsProtectedHarness,
-        contactsDirectory: URL,
+    /// Relaunches the sandbox: the vault is locked and reopened through its
+    /// passphrase, and a fresh service reads the persisted contacts domain.
+    func reopenContactService(
+        sandbox: TestHelpers.Sandbox,
         ownSignerKeys: [PGPKeyIdentity]? = nil
-    ) async -> (service: ContactService, store: ContactsDomainStore) {
-        let store = ContactsDomainStore(
-            storageRoot: harness.storageRoot,
-            registryStore: harness.registryStore,
-            domainKeyManager: harness.domainKeyManager,
-            currentWrappingRootKey: { harness.wrappingRootKey },
-            initialSnapshotProvider: {
-                XCTFail("Committed Contacts domain should not recreate its initial snapshot.")
-                return ContactsDomainSnapshot.empty()
-            }
-        )
-        let service = ContactService(
-            engine: engine,
-            contactsDomainStore: store
-        )
-        let availability = await service.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey },
-            ownSignerKeys: ownSignerKeys ?? certificationSignerKeys
-        )
-        XCTAssertEqual(availability, .availableProtectedDomain)
-        return (service, store)
+    ) async throws -> ContactService {
+        try await sandbox.reopen()
+        let service = ContactService(engine: engine, vault: sandbox.vault)
+        let availability = await service.openContacts(ownSignerKeys: ownSignerKeys ?? certificationSignerKeys)
+        XCTAssertEqual(availability, .available)
+        return service
     }
 
     func attachCertificationArtifact(
@@ -140,7 +83,7 @@ class ContactServiceTestCase: XCTestCase {
         keyRecord: ContactKeyRecord,
         exportFilenames: (String, String)
     ) async throws -> (VerifiedContactCertificationArtifact, VerifiedContactCertificationArtifact) {
-        let keyManagement = TestHelpers.makeKeyManagement(engine: engine).service
+        let keyManagement = try await TestHelpers.makeKeyManagement(engine: engine).service
         let signer = try await TestHelpers.generateLegacyKey(
             service: keyManagement,
             name: "Certification Signer",
@@ -170,7 +113,6 @@ class ContactServiceTestCase: XCTestCase {
             selectedUserId: selectedUserId,
             certificationKind: .generic
         )
-
         let first = try await certificateSignatureService.validateUserIdCertificationArtifact(
             signature: signature,
             targetKey: targetKey,
@@ -187,7 +129,6 @@ class ContactServiceTestCase: XCTestCase {
             source: .imported,
             exportFilename: exportFilenames.1
         )
-
         return (
             try XCTUnwrap(first.artifact),
             try XCTUnwrap(duplicate.artifact)
@@ -241,59 +182,5 @@ class ContactServiceTestCase: XCTestCase {
         )
         configure(&artifact)
         return artifact
-    }
-
-    func makeContactsProtectedHarness(
-        prefix: String,
-        contactsDirectory: URL
-    ) throws -> ContactsProtectedHarness {
-        let storageRoot = ProtectedDataStorageRoot(
-            baseDirectory: FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
-        )
-        let registryStore = ProtectedDataRegistryStore(
-            storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.contacts.\(UUID().uuidString)"
-        )
-        _ = try registryStore.performSynchronousBootstrap()
-        var registry = try registryStore.loadRegistry()
-        registry.sharedResourceLifecycleState = .ready
-        registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
-        try registryStore.saveRegistry(registry)
-
-        let keychain = MockKeychain()
-        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot, keychain: keychain)
-        let wrappingRootKey = Data(repeating: 0xA4, count: 32)
-        let store = ContactsDomainStore(
-            storageRoot: storageRoot,
-            registryStore: registryStore,
-            domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey }
-        )
-
-        return (
-            storageRoot: storageRoot,
-            registryStore: registryStore,
-            domainKeyManager: domainKeyManager,
-            keychain: keychain,
-            wrappingRootKey: wrappingRootKey,
-            store: store
-        )
-    }
-
-    func authorizedContactsGate() -> ContactsPostAuthGateDecision {
-        ContactsPostAuthGateDecision(
-            postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
-            frameworkState: .sessionAuthorized
-        )
-    }
-
-    func cleanup(_ container: AppContainer) {
-        try? FileManager.default.removeItem(
-            at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
-        )
-        if let defaultsSuiteName = container.defaultsSuiteName {
-            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
-        }
     }
 }

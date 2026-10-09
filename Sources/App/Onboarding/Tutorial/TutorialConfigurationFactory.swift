@@ -171,9 +171,7 @@ struct TutorialConfigurationFactory {
 
     func settingsConfiguration() -> SettingsView.Configuration {
         var configuration = SettingsView.Configuration(
-            onAuthModeConfirmationRequested: { [weak store] request in
-                store?.presentAuthModeConfirmation(request)
-            },
+            isSandbox: true,
             isOnboardingEntryEnabled: false,
             isGuidedTutorialEntryEnabled: false,
             isAppIconEntryEnabled: false,
@@ -186,8 +184,6 @@ struct TutorialConfigurationFactory {
                 defaultValue: "App Icon changes affect the real app and are unavailable inside the tutorial sandbox."
             )
         )
-        configuration.protectedSettingsHostMode = .tutorialSandbox
-        configuration.protectedSettingsHost = ProtectedSettingsHost(mode: .tutorialSandbox)
         configuration.localDataResetAvailability = .disabled(
             footer: String(
                 localized: "guidedTutorial.settings.restricted.localDataReset",

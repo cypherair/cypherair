@@ -3,9 +3,9 @@ import XCTest
 
 final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     func test_protectedCertificationArtifactSaveDeduplicatesExportsAndPersists() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsCertificationSave")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -40,24 +40,21 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
         XCTAssertEqual(export.filename.value, "artifact-save.asc")
 
-        try await service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        let reopenedArtifacts = reopened.service.certificationArtifacts(for: keyRecord.keyId)
+        try await service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        let reopenedArtifacts = reopened.certificationArtifacts(for: keyRecord.keyId)
 
         XCTAssertEqual(reopenedArtifacts.map(\.artifactId), [saved.artifactId])
         XCTAssertEqual(
-            reopened.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            reopened.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
             .certified
         )
     }
 
     func test_certificationProjectionDoesNotChangeManualVerification() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsManualSeparate")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -89,9 +86,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     }
 
     func test_certificationArtifactSaveRejectsStaleTargetDigest() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsStaleDigest")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -127,9 +124,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     }
 
     func test_certificationArtifactSaveBackfillsMissingTargetDigest() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsBackfillDigest")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -167,9 +164,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     }
 
     func test_certificationArtifactDedupeRefreshesValidatedMetadata() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsDedupeRefresh")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -239,9 +236,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     }
 
     func test_certificationProjectionRecomputeMarksStaleDigestInvalidOrStale() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsRecomputeStaleDigest")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -290,9 +287,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     }
 
     func test_certificationProjectionRecomputeReturnsTrueWhenOnlyArtifactStatusChanges() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsRecomputeArtifactOnly")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -341,9 +338,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     }
 
     func test_certificationProjectionRecomputeKeepsCurrentDigestValidCertified() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsRecomputeValidDigest")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -384,9 +381,9 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
     /// The badge must say what the engine says about the signer *now*, not what
     /// it said when the certification was saved.
     func test_openContacts_certificationBadgeFollowsCurrentSignerVerdict() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsCertificationRevalidation")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -416,27 +413,19 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         // The signer is no longer among the keys this device holds. The vouch
         // cannot be checked, so the badge must stop asserting it — without
         // claiming the certification is invalid.
-        try await service.relockProtectedData()
-        let withoutSigner = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory,
-            ownSignerKeys: []
-        )
+        try await service.relockVault()
+        let withoutSigner = try await reopenContactService(sandbox: opened.sandbox, ownSignerKeys: [])
         XCTAssertEqual(
-            withoutSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            withoutSigner.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
             .revalidationNeeded
         )
 
         // The signer is available again and still sound: the verdict is retaken
         // and the badge returns rather than staying stuck at its worst answer.
-        try await withoutSigner.service.relockProtectedData()
-        let withSigner = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory,
-            ownSignerKeys: [signer]
-        )
+        try await withoutSigner.relockVault()
+        let withSigner = try await reopenContactService(sandbox: opened.sandbox, ownSignerKeys: [signer])
         XCTAssertEqual(
-            withSigner.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            withSigner.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
             .certified
         )
 
@@ -452,18 +441,14 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             "The revoked-signer fixture must actually read as revoked"
         )
 
-        try await withSigner.service.relockProtectedData()
-        let afterRevocation = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory,
-            ownSignerKeys: [revokedSigner]
-        )
+        try await withSigner.relockVault()
+        let afterRevocation = try await reopenContactService(sandbox: opened.sandbox, ownSignerKeys: [revokedSigner])
         XCTAssertEqual(
-            afterRevocation.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            afterRevocation.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
             .invalidOrStale
         )
         let revalidatedArtifact = try XCTUnwrap(
-            afterRevocation.service.certificationArtifacts(for: keyRecord.keyId).first
+            afterRevocation.certificationArtifacts(for: keyRecord.keyId).first
         )
         XCTAssertEqual(revalidatedArtifact.validationStatus, .invalidOrStale)
         XCTAssertEqual(

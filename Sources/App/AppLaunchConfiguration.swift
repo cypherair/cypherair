@@ -17,7 +17,8 @@ struct AppLaunchConfiguration {
     /// human biometric at launch. Meaningful only with
     /// `requiresManualAuthentication`; the derivation enforces that pairing.
     let manualAuthStartsUnlocked: Bool
-    let opensAuthModeConfirmation: Bool
+    /// The sandbox vault's passphrase under UI test, so a test can type it.
+    let uiTestVaultPassphrase: String
     let preloadsUITestContact: Bool
 
     var usesUITestAppContainer: Bool {
@@ -55,7 +56,7 @@ struct AppLaunchConfiguration {
             self.isXCTestHost = false
             self.requiresManualAuthentication = false
             self.manualAuthStartsUnlocked = false
-            self.opensAuthModeConfirmation = false
+            self.uiTestVaultPassphrase = Self.defaultUITestVaultPassphrase
             self.preloadsUITestContact = false
             self.shouldSkipOnboarding = false
             self.tutorialModule = nil
@@ -69,7 +70,7 @@ struct AppLaunchConfiguration {
         self.requiresManualAuthentication = requiresManualAuthentication
         self.manualAuthStartsUnlocked = requiresManualAuthentication
             && environment["UITEST_MANUAL_AUTH_STARTS_UNLOCKED"] == "1"
-        self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
+        self.uiTestVaultPassphrase = environment["UITEST_VAULT_PASSPHRASE"] ?? Self.defaultUITestVaultPassphrase
         self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
         self.tutorialModule = environment["UITEST_TUTORIAL_TASK"].flatMap(Self.tutorialModule(for:))
@@ -84,6 +85,8 @@ struct AppLaunchConfiguration {
         }
     }
 
+    static let defaultUITestVaultPassphrase = "cypherair-uitest-passphrase"
+
     private static var defaultAllowsUITestLaunchOverrides: Bool {
         #if DEBUG
         true
@@ -96,7 +99,6 @@ struct AppLaunchConfiguration {
         switch value {
         case "createDemoIdentity": .createDemoIdentity
         case "addDemoContact": .addDemoContact
-        case "enableHighSecurity": .enableHighSecurity
         default: nil
         }
     }

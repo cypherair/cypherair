@@ -1,65 +1,54 @@
 import Foundation
 import LocalAuthentication
+import Sealing
+import Stores
+import Vault
 
-/// Generation path for Secure Enclave custody public-only keys (device-bound
-/// families).
+/// Generates device-bound identities: a fresh custody key pair in the enclave
+/// under one approval, the certificate built through the engine's external
+/// signer, and for the post-quantum families the classical half sealed against
+/// the identity wrapping key. Any failure undoes what was created.
 final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     typealias GenerationCheckpoint = @Sendable () async throws -> Void
 
     private let certificateBuilder: any SecureEnclaveCustodyCertificateBuilding
-    private let handleStore: SecureEnclaveCustodyHandleStore
+    private let vault: AppVault
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
     private let compositeCertificateBuilder: (any SecureEnclaveCompositeCertificateBuilding)?
-    private let compositeHandleStore: SecureEnclaveCustodyHandleStore?
-    private let compositeHighHandleStore: SecureEnclaveCustodyHandleStore?
     private let compositeSigner: (any SecureEnclaveCompositeSigning)?
-    private let compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore?
     private let catalogStore: KeyCatalogStore
     private let resolver: PGPKeyCapabilityResolver
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let commitCoordinator: KeyProvisioningCommitCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator?
-    private let custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let afterIdentityCommitCheckpoint: GenerationCheckpoint?
 
     init(
         certificateBuilder: any SecureEnclaveCustodyCertificateBuilding,
-        handleStore: SecureEnclaveCustodyHandleStore,
+        vault: AppVault,
         digestSigner: any SecureEnclaveCustodyDigestSigning,
         compositeCertificateBuilder: (any SecureEnclaveCompositeCertificateBuilding)? = nil,
-        compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil,
-        compositeHighHandleStore: SecureEnclaveCustodyHandleStore? = nil,
         compositeSigner: (any SecureEnclaveCompositeSigning)? = nil,
-        compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore? = nil,
         catalogStore: KeyCatalogStore,
         resolver: PGPKeyCapabilityResolver,
         invalidationGate: KeyProvisioningInvalidationGate,
         commitCoordinator: KeyProvisioningCommitCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
-        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         afterIdentityCommitCheckpoint: GenerationCheckpoint? = nil
     ) {
         self.certificateBuilder = certificateBuilder
-        self.handleStore = handleStore
+        self.vault = vault
         self.digestSigner = digestSigner
         self.compositeCertificateBuilder = compositeCertificateBuilder
-        self.compositeHandleStore = compositeHandleStore
-        self.compositeHighHandleStore = compositeHighHandleStore
         self.compositeSigner = compositeSigner
-        self.compositeClassicalComponentStore = compositeClassicalComponentStore
         self.catalogStore = catalogStore
         self.resolver = resolver
         self.invalidationGate = invalidationGate
         self.commitCoordinator = commitCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.custodyOperationAuthenticator = custodyOperationAuthenticator
         self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
-    /// Only the custody authorization and immediately authorized handle-creation
-    /// window is enrolled in an operation-prompt session. Certificate building
-    /// and durable metadata commit stay outside that window so a genuine macOS
-    /// away still locks immediately when grace period is 0.
     func generateKey(
         name: String,
         email: String?,
@@ -68,378 +57,171 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         guard let tier = family.deviceBoundCustodyTier else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Secure Enclave custody generation requires a device-bound family."
-            )
+            throw CypherAirError.invalidKeyData(reason: "Secure Enclave custody generation requires a device-bound family.")
         }
+        let resolution = resolver.resolution(for: .generate, family: family, custody: .appleSecureEnclavePrivateOperations)
+        guard resolution.support == .supported else {
+            throw CypherAirError.keyOperationUnavailable(category: resolution.failureCategory ?? .operationUnavailableByPolicy)
+        }
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
         switch tier {
         case .classicalP256:
-            return try await performGenerateClassicalKey(
-                name: name,
-                email: email,
-                validity: validity,
-                family: family,
-                invalidationToken: token
-            )
+            return try await generateClassical(name: name, email: email, validity: validity, family: family, token: token)
         case .postQuantum, .postQuantumHigh:
-            return try await performGenerateCompositeKey(
-                name: name,
-                email: email,
-                validity: validity,
-                family: family,
-                tier: tier,
-                invalidationToken: token
-            )
+            return try await generateComposite(name: name, email: email, validity: validity, family: family, tier: tier, token: token)
         }
     }
 
-    /// Classical (P-256) generation: create the two Secure Enclave keys under
-    /// one authorized window, build the public-only v4/v6 certificate through
-    /// the external P-256 signer, then commit the identity. Every failure path
-    /// tears down the enclave keys and any committed identity.
-    private func performGenerateClassicalKey(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        family: PGPKeyFamily,
-        invalidationToken token: KeyProvisioningInvalidationGate.Token
+    private func generateClassical(
+        name: String, email: String?, validity: PGPKeyValidity, family: PGPKeyFamily,
+        token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        let resolution = resolver.resolution(
-            for: .generate,
-            family: family,
-            custody: .appleSecureEnclavePrivateOperations
-        )
-        guard resolution.support == .supported else {
-            throw CypherAirError.keyOperationUnavailable(
-                category: resolution.failureCategory ?? .operationUnavailableByPolicy
-            )
-        }
-
-        try Task.checkCancellation()
-        try invalidationGate.checkValid(token)
-
-        let authorizedPair = try await createAuthorizedHandlePair(handleStore: handleStore)
-        let authorizedContext = authorizedPair.authenticationContext
-        defer {
-            authorizedContext?.invalidate()
-        }
-
-        let loadedPair = authorizedPair.loadedPair
-        let handlePair = try SecureEnclaveCustodyHandlePair(
-            signing: loadedPair.signing.binding,
-            keyAgreement: loadedPair.keyAgreement.binding
-        )
+        let authorized = try await createAuthorizedHandlePair(tier: .classicalP256)
+        defer { authorized.context.invalidate() }
         var storedFingerprint: String?
-        var didRollbackGeneratedState = false
         do {
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
-
             let generated = try await certificateBuilder.generatePublicCertificate(
-                name: name,
-                email: email,
-                validity: validity,
-                family: family,
-                handlePair: loadedPair,
-                digestSigner: digestSigner
+                name: name, email: email, validity: validity, family: family,
+                handlePair: authorized.pair, digestSigner: digestSigner
             )
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
-
-            return try await commitCoordinator.performCommit {
-                do {
-                    try Task.checkCancellation()
-                    try invalidationGate.checkValid(token)
-                    guard !catalogStore.containsKey(fingerprint: generated.metadata.fingerprint) else {
-                        throw CypherAirError.duplicateKey
-                    }
-
-                    let identity = PGPKeyIdentity(
-                        fingerprint: generated.metadata.fingerprint,
-                        userId: generated.metadata.userId,
-                        hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
-                        isRevoked: false,
-                        isExpired: generated.metadata.isExpired,
-                        isDefault: catalogStore.keys.isEmpty,
-                        isBackedUp: false,
-                        publicKeyData: generated.publicKeyData,
-                        revocationCert: generated.revocationCert,
-                        primaryAlgo: generated.metadata.primaryAlgo,
-                        subkeyAlgo: generated.metadata.subkeyAlgo,
-                        expiryDate: generated.metadata.expiryDate,
-                        keyFamily: family,
-                        privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-                    )
-                    try catalogStore.storeNewIdentity(identity)
-                    storedFingerprint = identity.fingerprint
-                    if let afterIdentityCommitCheckpoint {
-                        try await afterIdentityCommitCheckpoint()
-                    }
-                    try Task.checkCancellation()
-                    try invalidationGate.checkValid(token)
-                    return identity
-                } catch {
-                    do {
-                        didRollbackGeneratedState = true
-                        try rollbackGeneratedClassicalState(
-                            handlePair: handlePair,
-                            storedFingerprint: storedFingerprint
-                        )
-                    } catch {
-                        throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
-                    }
-                    throw error
-                }
-            }
+            return try await commit(
+                metadata: generated.metadata, publicKeyData: generated.publicKeyData, revocationCert: generated.revocationCert,
+                family: family, token: token
+            ) { storedFingerprint = $0 }
         } catch {
-            if !didRollbackGeneratedState {
-                do {
-                    try rollbackGeneratedClassicalState(
-                        handlePair: handlePair,
-                        storedFingerprint: storedFingerprint
-                    )
-                } catch {
-                    throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
-                }
+            do {
+                try rollback(pair: authorized.pair.pair, splitCustodyFingerprint: nil, storedFingerprint: storedFingerprint)
+            } catch {
+                throw CustodyError.cleanupOrRollbackFailed
             }
             throw error
         }
     }
 
-    /// Device-Bound Post-Quantum split-custody generation: create the two
-    /// Secure Enclave composite keys under one authorized window, build the
-    /// certificate through the external ML-DSA signer (the Ed25519/X25519
-    /// classical components are generated inside Rust), seal the returned
-    /// classical component under the fixed-access envelope, then commit the
-    /// identity. Every failure path tears down the enclave keys, the classical
-    /// envelope, and any committed identity.
-    private func performGenerateCompositeKey(
-        name: String,
-        email: String?,
-        validity: PGPKeyValidity,
-        family: PGPKeyFamily,
-        tier: SecureEnclaveCustodyTier,
-        invalidationToken token: KeyProvisioningInvalidationGate.Token
+    private func generateComposite(
+        name: String, email: String?, validity: PGPKeyValidity, family: PGPKeyFamily, tier: CustodyTier,
+        token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        // Each tier creates and shape-checks its handles against its own
-        // parameter set, so the enclave handle store is selected by tier
-        // (exhaustive: a new tier fails to compile until it is wired here).
-        let tierHandleStore: SecureEnclaveCustodyHandleStore?
-        switch tier {
-        case .classicalP256:
-            // generateKey dispatches classical tiers to the classical path
-            // before this function; reaching here is a wiring bug. Fail loudly
-            // in debug; the guard below still fails closed in release.
-            assertionFailure("Classical P-256 tier routed to composite generation")
-            tierHandleStore = nil
-        case .postQuantum:
-            tierHandleStore = compositeHandleStore
-        case .postQuantumHigh:
-            tierHandleStore = compositeHighHandleStore
-        }
-        guard let compositeCertificateBuilder,
-              let compositeSigner,
-              let compositeClassicalComponentStore,
-              let compositeHandleStore = tierHandleStore else {
+        guard let compositeCertificateBuilder, let compositeSigner else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)
         }
-        let resolution = resolver.resolution(
-            for: .generate,
-            family: family,
-            custody: .appleSecureEnclavePrivateOperations
-        )
-        guard resolution.support == .supported else {
-            throw CypherAirError.keyOperationUnavailable(
-                category: resolution.failureCategory ?? .operationUnavailableByPolicy
-            )
-        }
-
-        try Task.checkCancellation()
-        try invalidationGate.checkValid(token)
-
-        let authorizedPair = try await createAuthorizedHandlePair(
-            handleStore: compositeHandleStore
-        )
-        let authorizedContext = authorizedPair.authenticationContext
-        defer {
-            authorizedContext?.invalidate()
-        }
-
-        let handlePair = authorizedPair.loadedPair
+        let authorized = try await createAuthorizedHandlePair(tier: tier)
+        defer { authorized.context.invalidate() }
         var storedFingerprint: String?
-        var storedClassicalComponentFingerprint: String?
-        var didRollbackGeneratedState = false
+        var sealedFingerprint: String?
         do {
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
-
             var generated = try await compositeCertificateBuilder.generateCompositeCertificate(
-                name: name,
-                email: email,
-                validity: validity,
-                handlePair: handlePair,
-                compositeSigner: compositeSigner
+                name: name, email: email, validity: validity,
+                handlePair: authorized.pair, compositeSigner: compositeSigner
             )
-            // Move the raw classical component secrets out of the engine's
-            // result as soon as it arrives. A cancellation or invalidation
-            // throw between receipt and seal then frees them erased, and the
-            // seal below consumes them outright.
-            let classicalEddsaSecret = SensitiveBuffer(consuming: &generated.classicalEddsaSecret)
-            let classicalEcdhSecret = SensitiveBuffer(consuming: &generated.classicalEcdhSecret)
+            let eddsa = SensitiveBuffer(consuming: &generated.classicalEddsaSecret)
+            let ecdh = SensitiveBuffer(consuming: &generated.classicalEcdhSecret)
+            let concatenated = try SplitCustodyClassicalComponent.concatenate(eddsaSecret: eddsa, ecdhSecret: ecdh, tier: tier)
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
-
-            // Seal the classical component before the durable identity commit
-            // so a committed identity never exists without its component.
-            try compositeClassicalComponentStore.store(
-                fingerprint: generated.metadata.fingerprint,
-                eddsaSecret: classicalEddsaSecret,
-                ecdhSecret: classicalEcdhSecret,
-                tier: tier
-            )
-            storedClassicalComponentFingerprint = generated.metadata.fingerprint
-
-            return try await commitCoordinator.performCommit {
-                do {
-                    try Task.checkCancellation()
-                    try invalidationGate.checkValid(token)
-                    guard !catalogStore.containsKey(fingerprint: generated.metadata.fingerprint) else {
-                        throw CypherAirError.duplicateKey
-                    }
-
-                    let identity = PGPKeyIdentity(
-                        fingerprint: generated.metadata.fingerprint,
-                        userId: generated.metadata.userId,
-                        hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
-                        isRevoked: false,
-                        isExpired: generated.metadata.isExpired,
-                        isDefault: catalogStore.keys.isEmpty,
-                        isBackedUp: false,
-                        publicKeyData: generated.publicKeyData,
-                        revocationCert: generated.revocationCert,
-                        primaryAlgo: generated.metadata.primaryAlgo,
-                        subkeyAlgo: generated.metadata.subkeyAlgo,
-                        expiryDate: generated.metadata.expiryDate,
-                        keyFamily: family,
-                        privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-                    )
-                    try catalogStore.storeNewIdentity(identity)
-                    storedFingerprint = identity.fingerprint
-                    if let afterIdentityCommitCheckpoint {
-                        try await afterIdentityCommitCheckpoint()
-                    }
-                    try Task.checkCancellation()
-                    try invalidationGate.checkValid(token)
-                    return identity
-                } catch {
-                    do {
-                        didRollbackGeneratedState = true
-                        try rollbackGeneratedCompositeState(
-                            compositeHandleStore: compositeHandleStore,
-                            compositeClassicalComponentStore: compositeClassicalComponentStore,
-                            loadedPair: handlePair,
-                            storedClassicalComponentFingerprint: storedClassicalComponentFingerprint,
-                            storedFingerprint: storedFingerprint
-                        )
-                    } catch {
-                        throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
-                    }
-                    throw error
-                }
+            do {
+                try vault.splitCustody.seal(concatenated, fingerprint: generated.metadata.fingerprint, session: try vault.requireSession())
+            } catch {
+                throw CypherAirError.fromStore(error)
             }
+            sealedFingerprint = generated.metadata.fingerprint
+            return try await commit(
+                metadata: generated.metadata, publicKeyData: generated.publicKeyData, revocationCert: generated.revocationCert,
+                family: family, token: token
+            ) { storedFingerprint = $0 }
         } catch {
-            if !didRollbackGeneratedState {
-                do {
-                    try rollbackGeneratedCompositeState(
-                        compositeHandleStore: compositeHandleStore,
-                        compositeClassicalComponentStore: compositeClassicalComponentStore,
-                        loadedPair: handlePair,
-                        storedClassicalComponentFingerprint: storedClassicalComponentFingerprint,
-                        storedFingerprint: storedFingerprint
-                    )
-                } catch {
-                    throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
-                }
+            do {
+                try rollback(pair: authorized.pair.pair, splitCustodyFingerprint: sealedFingerprint, storedFingerprint: storedFingerprint)
+            } catch {
+                throw CustodyError.cleanupOrRollbackFailed
             }
             throw error
         }
     }
 
-    private func createAuthorizedHandlePair(
-        handleStore: SecureEnclaveCustodyHandleStore
-    ) async throws -> AuthorizedCustodyGenerationHandlePair {
-        try await withOperationPromptIfConfigured {
-            var authorizedContext: LAContext?
-            if let custodyOperationAuthenticator {
-                do {
-                    authorizedContext = try await custodyOperationAuthenticator(
-                        String(
-                            localized: "keygen.custody.auth.reason",
-                            defaultValue: "Authenticate to create your device-bound key."
-                        )
-                    )
-                } catch {
-                    authorizedContext?.invalidate()
-                    let normalized = SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
-                    throw CypherAirError.keyOperationUnavailable(
-                        category: PGPKeyOperationFailureMapper.category(
-                            for: normalized,
-                            fallback: .localAuthenticationFailed
-                        )
-                    )
-                }
+    private func commit(
+        metadata: PGPKeyMetadata,
+        publicKeyData: Data,
+        revocationCert: Data,
+        family: PGPKeyFamily,
+        token: KeyProvisioningInvalidationGate.Token,
+        didStore: (String) -> Void
+    ) async throws -> PGPKeyIdentity {
+        try await commitCoordinator.performCommit {
+            try Task.checkCancellation()
+            try invalidationGate.checkValid(token)
+            guard !catalogStore.containsKey(fingerprint: metadata.fingerprint) else {
+                throw CypherAirError.duplicateKey
             }
+            let identity = PGPKeyIdentity(
+                fingerprint: metadata.fingerprint,
+                userId: metadata.userId,
+                hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+                isRevoked: false,
+                isExpired: metadata.isExpired,
+                isDefault: catalogStore.keys.isEmpty,
+                isBackedUp: false,
+                publicKeyData: publicKeyData,
+                revocationCert: revocationCert,
+                primaryAlgo: metadata.primaryAlgo,
+                subkeyAlgo: metadata.subkeyAlgo,
+                expiryDate: metadata.expiryDate,
+                keyFamily: family,
+                privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+            )
+            try catalogStore.storeNewIdentity(identity)
+            didStore(identity.fingerprint)
+            if let afterIdentityCommitCheckpoint {
+                try await afterIdentityCommitCheckpoint()
+            }
+            try Task.checkCancellation()
+            try invalidationGate.checkValid(token)
+            return identity
+        }
+    }
 
+    private struct AuthorizedPair {
+        let pair: LoadedCustodyHandlePair
+        let context: LAContext
+    }
+
+    /// One approval covers both enclave key creations: the enclave prompts on
+    /// the session's operation context when the first key is created.
+    private func createAuthorizedHandlePair(tier: CustodyTier) async throws -> AuthorizedPair {
+        try await withOperationPromptIfConfigured {
+            let session: UnlockedSession
+            do { session = try vault.requireSession() } catch { throw CypherAirError.fromStore(error) }
+            let context = session.operationContext(
+                reason: String(localized: "keygen.custody.auth.reason", defaultValue: "Authenticate to create your device-bound key.")
+            )
             do {
-                let loadedPair = try handleStore.createLoadedHandlePair(
-                    authenticationContext: authorizedContext
-                )
-                return AuthorizedCustodyGenerationHandlePair(
-                    loadedPair: loadedPair,
-                    authenticationContext: authorizedContext
-                )
+                let created = try vault.custody.createPair(tier: tier, session: session, context: context)
+                return AuthorizedPair(pair: try LoadedCustodyHandlePair(signing: created.signing, keyAgreement: created.keyAgreement), context: context)
             } catch {
-                authorizedContext?.invalidate()
+                context.invalidate()
                 throw error
             }
         }
     }
 
-    private func rollbackGeneratedClassicalState(
-        handlePair: SecureEnclaveCustodyHandlePair,
-        storedFingerprint: String?
-    ) throws {
+    private func rollback(pair: CustodyHandlePair, splitCustodyFingerprint: String?, storedFingerprint: String?) throws {
         if let storedFingerprint {
             try catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
         }
-        try handleStore.deleteHandlePair(handlePair)
+        if let splitCustodyFingerprint {
+            try vault.splitCustody.delete(fingerprint: splitCustodyFingerprint)
+        }
+        try vault.custody.deletePair(pair)
     }
 
-    private func rollbackGeneratedCompositeState(
-        compositeHandleStore: SecureEnclaveCustodyHandleStore,
-        compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore,
-        loadedPair: SecureEnclaveCustodyLoadedHandlePair,
-        storedClassicalComponentFingerprint: String?,
-        storedFingerprint: String?
-    ) throws {
-        if let storedFingerprint {
-            try catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
-        }
-        if let storedClassicalComponentFingerprint {
-            compositeClassicalComponentStore.discardStoredComponent(
-                fingerprint: storedClassicalComponentFingerprint
-            )
-        }
-        let pair = try SecureEnclaveCustodyHandlePair(
-            signing: loadedPair.signing.binding,
-            keyAgreement: loadedPair.keyAgreement.binding
-        )
-        try compositeHandleStore.deleteHandlePair(pair)
-    }
-
-    private func withOperationPromptIfConfigured<T>(
-        operation: () async throws -> T
-    ) async throws -> T {
+    private func withOperationPromptIfConfigured<T>(operation: () async throws -> T) async throws -> T {
         guard let authenticationPromptCoordinator else {
             return try await operation()
         }
@@ -447,9 +229,4 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             try await operation()
         }
     }
-}
-
-private struct AuthorizedCustodyGenerationHandlePair {
-    let loadedPair: SecureEnclaveCustodyLoadedHandlePair
-    let authenticationContext: LAContext?
 }

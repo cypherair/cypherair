@@ -100,10 +100,8 @@ struct EncryptView: View {
     @Environment(EncryptionService.self) private var encryptionService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
-    @Environment(AppConfiguration.self) private var config
-    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
+    @Environment(AppSettingsCoordinator.self) private var appSettings
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
     let configuration: Configuration
 
@@ -116,10 +114,8 @@ struct EncryptView: View {
             encryptionService: encryptionService,
             keyManagement: keyManagement,
             contactService: contactService,
-            config: config,
-            protectedOrdinarySettings: protectedOrdinarySettings,
+            appSettings: appSettings,
             appSessionOrchestrator: appSessionOrchestrator,
-            protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
         )
     }

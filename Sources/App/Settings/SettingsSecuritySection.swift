@@ -4,47 +4,19 @@ struct SettingsSecuritySection: View {
     let model: SettingsScreenModel
 
     var body: some View {
-        @Bindable var appConfiguration = model.appConfiguration
-
         Section {
-            Picker(
-                String(localized: "settings.appAccessPolicy", defaultValue: "App Access Protection"),
-                selection: Binding(
-                    get: { appConfiguration.appSessionAuthenticationPolicy },
-                    set: { newPolicy in
-                        guard newPolicy != appConfiguration.appSessionAuthenticationPolicy else { return }
-                        model.handleAppAccessPolicySelection(newPolicy)
-                    }
-                )
-            ) {
-                Text(String(localized: "settings.appAccessPolicy.userPresence", defaultValue: "User Presence"))
-                    .tag(AppSessionAuthenticationPolicy.userPresence)
-                Text(String(localized: "settings.appAccessPolicy.biometricsOnly", defaultValue: "Biometrics Only"))
-                    .tag(AppSessionAuthenticationPolicy.biometricsOnly)
+            if !model.configuration.isSandbox {
+                Button {
+                    model.presentChangePassphrase()
+                } label: {
+                    Label(
+                        String(localized: "settings.changePassphrase", defaultValue: "Change Passphrase"),
+                        systemImage: "key.horizontal"
+                    )
+                }
+                .disabled(!model.isSettingsEditable)
+                .accessibilityIdentifier("settings.changePassphrase")
             }
-            .accessibilityIdentifier("settings.appAccessPolicy")
-            .disabled(model.isSwitchingAppAccessPolicy)
-
-            Picker(
-                String(localized: "settings.authMode", defaultValue: "Portable Key Protection"),
-                selection: Binding(
-                    get: { appConfiguration.authModeIfUnlocked ?? .standard },
-                    set: { newMode in
-                        guard let currentMode = appConfiguration.authModeIfUnlocked,
-                              newMode != currentMode else { return }
-                        model.handleAuthModeSelection(newMode)
-                    }
-                )
-            ) {
-                Text(String(localized: "settings.authMode.standard", defaultValue: "Standard"))
-                    .tag(AuthenticationMode.standard)
-                Text(String(localized: "settings.authMode.high", defaultValue: "High Security"))
-                    .tag(AuthenticationMode.highSecurity)
-            }
-            .accessibilityIdentifier("settings.authMode")
-            .tutorialAnchor(.settingsAuthModePicker)
-            .disabled(model.isSwitching || appConfiguration.authModeIfUnlocked == nil)
-
             Picker(
                 String(localized: "settings.gracePeriod", defaultValue: "Re-authentication"),
                 selection: Binding(
@@ -56,18 +28,49 @@ struct SettingsSecuritySection: View {
                     Text(option.label).tag(option.value)
                 }
             }
-            .disabled(!model.isProtectedOrdinarySettingsEditable)
-
-            if model.shouldShowClipboardNoticeRow {
-                SettingsProtectedClipboardNoticeRow(model: model)
-            }
+            .disabled(!model.isSettingsEditable)
+            SettingsClipboardNoticeRow(model: model)
         } header: {
             Text(String(localized: "settings.security", defaultValue: "Security"))
         } footer: {
             Text(String(
-                localized: "settings.authMode.footer",
-                defaultValue: "Portable Key Protection applies to portable software keys. Device-bound keys always use biometric access and are not affected."
+                localized: "settings.security.footer",
+                defaultValue: "Unlocking takes your passphrase and one Face ID or Touch ID confirmation. Device-bound keys ask for biometrics again on every use."
             ))
+        }
+    }
+}
+
+struct SettingsClipboardNoticeRow: View {
+    let model: SettingsScreenModel
+
+    var body: some View {
+        if model.configuration.isSandbox {
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(
+                    String(localized: "settings.clipboardNotice", defaultValue: "Clipboard Safety Notice"),
+                    isOn: .constant(true)
+                )
+                .disabled(true)
+                Text(
+                    String(
+                        localized: "protectedSettings.tutorial.message",
+                        defaultValue: "The tutorial sandbox never reads or writes your real Clipboard Safety Notice."
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+        } else {
+            Toggle(
+                String(localized: "settings.clipboardNotice", defaultValue: "Clipboard Safety Notice"),
+                isOn: Binding(
+                    get: { model.isClipboardNoticeEnabled },
+                    set: { model.setClipboardNoticeEnabled($0) }
+                )
+            )
+            .disabled(!model.isSettingsEditable)
+            .accessibilityIdentifier("settings.clipboardNotice")
         }
     }
 }

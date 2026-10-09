@@ -129,49 +129,6 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
         }
     }
 
-    /// SE key reconstruction from dataRepresentation.
-    /// Threshold: < 10ms (typical observed latency is ~2–5ms).
-    func test_perf_seKeyReconstruction_latencyUnder10ms() throws {
-        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
-
-        // Generate SE key and extract its dataRepresentation for reconstruction.
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-        let keyData = handle.dataRepresentation
-
-        let options = XCTMeasureOptions()
-        options.iterationCount = 20
-
-        measure(metrics: [XCTClockMetric()], options: options) {
-            _ = try! secureEnclave.reconstructKey(from: keyData, authenticationContext: nil)
-        }
-    }
-
-    /// SE wrap/unwrap end-to-end (excluding biometric prompt).
-    /// Threshold: < 100ms. Soft-fail: record and document.
-    /// Measures: SE P-256 key gen + ephemeral-static ECDH + HKDF + AES-GCM envelope seal + unwrap cycle.
-    func test_perf_seWrapUnwrap_endToEnd_latencyUnder100ms() throws {
-        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
-
-        let fakePrivateKey = Data(repeating: 0xAB, count: 57) // Ed448 size (worst case)
-        let fingerprint = uniqueFingerprint()
-
-        let options = XCTMeasureOptions()
-        options.iterationCount = 10
-
-        measure(metrics: [XCTClockMetric()], options: options) {
-            let handle = try! secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
-            let bundle = try! secureEnclave.wrap(
-                privateKey: SensitiveBuffer(copying: fakePrivateKey), using: handle, fingerprint: fingerprint,
-                payloadKind: .softwareSecretCertificate
-            )
-            let unwrapped = try! secureEnclave.unwrap(
-                bundle: bundle, using: handle, fingerprint: fingerprint,
-                payloadKind: .softwareSecretCertificate
-            ).copiedBytes()
-            assert(unwrapped == fakePrivateKey)
-        }
-    }
-
     /// Argon2id calibration time at the shipped export parameters
     /// (2 GiB / t=1 / p=4). Recorded, not asserted — the point is the number,
     /// and the memory metric matters as much as the clock here.

@@ -426,13 +426,9 @@ private struct ContactDetailHostView: View {
             "lock.open"
         case .locked:
             "lock"
-        case .recoveryNeeded:
+        case .damaged:
             "exclamationmark.triangle"
-        case .frameworkUnavailable:
-            "externaldrive.badge.exclamationmark"
-        case .restartRequired:
-            "arrow.clockwise"
-        case .availableProtectedDomain:
+        case .available:
             "person"
         }
     }

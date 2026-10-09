@@ -7,8 +7,6 @@ enum TutorialAnchorID: Hashable {
     case contactsAddButton
     case keyRow(fingerprint: String)
     case keyDetailBackupButton
-    case settingsAuthModePicker
-    case settingsModeConfirmButton
 }
 
 private struct TutorialAnchorPreferenceKey: PreferenceKey {

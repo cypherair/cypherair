@@ -10,7 +10,7 @@ import XCTest
 /// pre-authenticated (`UITEST_MANUAL_AUTH_STARTS_UNLOCKED`), so it boots
 /// unlocked with the lock genuinely armed: the launch seam settles the session
 /// as already authenticated and nothing else is stubbed, so a later lock is a
-/// real lock and unlocking it needs a real authentication. Each test then
+/// real lock and unlocking it needs the passphrase. Each test then
 /// confirms the app is
 /// genuinely ACTIVE (frontmost) before opening its presentation and locking —
 /// active-app-then-lock is the canonical #697 reproduction, and only an
@@ -23,8 +23,7 @@ import XCTest
 /// `com.apple.screenIsLocked` distributed notification the app's lifecycle
 /// observer subscribes to for real macOS screen locks. The observer clears
 /// foreground-active before locking, so the locked state is stable: the
-/// surface's auto-auth no-ops until a genuine foreground return, and no
-/// biometric prompt appears during the test.
+/// surface waits for the passphrase, and no prompt appears during the test.
 ///
 /// Note: the posted distributed notification is system-wide; other listeners
 /// on this machine observe a spurious screen-lock event for the duration of a
@@ -45,22 +44,19 @@ final class MacLockShieldUITests: XCTestCase {
     }
 
     func test_lockWhileSheetOpen_shieldCoversSheet_withoutDismissingIt() throws {
-        launchMainPreAuthenticatedWithLockArmed(
-            extraEnvironment: ["UITEST_OPEN_AUTHMODE_CONFIRMATION": "1"]
-        )
+        launchMainPreAuthenticatedWithLockArmed()
         try confirmAppActiveOrSkip()
-
-        // Open a real window-modal sheet (the auth-mode confirmation modal
-        // auto-opens on the Settings tab under UITEST_OPEN_AUTHMODE_CONFIRMATION).
+        // Open a real window-modal sheet: Change Passphrase from Settings.
         element("sidebar.settings").tap()
-        XCTAssertTrue(element("settings.authmode.ready").waitForExistence(timeout: 10))
-        let sheetAction = element("settings.mode.confirm")
+        XCTAssertTrue(element("settings.ready").waitForExistence(timeout: 10))
+        element("settings.changePassphrase").tap()
+        XCTAssertTrue(element("changePassphrase.ready").waitForExistence(timeout: 10))
+        let sheetAction = element("changePassphrase.current")
         XCTAssertTrue(sheetAction.waitForExistence(timeout: 10))
         XCTAssertTrue(
             sheetAction.isHittable,
-            "Precondition: the sheet's action must be hittable before locking."
+            "Precondition: the sheet's field must be hittable before locking."
         )
-
         postScreenIsLockedNotification()
 
         let shield = element("appLock.surface")
@@ -111,13 +107,17 @@ final class MacLockShieldUITests: XCTestCase {
             "The sheet cover frame \(sheetCover.frame) must cover the sheet action frame \(sheetAction.frame)."
         )
 
-        // Optional human-driven tail for the manual verification lane: unlock
-        // with a real biometric and confirm the sheet is exactly where it was.
+        // Optional tail: unlock through the passphrase and confirm the sheet
+        // is exactly where it was.
         if ProcessInfo.processInfo.environment["UITEST_LOCK_SHIELD_HUMAN_UNLOCK"] == "1" {
             app.activate()
-            let retryButton = app.buttons["Tap to Authenticate"].firstMatch
-            XCTAssertTrue(retryButton.waitForExistence(timeout: 10))
-            retryButton.tap()
+            let passphraseField = element("appLock.passphrase")
+            XCTAssertTrue(passphraseField.waitForExistence(timeout: 10))
+            passphraseField.tap()
+            passphraseField.typeText(
+                ProcessInfo.processInfo.environment["UITEST_VAULT_PASSPHRASE"] ?? "cypherair-uitest-passphrase"
+            )
+            element("appLock.unlock").tap()
             XCTAssertTrue(
                 sheetAction.waitForExistence(timeout: 45),
                 "Expected the sheet to still exist after a human-driven unlock."
@@ -205,7 +205,7 @@ final class MacLockShieldUITests: XCTestCase {
 
         XCTAssertTrue(
             element("main.ready").waitForExistence(timeout: 15),
-            "Expected the pre-authenticated manual-auth launch to reach the main shell without a biometric prompt."
+            "Expected the pre-authenticated manual-auth launch to reach the main shell without a prompt."
         )
     }
 

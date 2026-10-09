@@ -1,535 +1,162 @@
 import Foundation
 import LocalAuthentication
-import Security
+import Sealing
+import Stores
+import Vault
 
 struct SecureEnclaveCustodyDeletionContext {
     let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
-    let handleStore: SecureEnclaveCustodyHandleStore
-    // Device-Bound Post-Quantum split custody; nil until the composition root
-    // wires the composite stores (the classical component envelope itself is
-    // removed by the shared keychain-material path, keyed by fingerprint).
     let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
-    let compositeHandleStore: SecureEnclaveCustodyHandleStore?
 
     init(
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
-        handleStore: SecureEnclaveCustodyHandleStore,
-        compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
-        compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil
+        compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil
     ) {
         self.publicBindingInspector = publicBindingInspector
-        self.handleStore = handleStore
         self.compositeBindingInspector = compositeBindingInspector
-        self.compositeHandleStore = compositeHandleStore
     }
 }
 
-/// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
+/// Expiry changes, deletion, and the default flag. A portable key's expiry
+/// change is one approval: the unwrap prompts, the reseal is software and
+/// replaces the row in place.
 final class KeyMutationService {
-    /// Modify-expiry pre-authentication: evaluates the persisted mode's access
-    /// control once and returns the authenticated context, which the flow
-    /// threads into the short Secure Enclave unwrap and rewrap windows.
-    /// `nil` keeps implicit per-operation authentication for unwired test and
-    /// bypass graphs; production wiring passes
-    /// `systemAccessControlExpiryAuthenticator`.
-    typealias ExpiryAuthenticator = (SecAccessControl, String) async throws -> LAContext
-
     private let keyAdapter: PGPKeyOperationAdapter
-    private let secureEnclave: any SecureEnclaveManageable
-    private let keychain: any KeychainManageable
-    private let bundleStore: KeyBundleStore
-    private let rewrapRecoveryStrategy: PrivateKeyRewrapRecoveryStrategy
+    private let vault: AppVault
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
-    private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
-    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let expiryAuthenticator: ExpiryAuthenticator?
     private let secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext?
     private var expiryMutationService: (any PrivateKeyExpiryMutationRouting)?
 
     init(
         keyAdapter: PGPKeyOperationAdapter,
-        secureEnclave: any SecureEnclaveManageable,
-        keychain: any KeychainManageable,
-        bundleStore: KeyBundleStore,
-        rewrapRecoveryStrategy: PrivateKeyRewrapRecoveryStrategy,
+        vault: AppVault,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService,
-        privateKeyControlStore: any PrivateKeyControlStoreProtocol,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        expiryAuthenticator: ExpiryAuthenticator? = nil,
         secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil
     ) {
         self.keyAdapter = keyAdapter
-        self.secureEnclave = secureEnclave
-        self.keychain = keychain
-        self.bundleStore = bundleStore
-        self.rewrapRecoveryStrategy = rewrapRecoveryStrategy
+        self.vault = vault
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
-        self.privateKeyControlStore = privateKeyControlStore
-        self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.expiryAuthenticator = expiryAuthenticator
         self.secureEnclaveCustodyDeletionContext = secureEnclaveCustodyDeletionContext
-    }
-
-    /// The production `ExpiryAuthenticator`: one system access-control
-    /// `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's
-    /// access control (a biometric satisfies both the Standard OR-gate and the
-    /// High Security flag set). Biometric reuse is disabled: this is exactly one
-    /// fresh authentication for exactly one user action.
-    static var systemAccessControlExpiryAuthenticator: ExpiryAuthenticator {
-        { accessControl, reason in
-            let context = LAContext()
-            context.touchIDAuthenticationAllowableReuseDuration = 0
-            do {
-                let success = try await context.evaluateAccessControl(
-                    accessControl,
-                    operation: .useKeyKeyExchange,
-                    localizedReason: reason
-                )
-                guard success else {
-                    throw CypherAirError.authenticationFailed
-                }
-                return context
-            } catch {
-                // Every failure path invalidates the never-returned context
-                // exactly once; only a returned (authenticated) context is the
-                // caller's to invalidate.
-                context.invalidate()
-                if let laError = error as? LAError {
-                    if [.userCancel, .appCancel, .systemCancel].contains(laError.code) {
-                        // The user dismissed their own prompt: abort the action
-                        // silently (the modify-expiry screen swallows
-                        // operationCancelled by design) instead of surfacing a
-                        // misleading storage/authentication alert.
-                        throw CypherAirError.operationCancelled
-                    }
-                    // Any other LocalAuthentication failure (failed match,
-                    // lockout, …) surfaces as an authentication failure — a
-                    // raw LAError would fall through the screen model's
-                    // fallback to the misleading "Failed to access secure
-                    // storage." keychain message.
-                    throw CypherAirError.authenticationFailed
-                }
-                throw error
-            }
-        }
     }
 
     func configureExpiryMutationService(_ service: any PrivateKeyExpiryMutationRouting) {
         expiryMutationService = service
     }
 
-    func modifyExpiry(
-        fingerprint: String,
-        newValidity: PGPKeyValidity
-    ) async throws -> PGPKeyIdentity {
-        return try await modifyExpiry(
-            fingerprint: fingerprint,
-            newValidity: newValidity,
-            authMode: nil
-        )
-    }
-
-    func modifyExpiry(
-        fingerprint: String,
-        newValidity: PGPKeyValidity,
-        authMode: AuthenticationMode
-    ) async throws -> PGPKeyIdentity {
-        try await modifyExpiry(
-            fingerprint: fingerprint,
-            newValidity: newValidity,
-            authMode: Optional(authMode)
-        )
-    }
-
-    private func modifyExpiry(
-        fingerprint: String,
-        newValidity: PGPKeyValidity,
-        authMode: AuthenticationMode?
-    ) async throws -> PGPKeyIdentity {
+    func modifyExpiry(fingerprint: String, newValidity: PGPKeyValidity) async throws -> PGPKeyIdentity {
         let operationRoute = await routeModifyExpiry(fingerprint: fingerprint)
-        defer {
-            operationRoute.endAuthorizedOperation()
-        }
+        defer { operationRoute.endAuthorizedOperation() }
         switch operationRoute {
         case .softwareSecretCertificate(let route):
-            let effectiveAuthMode: AuthenticationMode
-            if let authMode {
-                effectiveAuthMode = authMode
-            } else {
-                effectiveAuthMode = try privateKeyControlStore.requireUnlockedAuthMode()
-            }
-            return try await modifySoftwareExpiry(
-                route: route,
-                newValidity: newValidity,
-                authMode: effectiveAuthMode
-            )
-
+            return try await modifySoftwareExpiry(route: route, newValidity: newValidity)
         case .secureEnclaveSigner(let route):
-            return try await modifySecureEnclaveExpiry(
-                route: route,
-                newValidity: newValidity
-            )
-
+            guard let expiryMutationService else {
+                throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+            }
+            let result = try await expiryMutationService.modifySecureEnclaveExpiry(route: route, newValidity: newValidity)
+            return try catalogStore.updateExpiry(metadata: result.metadata, publicKeyData: result.publicKeyData)
         case .secureEnclaveCompositeSigner(let route):
-            return try await modifySecureEnclaveCompositeExpiry(
-                route: route,
-                newValidity: newValidity
-            )
-
+            guard let expiryMutationService else {
+                throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+            }
+            let result = try await expiryMutationService.modifySecureEnclaveCompositeExpiry(route: route, newValidity: newValidity)
+            return try catalogStore.updateExpiry(metadata: result.metadata, publicKeyData: result.publicKeyData)
         case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
-
         case .blocked(let resolution):
-            throw CypherAirError.keyOperationUnavailable(
-                category: resolution.failureCategory ?? .operationUnavailableByPolicy
-            )
+            throw CypherAirError.keyOperationUnavailable(category: resolution.failureCategory ?? .operationUnavailableByPolicy)
         }
     }
 
-    private func modifySoftwareExpiry(
-        route: SoftwareSecretCertificateRoute,
-        newValidity: PGPKeyValidity,
-        authMode: AuthenticationMode
-    ) async throws -> PGPKeyIdentity {
-        try await performModifySoftwareExpiry(
-            route: route,
-            newValidity: newValidity,
-            authMode: authMode
-        )
-    }
-
-    private func performModifySoftwareExpiry(
-        route: SoftwareSecretCertificateRoute,
-        newValidity: PGPKeyValidity,
-        authMode: AuthenticationMode
-    ) async throws -> PGPKeyIdentity {
+    private func modifySoftwareExpiry(route: SoftwareSecretCertificateRoute, newValidity: PGPKeyValidity) async throws -> PGPKeyIdentity {
         let fingerprint = route.identity.fingerprint
-        let accessControl = try authMode.createAccessControl()
-
-        // Authenticate before touching secret material, but scope the
-        // operation-prompt session only to the access-control prompt. The
-        // unwrap and rewrap Secure Enclave windows below have their own short
-        // enrollment; certificate mutation and durable storage do not.
-        var authenticationContext: LAContext?
-        authenticationContext = try await authenticateModifyExpiryIfConfigured(
-            accessControl: accessControl
-        )
-        defer {
-            authenticationContext?.invalidate()
-        }
-
-        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(
-            fingerprint: fingerprint,
-            authenticationContext: authenticationContext
-        )
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        var result = try await keyAdapter.modifyExpiry(
-            certData: secretKey,
-            newValidity: newValidity
-        )
-        // Nothing below reads the mutated certificate except the re-wrap, so it
-        // moves into a buffer that erases it however this function leaves.
+        let session: UnlockedSession
+        do { session = try vault.requireSession() } catch { throw CypherAirError.fromStore(error) }
+        let context = session.operationContext()
+        defer { context.invalidate() }
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint, authenticationContext: context)
+        defer { secretKey.resetBytes(in: 0..<secretKey.count) }
+        var result = try await keyAdapter.modifyExpiry(certData: secretKey, newValidity: newValidity)
         let mutatedCertificate = SensitiveBuffer(consuming: &result.certData)
-
         guard catalogStore.containsKey(fingerprint: fingerprint) else {
-            // Not a decrypt-recipient mismatch: the key vanished from the catalog
-            // mid-action (typically the key-metadata domain relocked underneath
-            // the flow). Surface that honestly instead of `noMatchingKey`'s
-            // decrypt-flavored message.
             throw CypherAirError.keyMetadataUnavailable
         }
-
-        let bundle = try await rewrapModifiedExpiryResult(
-            certData: mutatedCertificate,
-            fingerprint: fingerprint,
-            accessControl: accessControl,
-            authenticationContext: authenticationContext
-        )
-
-        // Crash-consistency invariant: the recovery journal must exist before the
-        // pending bundle is written (mirrors PrivateKeyRewrapWorkflow) — a kill
-        // between the two must never leave a journal-invisible pending key copy.
-        try privateKeyControlStore.beginModifyExpiry(fingerprint: fingerprint)
-
         do {
-            try bundleStore.saveBundle(
-                bundle,
-                fingerprint: fingerprint,
-                namespace: .pending
-            )
+            try vault.portableKeys.seal(mutatedCertificate, fingerprint: fingerprint, session: session)
         } catch {
-            // Journal deliberately retained: cleanupPendingBundle is best-effort,
-            // and clearing the journal after a silently failed cleanup would
-            // re-create the journal-invisible orphan this ordering prevents.
-            // Startup recovery resolves either end state — (complete, missing)
-            // → .none clears the flag; (complete, complete) → .deletePending.
-            bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
-            throw error
+            throw CypherAirError.fromStore(error)
         }
-
-        do {
-            _ = try bundleStore.loadBundle(
-                fingerprint: fingerprint,
-                namespace: .pending
-            )
-        } catch {
-            // Journal retained — same rationale as the save catch above.
-            bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
-            throw error
-        }
-
-        do {
-            try bundleStore.deleteBundle(fingerprint: fingerprint)
-        } catch {
-            throw error
-        }
-
-        do {
-            try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
-        } catch {
-            throw error
-        }
-
-        let updated = try catalogStore.updateExpiry(
-            metadata: result.metadata,
-            publicKeyData: result.publicKeyData
-        )
-
-        try privateKeyControlStore.clearModifyExpiryJournal()
-        return updated
-    }
-
-    private func authenticateModifyExpiryIfConfigured(
-        accessControl: SecAccessControl
-    ) async throws -> LAContext? {
-        guard let expiryAuthenticator else {
-            return nil
-        }
-        return try await authenticationPromptCoordinator.withOperationPrompt {
-            try await expiryAuthenticator(
-                accessControl,
-                String(
-                    localized: "keydetail.expiry.auth.reason",
-                    defaultValue: "Authenticate to change the key's expiry."
-                )
-            )
-        }
-    }
-
-    private func rewrapModifiedExpiryResult(
-        certData: borrowing SensitiveBuffer,
-        fingerprint: String,
-        accessControl: SecAccessControl,
-        authenticationContext: LAContext?
-    ) async throws -> WrappedKeyBundle {
-        try await authenticationPromptCoordinator.withOperationPrompt {
-            let seHandle = try secureEnclave.generateWrappingKey(
-                accessControl: accessControl,
-                authenticationContext: authenticationContext
-            )
-            return try secureEnclave.wrap(
-                privateKey: certData,
-                using: seHandle,
-                fingerprint: fingerprint,
-                payloadKind: .softwareSecretCertificate
-            )
-        }
-    }
-
-    private func modifySecureEnclaveExpiry(
-        route: SecureEnclaveSignerRoute,
-        newValidity: PGPKeyValidity
-    ) async throws -> PGPKeyIdentity {
-        guard let expiryMutationService else {
-            throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
-        }
-
-        let result = try await expiryMutationService.modifySecureEnclaveExpiry(
-            route: route,
-            newValidity: newValidity
-        )
-
-        let updated = try catalogStore.updateExpiry(
-            metadata: result.metadata,
-            publicKeyData: result.publicKeyData
-        )
-
-        return updated
-    }
-
-    private func modifySecureEnclaveCompositeExpiry(
-        route: SecureEnclaveCompositeSignerRoute,
-        newValidity: PGPKeyValidity
-    ) async throws -> PGPKeyIdentity {
-        guard let expiryMutationService else {
-            throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
-        }
-
-        let result = try await expiryMutationService.modifySecureEnclaveCompositeExpiry(
-            route: route,
-            newValidity: newValidity
-        )
-
-        let updated = try catalogStore.updateExpiry(
-            metadata: result.metadata,
-            publicKeyData: result.publicKeyData
-        )
-
-        return updated
+        return try catalogStore.updateExpiry(metadata: result.metadata, publicKeyData: result.publicKeyData)
     }
 
     private func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute {
         if let expiryMutationService {
             return await expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
         }
-
         guard let identity = catalogStore.identity(for: fingerprint) else {
             return .blocked(.unavailable(.metadataAssociationMismatch))
         }
-
-        let resolution = PGPKeyCapabilityResolver().resolution(
-            for: .modifyExpiry,
-            identity: identity
-        )
+        let resolution = PGPKeyCapabilityResolver().resolution(for: .modifyExpiry, identity: identity)
         guard resolution.support == .supported else {
             return .blocked(resolution)
         }
-
         switch identity.privateKeyCustodyKind {
         case .softwareSecretCertificate:
-            return .softwareSecretCertificate(
-                SoftwareSecretCertificateRoute(
-                    identity: identity,
-                    operation: .modifyExpiry
-                )
-            )
+            return .softwareSecretCertificate(SoftwareSecretCertificateRoute(identity: identity, operation: .modifyExpiry))
         case .appleSecureEnclavePrivateOperations:
             return .blocked(.unavailable(.operationUnavailableByPolicy))
         }
     }
 
     func deleteKey(fingerprint: String) throws {
-        guard let identity = catalogStore.identity(for: fingerprint) else {
-            try deleteKeychainMaterialAndMetadata(fingerprint: fingerprint)
-            return
+        var deletionErrors: [Error] = []
+        if let identity = catalogStore.identity(for: fingerprint),
+           identity.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations {
+            deletionErrors.append(contentsOf: deleteSecureEnclaveCustodyHandles(for: identity))
         }
-
-        switch identity.privateKeyCustodyKind {
-        case .softwareSecretCertificate:
-            try deleteKeychainMaterialAndMetadata(fingerprint: fingerprint)
-        case .appleSecureEnclavePrivateOperations:
-            try deleteSecureEnclaveCustodyKey(identity)
+        for store in [vault.portableKeys, vault.splitCustody] {
+            do { try store.delete(fingerprint: fingerprint) } catch { deletionErrors.append(error) }
         }
-    }
-
-    private func deleteKeychainMaterialAndMetadata(fingerprint: String) throws {
-        try reportPartialDeletionIfNeeded(
-            collectKeychainMaterialAndMetadataDeletionErrors(fingerprint: fingerprint)
-        )
-    }
-
-    /// Removes all private keychain material and the catalog metadata for `fingerprint`,
-    /// accumulating (never throwing) every removal failure so callers can merge error
-    /// sets and report once. Catalog metadata removal is attempted unconditionally — a
-    /// keychain failure never short-circuits it — so a key can never become permanently
-    /// undeletable.
-    private func collectKeychainMaterialAndMetadataDeletionErrors(fingerprint: String) -> [Error] {
-        var deletionErrors = deleteAllPrivateKeychainMaterial(for: fingerprint)
-        do {
-            try catalogStore.removeKey(fingerprint: fingerprint)
-        } catch {
-            deletionErrors.append(error)
+        do { try catalogStore.removeKey(fingerprint: fingerprint) } catch { deletionErrors.append(error) }
+        if let firstError = deletionErrors.first {
+            throw CypherAirError.keychainError(
+                "Partial key deletion: \(deletionErrors.count) item(s) could not be removed — \(firstError.localizedDescription)"
+            )
         }
-        clearRecoveryStateIfNeeded(afterDeleting: fingerprint)
-        return deletionErrors
-    }
-
-    private func deleteSecureEnclaveCustodyKey(_ identity: PGPKeyIdentity) throws {
-        // Collect Secure Enclave handle-deletion failures, then ALWAYS run keychain +
-        // catalog metadata removal (orphan-cleanup fallback), mirroring the software-key
-        // path. Merge both error sets and report once — so the key always leaves the
-        // catalog (stays deletable) while a partial deletion still surfaces to the caller.
-        var deletionErrors = deleteSecureEnclaveCustodyHandles(for: identity)
-        deletionErrors.append(
-            contentsOf: collectKeychainMaterialAndMetadataDeletionErrors(fingerprint: identity.fingerprint)
-        )
-        try reportPartialDeletionIfNeeded(deletionErrors)
     }
 
     private func deleteSecureEnclaveCustodyHandles(for identity: PGPKeyIdentity) -> [Error] {
-        guard let secureEnclaveCustodyDeletionContext else {
-            return []
-        }
+        guard let secureEnclaveCustodyDeletionContext else { return [] }
         guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
             return [CypherAirError.keyOperationUnavailable(category: .invalidFamilyCustody)]
         }
-        switch tier {
-        case .classicalP256:
-            break
-        case .postQuantum, .postQuantumHigh:
-            return deleteSecureEnclaveCompositeHandles(
-                for: identity,
-                context: secureEnclaveCustodyDeletionContext,
-                tier: tier
-            )
-        }
-
         do {
-            let inspection = try secureEnclaveCustodyDeletionContext.publicBindingInspector.inspectPublicBindings(
-                publicKeyData: identity.publicKeyData
-            )
-            guard inspection.fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame,
-                  inspection.keyVersion == identity.keyVersion else {
+            let (signing, keyAgreement): (Data, Data)
+            let fingerprint: String
+            let keyVersion: UInt8
+            switch tier {
+            case .classicalP256:
+                let inspection = try secureEnclaveCustodyDeletionContext.publicBindingInspector.inspectPublicBindings(publicKeyData: identity.publicKeyData)
+                (signing, keyAgreement) = (inspection.signingPublicKeyX963, inspection.keyAgreementPublicKeyX963)
+                (fingerprint, keyVersion) = (inspection.fingerprint, inspection.keyVersion)
+            case .postQuantum, .postQuantumHigh:
+                guard let compositeBindingInspector = secureEnclaveCustodyDeletionContext.compositeBindingInspector else {
+                    return [CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)]
+                }
+                let inspection = try compositeBindingInspector.inspectCompositeBindings(publicKeyData: identity.publicKeyData, tier: tier)
+                (signing, keyAgreement) = (inspection.signingComponentPublicKey, inspection.keyAgreementComponentPublicKey)
+                (fingerprint, keyVersion) = (inspection.fingerprint, inspection.keyVersion)
+            }
+            guard fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame, keyVersion == identity.keyVersion else {
                 return [CypherAirError.keyOperationUnavailable(category: .metadataAssociationMismatch)]
             }
-
-            try secureEnclaveCustodyDeletionContext.handleStore.deleteHandles(
-                signingPublicKeyRaw: inspection.signingPublicKeyX963,
-                keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
-            )
+            let pair = try vault.custody.locatePair(tier: tier, signingPublicKeyRaw: signing, keyAgreementPublicKeyRaw: keyAgreement)
+            try vault.custody.deletePair(pair)
             return []
-        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
-            return []
-        } catch {
-            return [error]
-        }
-    }
-
-    private func deleteSecureEnclaveCompositeHandles(
-        for identity: PGPKeyIdentity,
-        context: SecureEnclaveCustodyDeletionContext,
-        tier: SecureEnclaveCustodyTier
-    ) -> [Error] {
-        guard let compositeBindingInspector = context.compositeBindingInspector,
-              let compositeHandleStore = context.compositeHandleStore else {
-            return [CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)]
-        }
-
-        do {
-            let inspection = try compositeBindingInspector.inspectCompositeBindings(
-                publicKeyData: identity.publicKeyData,
-                tier: tier
-            )
-            guard inspection.fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame,
-                  inspection.keyVersion == identity.keyVersion else {
-                return [CypherAirError.keyOperationUnavailable(category: .metadataAssociationMismatch)]
-            }
-
-            // Deletion matches handles by raw public-key bytes across the shared
-            // key store's full (tier-spanning) inventory, so a single composite
-            // handle store deletes either tier's handles.
-            try compositeHandleStore.deleteHandles(
-                signingPublicKeyRaw: inspection.signingComponentPublicKey,
-                keyAgreementPublicKeyRaw: inspection.keyAgreementComponentPublicKey
-            )
-            return []
-        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
+        } catch let error as CustodyError where error.isMissing {
             return []
         } catch {
             return [error]
@@ -538,68 +165,5 @@ final class KeyMutationService {
 
     func setDefaultKey(fingerprint: String) throws {
         try catalogStore.setDefaultKey(fingerprint: fingerprint)
-    }
-
-    func checkAndRecoverFromInterruptedModifyExpiry() -> PrivateKeyRewrapRecoveryOutcome? {
-        guard let entry = try? privateKeyControlStore.recoveryJournal().modifyExpiry else {
-            return nil
-        }
-
-        let recoveryOutcome = rewrapRecoveryStrategy.recoverInterruptedRewrap(for: entry.fingerprint)
-
-        if recoveryOutcome.shouldClearRecoveryFlag {
-            try? privateKeyControlStore.clearModifyExpiryJournal()
-        }
-
-        return recoveryOutcome
-    }
-
-    private func deleteAllPrivateKeychainMaterial(for fingerprint: String) -> [Error] {
-        var deletionErrors: [Error] = []
-
-        for service in allPrivateKeychainServices(for: fingerprint) {
-            do {
-                try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
-            } catch {
-                guard !Self.isItemNotFound(error) else {
-                    continue
-                }
-                deletionErrors.append(error)
-            }
-        }
-
-        return deletionErrors
-    }
-
-    /// Every Keychain row that can hold private material for one identity,
-    /// across all custody kinds. A row that does not exist for this identity's
-    /// custody kind simply is not found; deleting the whole set is what keeps
-    /// key deletion from leaving a sealed remnant behind.
-    private func allPrivateKeychainServices(for fingerprint: String) -> [String] {
-        [
-            KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
-            KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
-            KeychainConstants.splitCustodyClassicalComponentService(fingerprint: fingerprint)
-        ]
-    }
-
-    private func clearRecoveryStateIfNeeded(afterDeleting fingerprint: String) {
-        try? privateKeyControlStore.clearModifyExpiryJournalIfMatches(fingerprint: fingerprint)
-
-        if catalogStore.keys.isEmpty {
-            try? privateKeyControlStore.clearRewrapJournal()
-        }
-    }
-
-    private func reportPartialDeletionIfNeeded(_ deletionErrors: [Error]) throws {
-        if let firstError = deletionErrors.first {
-            throw CypherAirError.keychainError(
-                "Partial key deletion: \(deletionErrors.count) item(s) could not be removed — \(firstError.localizedDescription)"
-            )
-        }
-    }
-
-    private static func isItemNotFound(_ error: Error) -> Bool {
-        KeychainFailureClassifier.isItemNotFound(error)
     }
 }

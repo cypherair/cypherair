@@ -45,6 +45,7 @@ $(SRCROOT)/pgp-mobile/src/qr_url.rs
 $(SRCROOT)/pgp-mobile/src/sign.rs
 $(SRCROOT)/pgp-mobile/src/signature_details.rs
 $(SRCROOT)/pgp-mobile/src/streaming.rs
+$(SRCROOT)/pgp-mobile/src/unlock_stretch.rs
 $(SRCROOT)/pgp-mobile/src/verify.rs
 $(SRCROOT)/pgp-mobile/uniffi-bindgen.rs
 $(SRCROOT)/scripts/build_apple_arm64e_xcframework.sh

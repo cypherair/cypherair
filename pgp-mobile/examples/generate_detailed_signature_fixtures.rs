@@ -27,6 +27,11 @@ use pgp_mobile::streaming;
 use sequoia_openpgp as openpgp;
 use tempfile::NamedTempFile;
 
+/// The passphrase the protected copy of the recipient secret is exported
+/// under. The Swift service tests import that copy the way a user would; the
+/// FFI tests keep using the unprotected certificate at the engine level.
+const FFI_DETAILED_RECIPIENT_PASSPHRASE: &str = "ffi-detailed-recipient";
+
 fn extract_signing_keypair(cert_data: &[u8]) -> openpgp::crypto::KeyPair {
     let policy = StandardPolicy::new();
     let cert = openpgp::Cert::from_bytes(cert_data).expect("signer cert should parse");
@@ -320,6 +325,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         fixtures_dir.join("ffi_detailed_signer_b.gpg"),
         signer_b.public_key_data,
+    )?;
+    fs::write(
+        fixtures_dir.join("ffi_detailed_recipient_secret_protected.asc"),
+        keys::export_secret_key(&recipient.cert_data, FFI_DETAILED_RECIPIENT_PASSPHRASE)?,
     )?;
     fs::write(
         fixtures_dir.join("ffi_detailed_recipient_secret.gpg"),

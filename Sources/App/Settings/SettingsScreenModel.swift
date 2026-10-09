@@ -1,177 +1,98 @@
 import Foundation
-import LocalAuthentication
 import SwiftUI
 
 @MainActor
 @Observable
 final class SettingsScreenModel {
-    typealias AuthModeSwitchAction = @MainActor (AuthenticationMode, [String], Bool) async throws -> Void
-    typealias AppAccessPolicySwitchAction = @MainActor (AppSessionAuthenticationPolicy) async throws -> Void
-    typealias LocalDataResetAuthenticationAction = @MainActor (
-        AppSessionAuthenticationPolicy,
-        String
-    ) async throws -> AppSessionAuthenticationResult
-
     let configuration: SettingsView.Configuration
-    let appConfiguration: AppConfiguration
-    let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
-    let protectedSettingsHost: ProtectedSettingsHost?
+    let appSettings: AppSettingsCoordinator
+    let localDataReset: LocalDataResetFlow
 
-    private let authManager: AuthenticationManager
-    private let keyManagement: KeyManagementService
     private let iosPresentationController: IOSPresentationController?
     private let macPresentationController: MacPresentationController?
-    private let authModeSwitchAction: AuthModeSwitchAction
-    private let appAccessPolicySwitchAction: AppAccessPolicySwitchAction
-    private let localDataResetAuthenticationAction: LocalDataResetAuthenticationAction
-    private let localDataResetService: LocalDataResetService?
-    private let localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?
-    /// Enrolls the Local Data Reset confirmation authentication in an
-    /// operation-prompt session. The destructive reset itself runs after that
-    /// short authentication window closes.
-    private let operationPromptCoordinator: AuthenticationPromptCoordinator
 
-    var pendingMode: AuthenticationMode?
-    private var pendingModeRequestID: UUID?
-    var presentedAuthModeRequest: AuthModeChangeConfirmationRequest?
-    var presentedAppAccessConfirmation: AppAccessPolicyChangeConfirmationRequest?
-    var isSwitching = false
-    var isSwitchingAppAccessPolicy = false
-    var switchError: String?
-    var showSwitchError = false
     var showOnboarding = false
     var showTutorialOnboarding = false
-    var showProtectedSettingsResetConfirmation = false
-    var showLocalDataResetWarning = false
-    var showLocalDataResetPhraseSheet = false
-    var showLocalDataResetFailureAlert = false
-    var localDataResetConfirmationPhrase = ""
-    var isResettingLocalData = false
-    private var localDataResetErrorMessage: String?
+    var showChangePassphrase = false
 
     init(
-        config: AppConfiguration,
-        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
-        authManager: AuthenticationManager,
-        keyManagement: KeyManagementService,
+        appSettings: AppSettingsCoordinator,
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
         configuration: SettingsView.Configuration,
         localDataResetService: LocalDataResetService? = nil,
-        localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil,
-        authModeSwitchAction: AuthModeSwitchAction? = nil,
-        appAccessPolicySwitchAction: AppAccessPolicySwitchAction? = nil,
-        localDataResetAuthenticationAction: LocalDataResetAuthenticationAction? = nil,
-        operationPromptCoordinator: AuthenticationPromptCoordinator? = nil
+        localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil
     ) {
         self.configuration = configuration
-        self.appConfiguration = config
-        self.protectedOrdinarySettings = protectedOrdinarySettings
-        self.protectedSettingsHost = configuration.protectedSettingsHost
-        self.authManager = authManager
-        self.keyManagement = keyManagement
+        self.appSettings = appSettings
         self.iosPresentationController = iosPresentationController
         self.macPresentationController = macPresentationController
-        self.localDataResetService = localDataResetService
-        self.localDataResetRestartCoordinator = localDataResetRestartCoordinator
-        self.authModeSwitchAction = authModeSwitchAction ?? { newMode, fingerprints, hasBackup in
-            try await authManager.switchMode(
-                to: newMode,
-                fingerprints: fingerprints,
-                hasBackup: hasBackup,
-                authenticator: authManager
-            )
+        let resetAvailable: Bool
+        switch configuration.localDataResetAvailability {
+        case .enabled: resetAvailable = true
+        case .disabled: resetAvailable = false
         }
-        // The switch action owns the whole two-store transaction, preference
-        // commit included (issue #747) — only the object that moves the root
-        // secret's Keychain gate can order the two writes. This fallback runs
-        // where no protected-data graph is wired (previews, tutorial sandbox),
-        // so there is no gate to move and the preference is the whole state.
-        self.appAccessPolicySwitchAction = appAccessPolicySwitchAction ?? { newPolicy in
-            guard authManager.canEvaluate(appSessionPolicy: newPolicy) else {
-                throw AuthenticationError.appAccessBiometricsUnavailable
-            }
-            config.completeAppSessionAuthenticationPolicySwitch(to: newPolicy)
-        }
-        self.localDataResetAuthenticationAction = localDataResetAuthenticationAction ?? { policy, reason in
-            try await authManager.evaluateAppSession(
-                policy: policy,
-                reason: reason
-            )
-        }
-        self.operationPromptCoordinator = operationPromptCoordinator ?? authManager.promptCoordinator
+        localDataReset = LocalDataResetFlow(
+            service: resetAvailable ? localDataResetService : nil,
+            restartCoordinator: localDataResetRestartCoordinator
+        )
     }
 
     var guidedTutorialEntryTitle: String {
-        if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
+        if appSettings.hasCompletedGuidedTutorial ?? false {
             String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
         } else {
             String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial")
         }
     }
 
-    var isProtectedOrdinarySettingsEditable: Bool {
-        protectedOrdinarySettings.isLoaded
+    var isSettingsEditable: Bool {
+        appSettings.isLoaded
     }
 
     var gracePeriodSelection: Int {
-        protectedOrdinarySettings.snapshot?.gracePeriod ?? AuthPreferences.defaultGracePeriod
+        appSettings.gracePeriodForSession ?? AppSettingsSnapshot.defaultGracePeriod
     }
 
-    /// The stored value, or — while the domain is locked, where every row is
-    /// disabled anyway — what a fresh install would show. Named against
-    /// `firstRunDefaults` so the fallback cannot drift from the real default.
     var encryptToSelfSelection: Bool {
-        protectedOrdinarySettings.snapshot?.encryptToSelf
-            ?? ProtectedOrdinarySettingsSnapshot.firstRunDefaults.encryptToSelf
+        appSettings.encryptToSelf ?? AppSettingsSnapshot.firstRun.encryptToSelf
     }
 
     var signMessagesSelection: Bool {
-        protectedOrdinarySettings.snapshot?.signMessages
-            ?? ProtectedOrdinarySettingsSnapshot.firstRunDefaults.signMessages
+        appSettings.signMessages ?? AppSettingsSnapshot.firstRun.signMessages
+    }
+
+    var isClipboardNoticeEnabled: Bool {
+        appSettings.clipboardNotice ?? AppSettingsSnapshot.firstRun.clipboardNotice
     }
 
     func setGracePeriod(_ gracePeriod: Int) {
-        protectedOrdinarySettings.setGracePeriod(gracePeriod)
+        appSettings.setGracePeriod(gracePeriod)
     }
 
     func setEncryptToSelf(_ encryptToSelf: Bool) {
-        protectedOrdinarySettings.setEncryptToSelf(encryptToSelf)
+        appSettings.setEncryptToSelf(encryptToSelf)
     }
 
     func setSignMessages(_ signMessages: Bool) {
-        protectedOrdinarySettings.setSignMessages(signMessages)
+        appSettings.setSignMessages(signMessages)
     }
 
-    var protectedSettingsSectionState: ProtectedSettingsHost.SectionState {
-        protectedSettingsHost?.sectionState ?? fallbackProtectedSettingsSectionState
-    }
-
-    var isProtectedClipboardNoticeEnabled: Bool {
-        if case .available(let clipboardNoticeEnabled) = protectedSettingsSectionState {
-            return clipboardNoticeEnabled
-        }
-        return true
-    }
-
-    var shouldShowClipboardNoticeRow: Bool {
-        switch configuration.protectedSettingsHostMode {
-        case .mainWindowLive, .tutorialSandbox:
-            true
-        }
+    func setClipboardNoticeEnabled(_ enabled: Bool) {
+        appSettings.setClipboardNotice(enabled)
     }
 
     var shouldShowLocalDataResetSection: Bool {
         switch configuration.localDataResetAvailability {
         case .enabled:
-            localDataResetService != nil
+            localDataReset.isAvailable || localDataReset.isResetting
         case .disabled:
             true
         }
     }
 
     var isLocalDataResetControlEnabled: Bool {
-        isLocalDataResetAvailable && localDataResetService != nil && !isResettingLocalData
+        localDataReset.isAvailable
     }
 
     var localDataResetFooter: String {
@@ -186,148 +107,13 @@ final class SettingsScreenModel {
         }
     }
 
-    var canConfirmLocalDataReset: Bool {
-        localDataResetConfirmationPhrase == "RESET"
-    }
-
-    var localDataResetFailureMessage: String {
-        localDataResetErrorMessage ?? String(
-            localized: "settings.resetAll.error.message",
-            defaultValue: "CypherAir X could not reset all local data."
-        )
-    }
-
-    var usesLocalModeSheet: Bool {
-        presentedAuthModeRequest?.requiresRiskAcknowledgement == true
-    }
-
-    var localModeTitle: String {
-        presentedAuthModeRequest?.title ?? ""
-    }
-
-    var localModeMessage: String {
-        presentedAuthModeRequest?.message ?? ""
-    }
-
-    func handleAuthModeSelection(_ newMode: AuthenticationMode) {
-        guard let currentMode = appConfiguration.authModeIfUnlocked else {
-            switchError = PrivateKeyControlError.locked.localizedDescription
-            showSwitchError = true
-            return
-        }
-        guard newMode != currentMode else {
-            return
-        }
-
-        let requestID = UUID()
-        pendingMode = newMode
-        pendingModeRequestID = requestID
-        presentedAuthModeRequest = nil
-
-        let request = SettingsAuthModeRequestBuilder.makeRequest(
-            id: requestID,
-            for: newMode,
-            hasBackup: hasBackup
-        ) { [weak self] in
-            self?.confirmPendingModeChange(requestID: requestID, mode: newMode)
-        } onCancel: { [weak self] in
-            self?.cancelPendingModeChange(requestID: requestID)
-        }
-
-        if let onAuthModeConfirmationRequested = configuration.onAuthModeConfirmationRequested {
-            onAuthModeConfirmationRequested(request)
-        } else if let macPresentationController {
-            macPresentationController.present(.authModeConfirmation(request))
-        } else {
-            presentedAuthModeRequest = request
-        }
-    }
-
-    func handleAppAccessPolicySelection(_ newPolicy: AppSessionAuthenticationPolicy) {
-        guard newPolicy != appConfiguration.appSessionAuthenticationPolicy else {
-            return
-        }
-
-        // "Biometrics Only" re-wraps the root secret with no passcode fallback:
-        // if biometrics later become unavailable, the protected-data layer is
-        // irrecoverable and every recovery avenue re-requires that same policy.
-        // Gate it behind a lockout warning + risk-acknowledgement, mirroring the
-        // High Security key switch. "User Presence" (the safe direction, passcode
-        // fallback restored) switches directly.
-        guard newPolicy == .biometricsOnly else {
-            performAppAccessPolicySwitch(newPolicy)
-            return
-        }
-
-        let requestID = UUID()
-        presentedAppAccessConfirmation = nil
-        presentedAppAccessConfirmation = SettingsAppAccessPolicyRequestBuilder.makeBiometricsOnlyRequest(
-            id: requestID,
-            onConfirm: { [weak self] in
-                self?.confirmPendingAppAccessPolicySwitch(requestID: requestID, newPolicy: newPolicy)
-            },
-            onCancel: { [weak self] in
-                self?.cancelPendingAppAccessPolicySwitch(requestID: requestID)
-            }
-        )
-    }
-
-    private func confirmPendingAppAccessPolicySwitch(
-        requestID: UUID,
-        newPolicy: AppSessionAuthenticationPolicy
-    ) {
-        // Switch unconditionally with the captured policy (mirrors
-        // confirmPendingModeChange): the sheet's confirm button calls dismiss()
-        // first, which drives the isPresented binding to nil this request before
-        // onConfirm() runs, so guarding the switch on the request still being
-        // present would drop every confirmation. The id-match governs only
-        // whether this call also clears the pending state.
-        if presentedAppAccessConfirmation?.id == requestID {
-            presentedAppAccessConfirmation = nil
-        }
-        performAppAccessPolicySwitch(newPolicy)
-    }
-
-    private func cancelPendingAppAccessPolicySwitch(requestID: UUID) {
-        guard presentedAppAccessConfirmation?.id == requestID else { return }
-        presentedAppAccessConfirmation = nil
-    }
-
-    func dismissAppAccessConfirmation() {
-        guard let request = presentedAppAccessConfirmation else { return }
-        cancelPendingAppAccessPolicySwitch(requestID: request.id)
-    }
-
-    private func performAppAccessPolicySwitch(_ newPolicy: AppSessionAuthenticationPolicy) {
-        isSwitchingAppAccessPolicy = true
-        Task {
-            do {
-                // The action commits the preference itself; this screen must not
-                // write it. A commit from here would be a second, unjournaled
-                // store and would reintroduce issue #747's crash window.
-                try await appAccessPolicySwitchAction(newPolicy)
-            } catch {
-                switchError = error.localizedDescription
-                showSwitchError = true
-            }
-            isSwitchingAppAccessPolicy = false
-        }
-    }
-
-    func dismissLocalModeRequest() {
-        guard let request = presentedAuthModeRequest else { return }
-        cancelPendingModeChange(requestID: request.id)
-    }
-
-    func dismissSwitchError() {
-        switchError = nil
-        showSwitchError = false
+    func presentChangePassphrase() {
+        guard !configuration.isSandbox else { return }
+        showChangePassphrase = true
     }
 
     func presentOnboarding() {
         guard configuration.isOnboardingEntryEnabled else { return }
-
-        #if !os(iOS)
         if let macPresentationController {
             macPresentationController.present(.onboarding(initialPage: 0))
         } else if let iosPresentationController {
@@ -335,19 +121,10 @@ final class SettingsScreenModel {
         } else {
             showOnboarding = true
         }
-        #else
-        if let macPresentationController {
-            macPresentationController.present(.onboarding(initialPage: 0))
-        } else if let iosPresentationController {
-            iosPresentationController.present(.onboarding(initialPage: 0, context: .inApp))
-        }
-        #endif
     }
 
     func presentTutorial() {
         guard configuration.isGuidedTutorialEntryEnabled else { return }
-
-        #if !os(iOS)
         if let macPresentationController {
             macPresentationController.present(.tutorial(presentationContext: .inApp))
         } else if let iosPresentationController {
@@ -355,230 +132,9 @@ final class SettingsScreenModel {
         } else {
             showTutorialOnboarding = true
         }
-        #else
-        if let macPresentationController {
-            macPresentationController.present(.tutorial(presentationContext: .inApp))
-        } else if let iosPresentationController {
-            iosPresentationController.present(.tutorial(presentationContext: .inApp))
-        }
-        #endif
-    }
-
-    func prepareProtectedSettingsSection() async {
-        await protectedSettingsHost?.refreshSettingsSection()
-    }
-
-    func requestProtectedSettingsUnlock() {
-        Task {
-            await protectedSettingsHost?.unlockForSettings()
-        }
-    }
-
-    func setProtectedClipboardNoticeEnabled(_ isEnabled: Bool) {
-        Task {
-            await protectedSettingsHost?.setClipboardNoticeEnabled(isEnabled)
-        }
-    }
-
-    func requestProtectedSettingsRetry() {
-        Task {
-            await protectedSettingsHost?.retryPendingRecovery()
-        }
-    }
-
-    func requestProtectedSettingsReset() {
-        showProtectedSettingsResetConfirmation = true
-    }
-
-    func confirmProtectedSettingsReset() {
-        showProtectedSettingsResetConfirmation = false
-        Task {
-            await protectedSettingsHost?.resetProtectedSettingsDomain()
-        }
-    }
-
-    func dismissProtectedSettingsResetConfirmation() {
-        showProtectedSettingsResetConfirmation = false
-    }
-
-    func requestLocalDataReset() {
-        guard isLocalDataResetControlEnabled else { return }
-        showLocalDataResetWarning = true
-    }
-
-    func dismissLocalDataResetWarning() {
-        showLocalDataResetWarning = false
-    }
-
-    func continueLocalDataReset() {
-        guard isLocalDataResetControlEnabled else { return }
-        showLocalDataResetWarning = false
-        localDataResetConfirmationPhrase = ""
-        showLocalDataResetPhraseSheet = true
-    }
-
-    func dismissLocalDataResetPhraseSheet() {
-        guard !isResettingLocalData else { return }
-        showLocalDataResetPhraseSheet = false
-        localDataResetConfirmationPhrase = ""
     }
 
     func clearTransientInput() {
-        localDataResetConfirmationPhrase = ""
-    }
-
-    func confirmLocalDataReset() {
-        guard isLocalDataResetControlEnabled,
-              canConfirmLocalDataReset,
-              let localDataResetService else { return }
-        showLocalDataResetPhraseSheet = false
-        isResettingLocalData = true
-        localDataResetErrorMessage = nil
-
-        Task {
-            do {
-                var resetAuthenticationContext: LAContext?
-                defer {
-                    resetAuthenticationContext?.invalidate()
-                }
-                let result = try await operationPromptCoordinator.withOperationPrompt {
-                    try await localDataResetAuthenticationAction(
-                        appConfiguration.appSessionAuthenticationPolicy,
-                        String(
-                            localized: "settings.resetAll.authReason",
-                            defaultValue: "Authenticate to reset all CypherAir X data on this device."
-                        )
-                    )
-                }
-                guard result.isAuthenticated else {
-                    throw AuthenticationError.failed
-                }
-                resetAuthenticationContext = result.context
-
-                _ = try await localDataResetService.resetAllLocalData(
-                    authenticationContext: resetAuthenticationContext
-                )
-                localDataResetRestartCoordinator?.markRestartRequired()
-            } catch {
-                localDataResetErrorMessage = error.localizedDescription
-            }
-
-            isResettingLocalData = false
-            // A reset that worked says so by restarting into a fresh app, not
-            // by asking the user to dismiss the news.
-            showLocalDataResetFailureAlert = localDataResetErrorMessage != nil
-            localDataResetConfirmationPhrase = ""
-        }
-    }
-
-    func dismissLocalDataResetFailureAlert() {
-        showLocalDataResetFailureAlert = false
-        localDataResetErrorMessage = nil
-    }
-
-    private var hasBackup: Bool {
-        Self.backupExpectationSatisfied(keys: keyManagement.keys)
-    }
-
-    /// Whether the backup expectation for High Security mode is satisfied.
-    /// Only software-custody keys can be backed up; device-bound Secure
-    /// Enclave keys have no exportable private material, so they carry no
-    /// backup obligation (a device-bound-only population is vacuously
-    /// satisfied rather than permanently nagged with an unsatisfiable task).
-    nonisolated static func backupExpectationSatisfied(keys: [PGPKeyIdentity]) -> Bool {
-        let softwareKeys = keys.filter {
-            $0.privateKeyCustodyKind == .softwareSecretCertificate
-        }
-        guard !softwareKeys.isEmpty else {
-            return true
-        }
-        return softwareKeys.contains(where: \.isBackedUp)
-    }
-
-    /// Mode switching re-wraps software-custody bundles only. The device-bound
-    /// exemption is enforced structurally by the component's own Keychain
-    /// namespace and its envelope's authenticated payloadKind
-    /// (docs/CUSTODY.md §2); this filter keeps the enumeration accurate so a
-    /// bundleless device-bound fingerprint never poisons recovery.
-    nonisolated static func rewrapFingerprints(keys: [PGPKeyIdentity]) -> [String] {
-        PGPKeyIdentity.softwareCustodyFingerprints(in: keys)
-    }
-
-    private var isLocalDataResetAvailable: Bool {
-        switch configuration.localDataResetAvailability {
-        case .enabled:
-            true
-        case .disabled:
-            false
-        }
-    }
-
-    private var fallbackProtectedSettingsSectionState: ProtectedSettingsHost.SectionState {
-        switch configuration.protectedSettingsHostMode {
-        case .mainWindowLive:
-            .locked
-        case .tutorialSandbox:
-            .tutorialSandbox
-        }
-    }
-
-    private func confirmPendingModeChange(
-        requestID: UUID,
-        mode: AuthenticationMode
-    ) {
-        if presentedAuthModeRequest?.id == requestID {
-            presentedAuthModeRequest = nil
-        }
-        performModeSwitch(to: mode, requestID: requestID)
-    }
-
-    private func cancelPendingModeChange(requestID: UUID) {
-        guard pendingModeRequestID == requestID else { return }
-
-        pendingMode = nil
-        pendingModeRequestID = nil
-        presentedAuthModeRequest = nil
-    }
-
-    private func performModeSwitch(
-        to newMode: AuthenticationMode,
-        requestID: UUID
-    ) {
-        isSwitching = true
-        let fingerprints = Self.rewrapFingerprints(keys: keyManagement.keys)
-        let hasBackup = hasBackup
-
-        Task {
-            do {
-                try await authModeSwitchAction(newMode, fingerprints, hasBackup)
-                appConfiguration.privateKeyControlState = .unlocked(newMode)
-            } catch {
-                if let currentMode = authManager.currentMode {
-                    appConfiguration.privateKeyControlState = .unlocked(currentMode)
-                } else {
-                    appConfiguration.privateKeyControlState = .recoveryNeeded
-                }
-                switchError = error.localizedDescription
-                showSwitchError = true
-            }
-
-            if pendingModeRequestID == requestID {
-                pendingMode = nil
-                pendingModeRequestID = nil
-                presentedAuthModeRequest = nil
-            }
-            isSwitching = false
-        }
-    }
-}
-
-private struct AppAccessPolicySwitchActionKey: EnvironmentKey {
-    static let defaultValue: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
-}
-
-extension EnvironmentValues {
-    var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? {
-        get { self[AppAccessPolicySwitchActionKey.self] }
-        set { self[AppAccessPolicySwitchActionKey.self] = newValue }
+        localDataReset.clearTransientInput()
     }
 }

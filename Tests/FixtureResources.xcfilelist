@@ -13,6 +13,7 @@ $(SRCROOT)/Tests/Fixtures/ffi_detailed_multisig_cleartext.asc
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_multisig_detached.sig
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_multisig_encrypted.gpg
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_recipient_secret.gpg
+$(SRCROOT)/Tests/Fixtures/ffi_detailed_recipient_secret_protected.asc
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_repeated_detached.sig
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_repeated_encrypted.gpg
 $(SRCROOT)/Tests/Fixtures/ffi_detailed_signer_a.gpg

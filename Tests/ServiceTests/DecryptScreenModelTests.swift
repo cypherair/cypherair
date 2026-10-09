@@ -27,7 +27,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        stack = await TestHelpers.makeServiceStack()
+        stack = try await TestHelpers.makeServiceStack()
         defaultsSuiteName = "com.cypherair.tests.decryptscreen.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)

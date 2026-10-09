@@ -71,6 +71,10 @@ pub enum PgpError {
     #[error("Wrong passphrase")]
     WrongPassphrase,
 
+    /// The unlock passphrase stretch was refused or failed.
+    #[error("Unlock stretch failed: {reason}")]
+    UnlockStretchFailed { reason: String },
+
     /// Encryption failed.
     #[error("Encryption failed: {reason}")]
     EncryptionFailed { reason: String },

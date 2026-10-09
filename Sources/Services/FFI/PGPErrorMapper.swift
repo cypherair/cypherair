@@ -100,6 +100,8 @@ enum PGPErrorMapper {
             return .messageLimitsExceeded(reason: reason)
         case .WrongPassphrase:
             return .wrongPassphrase
+        case .UnlockStretchFailed(let reason):
+            return .s2kError(reason: reason)
         case .InvalidKeyData(let reason):
             return .invalidKeyData(reason: reason)
         case .EncryptionFailed(let reason):

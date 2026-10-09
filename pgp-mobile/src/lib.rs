@@ -24,6 +24,7 @@ pub mod sign;
 pub mod signature_details;
 pub mod streaming;
 pub mod verify;
+mod unlock_stretch;
 
 use std::sync::Arc;
 
@@ -67,6 +68,23 @@ impl PgpEngine {
     #[uniffi::constructor]
     pub fn new() -> Self {
         PgpEngine
+    }
+
+    // ── Unlock passphrase ───────────────────────────────────────────
+
+    /// Stretch the unlock passphrase into the vault wrapping key's application
+    /// password with Argon2id. The parameters are the caller's fixed profile and
+    /// the salt is public metadata; the passphrase copy this call owns is
+    /// zeroized before returning.
+    pub fn derive_unlock_secret(
+        &self,
+        passphrase: Vec<u8>,
+        salt: Vec<u8>,
+        memory_kib: u32,
+        iterations: u32,
+        parallelism: u32,
+    ) -> Result<Vec<u8>, PgpError> {
+        unlock_stretch::derive_unlock_secret(passphrase, &salt, memory_kib, iterations, parallelism)
     }
 
     // ── Key Generation ──────────────────────────────────────────────

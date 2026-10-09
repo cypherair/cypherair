@@ -351,8 +351,8 @@ class CheckDeviceTestSkipListTests(unittest.TestCase):
         # the parser still recognises the classes it is meant to protect.
         module.check(REPO_ROOT)
         required = module.required_class_names(REPO_ROOT)
-        self.assertIn("DeviceSecureEnclaveTests", required)
-        self.assertIn("DeviceMIETests", required)
+        self.assertIn("DeviceApplicationPasswordProbeTests", required)
+        self.assertIn("DeviceSystemMemoryTests", required)
         self.assertNotIn("DeviceSecurityTestCase", required)
 
 

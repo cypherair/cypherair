@@ -27,7 +27,7 @@ final class ContactsScreenModel {
     }
 
     var canManageTags: Bool {
-        contactsAvailability == .availableProtectedDomain
+        contactsAvailability.isAvailable
     }
 
     var visibleContacts: [ContactIdentitySummary] {

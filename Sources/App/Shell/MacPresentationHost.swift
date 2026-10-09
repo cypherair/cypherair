@@ -3,8 +3,7 @@ import SwiftUI
 private struct MacPresentationHostModifier: ViewModifier {
     @Binding var activePresentation: MacPresentation?
 
-    @Environment(AppConfiguration.self) private var config
-    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
+    @Environment(AppSettingsCoordinator.self) private var appSettings
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     func body(content: Content) -> some View {
@@ -22,11 +21,6 @@ private struct MacPresentationHostModifier: ViewModifier {
         }
         .sheet(item: modalPresentationBinding) { presentation in
             switch presentation {
-            case .authModeConfirmation(let request):
-                NavigationStack {
-                    SettingsAuthModeConfirmationSheetView(request: request)
-                }
-                .presentationSizing(.form)
             case .modifyExpiry(let request):
                 NavigationStack {
                     ModifyExpirySheetView(request: request)
@@ -43,7 +37,7 @@ private struct MacPresentationHostModifier: ViewModifier {
         switch activePresentation {
         case .onboarding, .tutorial:
             return activePresentation
-        case .authModeConfirmation, .modifyExpiry:
+        case .modifyExpiry:
             return nil
         }
     }
@@ -53,7 +47,7 @@ private struct MacPresentationHostModifier: ViewModifier {
             get: {
                 guard let activePresentation else { return nil }
                 switch activePresentation {
-                case .authModeConfirmation, .modifyExpiry:
+                case .modifyExpiry:
                     return activePresentation
                 case .onboarding, .tutorial:
                     return nil
@@ -74,8 +68,7 @@ private struct MacPresentationHostModifier: ViewModifier {
         switch presentation {
         case .onboarding(let initialPage):
             OnboardingView(initialPage: initialPage)
-                .environment(config)
-                .environment(protectedOrdinarySettings)
+                .environment(appSettings)
                 .environment(tutorialStore)
                 .environment(\.macPresentationController, macPresentationControllerValue)
         case .tutorial(let presentationContext):
@@ -85,11 +78,10 @@ private struct MacPresentationHostModifier: ViewModifier {
                     activePresentation = nil
                 }
             )
-            .environment(config)
-            .environment(protectedOrdinarySettings)
+            .environment(appSettings)
             .environment(tutorialStore)
             .environment(\.macPresentationController, macPresentationControllerValue)
-        case .authModeConfirmation, .modifyExpiry:
+        case .modifyExpiry:
             EmptyView()
         }
     }

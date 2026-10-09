@@ -5,6 +5,7 @@
 - **Platforms** — iOS, iPadOS, macOS, and visionOS.
 - **Zero network access** — no HTTP(S), no networked SDKs, no telemetry, no update checks; the app works in airplane mode.
 - **One usage description** — for local biometric authentication. No camera, photo library, contacts, or network permission; any other entitlement in the project is a resource, sandbox, or hardening entitlement, not a privacy permission.
+- **One unlock passphrase** — mandatory and never stored. Every key on the device is sealed by the Secure Enclave with that passphrase folded in, so a copy of the app's files and Keychain decrypts nothing, on this device or any other, without it. Design: [docs/SECURITY.md](docs/SECURITY.md).
 - **Key families** — portable (software custody, exportable) and device-bound (Secure Enclave custody, never exportable), chosen at key generation and immutable per key. Promises: [docs/PRODUCT.md](docs/PRODUCT.md); custody: [docs/CUSTODY.md](docs/CUSTODY.md).
 
 ## Build

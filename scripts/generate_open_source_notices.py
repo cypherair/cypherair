@@ -27,36 +27,7 @@ APP_LICENSE_TEXT_PATHS = [
     ROOT / "LICENSE-MPL",
 ]
 APP_REPOSITORY_URL = "https://github.com/cypherair/cypherair"
-EXTERNAL_NOTICE_RECORDS = [
-    {
-        "id": "sqlcipher@4.19.0",
-        "displayName": "SQLCipher",
-        "version": "4.19.0 community",
-        "repositoryURL": "https://github.com/sqlcipher/sqlcipher",
-        "licenseName": "BSD-3-Clause",
-        "licenseFileResourceName": "SQLCipher-4.19.0.txt",
-        "kind": "thirdParty",
-        "isDirectDependency": True,
-        "licenseSourceKind": "projectFile",
-        "licenseSourceItems": [
-            "third_party/sqlcipher-notices/SQLCipher-LICENSE.md",
-        ],
-    },
-    {
-        "id": "sqlite@3.53.4",
-        "displayName": "SQLite",
-        "version": "3.53.4",
-        "repositoryURL": "https://sqlite.org",
-        "licenseName": "Public Domain",
-        "licenseFileResourceName": "SQLite-3.53.4.txt",
-        "kind": "thirdParty",
-        "isDirectDependency": True,
-        "licenseSourceKind": "projectFile",
-        "licenseSourceItems": [
-            "third_party/sqlcipher-notices/SQLite-PUBLIC-DOMAIN.md",
-        ],
-    },
-]
+EXTERNAL_NOTICE_RECORDS: list[dict] = []
 REGISTRY_LICENSE_PATTERN = re.compile(r"(?i)^(license|copying|unlicense|copyright)([.-].+)?$")
 LICENSE_FETCH_HEADERS = {"User-Agent": "CypherAir Open Source Notices"}
 APPLE_NOTICE_TARGETS = (

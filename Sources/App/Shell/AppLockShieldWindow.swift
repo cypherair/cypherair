@@ -49,7 +49,7 @@ import AppKit
 //   back to `.normal` on a REAL app switch so it can never float above other
 //   apps' windows. An app-resign caused by the lock surface's own unlock
 //   prompt is NOT a real app switch: the shield holds its elevated level
-//   while `AppLockController.isAuthenticating` spans the attempt, and drops
+//   while `AppLockController.isUnlocking` spans the attempt, and drops
 //   to `.normal` only if the attempt ends unresolved with the app still
 //   inactive. At `.normal` an attached sheet still beats the shield, so while
 //   the shield is presented every window in the host's attached-sheet chain
@@ -59,7 +59,7 @@ import AppKit
 //   is the union of the app-window frame and any attached-sheet chain.
 //
 // The shield observes only `AppLockController` state that already existed:
-// `isCosmeticallyCovered`, `isLocked`, plus, on macOS, `isAuthenticating` for
+// `isCosmeticallyCovered`, `isLocked`, plus, on macOS, `isUnlocking` for
 // the activation-level policy above. It contains no lock logic of its own and
 // never touches presentation state. Covering hides nothing and dismisses
 // nothing — after unlock (or a within-grace return) the user is exactly where
@@ -133,11 +133,12 @@ enum AppLockShieldPolicy {
 /// mode flip are applied by the coordinator, not here.
 private struct AppShieldContentView: View {
     let appLockController: AppLockController
+    let services: AppLockSurfaceServices
 
     var body: some View {
         switch AppLockShieldPolicy.mode(isLocked: appLockController.isLocked) {
         case .lock:
-            AppLockSurfaceView(appLockController: appLockController)
+            AppLockSurfaceView(appLockController: appLockController, services: services)
         case .privacy:
             AppPrivacySurfaceView()
         }
@@ -151,13 +152,14 @@ extension View {
     /// both the previous in-scene lock overlay (#697) and the previous
     /// in-scene cosmetic cover overlay (#723).
     @MainActor
-    func appLockShieldWindow(appLockController: AppLockController) -> some View {
+    func appLockShieldWindow(appLockController: AppLockController, services: AppLockSurfaceServices) -> some View {
         background(
             AppLockShieldWindowHost(
                 appLockController: appLockController,
+                services: services,
                 isCosmeticallyCovered: appLockController.isCosmeticallyCovered,
                 isLocked: appLockController.isLocked,
-                isAuthenticating: appLockController.isAuthenticating
+                isUnlocking: appLockController.isUnlocking
             )
         )
     }
@@ -167,6 +169,7 @@ extension View {
 
 private struct AppLockShieldWindowHost: UIViewRepresentable {
     let appLockController: AppLockController
+    let services: AppLockSurfaceServices
     /// The synchronous away-signal cover trigger. Stored so the representable
     /// value changes — and `updateUIView` fires — in the same render pass the
     /// signal flips in, before the system snapshots a backgrounding scene.
@@ -175,12 +178,12 @@ private struct AppLockShieldWindowHost: UIViewRepresentable {
     /// Unused on the UIKit family: `UIWindow.Level` is scene-local — it can
     /// never place the shield above another app's windows — so there is no
     /// inactive level drop and therefore no auth-prompt exception to it.
-    /// Carried so the shared `appLockShieldWindow(appLockController:)` entry
+    /// Carried so the shared `appLockShieldWindow(appLockController:services:)` entry
     /// point has one shape across platforms.
-    let isAuthenticating: Bool
+    let isUnlocking: Bool
 
     func makeCoordinator() -> AppLockShieldWindowCoordinator {
-        AppLockShieldWindowCoordinator(appLockController: appLockController)
+        AppLockShieldWindowCoordinator(appLockController: appLockController, services: services)
     }
 
     func makeUIView(context: Context) -> AppLockShieldAnchorView {
@@ -221,6 +224,7 @@ final class AppLockShieldWindowCoordinator {
     static let shieldWindowLevel = UIWindow.Level(UIWindow.Level.alert.rawValue + 1)
 
     private let appLockController: AppLockController
+    private let services: AppLockSurfaceServices
     private weak var windowScene: UIWindowScene?
     private var shieldWindow: UIWindow?
     private weak var restoreKeyWindow: UIWindow?
@@ -234,8 +238,9 @@ final class AppLockShieldWindowCoordinator {
     private var isCosmeticallyCovered = false
     private var isLocked = false
 
-    init(appLockController: AppLockController) {
+    init(appLockController: AppLockController, services: AppLockSurfaceServices) {
         self.appLockController = appLockController
+        self.services = services
     }
 
     func anchorDidMove(to scene: UIWindowScene?) {
@@ -285,7 +290,7 @@ final class AppLockShieldWindowCoordinator {
         window.isOpaque = true
         window.backgroundColor = .systemBackground
         window.rootViewController = UIHostingController(
-            rootView: AppShieldContentView(appLockController: appLockController)
+            rootView: AppShieldContentView(appLockController: appLockController, services: services)
         )
         window.isHidden = false
         shieldWindow = window
@@ -351,19 +356,20 @@ private let sheetCoverAccessibilityIdentifier = "appLock.sheetCover"
 
 private struct AppLockShieldWindowHost: NSViewRepresentable {
     let appLockController: AppLockController
+    let services: AppLockSurfaceServices
     /// The synchronous away-signal cover trigger (see the UIKit twin).
     let isCosmeticallyCovered: Bool
     let isLocked: Bool
-    /// `AppLockController.isAuthenticating`, wired through the SwiftUI update
+    /// `AppLockController.isUnlocking`, wired through the SwiftUI update
     /// path (a stored property, so the representable value changes and
-    /// `updateNSView` fires on every `.authenticating` transition — including
+    /// `updateNSView` fires on every `.unlocking` transition — including
     /// the attempt that ends unresolved while the app is still inactive,
     /// which produces no NSApplication activation notification to re-derive
     /// the level from).
-    let isAuthenticating: Bool
+    let isUnlocking: Bool
 
     func makeCoordinator() -> AppLockShieldWindowCoordinator {
-        AppLockShieldWindowCoordinator(appLockController: appLockController)
+        AppLockShieldWindowCoordinator(appLockController: appLockController, services: services)
     }
 
     func makeNSView(context: Context) -> AppLockShieldAnchorView {
@@ -376,7 +382,7 @@ private struct AppLockShieldWindowHost: NSViewRepresentable {
         context.coordinator.setState(
             cosmeticallyCovered: isCosmeticallyCovered,
             locked: isLocked,
-            authenticating: isAuthenticating
+            authenticating: isUnlocking
         )
     }
 
@@ -457,6 +463,7 @@ final class AppLockShieldWindowCoordinator {
     }
 
     private let appLockController: AppLockController
+    private let services: AppLockSurfaceServices
     private weak var hostWindow: NSWindow?
     private var shieldWindow: AppLockShieldPanel?
     private weak var restoreKeyWindow: NSWindow?
@@ -469,13 +476,13 @@ final class AppLockShieldWindowCoordinator {
     private var shieldTookKeyStatus = false
     private var isCosmeticallyCovered = false
     private var isLocked = false
-    /// SwiftUI-mirrored `AppLockController.isAuthenticating`, used only as a
+    /// SwiftUI-mirrored `AppLockController.isUnlocking`, used only as a
     /// change signal in `setState`. Level decisions read the controller live:
     /// it sets `.authenticating` synchronously before the LA prompt exists,
     /// so a live read can never be stale when the prompt's resign
     /// notification arrives — this mirror could be, if that resign outruns
     /// the next SwiftUI render.
-    private var isAuthenticating = false
+    private var isUnlocking = false
     private var observers: [any NSObjectProtocol] = []
 
     // Observer lifetime: `endObservations()` runs on every shield removal,
@@ -485,8 +492,9 @@ final class AppLockShieldWindowCoordinator {
     // `self` weakly, so they could never fire meaningfully after teardown
     // anyway.
 
-    init(appLockController: AppLockController) {
+    init(appLockController: AppLockController, services: AppLockSurfaceServices) {
         self.appLockController = appLockController
+        self.services = services
     }
 
     func anchorDidMove(to window: NSWindow?) {
@@ -500,8 +508,8 @@ final class AppLockShieldWindowCoordinator {
     }
 
     func setState(cosmeticallyCovered: Bool, locked: Bool, authenticating: Bool) {
-        let authenticatingChanged = authenticating != isAuthenticating
-        isAuthenticating = authenticating
+        let authenticatingChanged = authenticating != isUnlocking
+        isUnlocking = authenticating
         if cosmeticallyCovered != isCosmeticallyCovered || locked != isLocked {
             isCosmeticallyCovered = cosmeticallyCovered
             isLocked = locked
@@ -557,7 +565,7 @@ final class AppLockShieldWindowCoordinator {
         // Join a full-screen host's space instead of being stranded outside it.
         shield.collectionBehavior.insert(.fullScreenAuxiliary)
         shield.contentView = NSHostingView(
-            rootView: AppShieldContentView(appLockController: appLockController)
+            rootView: AppShieldContentView(appLockController: appLockController, services: services)
         )
         hostWindow.addChildWindow(shield, ordered: .above)
         shieldWindow = shield
@@ -718,7 +726,7 @@ final class AppLockShieldWindowCoordinator {
         guard let shieldWindow else { return }
         shieldWindow.level = Self.shieldLevel(
             appIsActive: NSApp.isActive,
-            isUnlockAuthenticationInFlight: appLockController.isAuthenticating
+            isUnlockAuthenticationInFlight: appLockController.isUnlocking
         )
         // Key status is (re)taken only on genuine activation and only in lock
         // mode — never `makeKey()` while the app is inactive (including the

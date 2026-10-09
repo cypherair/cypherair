@@ -14,7 +14,6 @@ final class KeyDetailScreenModel {
     let configuration: KeyDetailView.Configuration
     let exportController: FileExportController
 
-    private let appConfiguration: AppConfiguration
     private let keyManagement: KeyManagementService
     private let macPresentationController: MacPresentationController?
     private let dismissAction: @MainActor () -> Void
@@ -38,7 +37,6 @@ final class KeyDetailScreenModel {
 
     init(
         fingerprint: String,
-        config: AppConfiguration,
         keyManagement: KeyManagementService,
         macPresentationController: MacPresentationController?,
         configuration: KeyDetailView.Configuration,
@@ -54,7 +52,6 @@ final class KeyDetailScreenModel {
         self.fingerprint = fingerprint
         self.configuration = configuration
         self.exportController = exportController
-        self.appConfiguration = config
         self.keyManagement = keyManagement
         self.macPresentationController = macPresentationController
         self.dismissAction = dismissAction
@@ -183,7 +180,6 @@ final class KeyDetailScreenModel {
 
         guard configuration.outputInterceptionPolicy.interceptClipboardCopy?(
             armoredString,
-            appConfiguration,
             .publicKey
         ) != true else {
             return false

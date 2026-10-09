@@ -3,35 +3,27 @@ import Foundation
 extension ContactsAvailability {
     var unavailableTitle: String {
         switch self {
-        case .availableProtectedDomain:
+        case .available:
             String(localized: "contacts.availability.available.title", defaultValue: "Contacts Available")
         case .opening:
             String(localized: "contacts.availability.opening.title", defaultValue: "Opening Contacts")
         case .locked:
             String(localized: "contacts.availability.locked.title", defaultValue: "Contacts Locked")
-        case .recoveryNeeded:
-            String(localized: "contacts.availability.recovery.title", defaultValue: "Contacts Need Recovery")
-        case .frameworkUnavailable:
-            String(localized: "contacts.availability.framework.title", defaultValue: "Protected Data Unavailable")
-        case .restartRequired:
-            String(localized: "contacts.availability.restart.title", defaultValue: "Restart Required")
+        case .damaged:
+            String(localized: "contacts.availability.damaged.title", defaultValue: "Contacts Damaged")
         }
     }
 
     var unavailableDescription: String {
         switch self {
-        case .availableProtectedDomain:
+        case .available:
             String(localized: "contacts.availability.available.description", defaultValue: "Contacts are ready.")
         case .opening:
-            String(localized: "contacts.availability.opening.description", defaultValue: "Contacts are opening after app authentication.")
+            String(localized: "contacts.availability.opening.description", defaultValue: "Contacts are opening after unlock.")
         case .locked:
             String(localized: "contacts.availability.locked.description", defaultValue: "Unlock CypherAir X to use contacts.")
-        case .recoveryNeeded:
-            String(localized: "contacts.availability.recovery.description", defaultValue: "Contacts could not be loaded safely. Recovery is required before contact data can be used.")
-        case .frameworkUnavailable:
-            String(localized: "contacts.availability.framework.description", defaultValue: "Protected app data is unavailable. Contacts remain locked.")
-        case .restartRequired:
-            String(localized: "contacts.availability.restart.description", defaultValue: "Restart CypherAir X before using protected contact data.")
+        case .damaged:
+            String(localized: "contacts.availability.damaged.description", defaultValue: "The contacts data on this device could not be opened. Reset All Local Data is the only remedy.")
         }
     }
 }

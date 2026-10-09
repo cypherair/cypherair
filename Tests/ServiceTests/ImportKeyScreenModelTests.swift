@@ -169,7 +169,7 @@ final class ImportKeyScreenModelTests: XCTestCase {
         loadFileAction: ImportKeyScreenModel.LoadFileAction? = nil
     ) -> ImportKeyScreenModel {
         ImportKeyScreenModel(
-            keyManagement: TestHelpers.makeKeyManagement().service,
+            keyManagement: TestHelpers.makeLockedKeyManagement(),
             dismissAction: dismissAction,
             importKeyAction: importKeyAction ?? { _, _ in
                 makeKeyRouteTestIdentity(fingerprint: "1111111111111111111111111111111111111111")

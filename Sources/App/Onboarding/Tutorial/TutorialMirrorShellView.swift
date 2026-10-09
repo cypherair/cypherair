@@ -12,8 +12,7 @@ struct TutorialMirrorShellView: View {
                 sizeClass: sizeClass
             )
             .environment(tutorialStore)
-            .environment(container.config)
-            .environment(container.protectedOrdinarySettingsCoordinator)
+            .environment(container.appSettings)
             .environment(container.keyManagement)
             .environment(container.contactService)
             .environment(container.encryptionService)
@@ -22,7 +21,6 @@ struct TutorialMirrorShellView: View {
             .environment(container.certificateSignatureService)
             .environment(container.qrService)
             .environment(container.selfTestService)
-            .environment(container.authManager)
             .screenReady(tutorialStore.currentModule?.readyMarker ?? "tutorial.workspace.ready")
             .onAppear {
                 tutorialStore.noteVisibleSurface(
@@ -37,7 +35,7 @@ struct TutorialMirrorShellView: View {
                     systemImage: "testtube.2"
                 )
             } description: {
-                Text(tutorialStore.errorMessage ?? String(localized: "guidedTutorial.error.defaults", defaultValue: "Could not prepare the sandbox tutorial environment."))
+                Text(tutorialStore.errorMessage ?? String(localized: "guidedTutorial.error.sandbox", defaultValue: "Could not prepare the tutorial sandbox."))
             } actions: {
                 Button(String(localized: "common.done", defaultValue: "Done")) {
                     tutorialStore.returnToOverview()

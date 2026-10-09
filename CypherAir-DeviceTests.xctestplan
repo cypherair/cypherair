@@ -19,18 +19,11 @@
         "includeXCTests" : true
       },
       "selectedTests" : [
-        "DeviceSecureEnclaveTests",
-        "DeviceSecureEnclaveCustodyHiddenGenerationTests",
-        "DeviceSecureEnclaveCustodyHandleStoreTests",
-        "DeviceSecureEnclaveCustodyDecryptTests",
-        "DeviceSecureEnclaveCompositeCustodyTests",
+        "DeviceApplicationPasswordProbeTests",
+        "DeviceApplicationPasswordBiometricProbeTests",
+        "DevicePerformanceTests",
         "DeviceSecureEnclavePqcHighProbeTests",
-        "DeviceAuthenticationManagerTests",
-        "DeviceModeSwitchTests",
-        "DeviceProtectedDataRootSecretStoreTests",
-        "DeviceMIETests",
-        "DeviceSystemMemoryTests",
-        "DevicePerformanceTests"
+        "DeviceSystemMemoryTests"
       ],
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",

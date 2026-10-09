@@ -23,7 +23,6 @@ struct KeyDetailView: View {
     let fingerprint: String
     let configuration: Configuration
 
-    @Environment(AppConfiguration.self) private var config
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macPresentationController) private var macPresentationController
@@ -39,7 +38,6 @@ struct KeyDetailView: View {
     var body: some View {
         KeyDetailScreenHostView(
             fingerprint: fingerprint,
-            config: config,
             keyManagement: keyManagement,
             macPresentationController: macPresentationController,
             configuration: configuration,
@@ -53,7 +51,6 @@ private struct KeyDetailScreenHostView: View {
 
     init(
         fingerprint: String,
-        config: AppConfiguration,
         keyManagement: KeyManagementService,
         macPresentationController: MacPresentationController?,
         configuration: KeyDetailView.Configuration,
@@ -62,7 +59,6 @@ private struct KeyDetailScreenHostView: View {
         _model = State(
             initialValue: KeyDetailScreenModel(
                 fingerprint: fingerprint,
-                config: config,
                 keyManagement: keyManagement,
                 macPresentationController: macPresentationController,
                 configuration: configuration,

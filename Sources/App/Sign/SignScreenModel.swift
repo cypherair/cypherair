@@ -26,8 +26,7 @@ final class SignScreenModel {
     let exportController: FileExportController
 
     private let keyManagement: KeyManagementService
-    private let appConfiguration: AppConfiguration
-    private let protectedSettingsHost: ProtectedSettingsHost?
+    private let appSettings: AppSettingsCoordinator
     private let cleartextSigningAction: CleartextSigningAction
     private let detachedFileSigningAction: FileOperationAction<DetachedFileSigningRequest, Data>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
@@ -48,8 +47,7 @@ final class SignScreenModel {
     init(
         signingService: SigningService,
         keyManagement: KeyManagementService,
-        config: AppConfiguration,
-        protectedSettingsHost: ProtectedSettingsHost? = nil,
+        appSettings: AppSettingsCoordinator,
         configuration: SignView.Configuration,
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
@@ -63,10 +61,9 @@ final class SignScreenModel {
         self.operation = operationController
         self.exportController = exportController
         self.keyManagement = keyManagement
-        self.appConfiguration = config
-        self.protectedSettingsHost = protectedSettingsHost
+        self.appSettings = appSettings
         self.clipboardNoticeDecision = clipboardNoticeDecision ?? {
-            await protectedSettingsHost?.clipboardNoticeDecision() ?? true
+            appSettings.clipboardNotice ?? true
         }
         self.clipboardWriter = clipboardWriter ?? { string, shouldShowNotice in
             operationController.copyToClipboard(string, shouldShowNotice: shouldShowNotice)
@@ -218,7 +215,6 @@ final class SignScreenModel {
 
         guard configuration.outputInterceptionPolicy.interceptClipboardCopy?(
             signedMessage,
-            appConfiguration,
             .generic
         ) != true else {
             return false
@@ -288,7 +284,7 @@ final class SignScreenModel {
         Task { @MainActor [weak self] in
             guard let self else { return }
             if disableFutureNotices {
-                await self.protectedSettingsHost?.disableClipboardNotice()
+                self.appSettings.setClipboardNotice(false)
             }
             self.operation.dismissClipboardNotice()
         }

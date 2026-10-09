@@ -8,7 +8,7 @@ enum OutputArtifactKind {
 }
 
 struct OutputInterceptionPolicy {
-    var interceptClipboardCopy: (@MainActor (String, AppConfiguration, OutputArtifactKind) -> Bool)?
+    var interceptClipboardCopy: (@MainActor (String, OutputArtifactKind) -> Bool)?
     var interceptDataExport: (@MainActor (Data, ExportFilename, OutputArtifactKind) throws -> Bool)?
     var interceptFileExport: (@MainActor (URL, ExportFilename, OutputArtifactKind) -> Bool)?
 

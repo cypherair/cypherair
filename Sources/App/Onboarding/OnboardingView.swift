@@ -185,7 +185,7 @@ struct OnboardingKeyFamiliesPage: View {
 
 /// Page 3: exit — enter the guided tutorial sandbox or skip into the app.
 struct OnboardingTutorialPage: View {
-    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
+    @Environment(AppSettingsCoordinator.self) private var appSettings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
@@ -241,7 +241,7 @@ struct OnboardingTutorialPage: View {
     }
 
     private func presentTutorial() {
-        protectedOrdinarySettings.setHasCompletedOnboarding(true)
+        appSettings.setHasCompletedOnboarding(true)
         #if os(iOS)
         if let iosPresentationController {
             iosPresentationController.handoffToTutorialAfterOnboardingDismiss(.onboardingFirstRun)
@@ -258,7 +258,7 @@ struct OnboardingTutorialPage: View {
     }
 
     private func skipTutorial() {
-        protectedOrdinarySettings.setHasCompletedOnboarding(true)
+        appSettings.setHasCompletedOnboarding(true)
         if let macPresentationController {
             macPresentationController.dismiss()
         } else if let iosPresentationController {

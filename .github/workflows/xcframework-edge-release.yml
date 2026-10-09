@@ -206,11 +206,6 @@ jobs:
       # freshness gate matters more here than anywhere else.
       - name: Check XCFramework source fingerprint
         run: python3 scripts/xcframework_source_fingerprint.py --check
-      - name: Restore SQLCipher XCFramework
-        if: steps.platform_preflight.outputs.ready == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
       # GitHub-hosted runners do not carry CypherAir signing material; these
       # generic probes are unsigned compile/link checks. Local and Xcode Cloud
       # app validation use signing and must not copy CODE_SIGNING_ALLOWED=NO.

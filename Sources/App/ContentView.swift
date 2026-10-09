@@ -15,10 +15,9 @@ struct ContentView: View {
 
 #if os(macOS)
 struct MacAppShellView: View {
-    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
+    @Environment(AppSettingsCoordinator.self) private var appSettings
 
     let navigationState: MacShellNavigationState
-    let opensAuthModeConfirmation: Bool
 
     var body: some View {
         @Bindable var navigationState = navigationState
@@ -51,15 +50,14 @@ struct MacAppShellView: View {
         .macPresentationHost($navigationState.activePresentation)
         .task {
             presentOnboardingIfNeeded()
-            presentLaunchAuthModeConfirmationIfNeeded()
         }
-        .onChange(of: protectedOrdinarySettings.state) { _, _ in
+        .onChange(of: appSettings.snapshot) { _, _ in
             presentOnboardingIfNeeded()
         }
     }
 
     private func presentOnboardingIfNeeded() {
-        guard protectedOrdinarySettings.hasCompletedOnboarding == false,
+        guard appSettings.hasCompletedOnboarding == false,
               navigationState.activePresentation == nil else {
             return
         }
@@ -68,17 +66,6 @@ struct MacAppShellView: View {
 
     // UITest-only: auto-present the auth-mode confirmation in the main window when launched
     // with UITEST_OPEN_AUTHMODE_CONFIRMATION.
-    private func presentLaunchAuthModeConfirmationIfNeeded() {
-        guard opensAuthModeConfirmation,
-              navigationState.activePresentation == nil else {
-            return
-        }
-        navigationState.selectedTab = .settings
-        navigationState.activePresentation = .authModeConfirmation(
-            SettingsAuthModeRequestBuilder.makeLaunchPreviewRequest()
-        )
-    }
-
     private func sidebarRow(_ tab: AppShellTab) -> some View {
         Label(
             AppShellComposition.title(for: tab),
@@ -113,7 +100,7 @@ struct MacAppShellView: View {
             case .contacts:
                 ContactsView()
             case .settings:
-                MainWindowSettingsRootView()
+                SettingsView()
             case .encrypt:
                 EncryptView()
             case .decrypt:

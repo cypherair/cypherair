@@ -8,7 +8,7 @@ final class SigningServiceTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        stack = await TestHelpers.makeServiceStack()
+        stack = try await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -170,7 +170,7 @@ final class SigningServiceTests: XCTestCase {
     func test_verifyCleartext_unknownSigner_returnsUnknownSigner() async throws {
         // Create a separate stack for signing — the signer must not be known
         // to the verifier's contacts or own keys
-        let otherStack = await TestHelpers.makeServiceStack()
+        let otherStack = try await TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
         let otherIdentity = try await TestHelpers.generateAndStoreKey(
@@ -185,7 +185,7 @@ final class SigningServiceTests: XCTestCase {
         )
 
         // Verify on the original stack — the signer is not known
-        try await stack.contactService.relockProtectedData()
+        try await stack.contactService.relockVault()
         let result = try await stack.signingService.verifyCleartextDetailed(strangerSigned)
         XCTAssertEqual(result.verification.summaryState, .contactsContextUnavailable)
         XCTAssertEqual(result.verification.contactsUnavailableReason, .locked)
@@ -193,7 +193,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_modernHigh_unknownSigner_returnsUnknownSigner() async throws {
-        let otherStack = await TestHelpers.makeServiceStack()
+        let otherStack = try await TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
         let otherIdentity = try await TestHelpers.generateAndStoreKey(
@@ -207,7 +207,7 @@ final class SigningServiceTests: XCTestCase {
             signerFingerprint: otherIdentity.fingerprint
         )
 
-        try await stack.contactService.relockProtectedData()
+        try await stack.contactService.relockVault()
         let result = try await stack.signingService.verifyCleartextDetailed(strangerSigned)
         XCTAssertEqual(result.verification.summaryState, .contactsContextUnavailable)
     }
@@ -401,22 +401,4 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
-    // MARK: - High Security Biometrics Blocking
-
-    func test_signCleartext_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
-        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
-
-        stack.mockSE.simulatedAuthMode = .highSecurity
-        stack.mockSE.biometricsAvailable = false
-
-        do {
-            _ = try await stack.signingService.signCleartext(
-                "Test message",
-                signerFingerprint: identity.fingerprint
-            )
-            XCTFail("Expected error when biometrics unavailable in High Security mode")
-        } catch {
-            // Auth error propagated from SE reconstructKey
-        }
-    }
 }

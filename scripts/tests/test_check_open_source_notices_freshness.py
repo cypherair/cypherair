@@ -39,10 +39,6 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
         (root / "scripts/generate_open_source_notices.py").symlink_to(
             REPO_ROOT / "scripts/generate_open_source_notices.py"
         )
-        (root / "third_party").mkdir()
-        (root / "third_party/sqlcipher-xcframework.pin.json").write_text(
-            '{"release": {"tag": "sqlcipher-xcframework-v4.19.0-cypherair.1"}}\n', encoding="utf-8"
-        )
         (root / "pgp-mobile").mkdir()
         (root / module.CARGO_LOCK).write_text(CARGO_LOCK, encoding="utf-8")
         (root / "pgp-mobile/Cargo.toml").write_text(
@@ -74,27 +70,9 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
                 "kind": "thirdParty",
                 "licenseFileResourceName": "zeroize-1.8.2.txt",
             },
-            {
-                "id": "sqlcipher@4.19.0",
-                "kind": "thirdParty",
-                "licenseFileResourceName": "SQLCipher-4.19.0.txt",
-            },
-            {
-                "id": "sqlite@3.53.4",
-                "kind": "thirdParty",
-                "licenseFileResourceName": "SQLite-3.53.4.txt",
-            },
         ]
 
     def test_recorded_fingerprint_matches_a_fresh_tree(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir_name:
-            root = self.make_repo(Path(temp_dir_name))
-            module.write_fingerprint(root)
-            module.check(root)
-
-    def test_external_records_do_not_need_a_cargo_package(self) -> None:
-        # SQLCipher and SQLite are injected by the generator, not resolved by
-        # cargo; the gate must not demand them in Cargo.lock.
         with tempfile.TemporaryDirectory() as temp_dir_name:
             root = self.make_repo(Path(temp_dir_name))
             module.write_fingerprint(root)
@@ -116,11 +94,10 @@ class CheckOpenSourceNoticesFreshnessTests(unittest.TestCase):
             self.assertIn(module.REGENERATE_COMMAND, message)
 
     def test_every_generation_input_is_gated(self) -> None:
-        # A feature change, a SQLCipher pin bump, or a generator edit all change
-        # what the notices should say, and none of them touch Cargo.lock.
+        # A feature change or a generator edit changes what the notices should
+        # say, and neither touches Cargo.lock.
         for relative in (
             "pgp-mobile/Cargo.toml",
-            "third_party/sqlcipher-xcframework.pin.json",
         ):
             with self.subTest(relative=relative), tempfile.TemporaryDirectory() as temp_dir_name:
                 root = self.make_repo(Path(temp_dir_name))

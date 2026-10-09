@@ -69,7 +69,7 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
     func test_exportRevocationCertificate_neverMarksKeyBackedUp() async {
         // The post-generation surface must not produce any "backup complete"
         // signal: revocation-artifact export is not a private-key backup.
-        let keyManagement = TestHelpers.makeKeyManagement().service
+        let keyManagement = TestHelpers.makeLockedKeyManagement()
         let model = PostGenerationPromptScreenModel(
             identity: makeDeviceBoundIdentity(),
             keyManagement: keyManagement,
@@ -111,7 +111,7 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
     ) -> PostGenerationPromptScreenModel {
         PostGenerationPromptScreenModel(
             identity: identity,
-            keyManagement: TestHelpers.makeKeyManagement().service,
+            keyManagement: TestHelpers.makeLockedKeyManagement(),
             revocationExportAction: revocationExportAction
         )
     }
