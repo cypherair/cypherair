@@ -13,7 +13,7 @@ from support import REPO_ROOT, load_script_module
 
 class XcodeBuildPhaseScriptTests(unittest.TestCase):
     def test_source_compliance_phase_is_declared(self) -> None:
-        project_text = (REPO_ROOT / "CypherAir.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+        project_text = (REPO_ROOT / "CypherAir.xcodeproj/project.xcproj").read_text(encoding="utf-8")
 
         self.assertIn("Generate Source Compliance Info", project_text)
 

@@ -1,0 +1,62 @@
+name: OSS Scanner Image
+
+on:
+  pull_request:
+    paths:
+      - .oss-scanner/**
+      - pgp-mobile/**
+      - scripts/assert_min_gpg_version.sh
+      - scripts/assert_min_sq_version.sh
+      - .github/workflows/oss-scanner-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oss-scanner-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Build and test offline as the scanner does
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Free disk for the image
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Check out the scanner's enrolment tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: anthropics/oss-scanner
+          ref: 481b73cc028deee0409d09c6aca619b614553880
+          persist-credentials: false
+      - name: Enrol this ref the way the scanner reads it
+        env:
+          REPO: ${{ github.event.pull_request.head.repo.html_url || format('{0}/{1}', github.server_url, github.repository) }}
+          REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --user --break-system-packages pyyaml
+          mkdir -p projects/cypherair
+          cat > projects/cypherair/project.yaml <<YAML
+          repo: ${REPO}#${REF}
+          primary_contact: nobody@cypherair.invalid
+          dockerfile: .oss-scanner/Dockerfile
+          YAML
+          tools/validate.py
+      - name: Build the image with the scanner's tools/check
+        run: tools/check --no-shell cypherair
+      # A fast subset, to keep this job short.
+      - name: Run a smoke group of lanes in the finished image with no network
+        run: |
+          docker run --rm --init --network none --cap-add SYS_PTRACE --cpus 2 --memory 8g -w /src/pgp-mobile \
+            -e CYPHERAIR_REQUIRE_SQ=1 \
+            oss-scanner-check/built:cypherair \
+            cargo test --locked --offline \
+              --test message_consumption_tests \
+              --test security_decrypt_policy_tests \
+              --test security_signature_policy_tests \
+              --test streaming_resilience_tests \
+              --test portable_pq_message_tests \
+              --test qr_url_tests \
+              --test sq_live_interop_tests
