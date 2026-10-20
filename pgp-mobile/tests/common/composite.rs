@@ -108,7 +108,7 @@ pub fn decapsulate_mlkem768_with_ossl(
     secret_seed: &[u8],
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, ossl::Error> {
-    let ctx = OsslContext::new_lib_ctx();
+    let ctx = OsslContext::new_lib_ctx_checked()?;
     let mut key = EvpPkey::import(
         &ctx,
         EvpPkeyType::MlKem768,
@@ -346,7 +346,7 @@ pub fn decapsulate_mlkem1024_with_ossl(
     secret_seed: &[u8],
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, ossl::Error> {
-    let ctx = OsslContext::new_lib_ctx();
+    let ctx = OsslContext::new_lib_ctx_checked()?;
     let mut key = EvpPkey::import(
         &ctx,
         EvpPkeyType::MlKem1024,

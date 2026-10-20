@@ -14,20 +14,20 @@ name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
 
 [dependencies]
-sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
+sequoia-openpgp = { version = "=2.4.2", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
 uniffi = { version = "0.32", features = ["cli"] }
 openssl = { version = "0.10", features = ["vendored"] }
 zeroize = { version = "1", features = ["derive"] }
-argon2 = "0.5"
+argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
 base64 = { version = "0.23", default-features = false, features = ["std"] }
 thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"
-sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
+sequoia-openpgp = { version = "=2.4.2", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
@@ -35,7 +35,7 @@ sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
 # ossl release sequoia-openpgp's crypto-openssl backend already pulls in, with
 # the same feature shape (reuse the openssl-sys build instead of a second
 # OpenSSL source tree).
-ossl = { version = "1.5.2", default-features = false, features = ["openssl-sys"] }
+ossl = { version = "1.5.3", default-features = false, features = ["openssl-sys"] }
 
 [build-dependencies]
 uniffi = { version = "0.32", features = ["build"] }

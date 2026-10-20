@@ -84,6 +84,21 @@
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "argon2-0.5.3.txt",
     "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "argon2@0.6.0",
+    "displayName": "argon2",
+    "version": "0.6.0",
+    "repositoryURL": "https://github.com/RustCrypto/password-hashes",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "argon2-0.6.0.txt",
+    "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
@@ -182,12 +197,42 @@
     ]
   },
   {
+    "id": "blake2@0.11.0",
+    "displayName": "blake2",
+    "version": "0.11.0",
+    "repositoryURL": "https://github.com/RustCrypto/hashes",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "blake2-0.11.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
     "id": "block-buffer@0.10.4",
     "displayName": "block-buffer",
     "version": "0.10.4",
     "repositoryURL": "https://github.com/RustCrypto/utils",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "block-buffer-0.10.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "block-buffer@0.12.1",
+    "displayName": "block-buffer",
+    "version": "0.12.1",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "block-buffer-0.12.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -225,12 +270,12 @@
     ]
   },
   {
-    "id": "camino@1.2.5",
+    "id": "camino@1.2.6",
     "displayName": "camino",
-    "version": "1.2.5",
+    "version": "1.2.6",
     "repositoryURL": "https://github.com/camino-rs/camino",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "camino-1.2.5.txt",
+    "licenseFileResourceName": "camino-1.2.6.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -269,12 +314,12 @@
     ]
   },
   {
-    "id": "cfg-if@1.0.4",
+    "id": "cfg-if@1.0.5",
     "displayName": "cfg-if",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "repositoryURL": "https://github.com/rust-lang/cfg-if",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "cfg-if-1.0.4.txt",
+    "licenseFileResourceName": "cfg-if-1.0.5.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -284,12 +329,12 @@
     ]
   },
   {
-    "id": "clap@4.6.6",
+    "id": "clap@4.6.7",
     "displayName": "clap",
-    "version": "4.6.6",
+    "version": "4.6.7",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap-4.6.6.txt",
+    "licenseFileResourceName": "clap-4.6.7.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -299,12 +344,12 @@
     ]
   },
   {
-    "id": "clap_builder@4.6.6",
+    "id": "clap_builder@4.6.7",
     "displayName": "clap_builder",
-    "version": "4.6.6",
+    "version": "4.6.7",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap_builder-4.6.6.txt",
+    "licenseFileResourceName": "clap_builder-4.6.7.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -314,18 +359,33 @@
     ]
   },
   {
-    "id": "clap_lex@1.1.0",
+    "id": "clap_lex@1.1.1",
     "displayName": "clap_lex",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap_lex-1.1.0.txt",
+    "licenseFileResourceName": "clap_lex-1.1.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "LICENSE-MIT",
       "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "cmov@0.5.4",
+    "displayName": "cmov",
+    "version": "0.5.4",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "cmov-0.5.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
     ]
   },
   {
@@ -344,12 +404,27 @@
     ]
   },
   {
-    "id": "crc32fast@1.5.2",
+    "id": "cpufeatures@0.3.1",
+    "displayName": "cpufeatures",
+    "version": "0.3.1",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "cpufeatures-0.3.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "crc32fast@1.5.3",
     "displayName": "crc32fast",
-    "version": "1.5.2",
+    "version": "1.5.3",
     "repositoryURL": "https://github.com/srijs/rust-crc32fast",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "crc32fast-1.5.2.txt",
+    "licenseFileResourceName": "crc32fast-1.5.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -374,12 +449,42 @@
     ]
   },
   {
+    "id": "crypto-common@0.2.2",
+    "displayName": "crypto-common",
+    "version": "0.2.2",
+    "repositoryURL": "https://github.com/RustCrypto/traits",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "crypto-common-0.2.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
     "id": "ctor@1.0.13",
     "displayName": "ctor",
     "version": "1.0.13",
     "repositoryURL": "https://github.com/mmastrac/linktime",
     "licenseName": "Apache-2.0 OR MIT",
     "licenseFileResourceName": "ctor-1.0.13.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "ctutils@0.4.3",
+    "displayName": "ctutils",
+    "version": "0.4.3",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "ctutils-0.4.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -404,6 +509,21 @@
     ]
   },
   {
+    "id": "digest@0.11.3",
+    "displayName": "digest",
+    "version": "0.11.3",
+    "repositoryURL": "https://github.com/RustCrypto/traits",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "digest-0.11.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
     "id": "dyn-clone@1.0.20",
     "displayName": "dyn-clone",
     "version": "1.0.20",
@@ -419,12 +539,12 @@
     ]
   },
   {
-    "id": "equivalent@1.0.2",
+    "id": "equivalent@1.0.3",
     "displayName": "equivalent",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "repositoryURL": "https://github.com/indexmap-rs/equivalent",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "equivalent-1.0.2.txt",
+    "licenseFileResourceName": "equivalent-1.0.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -509,12 +629,12 @@
     ]
   },
   {
-    "id": "fs-err@3.3.1",
+    "id": "fs-err@3.3.2",
     "displayName": "fs-err",
-    "version": "3.3.1",
+    "version": "3.3.2",
     "repositoryURL": "https://github.com/andrewhickman/fs-err",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "fs-err-3.3.1.txt",
+    "licenseFileResourceName": "fs-err-3.3.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -617,6 +737,21 @@
     "repositoryURL": "https://github.com/withoutboats/heck",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "heck-0.5.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "hybrid-array@0.4.15",
+    "displayName": "hybrid-array",
+    "version": "0.4.15",
+    "repositoryURL": "https://github.com/RustCrypto/hybrid-array",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "hybrid-array-0.4.15.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -784,12 +919,12 @@
     ]
   },
   {
-    "id": "lalrpop-util@0.23.1",
+    "id": "lalrpop-util@0.23.2",
     "displayName": "lalrpop-util",
-    "version": "0.23.1",
+    "version": "0.23.2",
     "repositoryURL": "https://github.com/lalrpop/lalrpop",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "lalrpop-util-0.23.1.txt",
+    "licenseFileResourceName": "lalrpop-util-0.23.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -799,12 +934,12 @@
     ]
   },
   {
-    "id": "libc@0.2.189",
+    "id": "libc@0.2.191",
     "displayName": "libc",
-    "version": "0.2.189",
+    "version": "0.2.191",
     "repositoryURL": "https://github.com/rust-lang/libc",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "libc-0.2.189.txt",
+    "licenseFileResourceName": "libc-0.2.191.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -989,17 +1124,17 @@
     ]
   },
   {
-    "id": "ossl@1.5.2",
+    "id": "ossl@1.5.3",
     "displayName": "ossl",
-    "version": "1.5.2",
+    "version": "1.5.3",
     "repositoryURL": "https://github.com/latchset/kryoptic",
     "licenseName": "Apache-2.0",
-    "licenseFileResourceName": "ossl-1.5.2.txt",
+    "licenseFileResourceName": "ossl-1.5.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
-      "LICENSE-2.0.txt"
+      "LICENSE.txt"
     ]
   },
   {
@@ -1009,6 +1144,21 @@
     "repositoryURL": "https://github.com/RustCrypto/traits/tree/master/password-hash",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "password-hash-0.5.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "password-hash@0.6.1",
+    "displayName": "password-hash",
+    "version": "0.6.1",
+    "repositoryURL": "https://github.com/RustCrypto/traits",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "password-hash-0.6.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1030,6 +1180,21 @@
     "licenseSourceItems": [
       "LICENSE-MIT",
       "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "phc@0.6.1",
+    "displayName": "phc",
+    "version": "0.6.1",
+    "repositoryURL": "https://github.com/RustCrypto/formats",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "phc-0.6.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
     ]
   },
   {
@@ -1122,12 +1287,12 @@
     ]
   },
   {
-    "id": "rustix@1.1.4",
+    "id": "rustix@1.1.5",
     "displayName": "rustix",
-    "version": "1.1.4",
+    "version": "1.1.5",
     "repositoryURL": "https://github.com/bytecodealliance/rustix",
     "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "rustix-1.1.4.txt",
+    "licenseFileResourceName": "rustix-1.1.5.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1166,12 +1331,12 @@
     ]
   },
   {
-    "id": "sequoia-openpgp@2.4.1",
+    "id": "sequoia-openpgp@2.4.2",
     "displayName": "sequoia-openpgp",
-    "version": "2.4.1",
+    "version": "2.4.2",
     "repositoryURL": "https://gitlab.com/sequoia-pgp/sequoia",
     "licenseName": "LGPL-2.0-or-later",
-    "licenseFileResourceName": "sequoia-openpgp-2.4.1.txt",
+    "licenseFileResourceName": "sequoia-openpgp-2.4.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -1210,12 +1375,12 @@
     ]
   },
   {
-    "id": "serde_json@1.0.151",
+    "id": "serde_json@1.0.154",
     "displayName": "serde_json",
-    "version": "1.0.151",
+    "version": "1.0.154",
     "repositoryURL": "https://github.com/serde-rs/json",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "serde_json-1.0.151.txt",
+    "licenseFileResourceName": "serde_json-1.0.154.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1225,12 +1390,12 @@
     ]
   },
   {
-    "id": "serde_spanned@1.1.1",
+    "id": "serde_spanned@1.1.2",
     "displayName": "serde_spanned",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "serde_spanned-1.1.1.txt",
+    "licenseFileResourceName": "serde_spanned-1.1.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1268,26 +1433,27 @@
     ]
   },
   {
-    "id": "siphasher@1.0.3",
+    "id": "siphasher@1.0.4",
     "displayName": "siphasher",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "repositoryURL": "https://github.com/jedisct1/rust-siphash",
-    "licenseName": "MIT/Apache-2.0",
-    "licenseFileResourceName": "siphasher-1.0.3.txt",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "siphasher-1.0.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
-      "COPYING"
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
     ]
   },
   {
-    "id": "smallvec@1.16.1",
+    "id": "smallvec@1.16.3",
     "displayName": "smallvec",
-    "version": "1.16.1",
+    "version": "1.16.3",
     "repositoryURL": "https://github.com/servo/rust-smallvec",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "smallvec-1.16.1.txt",
+    "licenseFileResourceName": "smallvec-1.16.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1384,12 +1550,12 @@
     ]
   },
   {
-    "id": "textwrap@0.16.3",
+    "id": "textwrap@0.16.4",
     "displayName": "textwrap",
-    "version": "0.16.3",
+    "version": "0.16.4",
     "repositoryURL": "https://github.com/mgeisler/textwrap",
     "licenseName": "MIT",
-    "licenseFileResourceName": "textwrap-0.16.3.txt",
+    "licenseFileResourceName": "textwrap-0.16.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1398,12 +1564,12 @@
     ]
   },
   {
-    "id": "thiserror@2.0.20",
+    "id": "thiserror@2.0.21",
     "displayName": "thiserror",
-    "version": "2.0.20",
+    "version": "2.0.21",
     "repositoryURL": "https://github.com/dtolnay/thiserror",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "thiserror-2.0.20.txt",
+    "licenseFileResourceName": "thiserror-2.0.21.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -1427,12 +1593,12 @@
     ]
   },
   {
-    "id": "toml@1.1.6+spec-1.1.0",
+    "id": "toml@1.1.8+spec-1.1.0",
     "displayName": "toml",
-    "version": "1.1.6+spec-1.1.0",
+    "version": "1.1.8+spec-1.1.0",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml-1.1.6-spec-1.1.0.txt",
+    "licenseFileResourceName": "toml-1.1.8-spec-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1442,42 +1608,42 @@
     ]
   },
   {
-    "id": "toml_datetime@1.1.1+spec-1.1.0",
+    "id": "toml_datetime@1.1.2+spec-1.1.0",
     "displayName": "toml_datetime",
-    "version": "1.1.1+spec-1.1.0",
-    "repositoryURL": "https://github.com/toml-rs/toml",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml_datetime-1.1.1-spec-1.1.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "toml_parser@1.1.3+spec-1.1.0",
-    "displayName": "toml_parser",
-    "version": "1.1.3+spec-1.1.0",
-    "repositoryURL": "https://github.com/toml-rs/toml",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml_parser-1.1.3-spec-1.1.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "toml_writer@1.1.2+spec-1.1.0",
-    "displayName": "toml_writer",
     "version": "1.1.2+spec-1.1.0",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml_writer-1.1.2-spec-1.1.0.txt",
+    "licenseFileResourceName": "toml_datetime-1.1.2-spec-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "toml_parser@1.1.5+spec-1.1.0",
+    "displayName": "toml_parser",
+    "version": "1.1.5+spec-1.1.0",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "toml_parser-1.1.5-spec-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "toml_writer@1.1.3+spec-1.1.0",
+    "displayName": "toml_writer",
+    "version": "1.1.3+spec-1.1.0",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "toml_writer-1.1.3-spec-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1518,101 +1684,101 @@
     ]
   },
   {
-    "id": "uniffi@0.32.1",
+    "id": "uniffi@0.32.2",
     "displayName": "uniffi",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi-0.32.1.txt",
+    "licenseFileResourceName": "uniffi-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_bindgen@0.32.1",
+    "id": "uniffi_bindgen@0.32.2",
     "displayName": "uniffi_bindgen",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_bindgen-0.32.1.txt",
+    "licenseFileResourceName": "uniffi_bindgen-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_build@0.32.1",
+    "id": "uniffi_build@0.32.2",
     "displayName": "uniffi_build",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_build-0.32.1.txt",
+    "licenseFileResourceName": "uniffi_build-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_core@0.32.1",
+    "id": "uniffi_core@0.32.2",
     "displayName": "uniffi_core",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_core-0.32.1.txt",
+    "licenseFileResourceName": "uniffi_core-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_meta@0.32.1",
+    "id": "uniffi_meta@0.32.2",
     "displayName": "uniffi_meta",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_meta-0.32.1.txt",
+    "licenseFileResourceName": "uniffi_meta-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_pipeline@0.32.1",
+    "id": "uniffi_pipeline@0.32.2",
     "displayName": "uniffi_pipeline",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_pipeline-0.32.1.txt",
+    "licenseFileResourceName": "uniffi_pipeline-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_udl@0.32.1",
+    "id": "uniffi_udl@0.32.2",
     "displayName": "uniffi_udl",
-    "version": "0.32.1",
+    "version": "0.32.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_udl-0.32.1.txt",
+    "licenseFileResourceName": "uniffi_udl-0.32.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.32.1:LICENSE"
+      "v0.32.2:LICENSE"
     ]
   },
   {
@@ -1673,12 +1839,12 @@
     ]
   },
   {
-    "id": "xxhash-rust@0.8.18",
+    "id": "xxhash-rust@0.8.19",
     "displayName": "xxhash-rust",
-    "version": "0.8.18",
+    "version": "0.8.19",
     "repositoryURL": "https://github.com/DoumanAsh/xxhash-rust",
     "licenseName": "BSL-1.0",
-    "licenseFileResourceName": "xxhash-rust-0.8.18.txt",
+    "licenseFileResourceName": "xxhash-rust-0.8.19.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1715,12 +1881,12 @@
     ]
   },
   {
-    "id": "zeroize@1.9.0",
+    "id": "zeroize@1.9.1",
     "displayName": "zeroize",
-    "version": "1.9.0",
+    "version": "1.9.1",
     "repositoryURL": "https://github.com/RustCrypto/utils",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "zeroize-1.9.0.txt",
+    "licenseFileResourceName": "zeroize-1.9.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -1758,12 +1924,12 @@
     ]
   },
   {
-    "id": "zlib-rs@0.6.7",
+    "id": "zlib-rs@0.6.8",
     "displayName": "zlib-rs",
-    "version": "0.6.7",
+    "version": "0.6.8",
     "repositoryURL": "https://github.com/trifectatechfoundation/zlib-rs",
     "licenseName": "Zlib",
-    "licenseFileResourceName": "zlib-rs-0.6.7.txt",
+    "licenseFileResourceName": "zlib-rs-0.6.8.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
