@@ -1,0 +1,10 @@
+# cargo audit reads this file from the directory it runs in; every gate runs
+# from the repository root.
+[advisories]
+ignore = [
+    # basic-toml is unmaintained, with no patched release. Only askama's
+    # template configuration pulls it, as a proc-macro input of
+    # uniffi_bindgen, so none of it ships in PgpMobile. Drop this entry once
+    # the pinned uniffi no longer pulls it.
+    "RUSTSEC-2026-0374",
+]
