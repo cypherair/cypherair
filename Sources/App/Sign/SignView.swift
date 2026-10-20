@@ -86,115 +86,127 @@ private struct SignScreenHostView: View {
         let exportController = model.exportController
         let fileImportRequestToken = model.fileImportRequestToken
 
-        CypherToolScreenLayout(hasOutput: hasOutput) {
-            Section {
-                CypherModePicker(
-                    title: String(localized: "sign.mode", defaultValue: "Mode"),
-                    selection: $model.signMode,
-                    selectedValueLabel: model.signMode.label,
-                    isDisabled: operation.isRunning,
-                    accessibilityIdentifier: "sign.mode.picker"
-                ) {
-                    ForEach(SignView.SignMode.allCases, id: \.self) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-            }
-
-            if model.signMode == .text {
-                textSigningContent
-                    .disabled(operation.isRunning)
+        Group {
+            if model.signingKeys.isEmpty {
+                CypherToolKeyRequiredView(
+                    title: String(localized: "sign.keyRequired.title", defaultValue: "No Key to Sign With"),
+                    message: String(
+                        localized: "sign.keyRequired.message",
+                        defaultValue: "Signing needs a key of your own. Generate or import one in Keys."
+                    )
+                )
             } else {
-                fileSigningContent
-                    .disabled(operation.isRunning)
-            }
-
-            Section {
-                if model.signingKeys.count > 1 {
-                    Picker(
-                        String(localized: "sign.signingKey", defaultValue: "Signing Key"),
-                        selection: $model.signerFingerprint
-                    ) {
-                        ForEach(model.signingKeys) { key in
-                            Text(key.userId ?? key.shortKeyId)
-                                .tag(Optional(key.fingerprint))
+                CypherToolScreenLayout(hasOutput: hasOutput) {
+                    Section {
+                        CypherModePicker(
+                            title: String(localized: "sign.mode", defaultValue: "Mode"),
+                            selection: $model.signMode,
+                            selectedValueLabel: model.signMode.label,
+                            isDisabled: operation.isRunning,
+                            accessibilityIdentifier: "sign.mode.picker"
+                        ) {
+                            ForEach(SignView.SignMode.allCases, id: \.self) { mode in
+                                Text(mode.label).tag(mode)
+                            }
                         }
                     }
-                }
-            }
-            .disabled(operation.isRunning)
 
-            Section {
-                Button {
-                    model.sign()
-                } label: {
-                    CypherOperationButtonLabel(
-                        idleTitle: String(localized: "sign.button", defaultValue: "Sign"),
-                        runningTitle: String(localized: "sign.signing", defaultValue: "Signing..."),
-                        isRunning: operation.isRunning,
-                        isCancelling: operation.isCancelling,
-                        progressFraction: model.signMode == .file ? operation.progress?.fractionCompleted : nil
-                    )
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(model.signButtonDisabled)
-            }
-
-            if model.showsFileCancelAction {
-                CypherOperationCancelSection(
-                    isCancelling: operation.isCancelling,
-                    cancel: operation.cancel
-                )
-            }
-        } output: {
-            if model.signMode == .text, let signedMessage = model.signedMessage {
-                Section {
-                    CypherOutputTextBlock(
-                        text: signedMessage,
-                        font: .system(.caption, design: .monospaced)
-                    )
-
-                    CypherCopyButton(
-                        title: String(localized: "common.copy", defaultValue: "Copy")
-                    ) {
-                        await model.copySignedMessageToClipboard()
+                    if model.signMode == .text {
+                        textSigningContent
+                            .disabled(operation.isRunning)
+                    } else {
+                        fileSigningContent
+                            .disabled(operation.isRunning)
                     }
-                    .disabled(!model.configuration.allowsClipboardWrite)
 
-                    Button {
-                        model.exportSignedMessage()
-                    } label: {
-                        Label(
-                            String(localized: "common.save", defaultValue: "Save"),
-                            systemImage: "square.and.arrow.down"
+                    Section {
+                        if model.signingKeys.count > 1 {
+                            Picker(
+                                String(localized: "sign.signingKey", defaultValue: "Signing Key"),
+                                selection: $model.signerFingerprint
+                            ) {
+                                ForEach(model.signingKeys) { key in
+                                    Text(key.userId ?? key.shortKeyId)
+                                        .tag(Optional(key.fingerprint))
+                                }
+                            }
+                        }
+                    }
+                    .disabled(operation.isRunning)
+
+                    Section {
+                        Button {
+                            model.sign()
+                        } label: {
+                            CypherOperationButtonLabel(
+                                idleTitle: String(localized: "sign.button", defaultValue: "Sign"),
+                                runningTitle: String(localized: "sign.signing", defaultValue: "Signing..."),
+                                isRunning: operation.isRunning,
+                                isCancelling: operation.isCancelling,
+                                progressFraction: model.signMode == .file ? operation.progress?.fractionCompleted : nil
+                            )
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(model.signButtonDisabled)
+                    }
+
+                    if model.showsFileCancelAction {
+                        CypherOperationCancelSection(
+                            isCancelling: operation.isCancelling,
+                            cancel: operation.cancel
                         )
                     }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(!model.configuration.allowsTextResultExport)
-                } header: {
-                    Text(String(localized: "sign.result", defaultValue: "Signed Message"))
-                } footer: {
-                    if let resultRestrictionMessage = model.configuration.resultRestrictionMessage {
-                        Text(resultRestrictionMessage)
-                    }
-                }
-            }
+                } output: {
+                    if model.signMode == .text, let signedMessage = model.signedMessage {
+                        Section {
+                            CypherOutputTextBlock(
+                                text: signedMessage,
+                                font: .system(.caption, design: .monospaced)
+                            )
 
-            if model.signMode == .file, model.detachedSignature != nil {
-                Section {
-                    Button {
-                        model.exportDetachedSignature()
-                    } label: {
-                        Label(
-                            String(localized: "sign.share.signature", defaultValue: "Save .sig File"),
-                            systemImage: "square.and.arrow.down"
-                        )
+                            CypherCopyButton(
+                                title: String(localized: "common.copy", defaultValue: "Copy")
+                            ) {
+                                await model.copySignedMessageToClipboard()
+                            }
+                            .disabled(!model.configuration.allowsClipboardWrite)
+
+                            Button {
+                                model.exportSignedMessage()
+                            } label: {
+                                Label(
+                                    String(localized: "common.save", defaultValue: "Save"),
+                                    systemImage: "square.and.arrow.down"
+                                )
+                            }
+                            .keyboardShortcut("s", modifiers: .command)
+                            .disabled(!model.configuration.allowsTextResultExport)
+                        } header: {
+                            Text(String(localized: "sign.result", defaultValue: "Signed Message"))
+                        } footer: {
+                            if let resultRestrictionMessage = model.configuration.resultRestrictionMessage {
+                                Text(resultRestrictionMessage)
+                            }
+                        }
                     }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(!model.configuration.allowsFileResultExport)
-                } header: {
-                    Text(String(localized: "sign.detached.result", defaultValue: "Detached Signature"))
+
+                    if model.signMode == .file, model.detachedSignature != nil {
+                        Section {
+                            Button {
+                                model.exportDetachedSignature()
+                            } label: {
+                                Label(
+                                    String(localized: "sign.share.signature", defaultValue: "Save .sig File"),
+                                    systemImage: "square.and.arrow.down"
+                                )
+                            }
+                            .keyboardShortcut("s", modifiers: .command)
+                            .disabled(!model.configuration.allowsFileResultExport)
+                        } header: {
+                            Text(String(localized: "sign.detached.result", defaultValue: "Detached Signature"))
+                        }
+                    }
                 }
             }
         }

@@ -18,5 +18,6 @@ struct SharedIOSTabShellView: View {
                 }
             }
         }
+        .environment(\.appShellTabSelection, $selectedTab)
     }
 }

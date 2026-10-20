@@ -382,17 +382,26 @@ final class EncryptScreenModel {
         fileImportRequestGate.currentToken
     }
 
-    /// The two message-composition defaults resolve the same way: the value this
-    /// message carries, falling back to the live app default so a domain that
-    /// unlocks mid-screen is picked up without waiting for a refresh. `nil` means
-    /// the app default is still unreadable — the screen states no value rather
-    /// than inventing one, and encryption stays blocked until it can.
+    /// Signing and the self copy both need a key of one's own; without one
+    /// the message goes to its recipients only, unsigned.
+    var hasOwnKey: Bool {
+        !keyManagement.keys.isEmpty
+    }
+
+    /// The two message-composition defaults resolve the same way: off without
+    /// a key of one's own, otherwise the value this message carries, falling
+    /// back to the live app default so a domain that unlocks mid-screen is
+    /// picked up without waiting for a refresh. `nil` means the app default is
+    /// still unreadable — the screen states no value rather than inventing
+    /// one, and encryption stays blocked until it can.
     var resolvedEncryptToSelf: Bool? {
-        encryptToSelf ?? appSettings.encryptToSelf
+        guard hasOwnKey else { return false }
+        return encryptToSelf ?? appSettings.encryptToSelf
     }
 
     var resolvedSignMessage: Bool? {
-        signMessage ?? appSettings.signMessages
+        guard hasOwnKey else { return false }
+        return signMessage ?? appSettings.signMessages
     }
 
     var encryptToSelfToggleValue: Bool {
@@ -404,14 +413,14 @@ final class EncryptScreenModel {
     }
 
     var isEncryptToSelfControlEnabled: Bool {
-        if configuration.encryptToSelfPolicy.isLocked {
+        if !hasOwnKey || configuration.encryptToSelfPolicy.isLocked {
             return false
         }
         return resolvedEncryptToSelf != nil
     }
 
     var isSignMessageControlEnabled: Bool {
-        if configuration.signingPolicy.isLocked {
+        if !hasOwnKey || configuration.signingPolicy.isLocked {
             return false
         }
         return resolvedSignMessage != nil

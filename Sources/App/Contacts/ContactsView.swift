@@ -39,7 +39,7 @@ private struct ContactsScreenHostView: View {
             text: $model.searchText,
             prompt: String(
                 localized: "contacts.search.prompt",
-                defaultValue: "Names, email, tags, fingerprints"
+                defaultValue: "Search contacts"
             )
         )
         .searchSuggestions {

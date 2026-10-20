@@ -39,7 +39,7 @@ struct EncryptScreenHostView: View {
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
         .cypherSearchable(
             text: $model.recipientSearchText,
-            prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")
+            prompt: String(localized: "encrypt.search.prompt", defaultValue: "Search recipients")
         )
         .encryptScreenPresentations(model: model)
         .onChange(of: runtimeSyncKey) { _, _ in

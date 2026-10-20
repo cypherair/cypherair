@@ -84,6 +84,12 @@ enum AppTool: String, Hashable, CaseIterable {
     }
 }
 
+extension EnvironmentValues {
+    /// The shell's selected section, for a screen that sends the person to
+    /// another one. Nil outside a tab shell.
+    @Entry var appShellTabSelection: Binding<AppShellTab>? = nil
+}
+
 struct AppShellTabDefinition: Identifiable {
     let tab: AppShellTab
     let content: AnyView

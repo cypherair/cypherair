@@ -12,10 +12,12 @@ enum ToolScreenLayoutPolicy {
     }
 }
 
-/// Shared layout for the Encrypt/Decrypt/Sign/Verify tool screens: a single
-/// scrolling `Form` everywhere, except on wide macOS windows where the
-/// interactive workflow (input, options, primary action) and the produced
-/// output sit in side-by-side panes.
+/// Shared layout for the Encrypt/Decrypt/Sign/Verify tool screens: the
+/// workflow (mode, input, options, primary action) and the output it
+/// produces. Where there is room or a fold to respect they are two forms
+/// that scroll on their own — the panes of a `CypherSplitArrangement` on iOS
+/// and visionOS, side-by-side panes in a wide macOS window — and elsewhere
+/// one form with the output below the workflow.
 ///
 /// A finished operation's output settles in rather than snapping: `hasOutput`
 /// is the one place all four tools change from working to done, so the reveal
@@ -44,7 +46,18 @@ struct CypherToolScreenLayout<Workflow: View, Output: View>: View {
                 isWide = ToolScreenLayoutPolicy.isWide(width: width)
             }
         #else
-        singleColumnForm
+        CypherSplitArrangement { isSplit in
+            Form {
+                workflow()
+
+                if !isSplit {
+                    output()
+                }
+            }
+        } secondary: {
+            outputPane
+        }
+        .groupedPaneBackground()
         #endif
     }
 
@@ -60,43 +73,67 @@ struct CypherToolScreenLayout<Workflow: View, Output: View>: View {
 
                 Divider()
 
-                Group {
-                    if hasOutput {
-                        Form {
-                            output()
-                        }
-                    } else {
-                        outputPlaceholder
-                    }
-                }
-                .frame(minWidth: 320, maxWidth: 760)
+                outputPane
+                    .frame(minWidth: 320, maxWidth: 760)
             }
             .frame(maxWidth: .infinity, alignment: .center)
         } else {
-            singleColumnForm
-                .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
-        }
-    }
-
-    private var outputPlaceholder: some View {
-        ContentUnavailableView {
-            Label(
-                String(localized: "tool.output.placeholder.title", defaultValue: "No Output Yet"),
-                systemImage: "tray"
-            )
-        } description: {
-            Text(String(
-                localized: "tool.output.placeholder.message",
-                defaultValue: "Results appear here after you run the operation."
-            ))
+            Form {
+                workflow()
+                output()
+            }
+            .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         }
     }
     #endif
 
-    private var singleColumnForm: some View {
-        Form {
-            workflow()
-            output()
+    @ViewBuilder
+    private var outputPane: some View {
+        if hasOutput {
+            Form {
+                output()
+            }
+        } else {
+            ContentUnavailableView {
+                Label(
+                    String(localized: "tool.output.placeholder.title", defaultValue: "No Output Yet"),
+                    systemImage: "tray"
+                )
+            } description: {
+                Text(String(
+                    localized: "tool.output.placeholder.message",
+                    defaultValue: "Results appear here after you run the operation."
+                ))
+            }
+        }
+    }
+}
+
+/// What Decrypt and Sign show while there is no key of one's own, which both
+/// need: why, and the way to Keys, where keys are generated and imported. The
+/// button needs a shell that offers its tab selection; the macOS sidebar
+/// keeps Keys in view beside the tool instead.
+struct CypherToolKeyRequiredView: View {
+    let title: String
+    let message: String
+
+    @Environment(\.appShellTabSelection) private var shellTabSelection
+
+    var body: some View {
+        CypherFoldClearContent {
+            ContentUnavailableView {
+                Label(title, systemImage: "key.slash")
+            } description: {
+                Text(message)
+            } actions: {
+                if let shellTabSelection {
+                    Button(String(localized: "tool.keyRequired.openKeys", defaultValue: "Go to Keys")) {
+                        shellTabSelection.wrappedValue = .keys
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("tool.keyRequired.openKeys")
+                }
+            }
         }
     }
 }
