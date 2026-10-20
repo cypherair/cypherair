@@ -97,6 +97,18 @@ final class AppVault: @unchecked Sendable {
         )
     }
 
+    #if targetEnvironment(simulator)
+    /// Simulator composition: the sandbox in a directory erased at every
+    /// launch. The simulator has no Secure Enclave and a context there cannot
+    /// carry an application password, so the production composition cannot
+    /// open; nothing persists between launches.
+    static func simulator() throws -> AppVault {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "SimulatorVault", directoryHint: .isDirectory)
+        try? FileManager.default.removeItem(at: directory)
+        return try sandbox(directory: directory)
+    }
+    #endif
+
     // MARK: - Lifecycle
 
     /// Whether onboarding completed. An unreadable Keychain counts as a vault,

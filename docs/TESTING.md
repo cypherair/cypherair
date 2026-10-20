@@ -2,7 +2,7 @@
 
 ## 1. Lanes
 
-**The Swift unit and FFI lane runs on macOS only.** The iOS Simulator compiles it, but the unit-test host app dies at launch: the vault's protected-data directory requires the volume to report file-protection support and re-reads the `.complete` attribute it just wrote, failing closed when either check fails, which is what the simulator's volume does.
+**The Swift unit and FFI lane runs on macOS.** A simulator build runs the sandbox composition in place of the production one, because the simulator has no Secure Enclave and a context there cannot carry an application password, and it accepts the missing file-protection readback the simulator's volume gives; nothing a simulator run passes says anything about the production composition or about file protection.
 
 **CI runs no `xcodebuild test` at all.** The local macOS unit lane is the source of truth for Swift validation, in every case. Hosted runners carry no CypherAir signing material by policy — signed app builds stay local and on Xcode Cloud — and a hosted-image mismatch skips the affected Apple platform probe rather than failing; **a skipped probe never stands in for release validation.**
 
