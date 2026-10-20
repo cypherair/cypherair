@@ -29,10 +29,10 @@ enum TestHelpers {
         }
     }
 
-    static func makeSandbox() async throws -> Sandbox {
+    static func makeSandbox(authenticator: any Authenticator = NoPromptAuthenticator()) async throws -> Sandbox {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
-        let vault = try AppVault.sandbox(directory: directory)
+        let vault = try AppVault.sandbox(directory: directory, authenticator: authenticator)
         try await vault.bootstrap(passphrase: SensitiveBuffer.utf8(Sandbox.passphrase), reason: "")
         return Sandbox(vault: vault, directory: directory)
     }

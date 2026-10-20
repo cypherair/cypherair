@@ -75,6 +75,11 @@ public final class CountingAuthenticator: Authenticator, @unchecked Sendable {
         count.withLock { $0 += 1 }
         if let failure { throw failure }
     }
+
+    public func authenticateBiometrics(context: LAContext, reason: String) async throws(VaultError) {
+        count.withLock { $0 += 1 }
+        if let failure { throw failure }
+    }
 }
 
 public extension SensitiveBuffer {

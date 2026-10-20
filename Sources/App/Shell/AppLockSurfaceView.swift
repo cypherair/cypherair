@@ -139,7 +139,7 @@ private struct UnlockView: View {
                 .accessibilityIdentifier("appLock.unlock")
                 Text(String(
                     localized: "vault.unlock.hint",
-                    defaultValue: "Your passphrase, then Face ID or Touch ID."
+                    defaultValue: "Your passphrase, then confirm it is you."
                 ))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -191,13 +191,13 @@ extension AppLockController.UnlockFailure {
         case .wrongPassphrase:
             String(localized: "vault.unlock.failure.wrongPassphrase", defaultValue: "That passphrase is not right.")
         case .presenceCancelled:
-            String(localized: "vault.unlock.failure.cancelled", defaultValue: "Unlock was cancelled.")
+            String(localized: "vault.unlock.failure.cancelled", defaultValue: "The presence check was cancelled.")
         case .presenceFailed:
-            String(localized: "vault.unlock.failure.presence", defaultValue: "Face ID or Touch ID did not confirm it is you.")
+            String(localized: "vault.unlock.failure.presence", defaultValue: "The presence check did not confirm it is you.")
         case .presenceUnavailable:
             String(
                 localized: "vault.unlock.failure.presenceUnavailable",
-                defaultValue: "Face ID or Touch ID is not available right now. Unlock the device with its passcode or password, then try again."
+                defaultValue: "Biometric authentication is not available right now. Make sure the device has a passcode or password and is unlocked, then try again."
             )
         case .enclaveUnavailable:
             String(localized: "vault.unlock.failure.enclave", defaultValue: "The Secure Enclave is not available on this device.")
@@ -206,8 +206,8 @@ extension AppLockController.UnlockFailure {
                 localized: "vault.unlock.failure.damaged",
                 defaultValue: "The vault on this device is damaged and cannot be opened. Reset All Local Data is the only remedy."
             )
-        case .other(let reason):
-            String(localized: "vault.unlock.failure.other", defaultValue: "Unlock failed: \(reason)")
+        case .other:
+            String(localized: "vault.unlock.failure.other", defaultValue: "That did not work. Try again, and restart CypherAir X if it keeps failing.")
         }
     }
 }
@@ -266,7 +266,7 @@ private struct VaultSetupView: View {
             } footer: {
                 Text(String(
                     localized: "vault.setup.footer",
-                    defaultValue: "Creating the vault asks for Face ID or Touch ID once. Unlocking later takes the passphrase and one confirmation."
+                    defaultValue: "Creating the vault asks you to confirm it is you once. Unlocking later takes the passphrase and one confirmation."
                 ))
             }
         }
@@ -424,7 +424,7 @@ private struct RestartRequiredView: View {
             LockHeader(subtitle: String(localized: "vault.restartRequired.title", defaultValue: "Restart Required"))
             Text(String(
                 localized: "vault.restartRequired.body",
-                defaultValue: "CypherAir X could not lock cleanly. Quit and reopen it to continue."
+                defaultValue: "CypherAir X could not lock cleanly. Close it and open it again to continue."
             ))
             .font(.callout)
             .foregroundStyle(.secondary)

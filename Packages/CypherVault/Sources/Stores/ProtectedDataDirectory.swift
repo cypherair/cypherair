@@ -42,6 +42,16 @@ public struct ProtectedDataDirectory: Sendable {
         url.appending(path: "\(domain).\(UUID().uuidString).tmp", directoryHint: .notDirectory)
     }
 
+    /// Removes every file in the directory: the domain files and whatever an
+    /// interrupted save left behind.
+    public func eraseContents() throws(StoreError) {
+        let names: [String]
+        do { names = try FileManager.default.contentsOfDirectory(atPath: url.path) } catch { throw .io("directory listing failed") }
+        for name in names {
+            do { try FileManager.default.removeItem(at: url.appending(path: name)) } catch { throw .io("delete failed") }
+        }
+    }
+
     /// Removes leftover temporary files from interrupted saves.
     public func sweepTemporaries() {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: url.path) else { return }

@@ -28,6 +28,7 @@ final class PrivateKeyAccessService {
         try await authenticationPromptCoordinator.withOperationPrompt {
             let session = try vault.requireSession()
             let context = authenticationContext ?? session.operationContext()
+            defer { if authenticationContext == nil { context.invalidate() } }
             return try await Self.openOffMainActor(
                 store: vault.portableKeys,
                 session: session,

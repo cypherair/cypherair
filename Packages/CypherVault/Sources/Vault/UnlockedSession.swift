@@ -47,8 +47,9 @@ public final class UnlockedSession: @unchecked Sendable {
     }
 
     /// A fresh context for one private operation: no biometric reuse, no
-    /// passcode fallback, and the enclave prompts for the key's constraint with
-    /// `reason` when the operation runs.
+    /// passcode fallback. The caller evaluates the key's constraint on it inside
+    /// the operation-prompt window, then disallows interaction, so the enclave
+    /// never prompts on its own.
     public func operationContext(reason: String? = nil) -> LAContext {
         let context = LAContext()
         context.touchIDAuthenticationAllowableReuseDuration = 0

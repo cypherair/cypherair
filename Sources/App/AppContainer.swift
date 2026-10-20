@@ -237,6 +237,9 @@ final class AppContainer: @unchecked Sendable {
             },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
+            },
+            operationPromptScope: { operation in
+                try await authPromptCoordinator.withOperationPrompt(operation)
             }
         )
         #if os(macOS)

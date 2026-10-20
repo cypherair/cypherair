@@ -6,8 +6,10 @@ import Vault
 
 /// Decides how one private operation runs: software certificate, or one of the
 /// enclave custody routes. Custody routes locate handles by public binding
-/// without a prompt, then take one approval that covers every enclave load of
-/// the operation, with the identity credential presented by the stores.
+/// without a prompt, then take one biometric approval inside the
+/// operation-prompt window; the context carries it into every enclave load of
+/// the operation with interaction disallowed, and the stores present the
+/// identity credential.
 final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Sendable {
     private let catalogStore: KeyCatalogStore
     private let resolver: PGPKeyCapabilityResolver
@@ -78,7 +80,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             let binding = request.operation.requiredRole == .signing ? pair.signing : pair.keyAgreement
             let authorized = try await withOperationPromptIfConfigured {
                 let session = try vault.requireSession()
-                let authorization = makeOperationAuthorization(session: session)
+                let authorization = try await makeOperationAuthorization(session: session)
                 do {
                     let handle = try vault.custody.loadHandle(reference: binding.reference, expectedPublicKeyRaw: binding.publicKeyRaw, session: session, context: authorization.authenticationContext)
                     return (handle, authorization)
@@ -117,7 +119,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             let binding = request.operation.requiredRole == .signing ? pair.signing : pair.keyAgreement
             let authorized = try await withOperationPromptIfConfigured {
                 let session = try vault.requireSession()
-                let authorization = makeOperationAuthorization(session: session)
+                let authorization = try await makeOperationAuthorization(session: session)
                 do {
                     let handle = try vault.custody.loadHandle(reference: binding.reference, expectedPublicKeyRaw: binding.publicKeyRaw, session: session, context: authorization.authenticationContext)
                     let opened = try vault.splitCustody.open(fingerprint: identity.fingerprint, session: session, context: authorization.authenticationContext)
@@ -139,12 +141,21 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         }
     }
 
-    private func makeOperationAuthorization(session: UnlockedSession) -> SecureEnclaveCustodyOperationAuthorization {
-        SecureEnclaveCustodyOperationAuthorization(
-            authenticationContext: session.operationContext(
-                reason: String(localized: "keyoperation.custody.auth.reason", defaultValue: "Authenticate to use your device-bound key.")
-            )
-        )
+    /// One biometric evaluation on a fresh context, inside the operation-prompt
+    /// window the caller holds open. The approved context then carries the
+    /// identity credential into every enclave load of the operation with no
+    /// further prompt.
+    private func makeOperationAuthorization(session: UnlockedSession) async throws -> SecureEnclaveCustodyOperationAuthorization {
+        let reason = String(localized: "keyoperation.custody.auth.reason", defaultValue: "Authenticate to use your device-bound key.")
+        let context = session.operationContext(reason: reason)
+        do {
+            try await vault.vault.authenticator.authenticateBiometrics(context: context, reason: reason)
+        } catch {
+            context.invalidate()
+            throw error
+        }
+        context.interactionNotAllowed = true
+        return SecureEnclaveCustodyOperationAuthorization(authenticationContext: context)
     }
 
     private func withOperationPromptIfConfigured<T>(operation: () async throws -> T) async throws -> T {

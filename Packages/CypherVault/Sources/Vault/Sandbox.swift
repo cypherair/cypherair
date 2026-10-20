@@ -217,4 +217,6 @@ public struct NoPromptAuthenticator: Authenticator {
     public init() {}
 
     public func authenticate(context: LAContext, reason: String) async throws(VaultError) {}
+
+    public func authenticateBiometrics(context: LAContext, reason: String) async throws(VaultError) {}
 }

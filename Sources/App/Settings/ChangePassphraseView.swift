@@ -6,6 +6,7 @@ import Vault
 /// every passphrase in the app is chosen, and one presence prompt.
 struct ChangePassphraseView: View {
     @Environment(AppLockController.self) private var appLockController
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
     @State private var model = ChangePassphraseModel()
     @FocusState private var focus: CypherPassphraseEntry.Field?
@@ -79,6 +80,11 @@ struct ChangePassphraseView: View {
         .onAppear {
             isCurrentFocused = true
         }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            focus = nil
+            isCurrentFocused = false
+            model.clear()
+        }
         .screenReady("changePassphrase.ready")
     }
 }
@@ -91,6 +97,14 @@ final class ChangePassphraseModel {
     var confirmation = ""
     private(set) var isSaving = false
     private(set) var errorMessage: String?
+
+    /// A relock cleared the content; nothing typed survives it.
+    func clear() {
+        current = ""
+        passphrase = ""
+        confirmation = ""
+        errorMessage = nil
+    }
 
     var canSave: Bool {
         !isSaving
@@ -129,8 +143,10 @@ final class ChangePassphraseModel {
             String(localized: "changePassphrase.error.wrongCurrent", defaultValue: "The current passphrase is not right.")
         case .authenticationCancelled:
             String(localized: "changePassphrase.error.cancelled", defaultValue: "The change was cancelled. Your passphrase is unchanged.")
-        case .authenticationFailed, .authenticationUnavailable:
-            String(localized: "changePassphrase.error.presence", defaultValue: "Face ID or Touch ID did not confirm it is you. Your passphrase is unchanged.")
+        case .authenticationFailed:
+            String(localized: "changePassphrase.error.presence", defaultValue: "The presence check did not confirm it is you. Your passphrase is unchanged.")
+        case .authenticationUnavailable:
+            String(localized: "changePassphrase.error.presenceUnavailable", defaultValue: "Biometric authentication is not available right now. Your passphrase is unchanged.")
         case .enclaveUnavailable, .locked, .noSealedRoot, .sealedRootCorrupt, .storage, .internalFailure:
             String(localized: "changePassphrase.error.failed", defaultValue: "The passphrase could not be changed. Your passphrase is unchanged.")
         }

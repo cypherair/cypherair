@@ -74,7 +74,7 @@ final class AppVault: @unchecked Sendable {
 
     /// Sandbox composition: software keys, rows in memory, no stretch, no
     /// prompt, domain files under `directory`. The tutorial and the test hosts.
-    static func sandbox(directory: URL) throws -> AppVault {
+    static func sandbox(directory: URL, authenticator: any Authenticator = NoPromptAuthenticator()) throws -> AppVault {
         let enclave = SoftwareEnclave()
         let custodyRows = Dictionary(
             uniqueKeysWithValues: CustodyTier.allCases.flatMap { tier in
@@ -86,7 +86,7 @@ final class AppVault: @unchecked Sendable {
                 enclave: enclave,
                 rootRows: InMemoryRowStore(),
                 stretcher: SandboxStretcher(),
-                authenticator: NoPromptAuthenticator()
+                authenticator: authenticator
             ),
             directory: try ProtectedDataDirectory(url: directory),
             portableKeys: .portableKeys(rows: InMemoryRowStore()),
@@ -99,8 +99,10 @@ final class AppVault: @unchecked Sendable {
 
     // MARK: - Lifecycle
 
+    /// Whether onboarding completed. An unreadable Keychain counts as a vault,
+    /// so a read failure never routes to first-run setup.
     var hasSealedRoot: Bool {
-        (try? vault.sealedRootExists()) ?? false
+        (try? vault.sealedRootExists()) ?? true
     }
 
     var isUnlocked: Bool { open.withLock { $0 != nil } }
@@ -173,18 +175,15 @@ final class AppVault: @unchecked Sendable {
     }
 
     /// Reset All Local Data: the sealed root, every identity row, every custody
-    /// row, and every domain file. Every identity key is unusable afterwards by
-    /// construction.
+    /// row, and everything in the protected directory. Every identity key is
+    /// unusable afterwards by construction.
     func reset() throws {
         relock()
         try vault.reset()
         try portableKeys.deleteAll()
         try splitCustody.deleteAll()
         try custody.deleteAll()
-        try domains.settings.delete()
-        try domains.contacts.delete()
-        try domains.keys.delete()
-        directory.sweepTemporaries()
+        try directory.eraseContents()
     }
 
     /// What a reset must have removed. Empty when nothing remains.

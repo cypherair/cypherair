@@ -26,7 +26,7 @@ final class AppLockController {
         case presenceUnavailable
         case enclaveUnavailable
         case sealedRootDamaged
-        case other(String)
+        case other
 
         init(_ error: VaultError) {
             switch error {
@@ -36,9 +36,7 @@ final class AppLockController {
             case .authenticationUnavailable: self = .presenceUnavailable
             case .enclaveUnavailable: self = .enclaveUnavailable
             case .sealedRootCorrupt: self = .sealedRootDamaged
-            case .noSealedRoot: self = .other("no sealed root")
-            case .locked: self = .other("locked")
-            case .storage(let reason), .internalFailure(let reason): self = .other(reason)
+            case .noSealedRoot, .locked, .storage, .internalFailure: self = .other
             }
         }
 
@@ -55,6 +53,7 @@ final class AppLockController {
     private let relockServices: @MainActor () async throws -> Void
     private let contentClearHandler: () -> Void
     private let operationPromptInProgressProvider: (() -> Bool)?
+    private let operationPromptScope: ((@MainActor () async throws -> Void) async throws -> Void)?
     private let waitForAwayRelockDeadline: (TimeInterval) async throws -> Void
 
     private(set) var lockState: LockState
@@ -81,6 +80,7 @@ final class AppLockController {
         relockServices: @escaping @MainActor () async throws -> Void,
         contentClearHandler: @escaping () -> Void = {},
         operationPromptInProgressProvider: (() -> Bool)? = nil,
+        operationPromptScope: ((@MainActor () async throws -> Void) async throws -> Void)? = nil,
         waitForAwayRelockDeadline: @escaping (TimeInterval) async throws -> Void = { seconds in
             try await Task.sleep(for: .seconds(seconds), tolerance: .seconds(1), clock: .continuous)
         }
@@ -93,6 +93,7 @@ final class AppLockController {
         self.relockServices = relockServices
         self.contentClearHandler = contentClearHandler
         self.operationPromptInProgressProvider = operationPromptInProgressProvider
+        self.operationPromptScope = operationPromptScope
         self.waitForAwayRelockDeadline = waitForAwayRelockDeadline
         lockState = vault.hasSealedRoot ? .locked : .setupRequired
     }
@@ -103,6 +104,15 @@ final class AppLockController {
 
     var isUnlocking: Bool {
         lockState == .unlocking
+    }
+
+    /// A session is open in `.unlocked` and on the integrity screen, where
+    /// intact portable keys can still be exported; both relock the same way.
+    private var isSessionOpen: Bool {
+        switch lockState {
+        case .unlocked, .integrityFailure: true
+        case .setupRequired, .locked, .unlocking, .failed, .restartRequired: false
+        }
     }
 
     var acceptsPassphrase: Bool {
@@ -133,7 +143,7 @@ final class AppLockController {
         } catch {
             vault.relock()
             setLockState(.setupRequired)
-            setupFailure = .other(error.localizedDescription)
+            setupFailure = .other
             return
         }
         setupFailure = nil
@@ -145,6 +155,9 @@ final class AppLockController {
         }
         handledAwayGeneration = awayGeneration
         setLockState(.unlocked)
+        if !isForegroundActive {
+            armAwayRelock()
+        }
     }
 
     /// Why the last setup attempt did not produce a vault.
@@ -158,6 +171,7 @@ final class AppLockController {
         setLockState(.unlocking)
         contentClearHandler()
         await relockEverything()
+        guard lockState != .restartRequired else { return }
         let attempt = self.attempt ?? vault.beginUnlock(reason: Self.localizedUnlockReason)
         self.attempt = attempt
         let session: UnlockedSession
@@ -188,21 +202,28 @@ final class AppLockController {
             await enterLocked()
             return
         }
-        if report.isIntact {
-            setLockState(.unlocked)
-            if !isForegroundActive {
-                armAwayRelock()
-            }
-        } else {
-            setLockState(.integrityFailure(report))
+        setLockState(report.isIntact ? .unlocked : .integrityFailure(report))
+        if !isForegroundActive {
+            armAwayRelock()
         }
     }
 
     /// Reseals the root under `new`. The current passphrase and the presence
     /// prompt gate it; a cancelled prompt leaves the old passphrase in force.
+    /// The prompt runs inside an operation-prompt window, so its own resign of
+    /// the app is not an away event.
     func changePassphrase(current: consuming SensitiveBuffer, new: consuming SensitiveBuffer) async throws {
         guard lockState == .unlocked else { throw VaultError.locked }
-        try await vault.changePassphrase(current: current, new: new, reason: Self.localizedChangePassphraseReason)
+        let reason = Self.localizedChangePassphraseReason
+        guard let operationPromptScope else {
+            try await vault.changePassphrase(current: current, new: new, reason: reason)
+            return
+        }
+        let current = SensitiveKeyBox(current)
+        let new = SensitiveKeyBox(new)
+        try await operationPromptScope {
+            try await vault.changePassphrase(current: current.copied(), new: new.copied(), reason: reason)
+        }
     }
 
     /// A vault sealed by something other than `createVault`: the test hosts.
@@ -254,7 +275,7 @@ final class AppLockController {
         #endif
         awayGeneration &+= 1
         discardAttempt()
-        guard lockState == .unlocked else {
+        guard isSessionOpen else {
             return
         }
         guard effectiveGracePeriod() == 0 else {
@@ -266,7 +287,7 @@ final class AppLockController {
 
     func handleForegroundActive() async {
         defer { isResolvingForegroundLock = false }
-        guard isForegroundActive, lockState == .unlocked else {
+        guard isForegroundActive, isSessionOpen else {
             return
         }
         if let handled = handledAwayGeneration, handled == awayGeneration {
@@ -302,7 +323,7 @@ final class AppLockController {
             return
         }
         hasPendingOperationPromptAway = false
-        guard lockState == .unlocked, !isForegroundActive else {
+        guard isSessionOpen, !isForegroundActive else {
             return
         }
         handleAwayEvent()
@@ -321,7 +342,7 @@ final class AppLockController {
     private func armAwayRelock() {
         #if os(macOS)
         disarmAwayRelock()
-        guard lockState == .unlocked else {
+        guard isSessionOpen else {
             return
         }
         let secondsRemaining = max(graceDeadline.timeIntervalSinceNow, 0)
@@ -352,7 +373,7 @@ final class AppLockController {
     private func handleAwayRelockDeadline() {
         #if os(macOS)
         awayRelockTask = nil
-        guard !isForegroundActive, lockState == .unlocked else {
+        guard !isForegroundActive, isSessionOpen else {
             return
         }
         guard isGracePeriodExpired else {

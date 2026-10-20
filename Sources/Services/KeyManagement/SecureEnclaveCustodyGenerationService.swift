@@ -192,15 +192,22 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         let context: LAContext
     }
 
-    /// One approval covers both enclave key creations: the enclave prompts on
-    /// the session's operation context when the first key is created.
+    /// One biometric approval inside the operation-prompt window covers both
+    /// enclave key creations: the approved context, with interaction disallowed,
+    /// carries the identity credential into each creation.
     private func createAuthorizedHandlePair(tier: CustodyTier) async throws -> AuthorizedPair {
         try await withOperationPromptIfConfigured {
             let session: UnlockedSession
             do { session = try vault.requireSession() } catch { throw CypherAirError.fromStore(error) }
-            let context = session.operationContext(
-                reason: String(localized: "keygen.custody.auth.reason", defaultValue: "Authenticate to create your device-bound key.")
-            )
+            let reason = String(localized: "keygen.custody.auth.reason", defaultValue: "Authenticate to create your device-bound key.")
+            let context = session.operationContext(reason: reason)
+            do throws(VaultError) {
+                try await vault.vault.authenticator.authenticateBiometrics(context: context, reason: reason)
+            } catch {
+                context.invalidate()
+                throw CypherAirError.fromVault(error)
+            }
+            context.interactionNotAllowed = true
             do {
                 let created = try vault.custody.createPair(tier: tier, session: session, context: context)
                 return AuthorizedPair(pair: try LoadedCustodyHandlePair(signing: created.signing, keyAgreement: created.keyAgreement), context: context)
