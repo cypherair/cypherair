@@ -9,7 +9,6 @@ final class AppLaunchConfigurationTests: XCTestCase {
                 "UITEST_SKIP_ONBOARDING": "1",
                 "UITEST_TUTORIAL_TASK": "addDemoContact",
                 "UITEST_REQUIRE_MANUAL_AUTH": "1",
-                "UITEST_OPEN_AUTHMODE_CONFIRMATION": "1",
                 "UITEST_PRELOAD_CONTACT": "1"
             ],
             detectsXCTestHost: false,
@@ -133,7 +132,6 @@ final class AppLaunchConfigurationTests: XCTestCase {
                 "UITEST_SKIP_ONBOARDING": "1",
                 "UITEST_TUTORIAL_TASK": "addDemoContact",
                 "UITEST_REQUIRE_MANUAL_AUTH": "1",
-                "UITEST_OPEN_AUTHMODE_CONFIRMATION": "1",
                 "UITEST_PRELOAD_CONTACT": "1"
             ],
             detectsXCTestHost: false,

@@ -22,24 +22,6 @@ extension PGPKeyFamily {
     }
 }
 
-extension PGPPrivateOperationRole {
-    var custodyRole: CustodyRole {
-        switch self {
-        case .signing: .signing
-        case .keyAgreement: .keyAgreement
-        }
-    }
-}
-
-extension CustodyRole {
-    var operationRole: PGPPrivateOperationRole {
-        switch self {
-        case .signing: .signing
-        case .keyAgreement: .keyAgreement
-        }
-    }
-}
-
 extension CustodyError {
     var failureCategory: PGPKeyOperationFailureCategory {
         switch self {
@@ -267,8 +249,7 @@ struct CustodyOperations: SecureEnclaveCustodyDigestSigning, SecureEnclaveCustod
     }
 }
 
-/// One biometric system-sheet evaluation per custody private operation, whose
-/// context then covers the enclave loads that follow.
+/// Whether an identity's custody handles can be loaded, and if not, why.
 enum SecureEnclaveCustodyHandleAvailability: Equatable, Sendable {
     case available
     case unavailable(PGPKeyOperationFailureCategory)

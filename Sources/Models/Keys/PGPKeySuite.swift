@@ -2,8 +2,7 @@ import Foundation
 
 /// App-owned software key-generation suite vocabulary, named by RFC 9580/9980
 /// registered algorithms and ordered by ascending security tier. Cases map
-/// 1:1 onto the generated FFI `KeySuite`; raw values persist in the contacts
-/// database key records.
+/// 1:1 onto the generated FFI `KeySuite`; raw values persist in the key list.
 enum PGPKeySuite: String, CaseIterable, Codable, Hashable, Sendable {
     case ed25519LegacyCurve25519Legacy
     case ed25519X25519

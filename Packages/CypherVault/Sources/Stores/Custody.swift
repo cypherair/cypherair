@@ -269,8 +269,8 @@ public struct CustodyKeyStore: Sendable {
         }
     }
 
-    /// Reconstructs one key, checking the row's advertised public key against
-    /// what the caller expects and against the enclave's own answer.
+    /// Reconstructs one key and checks the enclave's answer against the public
+    /// key the caller expects.
     public func loadHandle(reference: CustodyHandleReference, expectedPublicKeyRaw: Data, session: UnlockedSession, context: LAContext) throws(CustodyError) -> LoadedCustodyHandle {
         guard CustodyPublicBinding.hasExpectedPublicKeyShape(expectedPublicKeyRaw, role: reference.role, tier: reference.tier) else {
             throw .invalidPublicKey(reference.role)

@@ -9,7 +9,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     private let lock = NSLock()
-    /// Operation-prompt lifecycle hooks (the `.authenticating` rule's MainActor
+    /// Operation-prompt lifecycle hooks (the `.unlocking` rule's main-actor
     /// mirror). `…SessionBegan` fires when the operation-prompt stack
     /// goes 0 → 1; `…PromptsEnded` fires when it returns to 0. Both fire OUTSIDE
     /// the lock, on the thread that pushed or popped; macOS wires them (via a

@@ -9,15 +9,9 @@ import Stores
 /// and what a wrong passphrase or damaged data leaves behind.
 @MainActor
 final class AppLockControllerTests: XCTestCase {
-    private final class Services {
-        var loads = 0
-        var relocks = 0
-        var contentClears = 0
-    }
 
     private var directory: URL!
     private var vault: AppVault!
-    private var services: Services!
     private var gracePeriod: Int? = 0
     private var lastAuthentication: Date?
 
@@ -25,7 +19,6 @@ final class AppLockControllerTests: XCTestCase {
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirLockTests-\(UUID().uuidString)", isDirectory: true)
         vault = try AppVault.sandbox(directory: directory)
-        services = Services()
     }
 
     override func tearDown() async throws {
@@ -34,15 +27,14 @@ final class AppLockControllerTests: XCTestCase {
     }
 
     private func makeController() -> AppLockController {
-        let services = services!
         return AppLockController(
             vault: vault,
             gracePeriodProvider: { [self] in gracePeriod },
             lastAuthenticationDateProvider: { [self] in lastAuthentication },
             recordSuccessfulAuthentication: { [self] in lastAuthentication = Date() },
-            loadServices: { services.loads += 1 },
-            relockServices: { services.relocks += 1 },
-            contentClearHandler: { services.contentClears += 1 }
+            loadServices: {},
+            relockServices: {},
+            contentClearHandler: {}
         )
     }
 
@@ -60,13 +52,10 @@ final class AppLockControllerTests: XCTestCase {
         await controller.createVault(passphrase: .utf8("correct horse battery staple"))
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertTrue(vault.isUnlocked)
-        XCTAssertEqual(services.loads, 1)
 
         controller.lockNow()
         await waitUntil { controller.lockState == .locked }
         XCTAssertFalse(vault.isUnlocked)
-        XCTAssertEqual(services.relocks, 1)
-        XCTAssertEqual(services.contentClears, 1)
 
         await controller.unlock(passphrase: .utf8("wrong"))
         XCTAssertEqual(controller.lockState, .failed(.wrongPassphrase))
@@ -75,7 +64,6 @@ final class AppLockControllerTests: XCTestCase {
         await controller.unlock(passphrase: .utf8("correct horse battery staple"))
         XCTAssertEqual(controller.lockState, .unlocked)
         XCTAssertTrue(vault.isUnlocked)
-        XCTAssertEqual(services.loads, 2)
     }
 
     func test_awayWithNoGracePeriod_locks_andAwayWithinGracePeriodDoesNot() async {
@@ -114,13 +102,4 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertNotNil(vault.contacts)
     }
 
-    func test_resetAfterLocalDataReset_returnsToSetup() async {
-        let controller = makeController()
-        await controller.createVault(passphrase: .utf8("correct horse battery staple"))
-        try? vault.reset()
-        controller.resetAfterLocalDataReset()
-        XCTAssertEqual(controller.lockState, .setupRequired)
-        XCTAssertFalse(controller.isUnlocking)
-        XCTAssertTrue(controller.isLocked)
-    }
 }

@@ -21,7 +21,7 @@ import AppKit
 // `isCosmeticallyCovered` is synchronous on the away signal, so the shield is
 // up before the system snapshots the scene, while the lock itself lands on an
 // async `Task`. `AppLockController.isLocked` is already true for
-// `.authenticating`/`.authenticationFailed`, so the lock face wins during
+// `.unlocking` and `.failed`, so the lock face wins during
 // auth prompts with no extra precedence state.
 //
 // Per-mode input discipline (`AppLockShieldPolicy.Mode`): lock mode takes key
@@ -84,7 +84,7 @@ enum AppLockShieldPolicy {
         /// still resolving its lock decision) but not locked.
         case privacy
         /// The authentication gate: the app is locked (including the
-        /// `.authenticating` / `.authenticationFailed` states).
+        /// `.unlocking` and `.failed` states).
         case lock
 
         /// Lock mode owns keyboard routing: the shield window becomes key so
@@ -110,7 +110,7 @@ enum AppLockShieldPolicy {
     }
 
     /// The rendering mode of a presented shield. Lock always wins: `isLocked`
-    /// is true for `.authenticating`/`.authenticationFailed` too, so the lock
+    /// is true for `.unlocking` and `.failed` too, so the lock
     /// face covers content during auth prompts with no extra state.
     static func mode(isLocked: Bool) -> Mode {
         isLocked ? .lock : .privacy
@@ -436,7 +436,7 @@ final class AppLockShieldWindowCoordinator {
     /// Elevated while the app is active — the case the #697 invariant is
     /// about — and while an app-session unlock attempt is in flight:
     /// LocalAuthentication's prompt resigns the app (the exact resign
-    /// `AppLockController.handleAwayEvent`'s `.authenticating` rule treats as
+    /// `AppLockController.handleAwayEvent`'s `.unlocking` rule treats as
     /// the auth sheet's own), and a `.normal`-level child window falls behind
     /// an attached sheet (probed for #697) — dropping on that resign would
     /// expose the covered sheet for the whole prompt. Only a real app switch
@@ -478,7 +478,7 @@ final class AppLockShieldWindowCoordinator {
     private var isLocked = false
     /// SwiftUI-mirrored `AppLockController.isUnlocking`, used only as a
     /// change signal in `setState`. Level decisions read the controller live:
-    /// it sets `.authenticating` synchronously before the LA prompt exists,
+    /// it sets `.unlocking` synchronously before the LA prompt exists,
     /// so a live read can never be stale when the prompt's resign
     /// notification arrives — this mirror could be, if that resign outruns
     /// the next SwiftUI render.
@@ -515,7 +515,7 @@ final class AppLockShieldWindowCoordinator {
             isLocked = locked
             apply()
         } else if authenticatingChanged {
-            // `.authenticating` begins and ends without the presentation
+            // `.unlocking` begins and ends without the presentation
             // signals changing. Re-derive the level on each flip: the begin
             // re-elevates a shield whose level a racing prompt-resign
             // notification may already have processed, and the end drops an

@@ -36,28 +36,4 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         return context
     }
 
-    final func hex(_ data: Data) -> String {
-        data.map { String(format: "%02x", $0) }.joined()
-    }
-
-    final func recordEvidence(
-        _ scenario: SecureEnclaveCustodyEvidenceScenario,
-        configuration: SecureEnclaveCustodyEvidenceFamily? = nil,
-        observedCategory: PGPKeyOperationFailureCategory? = nil,
-        handleCount: Int? = nil,
-        completeSetCount: Int? = nil
-    ) {
-        let outcome: SecureEnclaveCustodyEvidenceOutcome =
-            (testRun?.failureCount ?? 0) == 0 ? .passed : .failed
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(
-                scenario: scenario,
-                configuration: configuration,
-                outcome: outcome,
-                observedCategory: observedCategory,
-                handleCount: handleCount,
-                completeSetCount: completeSetCount
-            )
-        )
-    }
 }

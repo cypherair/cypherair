@@ -7,7 +7,6 @@ import Vault
 /// certificate, the vault seals it against the identity wrapping key, and the
 /// key list records it. Sealing is software, so provisioning never prompts.
 final class KeyProvisioningService {
-    typealias ProvisioningCheckpoint = @Sendable () async -> Void
 
     private let keyAdapter: PGPKeyOperationAdapter
     private let vault: AppVault
@@ -15,10 +14,6 @@ final class KeyProvisioningService {
     private let catalogStore: KeyCatalogStore
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let commitCoordinator: KeyProvisioningCommitCoordinator
-    private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
-    private let afterImportOffMainActorCheckpoint: ProvisioningCheckpoint?
-    private let afterPermanentStoreCheckpoint: ProvisioningCheckpoint?
-    private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
 
     init(
         keyAdapter: PGPKeyOperationAdapter,
@@ -26,11 +21,7 @@ final class KeyProvisioningService {
         memoryInfo: any MemoryInfoProvidable,
         catalogStore: KeyCatalogStore,
         invalidationGate: KeyProvisioningInvalidationGate,
-        commitCoordinator: KeyProvisioningCommitCoordinator,
-        beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil,
-        afterImportOffMainActorCheckpoint: ProvisioningCheckpoint? = nil,
-        afterPermanentStoreCheckpoint: ProvisioningCheckpoint? = nil,
-        afterIdentityStoreCheckpoint: ProvisioningCheckpoint? = nil
+        commitCoordinator: KeyProvisioningCommitCoordinator
     ) {
         self.keyAdapter = keyAdapter
         self.vault = vault
@@ -38,10 +29,6 @@ final class KeyProvisioningService {
         self.catalogStore = catalogStore
         self.invalidationGate = invalidationGate
         self.commitCoordinator = commitCoordinator
-        self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
-        self.afterImportOffMainActorCheckpoint = afterImportOffMainActorCheckpoint
-        self.afterPermanentStoreCheckpoint = afterPermanentStoreCheckpoint
-        self.afterIdentityStoreCheckpoint = afterIdentityStoreCheckpoint
     }
 
     func generateKey(
@@ -91,9 +78,6 @@ final class KeyProvisioningService {
         try invalidationGate.checkValid(token)
         var imported = try await keyAdapter.importSecretKey(armoredData: armoredData, passphrase: passphrase)
         let secretCertificate = SensitiveKeyBox(SensitiveBuffer(consuming: &imported.secretKeyData))
-        if let afterImportOffMainActorCheckpoint {
-            await afterImportOffMainActorCheckpoint()
-        }
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
         if catalogStore.containsKey(fingerprint: imported.metadata.fingerprint) {
@@ -124,9 +108,6 @@ final class KeyProvisioningService {
     }
 
     private func prepareForPermanentStorage(token: KeyProvisioningInvalidationGate.Token) async throws {
-        if let beforePermanentStorageCheckpoint {
-            await beforePermanentStorageCheckpoint()
-        }
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
     }
@@ -150,16 +131,10 @@ final class KeyProvisioningService {
                     throw CypherAirError.fromStore(error)
                 }
                 didSeal = true
-                if let afterPermanentStoreCheckpoint {
-                    await afterPermanentStoreCheckpoint()
-                }
                 try Task.checkCancellation()
                 try invalidationGate.checkValid(token)
                 try catalogStore.storeNewIdentity(identity)
                 didStoreIdentity = true
-                if let afterIdentityStoreCheckpoint {
-                    await afterIdentityStoreCheckpoint()
-                }
                 try Task.checkCancellation()
                 try invalidationGate.checkValid(token)
             } catch {

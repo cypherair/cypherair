@@ -193,10 +193,9 @@
         "OTHER_CFLAGS": [
           "$(inherited)",
           "-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-          "-DSQLITE_HAS_CODEC",
         ],
         "OTHER_LDFLAGS": "$(inherited)",
-        "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC",
+        "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
         "PRODUCT_BUNDLE_IDENTIFIER": "com.chentianren.cypherair",
         "PROVISIONING_PROFILE_SPECIFIER": "",
         "REGISTER_APP_GROUPS": "YES",
@@ -310,9 +309,8 @@
         "OTHER_CFLAGS": [
           "$(inherited)",
           "-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-          "-DSQLITE_HAS_CODEC",
         ],
-        "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC",
+        "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
         "PRODUCT_BUNDLE_IDENTIFIER": "com.chentianren.cypherair.tests",
         "SDKROOT": "iphoneos",
         "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator macosx xros xrsimulator",

@@ -81,12 +81,6 @@ public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
         }
     }
 
-    public func delete() throws(StoreError) {
-        let fileURL = directory.fileURL(domain: domain)
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        do { try FileManager.default.removeItem(at: fileURL) } catch { throw .io("delete failed") }
-    }
-
     /// Whether the file is intact, missing, or damaged, without returning it.
     public func integrity(key: SymmetricKey) -> DomainIntegrity {
         do {

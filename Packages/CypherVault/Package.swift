@@ -11,6 +11,7 @@ let package = Package(
     name: "CypherVault",
     platforms: [.iOS(.v27), .macOS(.v27), .visionOS(.v27)],
     products: [
+        .library(name: "Sealing", targets: ["Sealing"]),
         .library(name: "Vault", targets: ["Vault"]),
         .library(name: "Stores", targets: ["Stores"]),
     ],

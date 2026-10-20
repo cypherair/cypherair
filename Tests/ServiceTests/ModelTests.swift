@@ -772,13 +772,6 @@ final class ModelTests: XCTestCase {
         )
     }
 
-    private func makeIsolatedDefaults() -> UserDefaults {
-        let suiteName = "com.cypherair.tests.model.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        return defaults
-    }
-
     func test_certificateSelectionAdapter_selectorInput_preservesBytesAndOccurrence() {
         let option = UserIdSelectionOption(
             occurrenceIndex: 1,

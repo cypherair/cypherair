@@ -42,14 +42,7 @@ enum TestHelpers {
         sandbox givenSandbox: Sandbox? = nil,
         memoryInfo: (any MemoryInfoProvidable)? = nil,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
-        custodyGeneration: Bool = true,
-        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        afterPermanentStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+        custodyGeneration: Bool = true
     ) async throws -> (service: KeyManagementService, sandbox: Sandbox) {
         let sandbox: Sandbox
         if let given = givenSandbox {
@@ -75,13 +68,6 @@ enum TestHelpers {
                 compositeBindingInspector: compositeBindingInspector
             ),
             metadataPersistence: VaultKeyMetadataStore(vault: vault),
-            provisioningCheckpoint: provisioningCheckpoint,
-            afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
-            afterPermanentStoreCheckpoint: afterPermanentStoreCheckpoint,
-            identityStoreCheckpoint: identityStoreCheckpoint,
-            postProvisioningCheckpoint: postProvisioningCheckpoint,
-            commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint,
-            relockInvalidationCheckpoint: relockInvalidationCheckpoint,
             secureEnclaveCustodyGenerationServiceFactory: custodyGeneration
                 ? { catalogStore, invalidationGate, commitCoordinator in
                     SecureEnclaveCustodyGenerationService(
@@ -256,9 +242,6 @@ enum TestHelpers {
         )
     }
 
-    static func cleanupTempDir(_ url: URL) {
-        try? FileManager.default.removeItem(at: url)
-    }
 }
 
 extension ContactService {

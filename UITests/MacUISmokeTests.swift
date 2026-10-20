@@ -597,21 +597,4 @@ final class MacUISmokeTests: XCTestCase {
         )
     }
 
-    private func waitForElementEnabled(
-        _ element: XCUIElement,
-        timeout: TimeInterval = 10
-    ) {
-        XCTAssertTrue(
-            element.waitForExistence(timeout: timeout),
-            "Expected element \(element) to appear."
-        )
-
-        let predicate = NSPredicate(format: "isEnabled == true")
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [expectation], timeout: timeout),
-            .completed,
-            "Expected element to become enabled."
-        )
-    }
 }

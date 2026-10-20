@@ -64,8 +64,6 @@ struct MacAppShellView: View {
         navigationState.activePresentation = .onboarding(initialPage: 0)
     }
 
-    // UITest-only: auto-present the auth-mode confirmation in the main window when launched
-    // with UITEST_OPEN_AUTHMODE_CONFIRMATION.
     private func sidebarRow(_ tab: AppShellTab) -> some View {
         Label(
             AppShellComposition.title(for: tab),

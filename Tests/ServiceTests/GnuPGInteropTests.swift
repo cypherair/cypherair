@@ -1,7 +1,7 @@
 import XCTest
 @testable import CypherAir
 
-/// Swift-layer GnuPG interoperability tests (TESTING.md §3, fixtures mechanism).
+/// Swift-layer GnuPG interoperability tests (TESTING.md §4).
 ///
 /// These tests load pre-generated GnuPG fixture files from the test bundle
 /// and verify that PgpEngine (via UniFFI FFI) can correctly process them.

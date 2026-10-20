@@ -114,8 +114,8 @@ else
   APP_BINARY="$WORK/dd/Build/Products/Debug/CypherAir.app/Contents/MacOS/CypherAir"
 fi
 
-# --- 3. Launch with a sheet up, so a presented window is probed too ----------
-UITEST_ROOT=main UITEST_SKIP_ONBOARDING=1 UITEST_OPEN_AUTHMODE_CONFIRMATION=1 \
+# --- 3. Launch the app -------------------------------------------------------
+UITEST_ROOT=main UITEST_SKIP_ONBOARDING=1 \
   "$APP_BINARY" >"$WORK/app.log" 2>&1 &
 APP_PID=$!
 disown "$APP_PID" 2>/dev/null   # so killing it at exit does not print job-control noise

@@ -21,9 +21,6 @@ final class KeyManagementService: @unchecked Sendable {
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
     private let provisioningCommitCoordinator: KeyProvisioningCommitCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
-    private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
-    private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let compositeCustodyRouterContext: CompositeCustodyRouterContext?
 
     var isSecureEnclaveCustodyGenerationAvailable: Bool {
@@ -39,13 +36,6 @@ final class KeyManagementService: @unchecked Sendable {
         compositeCustodyRouterContext: CompositeCustodyRouterContext? = nil,
         secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil,
         metadataPersistence: any KeyMetadataPersistence,
-        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        afterPermanentStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         secureEnclaveCustodyGenerationServiceFactory: ((
             KeyCatalogStore,
             KeyProvisioningInvalidationGate,
@@ -68,9 +58,6 @@ final class KeyManagementService: @unchecked Sendable {
         self.provisioningInvalidationGate = provisioningInvalidationGate
         self.provisioningCommitCoordinator = provisioningCommitCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.postProvisioningCheckpoint = postProvisioningCheckpoint
-        self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
-        self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.compositeCustodyRouterContext = compositeCustodyRouterContext
         self.provisioningService = KeyProvisioningService(
             keyAdapter: keyAdapter,
@@ -78,11 +65,7 @@ final class KeyManagementService: @unchecked Sendable {
             memoryInfo: memoryInfo,
             catalogStore: catalogStore,
             invalidationGate: provisioningInvalidationGate,
-            commitCoordinator: provisioningCommitCoordinator,
-            beforePermanentStorageCheckpoint: provisioningCheckpoint,
-            afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
-            afterPermanentStoreCheckpoint: afterPermanentStoreCheckpoint,
-            afterIdentityStoreCheckpoint: identityStoreCheckpoint
+            commitCoordinator: provisioningCommitCoordinator
         )
         self.secureEnclaveCustodyGenerationService = secureEnclaveCustodyGenerationServiceFactory?(
             catalogStore,
@@ -133,13 +116,6 @@ final class KeyManagementService: @unchecked Sendable {
         metadataLoadState = .locked
     }
 
-    func markKeyMetadataRecoveryNeeded() {
-        catalogStore.clearInMemoryIdentities()
-        keys = []
-        secureEnclaveCustodyRecoveryReport = .empty
-        metadataLoadState = .recoveryNeeded
-    }
-
     func resetInMemoryStateAfterLocalDataReset() {
         provisioningInvalidationGate.invalidate()
         markKeyMetadataLocked()
@@ -157,9 +133,6 @@ final class KeyManagementService: @unchecked Sendable {
         try Task.checkCancellation()
         try provisioningInvalidationGate.checkValid(token)
         let identity = try await provisioningService.generateKey(name: name, email: email, validity: validity, suite: suite, invalidationToken: token)
-        if let postProvisioningCheckpoint {
-            await postProvisioningCheckpoint()
-        }
         try provisioningInvalidationGate.checkValid(token)
         syncKeysAndSecureEnclaveRecoveryReport()
         return identity
@@ -176,9 +149,6 @@ final class KeyManagementService: @unchecked Sendable {
         } catch let error as CustodyError {
             throw CypherAirError.keyOperationUnavailable(category: error.failureCategory)
         }
-        if let postProvisioningCheckpoint {
-            await postProvisioningCheckpoint()
-        }
         try provisioningInvalidationGate.checkValid(token)
         syncKeysAndSecureEnclaveRecoveryReport()
         return identity
@@ -189,9 +159,6 @@ final class KeyManagementService: @unchecked Sendable {
         try Task.checkCancellation()
         try provisioningInvalidationGate.checkValid(token)
         let identity = try await provisioningService.importKey(armoredData: armoredData, passphrase: passphrase, invalidationToken: token)
-        if let postProvisioningCheckpoint {
-            await postProvisioningCheckpoint()
-        }
         try provisioningInvalidationGate.checkValid(token)
         syncKeysAndSecureEnclaveRecoveryReport()
         return identity
@@ -320,11 +287,7 @@ final class KeyManagementService: @unchecked Sendable {
 extension KeyManagementService: VaultRelockParticipant {
     func relockVault() async throws {
         provisioningInvalidationGate.invalidate()
-        if let relockInvalidationCheckpoint {
-            await relockInvalidationCheckpoint()
-        }
         await provisioningCommitCoordinator.waitForActiveCommitsToFinish(
-            waiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
         )
         markKeyMetadataLocked()
     }
