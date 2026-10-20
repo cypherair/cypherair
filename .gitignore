@@ -43,3 +43,4 @@ CLAUDE.local.md
 # Python bytecode caches
 __pycache__/
 *.pyc
+.claude/skills/
