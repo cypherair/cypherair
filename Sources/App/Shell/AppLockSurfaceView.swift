@@ -382,6 +382,8 @@ private struct VaultIntegrityFailureView: View {
         )) { target in
             NavigationStack {
                 BackupKeyView(fingerprint: target.fingerprint)
+                    .toolbarTitleDisplayMode(.inline)
+                    .navigationTitleStaysVisible()
             }
             #if os(macOS)
             .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 560)

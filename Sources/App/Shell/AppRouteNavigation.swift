@@ -73,8 +73,13 @@ struct AppRouteHost<Root: View>: View {
 
         return NavigationStack(path: pathBinding) {
             root()
+                .navigationTitleStaysVisible()
                 .navigationDestination(for: AppRoute.self) { route in
+                    // Large titles belong to the tab roots; pushed screens
+                    // keep an inline title.
                     resolver.destination(for: route)
+                        .toolbarTitleDisplayMode(.inline)
+                        .navigationTitleStaysVisible()
                 }
         }
         #if os(macOS)

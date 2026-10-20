@@ -81,9 +81,10 @@ struct TutorialView: View {
                 .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
             }
             .navigationTitle(String(localized: "guidedTutorial.title", defaultValue: "Guided Tutorial"))
+            .navigationTitleStaysVisible()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.close", defaultValue: "Close")) {
+                    Button(role: .close) {
                         closeTutorial()
                     }
                     .accessibilityIdentifier(TutorialAutomationContract.closeIdentifier)
@@ -273,9 +274,10 @@ struct TutorialView: View {
                 .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
             }
             .navigationTitle(String(localized: "guidedTutorial.title", defaultValue: "Guided Tutorial"))
+            .navigationTitleStaysVisible()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.close", defaultValue: "Close")) {
+                    Button(role: .close) {
                         closeTutorial()
                     }
                     .accessibilityIdentifier(TutorialAutomationContract.closeIdentifier)

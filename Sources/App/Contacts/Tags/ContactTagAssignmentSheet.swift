@@ -55,9 +55,11 @@ struct ContactTagAssignmentSheet: View {
             }
             .scrollDismissesKeyboardInteractivelyIfAvailable()
             .navigationTitle(String(localized: "contactdetail.addTag.title", defaultValue: "Add Tag"))
+            .toolbarTitleDisplayMode(.inline)
+            .navigationTitleStaysVisible()
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.done", defaultValue: "Done")) {
+                ToolbarItem(placement: .sheetDone) {
+                    Button(role: .confirm) {
                         dismiss()
                     }
                 }

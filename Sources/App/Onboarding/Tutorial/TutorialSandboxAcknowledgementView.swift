@@ -74,9 +74,13 @@ struct TutorialSandboxAcknowledgementView: View {
             #if canImport(UIKit)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .navigationTitleStaysVisible()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview")) {
+                    Button(
+                        String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview"),
+                        systemImage: "chevron.backward"
+                    ) {
                         tutorialStore.returnToOverview()
                     }
                     .accessibilityIdentifier(TutorialAutomationContract.returnToOverviewIdentifier)

@@ -66,9 +66,10 @@ private struct PostGenerationPromptHostView: View {
         .accessibilityIdentifier("postgen.root")
         .screenReady("postgen.ready")
         .navigationTitle(String(localized: "postgen.title", defaultValue: "Key Ready"))
+        .toolbarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button(String(localized: "postgen.done", defaultValue: "Done")) {
+            ToolbarItem(placement: .sheetDone) {
+                Button(role: .confirm) {
                     handleDone()
                 }
                 .accessibilityIdentifier("postgen.done")

@@ -737,22 +737,6 @@
         }
       }
     },
-    "common.close" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Close"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭"
-          }
-        }
-      }
-    },
     "common.comingSoon" : {
       "localizations" : {
         "en" : {
@@ -7749,22 +7733,6 @@
         }
       }
     },
-    "import.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
-          }
-        }
-      }
-    },
     "import.canEncrypt" : {
       "localizations" : {
         "en" : {
@@ -8513,22 +8481,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "到期时间"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
           }
         }
       }
@@ -11779,22 +11731,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密钥已创建"
-          }
-        }
-      }
-    },
-    "postgen.done" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成"
           }
         }
       }

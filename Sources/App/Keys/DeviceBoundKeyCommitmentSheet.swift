@@ -82,9 +82,10 @@ struct DeviceBoundKeyCommitmentSheet: View {
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .navigationTitleStaysVisible()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                    Button(role: .cancel) {
                         onCancel()
                     }
                     .accessibilityIdentifier("keygen.deviceBound.confirm.cancel")

@@ -96,14 +96,12 @@ struct SelfTestView: View {
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))
         .toolbar {
             if case .completed = selfTestService.state, selfTestService.latestReport != nil {
-                ToolbarItem(placement: .automatic) {
-                    Button {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(
+                        String(localized: "selftest.share", defaultValue: "Save Report"),
+                        systemImage: "square.and.arrow.down"
+                    ) {
                         saveReport()
-                    } label: {
-                        Label(
-                            String(localized: "selftest.share", defaultValue: "Save Report"),
-                            systemImage: "square.and.arrow.down"
-                        )
                     }
                 }
             }

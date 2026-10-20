@@ -51,15 +51,18 @@ struct SettingsLocalDataResetPhraseView: View {
         #endif
         .cypherMacReadableContent()
         .navigationTitle(String(localized: "settings.resetAll.title", defaultValue: "Reset All Local Data?"))
+        .toolbarTitleDisplayMode(.inline)
+        .navigationTitleStaysVisible()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                Button(role: .cancel) {
                     flow.dismissPhraseSheet()
                 }
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(
                     String(localized: "settings.resetAll.confirm", defaultValue: "Reset"),
+                    systemImage: "trash",
                     role: .destructive
                 ) {
                     flow.confirm()

@@ -118,9 +118,11 @@ struct MyKeysView: View {
                 )
             }
         } label: {
-            Image(systemName: "plus")
+            Label(
+                String(localized: "keys.actions.menu", defaultValue: "Key Actions"),
+                systemImage: "plus"
+            )
         }
-        .accessibilityLabel(String(localized: "keys.actions.menu", defaultValue: "Key Actions"))
         .accessibilityHint(String(localized: "keys.actions.menu.hint", defaultValue: "Open actions to generate or import a key."))
     }
 

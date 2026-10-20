@@ -103,7 +103,6 @@ private struct DecryptScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
     let configuration: DecryptView.Configuration
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: DecryptScreenModel
 
     init(
@@ -126,23 +125,18 @@ private struct DecryptScreenHostView: View {
         let operation = model.operation
         let exportController = model.exportController
         let fileImportRequestToken = model.fileImportRequestToken
-        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
-            horizontalSizeClass: horizontalSizeClass
-        )
 
         CypherToolScreenLayout(hasOutput: hasOutput) {
-            if !usesToolbarModePicker {
-                Section {
-                    CypherModePicker(
-                        title: String(localized: "decrypt.mode", defaultValue: "Mode"),
-                        selection: $model.decryptMode,
-                        selectedValueLabel: model.decryptMode.label,
-                        isDisabled: operation.isRunning,
-                        accessibilityIdentifier: "decrypt.mode.picker"
-                    ) {
-                        ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
+            Section {
+                CypherModePicker(
+                    title: String(localized: "decrypt.mode", defaultValue: "Mode"),
+                    selection: $model.decryptMode,
+                    selectedValueLabel: model.decryptMode.label,
+                    isDisabled: operation.isRunning,
+                    accessibilityIdentifier: "decrypt.mode.picker"
+                ) {
+                    ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
                     }
                 }
             }
@@ -267,23 +261,6 @@ private struct DecryptScreenHostView: View {
         .formStyle(.grouped)
         #endif
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
-        .toolbar {
-            if usesToolbarModePicker {
-                ToolbarItem(placement: .principal) {
-                    CypherModePicker(
-                        title: String(localized: "decrypt.mode", defaultValue: "Mode"),
-                        selection: $model.decryptMode,
-                        selectedValueLabel: model.decryptMode.label,
-                        isDisabled: operation.isRunning,
-                        accessibilityIdentifier: "decrypt.mode.picker"
-                    ) {
-                        ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                }
-            }
-        }
         .fileImporter(
             isPresented: $model.showFileImporter,
             allowedContentTypes: allowedImportContentTypes,

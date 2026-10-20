@@ -123,14 +123,18 @@ private struct TagDetailHostView: View {
     private var toolbarContent: some ToolbarContent {
         if model.isEditingMembers {
             ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                Button(role: .cancel) {
                     withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
                         model.requestCancelMemberEditing()
                     }
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button(String(localized: "common.save", defaultValue: "Save")) {
+            ToolbarItem(placement: .confirmationAction) {
+                Button(
+                    String(localized: "common.save", defaultValue: "Save"),
+                    systemImage: "checkmark",
+                    role: .confirm
+                ) {
                     withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
                         model.saveMembership()
                     }
@@ -138,34 +142,49 @@ private struct TagDetailHostView: View {
                 .disabled(!model.canSaveMembershipDraft)
             }
         } else if model.contactsAvailability.isAvailable && model.tag != nil {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button(String(localized: "common.edit", defaultValue: "Edit")) {
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    String(localized: "common.edit", defaultValue: "Edit"),
+                    systemImage: "checklist"
+                ) {
                     withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
                         model.beginMemberEditing()
                     }
                 }
-                Menu {
-                    Button {
-                        model.beginRenameTag()
-                    } label: {
-                        Label(
-                            String(localized: "tagManagement.rename", defaultValue: "Rename Tag"),
-                            systemImage: "pencil"
-                        )
-                    }
-                    Button(role: .destructive) {
-                        model.requestDeleteTag()
-                    } label: {
-                        Label(
-                            String(localized: "tagManagement.delete", defaultValue: "Delete Tag"),
-                            systemImage: "trash"
-                        )
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel(String(localized: "tagManagement.detail.more", defaultValue: "More Tag Actions"))
             }
+            #if os(macOS)
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    tagActions
+                } label: {
+                    Label(
+                        String(localized: "tagManagement.detail.more", defaultValue: "More Tag Actions"),
+                        systemImage: "ellipsis.circle"
+                    )
+                }
+            }
+            #else
+            ToolbarOverflowMenu {
+                tagActions
+            }
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private var tagActions: some View {
+        Button(
+            String(localized: "tagManagement.rename", defaultValue: "Rename Tag"),
+            systemImage: "pencil"
+        ) {
+            model.beginRenameTag()
+        }
+        Button(
+            String(localized: "tagManagement.delete", defaultValue: "Delete Tag"),
+            systemImage: "trash",
+            role: .destructive
+        ) {
+            model.requestDeleteTag()
         }
     }
 
@@ -354,15 +373,21 @@ private struct RenameTagSheet: View {
                 }
             }
             .navigationTitle(String(localized: "tagManagement.rename", defaultValue: "Rename Tag"))
+            .toolbarTitleDisplayMode(.inline)
+            .navigationTitleStaysVisible()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                    Button(role: .cancel) {
                         model.cancelRenameTag()
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button(String(localized: "common.save", defaultValue: "Save")) {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(
+                        String(localized: "common.save", defaultValue: "Save"),
+                        systemImage: "checkmark",
+                        role: .confirm
+                    ) {
                         save()
                     }
                     .disabled(!model.canCommitRename)

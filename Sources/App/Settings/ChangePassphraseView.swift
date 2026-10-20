@@ -57,16 +57,21 @@ struct ChangePassphraseView: View {
         #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .navigationTitleStaysVisible()
         .interactiveDismissDisabled(model.isSaving)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                Button(role: .cancel) {
                     dismiss()
                 }
                 .disabled(model.isSaving)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button(String(localized: "changePassphrase.save", defaultValue: "Change")) {
+                Button(
+                    String(localized: "changePassphrase.save", defaultValue: "Change"),
+                    systemImage: "checkmark",
+                    role: .confirm
+                ) {
                     Task {
                         if await model.save(using: appLockController) {
                             dismiss()

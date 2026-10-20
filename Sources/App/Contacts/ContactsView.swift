@@ -57,23 +57,23 @@ private struct ContactsScreenHostView: View {
             if model.contactsAvailability.isAvailable {
                 ToolbarItemGroup(placement: .primaryAction) {
                     if model.canManageTags {
-                        Button {
+                        Button(
+                            String(localized: "contacts.manageTags", defaultValue: "Manage Tags"),
+                            systemImage: "tag"
+                        ) {
                             routeNavigator.open(.tagManagement)
-                        } label: {
-                            Image(systemName: "tag")
                         }
                         .accessibilityIdentifier("contacts.tags.toolbar")
-                        .accessibilityLabel(String(localized: "contacts.manageTags", defaultValue: "Manage Tags"))
                     }
 
-                    Button {
+                    Button(
+                        String(localized: "contacts.add", defaultValue: "Add Contact"),
+                        systemImage: "plus"
+                    ) {
                         routeNavigator.open(.addContact)
-                    } label: {
-                        Image(systemName: "plus")
                     }
                     .tutorialAnchor(.contactsAddButton)
                     .accessibilityIdentifier("contacts.add.toolbar")
-                    .accessibilityLabel(String(localized: "contacts.add", defaultValue: "Add Contact"))
                 }
             }
         }

@@ -36,5 +36,6 @@ struct TutorialLeaveConfirmationView: View {
         #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .navigationTitleStaysVisible()
     }
 }

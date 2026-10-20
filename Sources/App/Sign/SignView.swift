@@ -60,7 +60,6 @@ struct SignView: View {
 private struct SignScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: SignScreenModel
 
     init(
@@ -86,23 +85,18 @@ private struct SignScreenHostView: View {
         let operation = model.operation
         let exportController = model.exportController
         let fileImportRequestToken = model.fileImportRequestToken
-        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
-            horizontalSizeClass: horizontalSizeClass
-        )
 
         CypherToolScreenLayout(hasOutput: hasOutput) {
-            if !usesToolbarModePicker {
-                Section {
-                    CypherModePicker(
-                        title: String(localized: "sign.mode", defaultValue: "Mode"),
-                        selection: $model.signMode,
-                        selectedValueLabel: model.signMode.label,
-                        isDisabled: operation.isRunning,
-                        accessibilityIdentifier: "sign.mode.picker"
-                    ) {
-                        ForEach(SignView.SignMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
+            Section {
+                CypherModePicker(
+                    title: String(localized: "sign.mode", defaultValue: "Mode"),
+                    selection: $model.signMode,
+                    selectedValueLabel: model.signMode.label,
+                    isDisabled: operation.isRunning,
+                    accessibilityIdentifier: "sign.mode.picker"
+                ) {
+                    ForEach(SignView.SignMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
                     }
                 }
             }
@@ -209,23 +203,6 @@ private struct SignScreenHostView: View {
         .formStyle(.grouped)
         #endif
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
-        .toolbar {
-            if usesToolbarModePicker {
-                ToolbarItem(placement: .principal) {
-                    CypherModePicker(
-                        title: String(localized: "sign.mode", defaultValue: "Mode"),
-                        selection: $model.signMode,
-                        selectedValueLabel: model.signMode.label,
-                        isDisabled: operation.isRunning,
-                        accessibilityIdentifier: "sign.mode.picker"
-                    ) {
-                        ForEach(SignView.SignMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                }
-            }
-        }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: Binding(
