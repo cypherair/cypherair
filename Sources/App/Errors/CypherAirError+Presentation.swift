@@ -72,7 +72,7 @@ extension CypherAirError: LocalizedError {
         case .noRecipientsSelected:
             String(localized: "error.noRecipients", defaultValue: "Please select at least one recipient.")
         case .biometricsUnavailable:
-            String(localized: "error.biometricsUnavailable", defaultValue: "Biometric authentication is currently unavailable. In High Security mode, all private key operations are blocked until biometric authentication is restored.")
+            String(localized: "error.biometricsUnavailable", defaultValue: "Biometric authentication is not available right now, so device-bound keys cannot be used.")
         case .duplicateKey:
             String(localized: "error.duplicateKey", defaultValue: "A key with this fingerprint already exists on this device.")
         case .keyTooLargeForQr:
@@ -168,7 +168,7 @@ extension CypherAirError: LocalizedError {
         case .openPGPSemanticFailure:
             String(localized: "error.keyOperationUnavailable.openPGPSemanticFailure", defaultValue: "The OpenPGP operation failed.")
         case .recoveryRequired:
-            String(localized: "error.keyOperationUnavailable.recoveryRequired", defaultValue: "This key needs recovery before it can be used.")
+            String(localized: "error.keyOperationUnavailable.recoveryRequired", defaultValue: "The vault on this device is damaged, so this key cannot be used. Reset All Local Data is the only remedy.")
         case .cleanupOrRollbackFailure:
             String(localized: "error.keyOperationUnavailable.cleanupOrRollbackFailure", defaultValue: "The operation failed and cleanup could not complete.")
         }

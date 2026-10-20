@@ -492,7 +492,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前口令"
+            "value" : "当前密码短语"
           }
         }
       }
@@ -524,7 +524,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更改已取消。你的口令未变。"
+            "value" : "更改已取消。你的密码短语未变。"
           }
         }
       }
@@ -540,7 +540,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法更改口令。你的口令未变。"
+            "value" : "无法更改密码短语。你的密码短语未变。"
           }
         }
       }
@@ -550,13 +550,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Face ID or Touch ID did not confirm it is you. Your passphrase is unchanged."
+            "value" : "The presence check did not confirm it is you. Your passphrase is unchanged."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "面容 ID 或触控 ID 未能确认是你本人。你的口令未变。"
+            "value" : "身份确认未通过。你的密码短语未变。"
+          }
+        }
+      }
+    },
+    "changePassphrase.error.presenceUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is not available right now. Your passphrase is unchanged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物识别认证目前不可用。你的密码短语未变。"
           }
         }
       }
@@ -572,7 +588,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前口令不正确。"
+            "value" : "当前密码短语不正确。"
           }
         }
       }
@@ -588,7 +604,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的密钥和联系人保持不变。从下次解锁起需要使用新口令，且没有人能为你找回它。"
+            "value" : "你的密钥和联系人保持不变。从下次解锁起需要使用新密码短语，且没有人能为你找回它。"
           }
         }
       }
@@ -604,7 +620,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新口令"
+            "value" : "新密码短语"
           }
         }
       }
@@ -2972,7 +2988,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法打开此设备上的联系人数据。唯一的补救办法是重置所有本地数据。"
+            "value" : "无法打开此设备上的联系人数据。唯一的补救办法是重置所有本机数据。"
           }
         }
       }
@@ -3030,13 +3046,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contacts are opening after app authentication."
+            "value" : "Contacts are opening after unlock."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用认证完成后正在打开联系人。"
+            "value" : "解锁后正在打开联系人。"
           }
         }
       }
@@ -3958,13 +3974,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preferences are locked. Authenticate again before encrypting with the app default."
+            "value" : "Unlock CypherAir X before encrypting with app defaults."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "偏好设置已锁定。请重新验证身份后再使用应用默认加密设置。"
+            "value" : "请先解锁 CypherAir X，再使用应用默认设置加密。"
           }
         }
       }
@@ -4522,13 +4538,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Biometric authentication is currently unavailable. In High Security mode, all private key operations are blocked until biometric authentication is restored."
+            "value" : "Biometric authentication is not available right now, so device-bound keys cannot be used."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生物认证当前不可用。在高安全模式下，所有私钥操作将被阻止，直到生物认证恢复。"
+            "value" : "生物识别认证目前不可用，因此无法使用设备绑定密钥。"
           }
         }
       }
@@ -5194,13 +5210,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key needs recovery before it can be used."
+            "value" : "The vault on this device is damaged, so this key cannot be used. Reset All Local Data is the only remedy."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥需要先恢复才能使用。"
+            "value" : "此设备上的保险库已损坏，无法使用此密钥。唯一的补救办法是重置所有本机数据。"
           }
         }
       }
@@ -6778,13 +6794,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7 modules"
+            "value" : "%lld modules"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7 个模块"
+            "value" : "%lld 个模块"
           }
         }
       }
@@ -7578,13 +7594,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected key metadata could not be opened. Use protected data recovery or reset local data."
+            "value" : "Protected key metadata could not be opened. Reset All Local Data is the only remedy."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法打开受保护的密钥元数据。请使用受保护数据恢复或重置本地数据。"
+            "value" : "无法打开受保护的密钥元数据。唯一的补救办法是重置所有本机数据。"
           }
         }
       }
@@ -7594,13 +7610,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Key Metadata Needs Recovery"
+            "value" : "Key Metadata Is Damaged"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "密钥元数据需要恢复"
+            "value" : "密钥元数据已损坏"
           }
         }
       }
@@ -10828,13 +10844,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected key metadata could not be opened. Use protected data recovery or reset local data."
+            "value" : "Protected key metadata could not be opened. Reset All Local Data is the only remedy."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法打开受保护的密钥元数据。请使用受保护数据恢复或重置本地数据。"
+            "value" : "无法打开受保护的密钥元数据。唯一的补救办法是重置所有本机数据。"
           }
         }
       }
@@ -10844,13 +10860,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Key Metadata Needs Recovery"
+            "value" : "Key Metadata Is Damaged"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "密钥元数据需要恢复"
+            "value" : "密钥元数据已损坏"
           }
         }
       }
@@ -12866,7 +12882,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更改口令"
+            "value" : "更改密码短语"
           }
         }
       }
@@ -13228,13 +13244,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlocking takes your passphrase and one Face ID or Touch ID confirmation. Device-bound keys ask for biometrics again on every use."
+            "value" : "Unlocking takes your passphrase and one confirmation that it is you. Device-bound keys ask for biometrics again on every use."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁需要你的口令和一次面容 ID 或触控 ID 确认。设备绑定密钥在每次使用时都会再次要求生物识别。"
+            "value" : "解锁需要你的密码短语和一次身份确认。设备绑定密钥在每次使用时都会再次要求生物识别。"
           }
         }
       }
@@ -14674,7 +14690,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更改 CypherAir X 口令"
+            "value" : "更改 CypherAir X 密码短语"
           }
         }
       }
@@ -14690,7 +14706,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此设备上封存的部分数据无法打开。不会原地修复：请先备份仍然完好的内容，然后重置所有本地数据。"
+            "value" : "此设备上封存的部分数据无法打开。不会原地修复：请先备份仍然完好的内容，然后重置所有本机数据。"
           }
         }
       }
@@ -14876,13 +14892,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X could not lock cleanly. Quit and reopen it to continue."
+            "value" : "CypherAir X could not lock cleanly. Close it and open it again to continue."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X 未能干净地锁定。请退出并重新打开以继续。"
+            "value" : "CypherAir X 未能干净地锁定。请关闭并重新打开以继续。"
           }
         }
       }
@@ -14930,7 +14946,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X 在此设备上保存的一切都由这个口令和本设备的安全隔区共同封存。口令不会被存储，也没有人能找回它：如果忘记，唯一的出路是抹掉所有内容的重置。"
+            "value" : "CypherAir X 在此设备上保存的一切都由这个密码短语和本设备的安全隔区共同封存。密码短语不会被存储，也没有人能找回它：如果忘记，唯一的出路是抹掉所有内容的重置。"
           }
         }
       }
@@ -14940,13 +14956,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creating the vault asks for Face ID or Touch ID once. Unlocking later takes the passphrase and one confirmation."
+            "value" : "Creating the vault asks you to confirm it is you once. Unlocking later takes the passphrase and one confirmation."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建保险库会请求一次面容 ID 或触控 ID。之后解锁需要口令和一次确认。"
+            "value" : "创建保险库会请求一次身份确认。之后解锁需要密码短语和一次确认。"
           }
         }
       }
@@ -14978,7 +14994,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择你的口令"
+            "value" : "选择你的密码短语"
           }
         }
       }
@@ -15004,13 +15020,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlock was cancelled."
+            "value" : "The presence check was cancelled."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁已取消。"
+            "value" : "身份确认已取消。"
           }
         }
       }
@@ -15026,7 +15042,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此设备上的保险库已损坏，无法打开。唯一的补救办法是重置所有本地数据。"
+            "value" : "此设备上的保险库已损坏，无法打开。唯一的补救办法是重置所有本机数据。"
           }
         }
       }
@@ -15052,13 +15068,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlock failed: %@"
+            "value" : "That did not work. Try again, and restart CypherAir X if it keeps failing."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁失败：%@"
+            "value" : "操作未成功。请重试；如果持续失败，请重新启动 CypherAir X。"
           }
         }
       }
@@ -15068,13 +15084,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Face ID or Touch ID did not confirm it is you."
+            "value" : "The presence check did not confirm it is you."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "面容 ID 或触控 ID 未能确认是你本人。"
+            "value" : "身份确认未通过。"
           }
         }
       }
@@ -15084,13 +15100,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Face ID or Touch ID is not available right now. Unlock the device with its passcode or password, then try again."
+            "value" : "Biometric authentication is not available right now. Make sure the device has a passcode or password and is unlocked, then try again."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "面容 ID 或触控 ID 目前不可用。请先用设备密码解锁设备，然后重试。"
+            "value" : "生物识别认证目前不可用。请确认设备已设置密码并已解锁，然后重试。"
           }
         }
       }
@@ -15106,7 +15122,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "口令不正确。"
+            "value" : "密码短语不正确。"
           }
         }
       }
@@ -15122,7 +15138,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "口令"
+            "value" : "密码短语"
           }
         }
       }
@@ -15138,7 +15154,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "忘记口令…"
+            "value" : "忘记密码短语…"
           }
         }
       }
@@ -15148,13 +15164,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your passphrase, then Face ID or Touch ID."
+            "value" : "Your passphrase, then confirm it is you."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先输入口令，再进行面容 ID 或触控 ID 验证。"
+            "value" : "先输入密码短语，再确认是你本人。"
           }
         }
       }

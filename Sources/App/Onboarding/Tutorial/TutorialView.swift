@@ -126,7 +126,7 @@ struct TutorialView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Label(String(localized: "guidedTutorial.modulesCount", defaultValue: "7 modules"), systemImage: "list.number")
+                Label(String(localized: "guidedTutorial.modulesCount", defaultValue: "\(TutorialModuleID.allCases.count) modules"), systemImage: "list.number")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

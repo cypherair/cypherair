@@ -35,7 +35,7 @@ struct SettingsSecuritySection: View {
         } footer: {
             Text(String(
                 localized: "settings.security.footer",
-                defaultValue: "Unlocking takes your passphrase and one Face ID or Touch ID confirmation. Device-bound keys ask for biometrics again on every use."
+                defaultValue: "Unlocking takes your passphrase and one confirmation that it is you. Device-bound keys ask for biometrics again on every use."
             ))
         }
     }
