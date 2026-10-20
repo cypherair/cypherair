@@ -144,57 +144,43 @@ struct HomeView: View {
 
     private var quickActionsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: CypherSpacing.standard) {
-            actionButton(
-                title: String(localized: "home.encrypt", defaultValue: "Encrypt"),
-                icon: "lock.fill",
-                route: .encrypt,
-                anchor: .homeEncryptAction
-            )
-            actionButton(
-                title: String(localized: "home.decrypt", defaultValue: "Decrypt"),
-                icon: "lock.open.fill",
-                route: .decrypt,
-                anchor: .homeDecryptAction
-            )
-            actionButton(
-                title: String(localized: "home.sign", defaultValue: "Sign"),
-                icon: "signature",
-                route: .sign
-            )
-            actionButton(
-                title: String(localized: "home.verify", defaultValue: "Verify"),
-                icon: "checkmark.seal",
-                route: .verify
-            )
+            ForEach(AppTool.allCases, id: \.self) { tool in
+                toolButton(tool)
+            }
         }
     }
 
-    private func actionButton(
-        title: String,
-        icon: String,
-        route: AppRoute,
-        anchor: TutorialAnchorID? = nil
-    ) -> some View {
-        NavigationLink(value: route) {
+    private func toolButton(_ tool: AppTool) -> some View {
+        NavigationLink(value: tool.route) {
             VStack(spacing: CypherSpacing.compact) {
-                Image(systemName: icon)
+                Image(systemName: tool.systemImage)
                     .font(.title2)
                     .symbolRenderingMode(.hierarchical)
                     .accessibilityHidden(true)
-                Text(title)
+                Text(tool.title)
                     .font(.subheadline.weight(.medium))
             }
             .frame(maxWidth: .infinity, minHeight: 80)
         }
-        // .buttonStyle(.glass) is @available(visionOS, unavailable) in the
-        // visionOS 26.5 SDK; visionOS gets its native prominent chrome.
+        // .glass is unavailable on visionOS, which gets its native prominent chrome.
         #if os(visionOS)
         .buttonStyle(.borderedProminent)
         #else
         .buttonStyle(.glass)
         #endif
-        .accessibilityLabel(title)
-        .tutorialAnchor(anchor)
+        .accessibilityLabel(tool.title)
+        .tutorialAnchor(tutorialAnchor(for: tool))
         .cypherPressFeedback()
+    }
+
+    private func tutorialAnchor(for tool: AppTool) -> TutorialAnchorID? {
+        switch tool {
+        case .encrypt:
+            .homeEncryptAction
+        case .decrypt:
+            .homeDecryptAction
+        case .sign, .verify:
+            nil
+        }
     }
 }

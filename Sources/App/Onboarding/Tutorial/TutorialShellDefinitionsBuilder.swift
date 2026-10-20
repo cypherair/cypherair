@@ -7,10 +7,7 @@ struct TutorialShellDefinitionsBuilder {
 
     func definitions() -> [AppShellTabDefinition] {
         AppShellTab.allCases.map { tab in
-            AppShellComposition.definition(
-                for: tab,
-                content: root(for: tab)
-            )
+            AppShellTabDefinition(tab: tab, content: root(for: tab))
         }
     }
 
@@ -49,30 +46,6 @@ struct TutorialShellDefinitionsBuilder {
             return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
                     TutorialSettingsTaskView()
-                }
-            }
-        case .encrypt:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    EncryptView(configuration: store.configurationFactory.encryptConfiguration(isActiveModule: store.currentModule == .encryptDemoMessage))
-                }
-            }
-        case .decrypt:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    DecryptView(configuration: store.configurationFactory.decryptConfiguration(isActiveModule: store.currentModule == .decryptAndVerify))
-                }
-            }
-        case .sign:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    SignView(configuration: store.configurationFactory.signConfiguration())
-                }
-            }
-        case .verify:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    VerifyView(configuration: store.configurationFactory.verifyConfiguration())
                 }
             }
         }

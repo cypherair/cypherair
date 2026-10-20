@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// macOS menu commands: the in-window About item, key actions in the Keys
-/// menu, and sidebar tab selection (⌘1–⌘8) in the View menu.
+/// menu, and sidebar selection (⌘1–⌘8) in the View menu.
 struct MacKeyboardCommands: Commands {
     let navigationState: MacShellNavigationState
 
@@ -20,14 +20,14 @@ struct MacKeyboardCommands: Commands {
                 localized: "menu.about",
                 defaultValue: "About \(AppProductIdentity.localizedDisplayName)"
             )) {
-                navigationState.selectedTab = .settings
-                navigationState.setPath([.about], for: .settings)
+                navigationState.selection = .tab(.settings)
+                navigationState.setPath([.about], for: .tab(.settings))
             }
         }
 
         // Key actions live in their own menu; the single-window design leaves
         // no default File > New group to host them.
-        CommandMenu(AppShellComposition.title(for: .keys)) {
+        CommandMenu(AppShellTab.keys.title) {
             Button(String(localized: "menu.newKey", defaultValue: "New Key…")) {
                 openOnKeysTab(.keyGeneration)
             }
@@ -41,9 +41,9 @@ struct MacKeyboardCommands: Commands {
 
         CommandGroup(after: .sidebar) {
             Divider()
-            ForEach(Array(AppShellTab.allCases.enumerated()), id: \.element) { index, tab in
-                Button(AppShellComposition.title(for: tab)) {
-                    navigationState.selectedTab = tab
+            ForEach(Array(MacSidebarItem.allCases.enumerated()), id: \.element) { index, item in
+                Button(item.title) {
+                    navigationState.selection = item
                 }
                 .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
             }
@@ -51,8 +51,8 @@ struct MacKeyboardCommands: Commands {
     }
 
     private func openOnKeysTab(_ route: AppRoute) {
-        navigationState.selectedTab = .keys
-        navigationState.setPath([route], for: .keys)
+        navigationState.selection = .tab(.keys)
+        navigationState.setPath([route], for: .tab(.keys))
     }
 }
 #endif
