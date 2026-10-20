@@ -84,21 +84,6 @@
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "argon2-0.5.3.txt",
     "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "argon2@0.6.0",
-    "displayName": "argon2",
-    "version": "0.6.0",
-    "repositoryURL": "https://github.com/RustCrypto/password-hashes",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "argon2-0.6.0.txt",
-    "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
@@ -197,42 +182,12 @@
     ]
   },
   {
-    "id": "blake2@0.11.0",
-    "displayName": "blake2",
-    "version": "0.11.0",
-    "repositoryURL": "https://github.com/RustCrypto/hashes",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "blake2-0.11.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "block-buffer@0.10.4",
     "displayName": "block-buffer",
     "version": "0.10.4",
     "repositoryURL": "https://github.com/RustCrypto/utils",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "block-buffer-0.10.4.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "block-buffer@0.12.1",
-    "displayName": "block-buffer",
-    "version": "0.12.1",
-    "repositoryURL": "https://github.com/RustCrypto/utils",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "block-buffer-0.12.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -374,42 +329,12 @@
     ]
   },
   {
-    "id": "cmov@0.5.4",
-    "displayName": "cmov",
-    "version": "0.5.4",
-    "repositoryURL": "https://github.com/RustCrypto/utils",
-    "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "cmov-0.5.4.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
-    ]
-  },
-  {
     "id": "cpufeatures@0.2.17",
     "displayName": "cpufeatures",
     "version": "0.2.17",
     "repositoryURL": "https://github.com/RustCrypto/utils",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "cpufeatures-0.2.17.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "cpufeatures@0.3.1",
-    "displayName": "cpufeatures",
-    "version": "0.3.1",
-    "repositoryURL": "https://github.com/RustCrypto/utils",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "cpufeatures-0.3.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -449,21 +374,6 @@
     ]
   },
   {
-    "id": "crypto-common@0.2.2",
-    "displayName": "crypto-common",
-    "version": "0.2.2",
-    "repositoryURL": "https://github.com/RustCrypto/traits",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "crypto-common-0.2.2.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "ctor@1.0.13",
     "displayName": "ctor",
     "version": "1.0.13",
@@ -479,42 +389,12 @@
     ]
   },
   {
-    "id": "ctutils@0.4.3",
-    "displayName": "ctutils",
-    "version": "0.4.3",
-    "repositoryURL": "https://github.com/RustCrypto/utils",
-    "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "ctutils-0.4.3.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
-    ]
-  },
-  {
     "id": "digest@0.10.7",
     "displayName": "digest",
     "version": "0.10.7",
     "repositoryURL": "https://github.com/RustCrypto/traits",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "digest-0.10.7.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "digest@0.11.3",
-    "displayName": "digest",
-    "version": "0.11.3",
-    "repositoryURL": "https://github.com/RustCrypto/traits",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "digest-0.11.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -737,21 +617,6 @@
     "repositoryURL": "https://github.com/withoutboats/heck",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "heck-0.5.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "hybrid-array@0.4.15",
-    "displayName": "hybrid-array",
-    "version": "0.4.15",
-    "repositoryURL": "https://github.com/RustCrypto/hybrid-array",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "hybrid-array-0.4.15.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1153,21 +1018,6 @@
     ]
   },
   {
-    "id": "password-hash@0.6.1",
-    "displayName": "password-hash",
-    "version": "0.6.1",
-    "repositoryURL": "https://github.com/RustCrypto/traits",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "password-hash-0.6.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "percent-encoding@2.3.2",
     "displayName": "percent-encoding",
     "version": "2.3.2",
@@ -1180,21 +1030,6 @@
     "licenseSourceItems": [
       "LICENSE-MIT",
       "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "phc@0.6.1",
-    "displayName": "phc",
-    "version": "0.6.1",
-    "repositoryURL": "https://github.com/RustCrypto/formats",
-    "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "phc-0.6.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
     ]
   },
   {
