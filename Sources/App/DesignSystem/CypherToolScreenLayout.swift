@@ -54,6 +54,7 @@ struct CypherToolScreenLayout<Workflow: View, Output: View>: View {
                     output()
                 }
             }
+            .splitSeamDivider()
         } secondary: {
             outputPane
         }

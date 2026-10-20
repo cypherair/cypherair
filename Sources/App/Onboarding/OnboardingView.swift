@@ -114,24 +114,24 @@ private struct OnboardingPageLayout<Footer: View>: View {
         Group {
             if let fold, fold.width > fold.height {
                 VStack(spacing: 0) {
-                    part { header }
+                    part(anchor: .bottom) { header }
                         .frame(height: max(fold.minY, 0))
                     Color.clear
                         .frame(height: fold.height)
-                    part { footer() }
+                    part(anchor: .top) { footer() }
                         .padding(.bottom, pageIndicatorClearance)
                 }
             } else if let fold {
                 HStack(spacing: 0) {
-                    part { header }
+                    part(anchor: .center) { header }
                         .frame(width: max(fold.minX, 0))
                     Color.clear
                         .frame(width: fold.width)
-                    part { footer() }
+                    part(anchor: .center) { footer() }
                 }
                 .padding(.bottom, pageIndicatorClearance)
             } else {
-                part {
+                part(anchor: .center) {
                     header
                     footer()
                 }
@@ -163,7 +163,10 @@ private struct OnboardingPageLayout<Footer: View>: View {
             .padding(.horizontal, 40)
     }
 
-    private func part(@ViewBuilder _ content: () -> some View) -> some View {
+    /// One part of the page, scrolling when it does not fit. The two parts
+    /// of a page stacked around a fold sit against it, so they still read
+    /// as one page.
+    private func part(anchor: UnitPoint, @ViewBuilder _ content: () -> some View) -> some View {
         ScrollView {
             VStack(spacing: spacing) {
                 content()
@@ -171,7 +174,7 @@ private struct OnboardingPageLayout<Footer: View>: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, spacing)
         }
-        .defaultScrollAnchor(.center, for: .alignment)
+        .defaultScrollAnchor(anchor, for: .alignment)
         .scrollBounceBehavior(.basedOnSize)
     }
 }

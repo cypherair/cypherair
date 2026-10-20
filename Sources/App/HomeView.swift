@@ -67,12 +67,14 @@ struct HomeView: View {
                 .cypherMacReadableContent()
             }
             .scrollBounceBehavior(.basedOnSize)
+            .scrollAlignedTowardSplit()
         } secondary: {
             ScrollView {
                 toolGrid
                     .padding()
             }
             .scrollBounceBehavior(.basedOnSize)
+            .scrollAlignedTowardSplit()
         }
     }
 

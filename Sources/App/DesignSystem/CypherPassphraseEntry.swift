@@ -6,21 +6,29 @@ import SwiftUI
 /// passphrase has to be.
 ///
 /// Emits form rows; drop it inside a `Section`. The caller keeps the two
-/// strings and decides what an unsatisfied requirement means for its own
-/// action, asking `PassphraseRequirements` the same question this view
-/// displays.
+/// strings and how they are shown, so the entry can move within the caller's
+/// layout (between the panes of a split arrangement as a device folds)
+/// without hiding a generated passphrase the person has not written down
+/// yet. The caller also decides what an unsatisfied requirement means for
+/// its own action, asking `PassphraseRequirements` the same question this
+/// view displays.
 struct CypherPassphraseEntry: View {
     enum Field: Hashable {
         case passphrase
         case confirmation
     }
 
+    /// Whether the two fields show their text, and whether the passphrase is
+    /// one this entry generated rather than one the person typed.
+    struct Display: Equatable {
+        var isRevealed = false
+        var isGenerated = false
+    }
+
     @Binding var passphrase: String
     @Binding var confirmation: String
+    @Binding var display: Display
     @FocusState.Binding var focus: Field?
-
-    @State private var isRevealed = false
-    @State private var isGenerated = false
 
     private var requirements: PassphraseRequirements {
         PassphraseRequirements(of: passphrase)
@@ -34,7 +42,7 @@ struct CypherPassphraseEntry: View {
             get: { passphrase },
             set: { edited in
                 passphrase = edited
-                isGenerated = false
+                display.isGenerated = false
             }
         )
     }
@@ -52,11 +60,11 @@ struct CypherPassphraseEntry: View {
                 CypherSecureTextField(
                     String(localized: "passphrase.field", defaultValue: "Passphrase"),
                     text: typedPassphrase,
-                    isRevealed: isRevealed,
+                    isRevealed: display.isRevealed,
                     submitLabel: .next,
                     onSubmit: { focus = .confirmation }
                 )
-                .font(isRevealed ? .system(.body, design: .monospaced) : .body)
+                .font(display.isRevealed ? .system(.body, design: .monospaced) : .body)
                 .focused($focus, equals: .passphrase)
 
                 revealToggle
@@ -80,7 +88,7 @@ struct CypherPassphraseEntry: View {
                     )
                 }
 
-                if isGenerated {
+                if display.isGenerated {
                     Text(String(
                         localized: "passphrase.generated.note",
                         defaultValue: "Write it down and keep it somewhere safe. It is stored nowhere, and no one can recover it for you."
@@ -93,18 +101,18 @@ struct CypherPassphraseEntry: View {
         }
         .onChange(of: passphrase) { _, updated in
             if updated.isEmpty {
-                isRevealed = false
+                display.isRevealed = false
             }
         }
 
         CypherSecureTextField(
             String(localized: "passphrase.confirm", defaultValue: "Confirm Passphrase"),
             text: $confirmation,
-            isRevealed: isRevealed,
+            isRevealed: display.isRevealed,
             submitLabel: .done,
             onSubmit: { focus = nil }
         )
-        .font(isRevealed ? .system(.body, design: .monospaced) : .body)
+        .font(display.isRevealed ? .system(.body, design: .monospaced) : .body)
         .focused($focus, equals: .confirmation)
 
         if !passphrase.isEmpty, !confirmation.isEmpty, passphrase != confirmation {
@@ -116,13 +124,13 @@ struct CypherPassphraseEntry: View {
 
     private var revealToggle: some View {
         Button {
-            isRevealed.toggle()
+            display.isRevealed.toggle()
         } label: {
-            Image(systemName: isRevealed ? "eye.slash" : "eye")
+            Image(systemName: display.isRevealed ? "eye.slash" : "eye")
         }
         .buttonStyle(.borderless)
         .accessibilityLabel(
-            isRevealed
+            display.isRevealed
                 ? String(localized: "passphrase.hide", defaultValue: "Hide Passphrase")
                 : String(localized: "passphrase.show", defaultValue: "Show Passphrase")
         )
@@ -141,8 +149,7 @@ struct CypherPassphraseEntry: View {
         focus = nil
         passphrase = generated
         confirmation = generated
-        isRevealed = true
-        isGenerated = true
+        display = Display(isRevealed: true, isGenerated: true)
     }
 }
 

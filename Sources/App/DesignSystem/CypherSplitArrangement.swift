@@ -64,6 +64,20 @@ extension View {
         modifier(SplitPaneAlignment())
     }
 
+    /// The scroll view form of `alignedTowardSplit()`: content shorter than
+    /// its pane sits against the shared edge while the panes are stacked,
+    /// and starts at the top as usual otherwise.
+    func scrollAlignedTowardSplit() -> some View {
+        modifier(SplitPaneScrollAlignment())
+    }
+
+    /// Draws a hairline along the bottom of a primary pane stacked above the
+    /// secondary, where the primary's scrolling content is cut off; without
+    /// it a row half hidden at that edge looks clipped by mistake.
+    func splitSeamDivider() -> some View {
+        modifier(SplitSeamDivider())
+    }
+
     /// Gives a split arrangement of grouped forms or lists their grouped
     /// background, so the gap at a fold and a pane without a form belong to
     /// the same surface as the forms beside them.
@@ -123,5 +137,34 @@ private struct SplitPaneAlignment: ViewModifier {
     private var alignment: Alignment {
         guard axis == .vertical, let pane else { return .center }
         return pane == .primary ? .bottom : .top
+    }
+}
+
+private struct SplitPaneScrollAlignment: ViewModifier {
+    @Environment(\.splitPane) private var pane
+    @Environment(\.splitArrangementAxis) private var axis
+
+    func body(content: Content) -> some View {
+        content
+            .defaultScrollAnchor(anchor, for: .alignment)
+    }
+
+    private var anchor: UnitPoint? {
+        guard axis == .vertical, let pane else { return nil }
+        return pane == .primary ? .bottom : .top
+    }
+}
+
+private struct SplitSeamDivider: ViewModifier {
+    @Environment(\.splitPane) private var pane
+    @Environment(\.splitArrangementAxis) private var axis
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if pane == .primary, axis == .vertical {
+                    Divider()
+                }
+            }
     }
 }

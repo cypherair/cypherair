@@ -94,9 +94,6 @@ private struct UnlockView: View {
                     .padding(24)
             }
         }
-        .onAppear {
-            isPassphraseFocused = true
-        }
         .onChange(of: appLockController.lockState) { _, state in
             if case .failed = state {
                 isPassphraseFocused = true
@@ -173,6 +170,11 @@ private struct UnlockView: View {
             .accessibilityIdentifier("appLock.forgotPassphrase")
         }
         .frame(maxWidth: 440)
+        // The form moves between panes as the device folds and unfolds, and
+        // takes the focus back with it.
+        .onAppear {
+            isPassphraseFocused = true
+        }
     }
 
     private var canSubmit: Bool {
@@ -236,6 +238,7 @@ private struct VaultSetupView: View {
     let appLockController: AppLockController
     @State private var passphrase = ""
     @State private var confirmation = ""
+    @State private var passphraseDisplay = CypherPassphraseEntry.Display()
     @FocusState private var focus: CypherPassphraseEntry.Field?
 
     var body: some View {
@@ -283,6 +286,7 @@ private struct VaultSetupView: View {
             CypherPassphraseEntry(
                 passphrase: $passphrase,
                 confirmation: $confirmation,
+                display: $passphraseDisplay,
                 focus: $focus
             )
         }

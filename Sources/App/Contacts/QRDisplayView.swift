@@ -72,6 +72,7 @@ private struct QRDisplayHostView: View {
                 systemImage: "qrcode",
                 description: Text(Self.unavailabilityDescription(unavailability))
             )
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("qr.unavailable")
         } else if let qrCGImage = model.qrCGImage {
             Image(decorative: qrCGImage, scale: 1.0)

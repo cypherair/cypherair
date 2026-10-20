@@ -9,6 +9,7 @@ struct ChangePassphraseView: View {
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
     @State private var model = ChangePassphraseModel()
+    @State private var passphraseDisplay = CypherPassphraseEntry.Display()
     @FocusState private var focus: CypherPassphraseEntry.Field?
     @FocusState private var isCurrentFocused: Bool
 
@@ -31,6 +32,7 @@ struct ChangePassphraseView: View {
                 CypherPassphraseEntry(
                     passphrase: $model.passphrase,
                     confirmation: $model.confirmation,
+                    display: $passphraseDisplay,
                     focus: $focus
                 )
             } header: {
