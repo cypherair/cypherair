@@ -103,8 +103,13 @@ final class AppTemporaryArtifactStore: @unchecked Sendable {
             [.protectionKey: FileProtectionType.complete],
             ofItemAtPath: resolvedURL.path
         )
-        let attributes = try fileManager.attributesOfItem(atPath: resolvedURL.path)
-        guard attributes[.protectionKey] as? FileProtectionType == .complete else {
+        let readback = try fileManager.attributesOfItem(atPath: resolvedURL.path)[.protectionKey] as? FileProtectionType
+        #if targetEnvironment(simulator)
+        let verified = readback == .complete || readback == nil
+        #else
+        let verified = readback == .complete
+        #endif
+        guard verified else {
             throw AppTemporaryArtifactError.fileProtectionVerificationFailed(resolvedURL)
         }
     }

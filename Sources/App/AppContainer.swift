@@ -83,7 +83,11 @@ final class AppContainer: @unchecked Sendable {
         let engine = PgpEngine()
         let vault: AppVault
         do {
+            #if targetEnvironment(simulator)
+            vault = try AppVault.simulator()
+            #else
             vault = try AppVault.production(engine: engine)
+            #endif
         } catch {
             fatalError("The protected data directory is unavailable: \(error)")
         }

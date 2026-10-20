@@ -60,12 +60,19 @@ public struct ProtectedDataDirectory: Sendable {
         }
     }
 
-    /// Applies complete protection to `fileURL` and verifies it stuck.
+    /// Applies complete protection to `fileURL` and verifies it stuck. The
+    /// simulator's volume reports no protection attribute back, so simulator
+    /// builds alone accept a missing readback.
     static func protect(_ fileURL: URL) throws(StoreError) {
         do {
             try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: fileURL.path)
-            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-            guard attributes[.protectionKey] as? FileProtectionType == .complete else {
+            let readback = try FileManager.default.attributesOfItem(atPath: fileURL.path)[.protectionKey] as? FileProtectionType
+            #if targetEnvironment(simulator)
+            let verified = readback == .complete || readback == nil
+            #else
+            let verified = readback == .complete
+            #endif
+            guard verified else {
                 throw StoreError.fileProtectionVerificationFailed
             }
         } catch let error as StoreError {
