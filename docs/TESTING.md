@@ -6,11 +6,11 @@
 
 **CI runs no `xcodebuild test` at all.** The local macOS unit lane is the source of truth for Swift validation, in every case. Hosted runners carry no CypherAir signing material by policy — signed app builds stay local and on Xcode Cloud — and a hosted-image mismatch skips the affected Apple platform probe rather than failing; **a skipped probe never stands in for release validation.**
 
-**The vault package's tests are part of the unit lane** and run through the package scheme on macOS. They run on the package's sandbox composition — the software enclave, rows in memory, no prompt — behind a recording wrapper that keeps every access policy it is handed, and never reach LocalAuthentication.
+**The vault package's tests are part of the unit lane**: the unit plan runs them with the app's tests on macOS. They run on the package's sandbox composition — the software enclave, rows in memory, no prompt — behind a recording wrapper that keeps every access policy it is handed, and never reach LocalAuthentication.
 
 **Service tests run over a real sandbox vault, never a mock of it.** `TestHelpers.makeSandbox()` opens the same composition under a known passphrase in a temporary directory; `reopen()` locks and unlocks it through that passphrase, which is how a test proves something survived to disk. The UI-test container is the same composition: under `UITEST_REQUIRE_MANUAL_AUTH=1` the app boots locked and the test types `UITEST_VAULT_PASSPHRASE`, and nothing prompts.
 
-**The device lane needs a real Secure Enclave.** An Apple Silicon Mac runs the whole lane locally; SE-capable iPhones and iPads work too; the simulator cannot. The MIE subset additionally needs memory-tagging hardware (§5).
+**The device lane needs a real Secure Enclave.** An Apple Silicon Mac runs the whole lane locally; SE-capable iPhones and iPads work too; the simulator cannot.
 
 **The Rust and XCFramework CI jobs deliberately use no Cargo cache action:** a restored `target/` can mix compiler generations and break proc-macro builds.
 
@@ -19,8 +19,8 @@
 A test exists only if its name states the contract it guards and a later change could break that contract silently. If the regression it would catch cannot be named, it is not written. Four kinds meet that bar:
 
 - **Known-answer vectors** for the sealing layer, so drift in a derivation label or in authenticated data is caught.
-- **Adversarial tests:** flip each public field of an envelope and expect failure, open a blob as the wrong payload kind, leave a stray temporary file beside a domain, remove one domain file, remove the sealed root while domain files remain. The last three must land in the integrity-failure state, never in defaults.
-- **Invariant tests** against the fake enclave: no enclave key is ever created without the application-password option, every session buffer reads as zeros after relock, no path reuses a context after invalidation.
+- **Adversarial tests:** flip each public field of an envelope and expect failure, open a blob as the wrong payload kind, damage or remove one domain file and expect the integrity-failure state, never defaults.
+- **Invariant tests** over the sandbox composition: no enclave key is created without the application-password option except ML-KEM, every session accessor throws once relocked, and custody approvals are taken inside the operation-prompt window.
 - **Device tests** on real hardware: the application-password probes, plus one unlock and one private operation end to end.
 
 Not written: tests of initializers and accessors, tests that assert a mock was called, tests that mirror an implementation's branches, error-string snapshots.
@@ -29,7 +29,6 @@ Not written: tests of initializers and accessors, tests that assert a mock was c
 
 - **Every `XCTestCase` class under `Tests/DeviceSecurityTests/` that declares test methods must be listed in the unit plan's `skippedTests`**, or it runs in the unit lane and stops the run at a biometric prompt. The rule is scoped to that directory, not to a `Device*` name; `scripts/check_device_test_skip_list.py` enforces it in CI, but a local run bites first.
 - **The application-password probes are two classes with different needs.** `DeviceApplicationPasswordProbeTests` uses password-only access control and runs unattended in the device lane; `DeviceApplicationPasswordBiometricProbeTests` combines the biometric constraint and needs exactly one Touch ID or Face ID approval, so it is run with a person present. Their printed reports are the evidence behind the platform facts in [SECURITY.md](SECURITY.md); a change in what they observe re-opens the design decision that rests on it.
-- **`CypherAir-DangerousDeviceTests` is destructive.** Its Reset All Local Data cleanup proof deletes every app-owned Secure Enclave custody handle for the bundle, not only the handles it created. Run it against a disposable install or device state, never a real one.
 - **Device tests never write under the app's own Keychain services** (`com.cypherair.vault.*`); the probes tag their rows with their own names, so a run leaves the real vault untouched.
 - **Build phases read only what they declare, and a declared parent directory is not recursive access.** Adding a test fixture means adding it to `Tests/FixtureResources.xcfilelist` and its `.outputs` companion. Local validation must never depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`.
 - **Tutorial or UI-test launch-gating changes** additionally need the Mac UI plan plus Release and `AppStore Candidate Release` macOS build probes — the proof that the `UITEST_*` launch overrides stay Debug-only.
@@ -47,4 +46,4 @@ Under `CYPHERAIR_REQUIRE_GPG=1` / `CYPHERAIR_REQUIRE_SQ=1`, how the CI interop j
 
 ## 5. MIE validation
 
-Run on hardware with Hardware Memory Tagging (A19 / A19 Pro class) with the Xcode memory-tagging diagnostic enabled. The MIE tests also pass on hardware without tagging — they simply prove nothing about MIE there. **The pass criterion no test can assert is the out-of-band one:** after the run, Console.app and the crash logs must contain no `EXC_GUARD` / `GUARD_EXC_MTE_SYNC_FAULT` entry for the app.
+MIE validation needs hardware with memory tagging (A19 / A19 Pro class) and the Xcode memory-tagging diagnostic; no device test exercises it, and the build probes only prove the slices link. **The pass criterion is out of band:** after a run on such hardware, Console.app and the crash logs must contain no `EXC_GUARD` / `GUARD_EXC_MTE_SYNC_FAULT` entry for the app.
