@@ -124,6 +124,63 @@ pub fn gpg_import_key(gpg_path: &PathBuf, gnupghome: &TempDir, key_data: &[u8]) 
     );
 }
 
+/// Have gpg generate an unprotected v4 key in `gnupghome` (a `primary_algo`
+/// signing primary plus an `encryption_algo` encryption subkey) and return its
+/// exported public certificate.
+///
+/// Lanes where gpg decrypts use this rather than importing a secret key: a GnuPG
+/// recipient holds a key gpg made itself, and secret-key import is a separate gpg
+/// path with its own regressions (GnuPG 2.5.23 and 2.5.24 file unprotected ECDH
+/// secrets under the wrong keygrip, T8469).
+pub fn gpg_generate_key(
+    gpg_path: &PathBuf,
+    gnupghome: &TempDir,
+    user_id: &str,
+    primary_algo: &str,
+    encryption_algo: &str,
+) -> Vec<u8> {
+    let generated = gpg_cmd(gpg_path, gnupghome)
+        .args(["--status-fd", "1", "--passphrase", "", "--quick-gen-key"])
+        .args([user_id, primary_algo, "sign,cert", "never"])
+        .output()
+        .expect("Failed to run gpg --quick-gen-key");
+    assert!(
+        generated.status.success(),
+        "gpg --quick-gen-key failed:\nstderr: {}",
+        String::from_utf8_lossy(&generated.stderr),
+    );
+    let status = String::from_utf8_lossy(&generated.stdout);
+    let fingerprint = status
+        .lines()
+        .find_map(|line| line.strip_prefix("[GNUPG:] KEY_CREATED P "))
+        .and_then(|rest| rest.split_whitespace().next())
+        .unwrap_or_else(|| panic!("gpg --quick-gen-key reported no KEY_CREATED status:\n{status}"))
+        .to_string();
+
+    let added = gpg_cmd(gpg_path, gnupghome)
+        .args(["--passphrase", "", "--quick-add-key"])
+        .args([fingerprint.as_str(), encryption_algo, "encr", "never"])
+        .output()
+        .expect("Failed to run gpg --quick-add-key");
+    assert!(
+        added.status.success(),
+        "gpg --quick-add-key failed:\nstderr: {}",
+        String::from_utf8_lossy(&added.stderr),
+    );
+
+    let exported = gpg_cmd(gpg_path, gnupghome)
+        .arg("--export")
+        .arg(&fingerprint)
+        .output()
+        .expect("Failed to run gpg --export");
+    assert!(
+        exported.status.success() && !exported.stdout.is_empty(),
+        "gpg --export of the generated key failed:\nstderr: {}",
+        String::from_utf8_lossy(&exported.stderr),
+    );
+    exported.stdout
+}
+
 /// Assert, through GnuPG's machine-readable `--status-fd` interface, that gpg
 /// reported a cryptographically good and valid signature.
 ///
