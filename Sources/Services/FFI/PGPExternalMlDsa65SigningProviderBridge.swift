@@ -1,15 +1,16 @@
 import Foundation
+import Stores
 
 /// Bridges a loaded Secure Enclave composite signing handle into the Rust
 /// engine's `ExternalMlDsa65SigningProvider` callback. The callback performs
 /// exactly the enclave primitive — a pure ML-DSA-65 signature over the OpenPGP
 /// signature digest; the Ed25519 half and all composite assembly stay in Rust.
 final class PGPExternalMlDsa65SigningProviderBridge: ExternalMlDsa65SigningProvider, @unchecked Sendable {
-    private let handle: SecureEnclaveCustodyLoadedHandle
+    private let handle: LoadedCustodyHandle
     private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
-        handle: SecureEnclaveCustodyLoadedHandle,
+        handle: LoadedCustodyHandle,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.handle = handle
@@ -22,7 +23,7 @@ final class PGPExternalMlDsa65SigningProviderBridge: ExternalMlDsa65SigningProvi
             return MlDsa65Signature(raw: signature)
         } catch is CancellationError {
             throw ExternalCompositeSigningError.OperationCancelled
-        } catch let error as SecureEnclaveCustodyHandleError {
+        } catch let error as CustodyError {
             throw ExternalCompositeSigningError.Failed(
                 category: Self.callbackCategory(for: error.failureCategory)
             )

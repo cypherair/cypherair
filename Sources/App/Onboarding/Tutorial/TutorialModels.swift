@@ -8,7 +8,6 @@ enum TutorialModuleID: Int, CaseIterable, Hashable, Identifiable {
     case encryptDemoMessage
     case decryptAndVerify
     case backupKey
-    case enableHighSecurity
 
     var id: Int { rawValue }
 
@@ -26,8 +25,6 @@ enum TutorialModuleID: Int, CaseIterable, Hashable, Identifiable {
             String(localized: "guidedTutorial.module.decrypt", defaultValue: "Decrypt and Verify")
         case .backupKey:
             String(localized: "guidedTutorial.module.backup", defaultValue: "Back Up a Key")
-        case .enableHighSecurity:
-            String(localized: "guidedTutorial.module.highSecurity", defaultValue: "Enable High Security")
         }
     }
 
@@ -43,8 +40,6 @@ enum TutorialModuleID: Int, CaseIterable, Hashable, Identifiable {
             String(localized: "guidedTutorial.location.encrypt", defaultValue: "Encrypt")
         case .decryptAndVerify:
             String(localized: "guidedTutorial.location.decrypt", defaultValue: "Decrypt")
-        case .enableHighSecurity:
-            String(localized: "guidedTutorial.location.settings", defaultValue: "Settings")
         }
     }
 
@@ -62,8 +57,6 @@ enum TutorialModuleID: Int, CaseIterable, Hashable, Identifiable {
             String(localized: "guidedTutorial.module.decrypt.detail", defaultValue: "Check recipients, then decrypt and verify the signed message.")
         case .backupKey:
             String(localized: "guidedTutorial.module.backup.detail", defaultValue: "Create a passphrase-protected backup artifact inside the sandbox.")
-        case .enableHighSecurity:
-            String(localized: "guidedTutorial.module.highSecurity.detail", defaultValue: "Practice switching auth mode after backing up the sandbox key.")
         }
     }
 
@@ -75,8 +68,6 @@ enum TutorialModuleID: Int, CaseIterable, Hashable, Identifiable {
             .keys
         case .addDemoContact:
             .contacts
-        case .enableHighSecurity:
-            .settings
         }
     }
 
@@ -198,7 +189,6 @@ enum TutorialAutomationContract {
     static let sandboxAcknowledgementReadyMarker = "tutorial.sandbox.ready"
     static let completionReadyMarker = "tutorial.completion.ready"
     static let leaveConfirmationReadyMarker = "tutorial.leave.ready"
-    static let authModeConfirmationReadyMarker = "tutorial.authMode.ready"
     static let primaryActionIdentifier = "tutorial.primaryAction"
     static let primaryToolbarActionIdentifier = "tutorial.primaryAction.toolbar"
     static let resetIdentifier = "tutorial.reset"
@@ -210,9 +200,6 @@ enum TutorialAutomationContract {
     static let onboardingStartIdentifier = "onboarding.tutorial.start"
     static let onboardingSkipIdentifier = "onboarding.tutorial.skip"
     static let modalGuidanceIdentifier = "tutorial.modalGuidance"
-    static let authModeConfirmIdentifier = "tutorial.authMode.confirm"
-    static let authModeCancelIdentifier = "tutorial.authMode.cancel"
-    static let authModeRiskAcknowledgementIdentifier = "tutorial.authMode.riskAcknowledgement"
     static let leaveContinueIdentifier = "tutorial.leave.continue"
     static let leaveConfirmIdentifier = "tutorial.leave.confirm"
     static let completionPromptIdentifier = "tutorial.completionPrompt"
@@ -295,15 +282,12 @@ struct TutorialLeaveConfirmationRequest: Identifiable {
 
 enum TutorialModal: Identifiable {
     case importConfirmation(ImportConfirmationRequest)
-    case authModeConfirmation(AuthModeChangeConfirmationRequest)
     case leaveConfirmation(TutorialLeaveConfirmationRequest)
 
     var id: String {
         switch self {
         case .importConfirmation(let request):
             "import-\(request.id.uuidString)"
-        case .authModeConfirmation(let request):
-            "auth-\(request.id.uuidString)"
         case .leaveConfirmation(let request):
             "leave-\(request.id.uuidString)"
         }

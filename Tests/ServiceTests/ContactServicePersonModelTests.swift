@@ -281,9 +281,9 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedImport_sameEmailDifferentFingerprintCreatesNewIdentityAndStrongCandidate() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelStrongCandidate")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let firstKey = try engine.generateKey(
@@ -320,9 +320,9 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedImport_sameUserIdWithoutEmailCreatesWeakCandidateAndNeverAutoLinks() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelWeakCandidate")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let firstKey = try engine.generateKey(
@@ -355,9 +355,9 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedSameFingerprintUpdatePreservesCanonicalIdentityAndKeyIds() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelSameFingerprintUpdate")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -389,9 +389,9 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedMergePreservesKeyStateAndHistoricalSignerRecognition() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelMergeState")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let targetKey = try engine.generateKey(
@@ -433,15 +433,15 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
         XCTAssertEqual(try service.publicKeysForRecipientContactIDs([targetContactId]), [targetKey.publicKeyData])
 
         let verificationContext = service.contactsVerificationContext()
-        XCTAssertEqual(verificationContext.availability, .availableProtectedDomain)
+        XCTAssertEqual(verificationContext.availability, .available)
         XCTAssertTrue(verificationContext.contactKeys.contains { $0.fingerprint == sourceKey.fingerprint })
         XCTAssertTrue(verificationContext.contactKeys.contains { $0.fingerprint == targetKey.fingerprint })
     }
 
     func test_protectedMergeUnionsTags() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelMergeMembership")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let targetKey = try engine.generateKey(
@@ -488,13 +488,10 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
         )
         snapshot.identities[targetIdentityIndex].tagIds = ["tag-target"]
         snapshot.identities[sourceIdentityIndex].tagIds = ["tag-source"]
-        try opened.harness.store.replaceSnapshot(snapshot)
-        try await service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        let reopenedService = reopened.service
+        try opened.sandbox.vault.saveContacts(snapshot)
+        try await service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        let reopenedService = reopened
 
         _ = try reopenedService.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
 
@@ -507,9 +504,9 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
     }
 
     func test_protectedPreferredKeySelectionPersistsAndMissingPreferredFailsClosed() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPersonModelPreferredPersistence")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let firstKey = try engine.generateKey(
@@ -532,12 +529,9 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
         _ = try service.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
 
         try service.setPreferredKey(fingerprint: secondKey.fingerprint, for: targetContactId)
-        try await service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        let reopenedService = reopened.service
+        try await service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        let reopenedService = reopened
         XCTAssertEqual(
             reopenedService.availableContactIdentity(forContactID: targetContactId)?.preferredKey?.fingerprint,
             secondKey.fingerprint
@@ -549,13 +543,10 @@ final class ContactServicePersonModelTests: ContactServiceTestCase {
             where unresolvedSnapshot.keyRecords[index].contactId == targetContactId {
             unresolvedSnapshot.keyRecords[index].usageState = .additionalActive
         }
-        try reopened.store.replaceSnapshot(unresolvedSnapshot)
-        try await reopenedService.relockProtectedData()
-        let unresolved = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        let unresolvedService = unresolved.service
+        try opened.sandbox.vault.saveContacts(unresolvedSnapshot)
+        try await reopenedService.relockVault()
+        let unresolved = try await reopenContactService(sandbox: opened.sandbox)
+        let unresolvedService = unresolved
 
         XCTAssertNil(unresolvedService.availableContactIdentity(forContactID: targetContactId)?.preferredKey)
         XCTAssertThrowsError(try unresolvedService.publicKeysForRecipientContactIDs([targetContactId])) { error in

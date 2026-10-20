@@ -16,21 +16,6 @@ module = load_script_module(
 
 
 class GenerateSourceComplianceInfoTests(unittest.TestCase):
-    def test_external_binary_dependency_entry_records_sqlcipher_pin(self) -> None:
-        pin_path = REPO_ROOT / "third_party" / "sqlcipher-xcframework.pin.json"
-        pin = json.loads(pin_path.read_text(encoding="utf-8"))
-        entries = module.external_binary_dependency_entries([pin_path])
-
-        self.assertEqual(len(entries), 1)
-        entry = entries[0]
-        self.assertEqual(entry["name"], "SQLCipher.xcframework")
-        self.assertEqual(entry["releaseTag"], pin["release"]["tag"])
-        self.assertEqual(entry["releaseChannel"], "stable")
-        self.assertTrue(entry["releaseIsImmutable"])
-        self.assertFalse(entry["releaseIsPrerelease"])
-        self.assertFalse(entry["mirroredInCypherAirRelease"])
-        self.assertEqual(entry["upstreamTag"], pin["upstream"]["tag"])
-
     def test_regular_build_allows_unknown_when_commit_is_missing(self) -> None:
         self.assertEqual(
             module.resolved_commit_sha("", require_stable_release=False),

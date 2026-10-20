@@ -2,7 +2,7 @@ import SwiftUI
 
 struct EncryptScreenHostView: View {
     let configuration: EncryptView.Configuration
-    let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
+    let appSettings: AppSettingsCoordinator
     let appSessionOrchestrator: AppSessionOrchestrator
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -12,23 +12,19 @@ struct EncryptScreenHostView: View {
         encryptionService: EncryptionService,
         keyManagement: KeyManagementService,
         contactService: ContactService,
-        config: AppConfiguration,
-        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
+        appSettings: AppSettingsCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
-        protectedSettingsHost: ProtectedSettingsHost?,
         configuration: EncryptView.Configuration
     ) {
         self.configuration = configuration
-        self.protectedOrdinarySettings = protectedOrdinarySettings
+        self.appSettings = appSettings
         self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: EncryptScreenModel(
                 encryptionService: encryptionService,
                 keyManagement: keyManagement,
                 contactService: contactService,
-                config: config,
-                protectedOrdinarySettings: protectedOrdinarySettings,
-                protectedSettingsHost: protectedSettingsHost,
+                appSettings: appSettings,
                 configuration: configuration
             )
         )
@@ -71,8 +67,8 @@ struct EncryptScreenHostView: View {
         .onChange(of: runtimeSyncKey) { _, _ in
             model.updateConfiguration(configuration)
         }
-        .onChange(of: protectedOrdinarySettings.state) { _, _ in
-            model.refreshProtectedOrdinarySettings()
+        .onChange(of: appSettings.snapshot) { _, _ in
+            model.refreshSettings()
         }
         .onAppear {
             model.handleAppear()

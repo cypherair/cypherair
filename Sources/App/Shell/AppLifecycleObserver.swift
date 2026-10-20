@@ -14,7 +14,7 @@ import AppKit
 ///   prompt yields `.inactive` (cover only), never `.background`, so it is never an
 ///   away event — this is how grace=0 "no double-auth" holds structurally.
 /// - macOS: away = app-resign ∪ screen-lock ∪ explicit "Lock Now", filtered by the
-///   controller's `.authenticating` rule: a resign during an in-flight
+///   controller's `.unlocking` rule: a resign during an in-flight
 ///   app-session unlock is the auth sheet's own, and a resign during a private-key
 ///   operation prompt is deferred and decided when the prompts end. The observer
 ///   stays signal-only — every resign is still routed; the controller decides.

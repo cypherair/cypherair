@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 struct PGPSecureEnclaveCustodyGeneratedMaterial: Sendable {
     let publicKeyData: Data
@@ -14,7 +15,7 @@ protocol SecureEnclaveCustodyCertificateBuilding: Sendable {
         email: String?,
         validity: PGPKeyValidity,
         family: PGPKeyFamily,
-        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        handlePair: LoadedCustodyHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial
 }
@@ -31,7 +32,7 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
         email: String?,
         validity: PGPKeyValidity,
         family: PGPKeyFamily,
-        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        handlePair: LoadedCustodyHandlePair,
         digestSigner: any SecureEnclaveCustodyDigestSigning
     ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
         do {

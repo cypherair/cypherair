@@ -1,104 +1,11 @@
 import XCTest
-import CryptoKit
-import Security
-import LocalAuthentication
 @testable import CypherAir
 
-/// Shared base class for device-only security tests.
-///
-/// These tests exercise real Secure Enclave hardware, real Keychain,
-/// and real biometric authentication. They MUST run on a
-/// physical device (iPhone 17 Pro Max or any device with Secure Enclave).
-///
-/// Run with: CypherAir-DeviceTests test plan on a connected device.
+/// Tests that need the real device: the hardware enclave, the Keychain, or
+/// the system memory. Never part of the unit lane.
 class DeviceSecurityTestCase: XCTestCase {
-    // MARK: - Properties
-
-    private(set) var keychain: SystemKeychain!
-    private(set) var secureEnclave: HardwareSecureEnclave!
-    /// Fingerprints created during the test, cleaned up in tearDown.
-    private var createdFingerprints: [String] = []
-    /// Raw Keychain service keys created during the test, cleaned up in tearDown.
-    private var createdKeychainServices: [(service: String, account: String)] = []
-
-    // MARK: - Setup / Teardown
-
-    final override func setUp() {
-        super.setUp()
-        keychain = SystemKeychain()
-        secureEnclave = HardwareSecureEnclave()
-    }
-
-    final override func tearDown() {
-        // Clean up all Keychain items created during the test.
-        let account = KeychainConstants.defaultAccount
-        for fingerprint in createdFingerprints {
-            // Permanent + pending single-row envelopes (mode switch).
-            try? keychain.delete(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
-            try? keychain.delete(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account)
-        }
-        for entry in createdKeychainServices {
-            try? keychain.delete(service: entry.service, account: entry.account)
-        }
-
-        createdFingerprints = []
-        createdKeychainServices = []
-        keychain = nil
-        secureEnclave = nil
-        super.tearDown()
-    }
-
-    /// Generate a unique test fingerprint to avoid Keychain collisions between tests.
-    final func uniqueFingerprint() -> String {
-        let fp = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        createdFingerprints.append(fp)
-        return fp
-    }
-
-    /// Track a Keychain service for cleanup.
-    final func trackKeychain(
-        service: String,
-        account: String = KeychainConstants.defaultAccount
-    ) {
-        createdKeychainServices.append((service: service, account: account))
-    }
-
+    /// The system needs a moment between two authentication sheets.
     final func waitForAuthenticationSessionToSettle() async throws {
-        // Sequential device tests can leave LAContext activity in flight for a moment.
-        // Give the system prompt time to fully dismiss before starting the next auth-bound step.
         try await Task.sleep(for: .seconds(2))
-    }
-
-    final func makeAuthenticationManager(
-        secureEnclave: any SecureEnclaveManageable,
-        keychain: any KeychainManageable,
-        privateKeyControlStore: InMemoryPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
-    ) -> AuthenticationManager {
-        let authManager = AuthenticationManager(
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
-        )
-        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
-        return authManager
-    }
-
-    final func storePermanentBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
-        try keychain.save(
-            bundle.envelope,
-            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-    }
-
-    final func createWrappedBundle(
-        privateKey: Data,
-        fingerprint: String,
-        mode: AuthenticationMode
-    ) throws -> WrappedKeyBundle {
-        let accessControl = try mode.createAccessControl()
-        let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
-        return try secureEnclave.wrap(privateKey: SensitiveBuffer(copying: privateKey), using: handle, fingerprint: fingerprint, payloadKind: .softwareSecretCertificate)
     }
 }

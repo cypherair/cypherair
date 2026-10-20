@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 /// Generated Device-Bound Post-Quantum material. Unlike the P-256 result this
 /// carries the freshly generated classical component secrets, which the caller
@@ -18,7 +19,7 @@ protocol SecureEnclaveCompositeCertificateBuilding: Sendable {
         name: String,
         email: String?,
         validity: PGPKeyValidity,
-        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        handlePair: LoadedCustodyHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial
 }
@@ -39,7 +40,7 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         name: String,
         email: String?,
         validity: PGPKeyValidity,
-        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        handlePair: LoadedCustodyHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
         do {

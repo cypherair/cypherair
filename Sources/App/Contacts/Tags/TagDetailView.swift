@@ -36,8 +36,6 @@ private struct TagDetailHostView: View {
         Group {
             if !model.contactsAvailability.isAvailable {
                 tagManagementUnavailableContent(model.contactsAvailability)
-            } else if !model.canManageTag {
-                tagManagementUnavailableContent(model.contactsAvailability)
             } else if let tag = model.tag {
                 tagDetailContent(tag: tag)
             } else {
@@ -139,7 +137,7 @@ private struct TagDetailHostView: View {
                 }
                 .disabled(!model.canSaveMembershipDraft)
             }
-        } else if model.canManageTag && model.tag != nil {
+        } else if model.contactsAvailability.isAvailable && model.tag != nil {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button(String(localized: "common.edit", defaultValue: "Edit")) {
                     withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
@@ -278,34 +276,14 @@ private struct TagDetailHostView: View {
 
     private func tagManagementUnavailableContent(_ availability: ContactsAvailability) -> some View {
         ContentUnavailableView {
-            Label(tagManagementUnavailableTitle(availability), systemImage: "tag")
+            Label(availability.unavailableTitle, systemImage: "tag")
         } description: {
-            Text(tagManagementUnavailableDescription(availability))
+            Text(availability.unavailableDescription)
         } actions: {
             if availability == .opening {
                 ProgressView()
             }
         }
-    }
-
-    private func tagManagementUnavailableTitle(_ availability: ContactsAvailability) -> String {
-        if availability.isAvailable {
-            return String(
-                localized: "tagManagement.unavailable.protectedTitle",
-                defaultValue: "Protected Contacts Required"
-            )
-        }
-        return availability.unavailableTitle
-    }
-
-    private func tagManagementUnavailableDescription(_ availability: ContactsAvailability) -> String {
-        if availability.isAvailable {
-            return String(
-                localized: "tagManagement.unavailable.protectedDescription",
-                defaultValue: "Tag management is available when Contacts are backed by protected app data."
-            )
-        }
-        return availability.unavailableDescription
     }
 
     private func accessibilityLabel(for contact: ContactIdentitySummary, isSelected: Bool) -> String {

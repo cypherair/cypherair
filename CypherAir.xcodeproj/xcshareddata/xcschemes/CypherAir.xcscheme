@@ -56,12 +56,6 @@
          <TestPlanReference
             reference = "container:CypherAir-DeviceTests.xctestplan">
          </TestPlanReference>
-         <TestPlanReference
-            reference = "container:CypherAir-DangerousDeviceTests.xctestplan">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:CypherAir-InteropEvidenceTests.xctestplan">
-         </TestPlanReference>
       </TestPlans>
    </TestAction>
    <LaunchAction

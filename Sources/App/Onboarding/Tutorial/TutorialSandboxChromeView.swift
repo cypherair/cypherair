@@ -158,14 +158,14 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
     }
 
     private func primaryPromptButtonTitle(for module: TutorialModuleID) -> String {
-        if module == .enableHighSecurity {
+        if module == TutorialModuleID.allCases.last {
             return String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
         }
         return String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview")
     }
 
     private func completionMessage(for module: TutorialModuleID) -> String {
-        if module == .enableHighSecurity {
+        if module == TutorialModuleID.allCases.last {
             return String(localized: "guidedTutorial.task.complete.final", defaultValue: "This task is complete. Return to the tutorial overview to review completion and finish the tutorial.")
         }
         return String(localized: "guidedTutorial.task.complete", defaultValue: "This task is complete. Return to the tutorial overview to continue.")

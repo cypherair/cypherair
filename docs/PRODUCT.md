@@ -2,7 +2,7 @@
 
 ## 1. What CypherAir X is
 
-CypherAir X is a fully offline OpenPGP encryption tool for people who want to communicate securely without cryptographic knowledge — encrypt, decrypt, sign, and verify with keys and contacts managed on device. It never touches the network and asks for no permissions beyond the Face ID / Touch ID usage description; the iOS memory entitlements are resource entitlements for Argon2id headroom, not privacy permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.
+CypherAir X is a fully offline OpenPGP encryption tool for people who want to communicate securely without cryptographic knowledge — encrypt, decrypt, sign, and verify with keys and contacts managed on device. It never touches the network and asks for no permissions beyond the Face ID / Touch ID usage description; it asks for one unlock passphrase, mandatory, never stored, and never recoverable by anyone; the iOS memory entitlements are resource entitlements for Argon2id headroom, not privacy permissions. All I/O goes through system pickers, the clipboard, and the app's URL scheme.
 
 The product name is **CypherAir X**; copyright lines keep "CypherAir".
 
@@ -24,13 +24,15 @@ Actions that never proceed without an explicit user step:
 
 - **Device-bound key generation** requires passing a commitment sheet (the permanence consequences, §4) before generation starts.
 - **URL-scheme key import** always requires user confirmation before a key is added; a second import while one is pending errors rather than auto-adding.
-- **High Security Mode activation** requires a warning, a backup check over software-custody keys, and a biometric confirmation of the change.
+- **Changing the unlock passphrase** requires the current passphrase and the system presence prompt; a cancelled prompt leaves the old passphrase in force.
 
 ## 4. User-facing consequences of the security design
 
 - **Device-bound keys are permanent residents of one device's Secure Enclave.** Device loss, key-handle loss, or loss of biometric access makes the key permanently unusable — there is no recovery. Key family is **immutable** after generation.
 - **Software (portable) keys survive through backups** — export is passphrase-protected, and losing the wrapped copy is recoverable only from such a backup.
-- **High Security Mode** removes the passcode fallback: while biometrics are unavailable, decrypt, sign, and export stay blocked. Device-bound keys always require biometrics regardless of this setting.
+- **Unlocking is the passphrase plus one system presence prompt** — Face ID or Touch ID, with the device passcode or Mac password as the system's own fallback — and the grace period decides how often that repeats. There is no mode and no policy to choose; that single configuration is the product.
+- **A forgotten passphrase is unrecoverable.** Protected app data and every portable key without a backup are lost on that device, and device-bound keys are lost permanently, which is why the generated passphrase is offered first and why the backup reminder exists. Device-bound keys always require biometrics; no setting changes that.
+- **Damaged protected data has one screen and one remedy.** The app names what is intact and what is damaged, lets intact portable keys be exported, and offers Reset All Local Data. Nothing is repaired in place and nothing silently starts empty — which is also what a reinstall on iOS looks like until the user resets once.
 - **On macOS, screen lock locks the app immediately**, regardless of the grace-period setting, and **the re-authentication interval bounds the session, not just the next prompt**: the app keeps running while not frontmost, so once the interval passes it relocks itself. The other platforms suspend the app while it is away and run the same check on return.
 - **The privacy cover is not the lock.** When the app is not foreground-active it shows an opaque, app-identified cover — purely visual, with no authentication role.
 
@@ -42,7 +44,7 @@ Choices, not mechanisms — each could plausibly be built the other way and deli
 - **A message not addressed to you never triggers an authentication prompt.** Recipient matching runs against public certificates only and fails without touching any private key.
 - **Signing is on by default, and the default is a setting**; the per-message toggles decide the message being written.
 - **Signature verification is graded, not binary** — a bad or unknown signature is reported alongside the plaintext, never used to suppress it. The standalone Verify surface grades the same way; only its summary verdict is stricter.
-- **A weak passphrase is refused, not warned about.** Where the user chooses a passphrase, the app declines rather than letting a warning be dismissed, offers a generated passphrase as the first option, and asks for two plain requirements shown as they are met — never a strength score ([SECURITY.md](SECURITY.md)).
+- **A weak passphrase is refused, not warned about**, for the unlock passphrase and for backups alike. Where the user chooses a passphrase, the app declines rather than letting a warning be dismissed, offers a generated passphrase as the first option, and asks for two plain requirements shown as they are met — never a strength score ([SECURITY.md](SECURITY.md)).
 - **Every key ships with a revocation certificate**, generated at creation and at import and exportable from the key detail page. If the stored artifact is missing, export fails closed rather than regenerating.
 - **Key expiry is the user's choice on both paths, and never expiring is one of the choices.** Declining an expiry means the certificate carries no expiration — the engine is never handed a distant date. What is offered, what is accepted, and the ceiling over both are stated once in code and read by both surfaces.
 - **Tutorial state never touches the real workspace**, and the tutorial is not a prerequisite for key generation ([SECURITY.md](SECURITY.md)).

@@ -4,15 +4,12 @@ let mainWindowID = "cypherair-main-window"
 
 @MainActor
 enum MacPresentation: Identifiable {
-    case authModeConfirmation(AuthModeChangeConfirmationRequest)
     case modifyExpiry(ModifyExpiryRequest)
     case onboarding(initialPage: Int)
     case tutorial(presentationContext: TutorialPresentationContext)
 
     var id: String {
         switch self {
-        case .authModeConfirmation(let request):
-            "auth-\(request.id.uuidString)"
         case .modifyExpiry(let request):
             "expiry-\(request.id.uuidString)"
         case .onboarding(let initialPage):

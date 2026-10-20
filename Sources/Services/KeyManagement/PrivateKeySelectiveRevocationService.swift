@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 protocol PrivateKeySelectiveRevocationRouting: Sendable {
     func routeRevocation(fingerprint: String) async -> PrivateKeyOperationRoute

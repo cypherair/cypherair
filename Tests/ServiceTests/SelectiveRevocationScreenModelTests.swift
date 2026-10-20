@@ -524,7 +524,7 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
         subkeyRevocationExportAction: SelectiveRevocationScreenModel.SubkeyRevocationExportAction? = nil,
         userIdRevocationExportAction: SelectiveRevocationScreenModel.UserIdRevocationExportAction? = nil
     ) -> SelectiveRevocationScreenModel {
-        let keyManagement = TestHelpers.makeKeyManagement().service
+        let keyManagement = TestHelpers.makeLockedKeyManagement()
 
         return SelectiveRevocationScreenModel(
             fingerprint: fingerprint,

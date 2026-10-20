@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail closed when a device-only test class is missing from the unit test plan.
 
-Tests/DeviceSecurityTests/ holds the Secure Enclave, biometric, and MIE classes
+Tests/DeviceSecurityTests/ holds the Secure Enclave and biometric classes
 that must never run in the unit lane: on a machine with a real Secure Enclave
 they reach LocalAuthentication and stop the run on a Face ID / Touch ID prompt.
 CypherAir-UnitTests.xctestplan keeps them out through a hand-maintained
@@ -13,9 +13,7 @@ Tests/DeviceSecurityTests/ that declares test methods must be skipped by name in
 the plan, and the run fails with the missing class names when one is not.
 
 The class graph is built from all of Tests/**, not just the device directory,
-because device classes routinely extend bases declared elsewhere
-(KeyManagementServiceTestCase, TutorialSandboxDefaultsSerializedTestCase,
-ProtectedDataFrameworkTestCase, ContactServiceTestCase). Scanning only the
+because device classes routinely extend bases declared elsewhere. Scanning only the
 device directory would leave those subclasses unresolvable, and unresolvable
 used to mean "not a test class" -- a fail-open hole.
 

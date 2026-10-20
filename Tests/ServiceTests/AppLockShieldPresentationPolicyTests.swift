@@ -16,9 +16,7 @@ import XCTest
 ///   privacy mode — and never on staying in or leaving it.
 ///
 /// The mode rule itself (`isLocked ? lock : privacy`) is a one-line ternary
-/// not restated here; its load-bearing half — `.authenticating` reads as
-/// locked, so the lock face wins during auth prompts — is asserted on the
-/// controller in `AppLockControllerTests`.
+/// not restated here.
 final class AppLockShieldPresentationPolicyTests: XCTestCase {
     func test_presentation_coveredOrLocked() {
         XCTAssertFalse(AppLockShieldPolicy.isPresented(isCosmeticallyCovered: false, isLocked: false))

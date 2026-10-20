@@ -4,9 +4,9 @@ import XCTest
 final class ContactsScreenModelTests: ContactServiceTestCase {
     @MainActor
     func test_pr8ContactsScreenModelSearchAndTagFiltersVisibleContacts() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModel")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let work = try engine.generateKey(
@@ -50,9 +50,9 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_contactsScreenModelClearTransientInput_clearsSearchAndTagFilters() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsScreenModelClearInput")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -78,9 +78,9 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_pr8ContactsScreenModelPrunesStaleTagFilterAfterTagDeletion() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModelStaleTag")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -116,9 +116,9 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_pr8ContactsScreenModelIgnoresMissingTagFilterIds() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModelMissingTag")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(

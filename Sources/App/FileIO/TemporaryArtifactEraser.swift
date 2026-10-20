@@ -26,7 +26,7 @@ import Foundation
 /// that, not writing plaintext to disk in the first place.
 ///
 /// **It does not ask whether the artifact holds plaintext,** though zeroing
-/// ciphertext — a streaming `.gpg` output, the tutorial's SQLCipher store — buys
+/// ciphertext — a streaming `.gpg` output, the tutorial's sealed domain files — buys
 /// no confidentiality. Asking would mean a hand-kept list of which temporary
 /// roots are plaintext-bearing, and the day something plaintext lands under a
 /// root marked otherwise, the weaker treatment applies silently, with a green

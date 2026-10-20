@@ -9,7 +9,7 @@ struct SettingsGracePeriodOption: Identifiable, Equatable {
 
 enum SettingsGracePeriodPresentation {
     static var options: [SettingsGracePeriodOption] {
-        AppConfiguration.validGracePeriodValues.map { value in
+        AppSettingsSnapshot.validGracePeriodValues.map { value in
             SettingsGracePeriodOption(value: value, label: label(for: value))
         }
     }

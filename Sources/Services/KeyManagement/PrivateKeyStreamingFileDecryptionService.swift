@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 protocol StreamingFileDecrypting: Sendable {
     func decryptFile(

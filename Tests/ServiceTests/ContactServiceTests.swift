@@ -27,7 +27,7 @@ final class ContactServiceTests: ContactServiceTestCase {
     // MARK: - Load Contacts
 
     func test_loadContacts_emptyDirectory_returnsEmpty() async throws {
-        try await contactService.openProtectedContactsForTests()
+        await contactService.openContacts(ownSignerKeys: [])
         XCTAssertTrue(contactService.testContactKeyRecords.isEmpty,
                       "Loading from empty directory should produce no contacts")
     }
@@ -158,9 +158,9 @@ final class ContactServiceTests: ContactServiceTestCase {
     }
 
     func test_addContact_sameFingerprintMaterialUpdate_returnsUpdated() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactMaterialUpdate")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let generated = try engine.generateKey(
             name: "Update", email: "update@example.com",
@@ -186,22 +186,19 @@ final class ContactServiceTests: ContactServiceTestCase {
             refreshed.keyInfo.expiryTimestamp
         )
 
-        try await opened.service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        XCTAssertEqual(reopened.service.testContactKeyRecords.count, 1)
+        try await opened.service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        XCTAssertEqual(reopened.testContactKeyRecords.count, 1)
         XCTAssertEqual(
-            try engine.parseKeyInfo(keyData: reopened.service.testContactKeyRecords[0].publicKeyData).expiryTimestamp,
+            try engine.parseKeyInfo(keyData: reopened.testContactKeyRecords[0].publicKeyData).expiryTimestamp,
             refreshed.keyInfo.expiryTimestamp
         )
     }
 
     func test_addContact_sameFingerprintMaterialUpdate_preservesUnverifiedState() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactMaterialUpdateUnverified")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let generated = try engine.generateKey(
             name: "Update Unverified", email: "update-unverified@example.com",
@@ -227,12 +224,9 @@ final class ContactServiceTests: ContactServiceTestCase {
 
         XCTAssertFalse(updatedKey.isVerified)
 
-        try await opened.service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        XCTAssertFalse(reopened.service.testContactKeyRecords[0].manualVerificationState == .verified)
+        try await opened.service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        XCTAssertFalse(reopened.testContactKeyRecords[0].manualVerificationState == .verified)
     }
 
     func test_addContact_sameFingerprintMaterialUpdate_verifiedImportPromotesExistingUnverifiedContact() throws {
@@ -316,9 +310,9 @@ final class ContactServiceTests: ContactServiceTestCase {
     }
 
     func test_addContact_sameFingerprintRevocationUpdate_legacy_refreshesRevocationState() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactRevocationUpdateLegacy")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let base = try loadFixture("merge_revocation_legacy_base")
         let update = try loadFixture("merge_revocation_legacy_update")
@@ -333,12 +327,9 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertTrue(updatedKey.isRevoked)
         XCTAssertFalse(updatedKey.canEncryptTo)
 
-        try await opened.service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        XCTAssertTrue(reopened.service.testContactKeyRecords[0].isRevoked)
+        try await opened.service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
+        XCTAssertTrue(reopened.testContactKeyRecords[0].isRevoked)
     }
 
     func test_addContact_sameFingerprintRevocationUpdate_modernHigh_refreshesRevocationState() throws {
@@ -514,9 +505,9 @@ final class ContactServiceTests: ContactServiceTestCase {
     // MARK: - M5: Contact Mutation Persistence Across Reopen
 
     func test_setVerificationState_promotesContactToVerified_andPersists() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactVerificationPersist")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let generated = try engine.generateKey(
             name: "Manual Verify", email: "manual@example.com",
@@ -537,13 +528,10 @@ final class ContactServiceTests: ContactServiceTestCase {
             .verified
         )
 
-        try await opened.service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
+        try await opened.service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
         XCTAssertEqual(
-            reopened.service.availableContactKeyRecord(fingerprint: key.fingerprint)?.manualVerificationState,
+            reopened.availableContactKeyRecord(fingerprint: key.fingerprint)?.manualVerificationState,
             .verified
         )
     }
@@ -603,9 +591,9 @@ final class ContactServiceTests: ContactServiceTestCase {
     // MARK: - Certificate Lifecycle Reconciliation
 
     func test_openContacts_refreshesStaleLifecycleFlagsFromStoredCertificate() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactLifecycleRefresh")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let base = try loadFixture("merge_revocation_legacy_base")
         let update = try loadFixture("merge_revocation_legacy_update")
@@ -624,15 +612,12 @@ final class ContactServiceTests: ContactServiceTestCase {
         snapshot.keyRecords[index].isExpired = false
         snapshot.keyRecords[index].usageState = .preferred
         XCTAssertTrue(snapshot.keyRecords[index].canEncryptTo)
-        try opened.harness.store.replaceSnapshot(snapshot)
+        try opened.sandbox.vault.saveContacts(snapshot)
 
-        try await opened.service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
+        try await opened.service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
 
-        let refreshed = try XCTUnwrap(reopened.service.testContactKeyRecords.first)
+        let refreshed = try XCTUnwrap(reopened.testContactKeyRecords.first)
         XCTAssertEqual(refreshed.hasEncryptionSubkey, truth.hasEncryptionSubkey)
         XCTAssertEqual(refreshed.isRevoked, truth.isRevoked)
         XCTAssertEqual(refreshed.isExpired, truth.isExpired)
@@ -643,9 +628,9 @@ final class ContactServiceTests: ContactServiceTestCase {
     // MARK: - Manual Fingerprint Verification
 
     func test_setVerificationState_withdrawnVerificationSurvivesReopen() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactVerificationWithdrawal")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let generated = try engine.generateKey(
             name: "Withdrawn Verification",
@@ -664,13 +649,10 @@ final class ContactServiceTests: ContactServiceTestCase {
             .unverified
         )
 
-        try await opened.service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
+        try await opened.service.relockVault()
+        let reopened = try await reopenContactService(sandbox: opened.sandbox)
         XCTAssertEqual(
-            reopened.service.testContactKeyRecords.first?.manualVerificationState,
+            reopened.testContactKeyRecords.first?.manualVerificationState,
             .unverified
         )
     }

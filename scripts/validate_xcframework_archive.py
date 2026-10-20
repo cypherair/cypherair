@@ -14,9 +14,8 @@ Two checks, applied by every XCFramework restore path:
             Symlinks are legitimate in an xcframework (macOS framework bundles
             use versioned-layout links); only escaping ones are rejected.
 
-This is the validation scripts/restore_sqlcipher_xcframework.sh introduced for
-the SQLCipher restore, lifted into one owner so the PgpMobile restore in
-ci_scripts/ci_post_clone.sh applies exactly the same rules.
+One owner for the rules the PgpMobile restore in ci_scripts/ci_post_clone.sh
+applies.
 """
 
 from __future__ import annotations
@@ -97,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--tree", type=Path, help="extracted xcframework to validate after extraction")
     parser.add_argument(
         "--expected-root",
-        help="the single top-level bundle every zip entry must live under, e.g. SQLCipher.xcframework",
+        help="the single top-level bundle every zip entry must live under, e.g. PgpMobile.xcframework",
     )
     args = parser.parse_args(argv)
 

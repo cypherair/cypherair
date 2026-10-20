@@ -32,8 +32,8 @@ struct MyKeysView: View {
             )
         case .recoveryNeeded:
             metadataStateContent(
-                title: String(localized: "keys.recovery.title", defaultValue: "Key Metadata Needs Recovery"),
-                subtitle: String(localized: "keys.recovery.description", defaultValue: "Protected key metadata could not be opened. Use protected data recovery or reset local data."),
+                title: String(localized: "keys.recovery.title", defaultValue: "Key Metadata Is Damaged"),
+                subtitle: String(localized: "keys.recovery.description", defaultValue: "Protected key metadata could not be opened. Reset All Local Data is the only remedy."),
                 systemImage: "exclamationmark.triangle"
             )
         case .loaded:

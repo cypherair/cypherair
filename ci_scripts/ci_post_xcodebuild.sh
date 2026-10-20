@@ -29,7 +29,6 @@ ARM64E_MANIFEST="PgpMobile.arm64e-build-manifest.json"
 SOURCE_BUNDLE="CypherAir-source-bundle.tar.zst"
 COMPLIANCE_MANIFEST="CypherAir-compliance-manifest.json"
 RELINK_KIT="PgpMobile-relink-kit.tar.zst"
-SQLCIPHER_PIN_FILE="third_party/sqlcipher-xcframework.pin.json"
 
 log() { echo "[ci_post_xcodebuild] $*"; }
 fail() { echo "[ci_post_xcodebuild] error: $*" >&2; exit 1; }
@@ -187,7 +186,6 @@ package_and_publish_draft() {
         --source-bundle-output "$SOURCE_BUNDLE" \
         --manifest-output "$COMPLIANCE_MANIFEST" \
         --arm64e-manifest "$ARM64E_MANIFEST" \
-        --external-binary-dependency "$SQLCIPHER_PIN_FILE" \
         --binary-asset "$XCFRAMEWORK_ZIP" \
         --binary-asset "$XCFRAMEWORK_CHECKSUM" \
         --binary-asset "$ARM64E_MANIFEST" \

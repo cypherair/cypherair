@@ -14,9 +14,7 @@ this gate compares the *inputs and the dependency set* instead:
 
   1. every generation input still hashes to the value recorded when the notices
      were generated -- pgp-mobile/Cargo.lock and Cargo.toml (features decide
-     which packages are reachable), the SQLCipher pin (a pin bump changes the
-     shipped SQLCipher and SQLite versions, which are hand-declared records),
-     and the generator itself;
+     which packages are reachable) and the generator itself;
   2. open_source_notices.json still hashes to the value recorded at generation
      (a hand-edited manifest trips this);
   3. every shipped license text still hashes to the value recorded at
@@ -49,13 +47,11 @@ REGENERATE_COMMAND = "python3 scripts/generate_open_source_notices.py"
 SCHEMA_VERSION = 2
 
 # Everything that decides what the generator produces. Cargo.toml matters
-# because feature selection changes which packages are reachable; the SQLCipher
-# pin drives the two hand-declared external records; the generator is otherwise
-# outside its own gate.
+# because feature selection changes which packages are reachable; the generator
+# is otherwise outside its own gate.
 GENERATION_INPUTS = (
     CARGO_LOCK,
     "pgp-mobile/Cargo.toml",
-    "third_party/sqlcipher-xcframework.pin.json",
     "scripts/generate_open_source_notices.py",
 )
 

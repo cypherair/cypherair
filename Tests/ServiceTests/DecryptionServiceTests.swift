@@ -16,7 +16,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        stack = await TestHelpers.makeServiceStack()
+        stack = try await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -194,30 +194,6 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_parseRecipients_doesNotTriggerSeUnwrap() async throws {
-        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
-        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
-
-        let ciphertext = try await stack.encryptionService.encryptText(
-            "test",
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: nil,
-            encryptToSelf: false
-        )
-
-        let unwrapCountBefore = stack.mockSE.unwrapCallCount
-
-        // Phase 1 should succeed AND should NOT trigger SE unwrap
-        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
-
-        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore,
-                       "Phase 1 must NOT trigger SE unwrap — no authentication should occur")
-        XCTAssertNotNil(phase1.matchedKey,
-                        "Phase 1 should find a matched key")
-        XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
-                       "Phase 1 should match the correct key by primary fingerprint")
-    }
-
     // MARK: - Phase 2: Decrypt (Authentication Required)
 
     func test_decrypt_phase2_legacy_returnsPlaintext() async throws {
@@ -253,17 +229,6 @@ final class DecryptionServiceTests: XCTestCase {
 
         XCTAssertEqual(result.verification.summaryState, .verified,
                        "Signed message should verify with .verified summary state")
-    }
-
-    func test_decrypt_phase2_triggersSeUnwrap() async throws {
-        let (_, _, phase1) = try await encryptAndPreparePhase1(suite: .ed25519LegacyCurve25519Legacy)
-
-        let unwrapCountBefore = stack.mockSE.unwrapCallCount
-
-        _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-
-        XCTAssertGreaterThan(stack.mockSE.unwrapCallCount, unwrapCountBefore,
-                             "Phase 2 must trigger SE unwrap for authentication")
     }
 
     func test_decrypt_phase2_noMatchedKey_throwsError() async throws {
@@ -528,13 +493,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
 
-        let unwrapBefore = stack.mockSE.unwrapCallCount
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-        XCTAssertEqual(
-            stack.mockSE.unwrapCallCount,
-            unwrapBefore + 1,
-            "Detailed decrypt should unwrap exactly once"
-        )
         XCTAssertEqual(detailed.plaintext, plaintext)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].verificationState, .verified)
@@ -566,7 +525,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
 
-        try await stack.contactService.relockProtectedData()
+        try await stack.contactService.relockVault()
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         XCTAssertEqual(detailed.plaintext, plaintext)
@@ -580,6 +539,7 @@ final class DecryptionServiceTests: XCTestCase {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let protectedRecipientSecret = try loadFixture("ffi_detailed_recipient_secret_protected", ext: "asc")
         let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
 
         let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
@@ -587,13 +547,10 @@ final class DecryptionServiceTests: XCTestCase {
         try stack.contactService.importContact(publicKeyData: signerA)
         try stack.contactService.importContact(publicKeyData: signerB)
 
-        let identity = try TestHelpers.provisionFixtureBackedIdentity(
-            secretCertData: recipientSecret,
-            engine: stack.engine,
+        let identity = try await TestHelpers.importFixtureKey(
+            protectedSecret: protectedRecipientSecret,
+            passphrase: TestHelpers.ffiDetailedRecipientPassphrase,
             service: stack.keyManagement,
-            mockSE: stack.mockSE,
-            mockKC: stack.mockKC,
-            metadataPersistence: stack.metadataPersistence,
             isDefault: true
         )
         let phase1 = try makePhase1(matchedKey: identity, ciphertext: ciphertext)
@@ -646,7 +603,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
 
-        try await stack.contactService.relockProtectedData()
+        try await stack.contactService.relockVault()
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         XCTAssertEqual(detailed.plaintext, plaintext)
@@ -659,22 +616,18 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertNil(detailed.verification.signatures[0].signerIdentity)
     }
 
-    func test_decryptDetailed_noMatchedKey_throwsNoMatchingKeyWithoutUnwrap() async throws {
+    func test_decryptDetailed_noMatchedKey_throwsNoMatchingKey() async throws {
         let phase1 = DecryptionPhase1Result(
             recipientKeyIds: ["unknown"],
             matchedKey: nil,
             ciphertext: Data()
         )
-        let unwrapBefore = stack.mockSE.unwrapCallCount
-
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected noMatchingKey")
         } catch {
             assertCypherAirError(error) { if case .noMatchingKey = $0 { return true } else { return false } }
         }
-
-        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapBefore)
     }
 
     func test_decryptDetailed_legacy_midpointBitFlip_rejectsTamperedCiphertext()
@@ -774,17 +727,15 @@ final class DecryptionServiceTests: XCTestCase {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let protectedRecipientSecret = try loadFixture("ffi_detailed_recipient_secret_protected", ext: "asc")
         let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
 
         try stack.contactService.importContact(publicKeyData: signerA)
         try stack.contactService.importContact(publicKeyData: signerB)
-        let identity = try TestHelpers.provisionFixtureBackedIdentity(
-            secretCertData: recipientSecret,
-            engine: stack.engine,
+        let identity = try await TestHelpers.importFixtureKey(
+            protectedSecret: protectedRecipientSecret,
+            passphrase: TestHelpers.ffiDetailedRecipientPassphrase,
             service: stack.keyManagement,
-            mockSE: stack.mockSE,
-            mockKC: stack.mockKC,
-            metadataPersistence: stack.metadataPersistence,
             isDefault: true
         )
 
@@ -856,7 +807,7 @@ final class DecryptionServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: inputURL)
-        try await stack.contactService.relockProtectedData()
+        try await stack.contactService.relockVault()
         let detailed = try await stack.decryptionService.decryptFileStreamingDetailed(
             phase1: phase1,
             progress: nil
@@ -879,18 +830,15 @@ final class DecryptionServiceTests: XCTestCase {
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
-        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let protectedRecipientSecret = try loadFixture("ffi_detailed_recipient_secret_protected", ext: "asc")
         let ciphertext = try loadFixture("ffi_detailed_repeated_encrypted")
         let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
 
         try stack.contactService.importContact(publicKeyData: signerA)
-        _ = try TestHelpers.provisionFixtureBackedIdentity(
-            secretCertData: recipientSecret,
-            engine: stack.engine,
+        _ = try await TestHelpers.importFixtureKey(
+            protectedSecret: protectedRecipientSecret,
+            passphrase: TestHelpers.ffiDetailedRecipientPassphrase,
             service: stack.keyManagement,
-            mockSE: stack.mockSE,
-            mockKC: stack.mockKC,
-            metadataPersistence: stack.metadataPersistence,
             isDefault: true
         )
 
@@ -1124,25 +1072,6 @@ final class DecryptionServiceTests: XCTestCase {
         }
 
         try assertNoDecryptedOperationArtifacts()
-    }
-
-    // MARK: - High Security Biometrics Blocking
-
-    func test_decrypt_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
-        let (_, _, phase1) = try await encryptAndPreparePhase1(suite: .ed25519LegacyCurve25519Legacy)
-
-        // Simulate High Security mode with biometrics unavailable
-        stack.mockSE.simulatedAuthMode = .highSecurity
-        stack.mockSE.biometricsAvailable = false
-
-        do {
-            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-            XCTFail("Expected authentication error when biometrics unavailable in High Security mode")
-        } catch {
-            // The error propagates from MockSEError.authenticationFailed through
-            // KeyManagementService.unwrapPrivateKey → CypherAirError
-            // Accept any error here — the key invariant is that decryption does NOT succeed
-        }
     }
 
     // MARK: - Detailed Test Helpers

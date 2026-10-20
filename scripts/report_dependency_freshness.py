@@ -6,8 +6,7 @@ repository has, without modifying or weakening any pin:
 
 - compatible-range crates (``cargo update --dry-run`` count),
 - exact pins vs upstream latest (sequoia-openpgp and UniFFI on crates.io,
-  the SQLCipher wrapper pin JSON vs the owned fork's latest release, the
-  openssl-src carry ref vs its fork branch head, and the arm64e stage1
+  the openssl-src carry ref vs its fork branch head, and the arm64e stage1
   toolchain pin vs the latest stage1 release),
 - pinned GitHub Actions vs each action's latest release.
 
@@ -35,7 +34,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CARGO_MANIFEST = "pgp-mobile/Cargo.toml"
 CARGO_LOCK = "pgp-mobile/Cargo.lock"
 WORKFLOWS_DIR = ".github/workflows"
-SQLCIPHER_PIN = "third_party/sqlcipher-xcframework.pin.json"
 STAGE1_PIN = "third_party/arm64e-stage1-toolchain.pin.json"
 STAGE1_TAG_PREFIX = "rust-stage1-arm64e-toolchain-"
 USER_AGENT = "cypherair-dependency-freshness (https://github.com/cypherair/cypherair)"
@@ -333,21 +331,6 @@ def check_exact_crate_pins(repo_root: Path, fetchers: Fetchers) -> list[dict]:
     return entries
 
 
-def check_sqlcipher_pin(repo_root: Path, fetchers: Fetchers) -> list[dict]:
-    name = "SQLCipher.xcframework (cypherair/sqlcipher-xcframework)"
-    try:
-        pin = json.loads((repo_root / SQLCIPHER_PIN).read_text(encoding="utf-8"))
-        pinned_tag = pin["release"]["tag"]
-        repository = pin["repository"]
-        latest = fetchers.latest_release(repository)
-        latest_tag = str(latest.get("tag_name", ""))
-        status = STATUS_CURRENT if latest_tag == pinned_tag else STATUS_UPDATE
-        note = "wrapper releases are rebuilt on the fork before the app pin changes"
-        return [entry("exact-pins", name, status, pinned_tag, latest_tag, note)]
-    except Exception as error:  # noqa: BLE001
-        return [unavailable("exact-pins", name, error)]
-
-
 def check_carry_refs(repo_root: Path, fetchers: Fetchers) -> list[dict]:
     entries = []
     try:
@@ -440,7 +423,6 @@ def build_report(repo_root: Path, fetchers: Fetchers) -> dict:
     entries = []
     entries.extend(check_crates(repo_root, fetchers))
     entries.extend(check_exact_crate_pins(repo_root, fetchers))
-    entries.extend(check_sqlcipher_pin(repo_root, fetchers))
     entries.extend(check_stage1_pin(repo_root, fetchers))
     entries.extend(check_carry_refs(repo_root, fetchers))
     entries.extend(check_action_pins(repo_root, fetchers))

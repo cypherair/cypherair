@@ -1,4 +1,3 @@
-import LocalAuthentication
 import SwiftUI
 #if os(iOS)
 import UIKit
@@ -11,14 +10,7 @@ struct CypherAirApp: App {
     private var keyboardPolicyDelegate
     #endif
 
-    // MARK: - Shared Dependencies
-
     @State private var container: AppContainer
-
-    @State private var loadWarningCoordinator: AppLoadWarningCoordinator
-    @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
-    @State private var protectedSettingsHost: ProtectedSettingsHost
-    @State private var localDataResetRestartCoordinator: LocalDataResetRestartCoordinator
     @State private var tutorialStore: TutorialSessionStore
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
@@ -29,22 +21,20 @@ struct CypherAirApp: App {
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
     #endif
 
-    // MARK: - Init
-
     init() {
         #if os(macOS)
-        // Armed before the first window exists, so no window this process ever
-        // shows is capturable by another process.
         ScreenCaptureExclusion.install()
         #endif
         let launchConfiguration = AppLaunchConfiguration()
         let container: AppContainer
         #if DEBUG
         if launchConfiguration.usesUITestAppContainer {
-            container = AppContainer.makeUITest(
-                requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
-                manualAuthStartsUnlocked: launchConfiguration.manualAuthStartsUnlocked,
+            container = AppContainer.makeUITest()
+            container.startUITestSession(
+                passphrase: launchConfiguration.uiTestVaultPassphrase,
+                startsUnlocked: launchConfiguration.bootsPreAuthenticated,
                 preloadContact: launchConfiguration.preloadsUITestContact
+                    && !launchConfiguration.requiresManualAuthentication
             )
         } else {
             container = AppContainer.makeDefault()
@@ -52,249 +42,20 @@ struct CypherAirApp: App {
         #else
         container = AppContainer.makeDefault()
         #endif
-        if launchConfiguration.bootsPreAuthenticated {
-            // The one UI-test launch seam (DEBUG-only via
-            // AppLaunchConfiguration's release kill switch): settle the
-            // session as already authenticated, with the lock genuinely
-            // armed. Nothing is bypassed — the controller starts `.unlocked`
-            // with the current away epoch already answered, so the first
-            // foreground return does not prompt and every later away event,
-            // grace decision, and unlock runs the real path. MacUITests
-            // therefore drive a REAL lock transition without needing a human
-            // biometric at launch.
-            //
-            // The container side pairs with this: `makeUITest` gives a
-            // pre-authenticated boot the ungated ordinary-settings
-            // persistence (already loaded), because the post-auth fan-out
-            // that would load settings through the protected domain never
-            // runs when nothing authenticated at launch.
-            container.appLockController.resetAfterLocalDataReset(preserveAuthentication: true)
-            container.appSessionOrchestrator.recordAuthentication()
-        }
         if launchConfiguration.shouldSkipOnboarding {
-            container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)
+            container.appSettings.applyOnboardingCompletionOverrideForTesting(true)
         }
+        container.sweepTemporaryArtifactsAtLaunch()
         let tutorialStore = TutorialSessionStore()
         let incomingURLImportCoordinator = IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
         )
-        let startupCoordinator = AppStartupCoordinator()
-        let startupSnapshot = startupCoordinator.performPreAuthBootstrap(using: container)
-        let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
-            storageRoot: container.protectedDataStorageRoot,
-            hasPersistedSharedRight: { identifier in
-                container.protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
-            },
-            hasExternalProtectedDataArtifacts: {
-                try container.protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
-            },
-            removePersistedSharedRight: { identifier in
-                try await container.protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
-            }
-        )
-        let protectedSettingsHost = ProtectedSettingsHost(
-            evaluateAccessGate: { isFirstProtectedAccess in
-                let decision = container.appSessionOrchestrator.evaluateProtectedDataAccessGate(
-                    startupBootstrapOutcome: startupSnapshot.bootstrapOutcome,
-                    isFirstProtectedAccessInCurrentProcess: isFirstProtectedAccess
-                )
-                switch decision {
-                case .frameworkRecoveryNeeded:
-                    return .frameworkRecoveryNeeded
-                case .pendingMutationRecoveryRequired:
-                    return .pendingMutationRecoveryRequired
-                case .noProtectedDomainPresent:
-                    return .noProtectedDomainPresent
-                case .authorizationRequired:
-                    return .authorizationRequired
-                case .alreadyAuthorized:
-                    return .alreadyAuthorized
-                }
-            },
-            hasAuthorizationHandoffContext: {
-                container.appSessionOrchestrator.hasProtectedDataAuthorizationHandoffContext
-            },
-            authorizeSharedRight: { localizedReason, interactionMode in
-                if container.protectedDataSessionCoordinator.frameworkState == .sessionAuthorized,
-                   interactionMode != .requireReusableContext {
-                    return .authorized
-                }
-                do {
-                    let registry = try container.protectedDomainRecoveryCoordinator.loadCurrentRegistry()
-                    let authenticationContext = container.appSessionOrchestrator
-                        .consumeAuthenticatedContextForProtectedData()
-                    guard interactionMode == .allowInteraction
-                            || interactionMode == .requireReusableContext
-                            || authenticationContext != nil else {
-                        return .cancelledOrDenied
-                    }
-                    let authorization = await container.protectedDataSessionCoordinator.beginProtectedDataAuthorizationReturningContext(
-                        registry: registry,
-                        localizedReason: localizedReason,
-                        authenticationContext: authenticationContext
-                    )
-                    switch authorization.result {
-                    case .authorized:
-                        return .authorizedWithContext(authorization.authenticationContext)
-                    case .cancelledOrDenied:
-                        authorization.authenticationContext.invalidate()
-                        return .cancelledOrDenied
-                    case .frameworkRecoveryNeeded:
-                        authorization.authenticationContext.invalidate()
-                        return .frameworkRecoveryNeeded
-                    }
-                } catch {
-                    return .frameworkRecoveryNeeded
-                }
-            },
-            currentWrappingRootKey: {
-                try container.protectedDataSessionCoordinator.wrappingRootKeyData()
-            },
-            syncPreAuthorizationState: {
-                container.protectedSettingsStore.syncPreAuthorizationState()
-            },
-            currentDomainState: {
-                switch container.protectedSettingsStore.domainState {
-                case .locked:
-                    return .locked
-                case .unlocked:
-                    return .unlocked
-                case .recoveryNeeded:
-                    return .recoveryNeeded
-                case .pendingRetryRequired:
-                    return .pendingRetryRequired
-                case .pendingResetRequired:
-                    return .pendingResetRequired
-                case .frameworkUnavailable:
-                    return .frameworkUnavailable
-                }
-            },
-            currentClipboardNotice: {
-                container.protectedSettingsStore.clipboardNotice
-            },
-            ensureCommittedSettingsIfNeeded: {
-                try await container.protectedSettingsStore.ensureCommittedIfNeeded(
-                    persistSharedRight: { secret in
-                        try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                    },
-                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
-                    currentWrappingRootKey: {
-                        try container.protectedDataSessionCoordinator.wrappingRootKeyData()
-                    }
-                )
-            },
-            openDomainIfNeeded: { wrappingRootKey in
-                _ = try await container.protectedSettingsStore.openDomainIfNeeded(
-                    wrappingRootKey: wrappingRootKey
-                )
-            },
-            updateClipboardNotice: { isEnabled, wrappingRootKey in
-                try await container.protectedSettingsStore.updateClipboardNotice(
-                    isEnabled,
-                    wrappingRootKey: wrappingRootKey
-                )
-            },
-            pendingRecoveryAuthorizationRequirement: {
-                Self.protectedSettingsMutationRequirement(
-                    container.protectedDomainRecoveryCoordinator.pendingRecoveryAuthorizationRequirement()
-                )
-            },
-            recoverPendingMutation: {
-                try await Self.recoverProtectedSettingsPendingMutation(
-                    container: container,
-                    authenticationContext: nil
-                )
-            },
-            recoverPendingMutationWithContext: { authenticationContext in
-                try await Self.recoverProtectedSettingsPendingMutation(
-                    container: container,
-                    authenticationContext: authenticationContext
-                )
-            },
-            resetAuthorizationRequirement: {
-                Self.protectedSettingsMutationRequirement(
-                    container.protectedSettingsStore.resetAuthorizationRequirement()
-                )
-            },
-            resetDomain: {
-                try await container.protectedSettingsStore.resetDomain(
-                    persistSharedRight: { secret in
-                        try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                    },
-                    removeSharedRight: { identifier in
-                        try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
-                            identifier: identifier
-                        )
-                    },
-                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
-                    currentWrappingRootKey: {
-                        try container.protectedDataSessionCoordinator.wrappingRootKeyData()
-                    }
-                )
-            }
-        )
-
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
-        _loadWarningCoordinator = State(initialValue: AppLoadWarningCoordinator(initialWarning: startupSnapshot.loadError))
-        _startupSnapshot = State(initialValue: startupSnapshot)
-        _protectedSettingsHost = State(initialValue: protectedSettingsHost)
-        _localDataResetRestartCoordinator = State(initialValue: LocalDataResetRestartCoordinator())
         _tutorialStore = State(initialValue: tutorialStore)
         _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
     }
-
-    private static func protectedSettingsMutationRequirement(
-        _ requirement: ProtectedDataMutationAuthorizationRequirement
-    ) -> ProtectedSettingsHost.MutationAuthorizationRequirement {
-        switch requirement {
-        case .notRequired:
-            .notRequired
-        case .wrappingRootKeyRequired:
-            .wrappingRootKeyRequired
-        case .frameworkRecoveryNeeded:
-            .frameworkRecoveryNeeded
-        }
-    }
-
-    @MainActor
-    private static func recoverProtectedSettingsPendingMutation(
-        container: AppContainer,
-        authenticationContext: LAContext?
-    ) async throws -> ProtectedSettingsHost.RecoveryOutcome {
-        var recoveryHandlers: [any ProtectedDomainRecoveryHandler] = [
-            container.privateKeyControlStore,
-            container.protectedSettingsStore
-        ]
-        if let keyMetadataDomainStore = container.keyMetadataDomainStore {
-            recoveryHandlers.append(keyMetadataDomainStore)
-        }
-        if let contactsDomainStore = container.contactsDomainStore {
-            recoveryHandlers.append(contactsDomainStore)
-        }
-        let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
-            handlers: recoveryHandlers,
-            authenticationContext: authenticationContext,
-            removeSharedRight: { identifier in
-                try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
-                    identifier: identifier
-                )
-            }
-        )
-        switch outcome {
-        case .resumedToSteadyState:
-            return .resumedToSteadyState
-        case .retryablePending:
-            return .retryablePending
-        case .resetRequired:
-            return .resetRequired
-        case .frameworkRecoveryNeeded:
-            return .frameworkRecoveryNeeded
-        }
-    }
-
-    // MARK: - Scene
 
     var body: some Scene {
         #if os(macOS)
@@ -307,11 +68,7 @@ struct CypherAirApp: App {
         .defaultSize(width: 900, height: 560)
         .windowResizability(.contentMinSize)
         .commands {
-            // File > New Window stays disabled inside MacKeyboardCommands,
-            // which replaces the New group with key actions.
             MacKeyboardCommands(navigationState: macShellNavigationState)
-            // Restore the ⌘, Settings menu item that the standalone Settings scene used to
-            // provide automatically; in the single-window design it selects the Settings tab.
             CommandGroup(replacing: .appSettings) {
                 Button(String(localized: "settings.title", defaultValue: "Settings…")) {
                     macShellNavigationState.selectedTab = .settings
@@ -338,10 +95,7 @@ struct CypherAirApp: App {
         #if os(macOS)
         switch launchConfiguration.root {
         case .main:
-            MacAppShellView(
-                navigationState: macShellNavigationState,
-                opensAuthModeConfirmation: launchConfiguration.opensAuthModeConfirmation
-            )
+            MacAppShellView(navigationState: macShellNavigationState)
         case .tutorial:
             TutorialView(
                 presentationContext: .inApp,
@@ -356,26 +110,20 @@ struct CypherAirApp: App {
     @ViewBuilder
     private var mainWindowSceneContent: some View {
         LocalDataResetRestartGate(
-            coordinator: localDataResetRestartCoordinator,
+            coordinator: container.localDataResetRestartCoordinator,
             terminateAction: LocalDataResetRestartAction.terminateCurrentProcess
         ) {
             ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
                 mainWindowContent
-                    .task {
-                        await prepareUITestContactsIfNeeded()
-                    }
-                    // The lock surface AND the cosmetic privacy cover are the
-                    // two rendering modes of one shield window layered above
-                    // the whole presentation stack (sheets, covers, macOS
-                    // window-modal sheets) — an in-scene overlay would render
-                    // beneath presentations. See issues #697 and #723.
-                    .appLockShieldWindow(appLockController: container.appLockController)
+                    .appLockShieldWindow(
+                        appLockController: container.appLockController,
+                        services: container.lockSurfaceServices
+                    )
                     .appLifecycleObserver(
                         appLockController: container.appLockController
                     )
                     .environment(container.appLockController)
-                    .environment(container.config)
-                    .environment(container.protectedOrdinarySettingsCoordinator)
+                    .environment(container.appSettings)
                     .environment(container.keyManagement)
                     .environment(container.contactService)
                     .environment(container.encryptionService)
@@ -384,12 +132,9 @@ struct CypherAirApp: App {
                     .environment(container.certificateSignatureService)
                     .environment(container.qrService)
                     .environment(container.selfTestService)
-                    .environment(container.authManager)
                     .environment(container.appSessionOrchestrator)
                     .environment(\.localDataResetService, container.localDataResetService)
-                    .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
-                    .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
-                    .environment(\.protectedSettingsHost, protectedSettingsHost)
+                    .environment(\.localDataResetRestartCoordinator, container.localDataResetRestartCoordinator)
                     .environment(tutorialStore)
                     #if os(iOS) || os(visionOS)
                     .environment(\.iosPresentationController, iosPresentationControllerValue)
@@ -408,71 +153,25 @@ struct CypherAirApp: App {
         .task {
             presentInitialIOSFlowIfNeeded()
         }
-        .onChange(of: container.protectedOrdinarySettingsCoordinator.state) { _, _ in
-            guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
-            if container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding == false,
+        .onChange(of: container.appSettings.snapshot) { _, _ in
+            guard !container.localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
+            if container.appSettings.hasCompletedOnboarding == false,
                iosPresentationState.activePresentation == nil {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
         }
         #endif
         .incomingURLImportAlerts(coordinator: incomingURLImportCoordinator)
-        .appLoadWarningAlert(coordinator: loadWarningCoordinator)
-        .onAppear {
-            presentPendingLoadWarningIfPossible()
-        }
-        .onChange(of: loadWarningPresentationState) { _, _ in
-            presentPendingLoadWarningIfPossible()
-        }
-        .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
-            guard let warning else { return }
-            loadWarningCoordinator.enqueue(warning)
-            container.config.clearPostUnlockRecoveryLoadWarning()
-            presentPendingLoadWarningIfPossible()
-        }
         .onOpenURL { url in
             incomingURLRouter.handle(url)
         }
-    }
-
-    @MainActor
-    private func prepareUITestContactsIfNeeded() async {
-        guard launchConfiguration.usesUITestAppContainer,
-              !launchConfiguration.requiresManualAuthentication else {
-            return
-        }
-        _ = await container.prepareUITestContactsIfNeeded()
-    }
-
-    private var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction {
-        { newPolicy in
-            try await container.makeAppAccessPolicySwitchWorkflow().run(to: newPolicy)
-        }
-    }
-
-    private var loadWarningPresentationState: LoadWarningPresentationState {
-        LoadWarningPresentationState(
-            isAppLocked: container.appLockController.isLocked,
-            isAuthenticating: container.appLockController.isAuthenticating,
-            isLockCoverVisible: container.appLockController.isCosmeticallyCovered,
-            hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
-            allowsPreAuthenticationPresentation: launchConfiguration.usesUITestAppContainer
-                && !launchConfiguration.requiresManualAuthentication
-        )
-    }
-
-    private func presentPendingLoadWarningIfPossible() {
-        loadWarningCoordinator.presentPendingIfPossible(
-            presentationState: loadWarningPresentationState,
-            isRestartRequiredAfterLocalDataReset: localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset
-        )
     }
 
     private var incomingURLRouter: AppSceneIncomingURLRouter {
         AppSceneIncomingURLRouter(
             incomingURLImportCoordinator: incomingURLImportCoordinator,
             tutorialStore: tutorialStore,
-            localDataResetRestartCoordinator: localDataResetRestartCoordinator
+            localDataResetRestartCoordinator: container.localDataResetRestartCoordinator
         )
     }
 
@@ -480,7 +179,7 @@ struct CypherAirApp: App {
     private var onboardingPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {
-                guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else {
+                guard !container.localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else {
                     return nil
                 }
                 guard case .onboarding? = iosPresentationState.activePresentation else {
@@ -501,7 +200,7 @@ struct CypherAirApp: App {
     private var tutorialPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {
-                guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else {
+                guard !container.localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else {
                     return nil
                 }
                 guard case .tutorial? = iosPresentationState.activePresentation else {
@@ -526,13 +225,12 @@ struct CypherAirApp: App {
                 initialPage: initialPage,
                 presentationContext: context
             )
-            .environment(container.config)
-            .environment(container.protectedOrdinarySettingsCoordinator)
+            .environment(container.appSettings)
             .environment(tutorialStore)
             .environment(\.iosPresentationController, iosPresentationControllerValue)
             .interactiveDismissDisabled(
                 context == .firstRun
-                    && container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding != true
+                    && container.appSettings.hasCompletedOnboarding != true
             )
         }
     }
@@ -544,11 +242,10 @@ struct CypherAirApp: App {
                 presentationContext: presentationContext,
                 initialModule: launchConfiguration.root == .tutorial ? launchConfiguration.tutorialModule : nil
             )
-                .environment(container.config)
-                .environment(container.protectedOrdinarySettingsCoordinator)
-                .environment(tutorialStore)
-                .environment(container.appSessionOrchestrator)
-                .environment(\.iosPresentationController, iosPresentationControllerValue)
+            .environment(container.appSettings)
+            .environment(tutorialStore)
+            .environment(container.appSessionOrchestrator)
+            .environment(\.iosPresentationController, iosPresentationControllerValue)
         }
     }
 
@@ -567,20 +264,18 @@ struct CypherAirApp: App {
     }
 
     private func presentInitialIOSFlowIfNeeded() {
-        guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
+        guard !container.localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
         guard iosPresentationState.activePresentation == nil else { return }
-
         switch launchConfiguration.root {
         case .tutorial:
             iosPresentationState.activePresentation = .tutorial(presentationContext: .inApp)
         case .main:
-            if container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding == false {
+            if container.appSettings.hasCompletedOnboarding == false {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
         }
     }
     #endif
-
 }
 
 #if os(iOS)
@@ -593,8 +288,6 @@ private final class CypherAirKeyboardPolicyDelegate: NSObject, UIApplicationDele
     }
 }
 #endif
-
-// MARK: - App Alerts
 
 @MainActor
 private extension View {
@@ -642,25 +335,6 @@ private extension View {
                 localized: "import.tutorialBlocked.message",
                 defaultValue: "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
             ))
-        }
-    }
-
-    func appLoadWarningAlert(
-        coordinator: AppLoadWarningCoordinator
-    ) -> some View {
-        alert(
-            String(localized: "app.loadError.title", defaultValue: "Load Warning"),
-            isPresented: Binding(
-                get: { coordinator.presentedWarning != nil },
-                set: { if !$0 { coordinator.dismissPresentedWarning() } }
-            ),
-            presenting: coordinator.presentedWarning
-        ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {
-                coordinator.dismissPresentedWarning()
-            }
-        } message: { warning in
-            Text(warning)
         }
     }
 }

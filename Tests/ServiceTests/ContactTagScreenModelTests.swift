@@ -8,9 +8,9 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
         XCTAssertFalse(ContactsScreenModel(contactService: contactService).canManageTags)
         XCTAssertFalse(TagManagementScreenModel(contactService: contactService).canManageTags)
 
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagementAvailability")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
 
         XCTAssertTrue(ContactsScreenModel(contactService: opened.service).canManageTags)
@@ -19,9 +19,9 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_tagManagementScreenModelCreatesTagForNavigation() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagementModel")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let model = TagManagementScreenModel(contactService: service)
@@ -36,9 +36,9 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_tagDetailScreenModelRenamesDeletesAndSavesMembers() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagDetailModel")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -78,9 +78,9 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_tagDetailScreenModelKeepsSavedGroupingUntilMembershipSave() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagDetailSavedGrouping")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let member = try engine.generateKey(
@@ -128,9 +128,9 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_tagDetailScreenModelCancelMemberEditingConfirmsDiscardWhenDraftChanged() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagDetailDiscard")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(
@@ -163,9 +163,9 @@ final class ContactTagScreenModelTests: ContactServiceTestCase {
 
     @MainActor
     func test_tagDetailScreenModelClearTransientInput_clearsRenameAndMemberDrafts() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagDetailClearInput")
+        let opened = try await makeOpenedContactService()
         defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+            opened.sandbox.cleanup()
         }
         let service = opened.service
         let generated = try engine.generateKey(

@@ -2,18 +2,13 @@ import SwiftUI
 
 struct SettingsScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
-
     @State private var model: SettingsScreenModel
 
     init(
-        config: AppConfiguration,
-        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
-        authManager: AuthenticationManager,
-        keyManagement: KeyManagementService,
+        appSettings: AppSettingsCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
-        appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction?,
         localDataResetService: LocalDataResetService?,
         localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?,
         configuration: SettingsView.Configuration
@@ -21,16 +16,12 @@ struct SettingsScreenHostView: View {
         self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: SettingsScreenModel(
-                config: config,
-                protectedOrdinarySettings: protectedOrdinarySettings,
-                authManager: authManager,
-                keyManagement: keyManagement,
+                appSettings: appSettings,
                 iosPresentationController: iosPresentationController,
                 macPresentationController: macPresentationController,
                 configuration: configuration,
                 localDataResetService: localDataResetService,
-                localDataResetRestartCoordinator: localDataResetRestartCoordinator,
-                appAccessPolicySwitchAction: appAccessPolicySwitchAction
+                localDataResetRestartCoordinator: localDataResetRestartCoordinator
             )
         )
     }
@@ -45,9 +36,6 @@ struct SettingsScreenHostView: View {
             .screenReady("settings.ready")
             .navigationTitle(String(localized: "settings.title", defaultValue: "Settings"))
             .settingsScreenPresentations(model: model)
-            .task {
-                await model.prepareProtectedSettingsSection()
-            }
             .onChange(of: appSessionOrchestrator.contentClearGeneration) {
                 model.clearTransientInput()
             }
