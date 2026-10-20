@@ -1,0 +1,3 @@
+[advisories]
+# RUSTSEC-2026-0374: basic-toml is unmaintained, but build-time only (uniffi_bindgen's askama templates); it never ships.
+ignore = ["RUSTSEC-2026-0374"]
