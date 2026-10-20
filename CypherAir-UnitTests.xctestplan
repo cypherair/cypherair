@@ -27,27 +27,6 @@
         "identifier" : "8561964DF0A7E2575A3799D6",
         "name" : "CypherAirTests"
       }
-    },
-    {
-      "target" : {
-        "containerPath" : "container:Packages/CypherVault",
-        "identifier" : "SealingTests",
-        "name" : "SealingTests"
-      }
-    },
-    {
-      "target" : {
-        "containerPath" : "container:Packages/CypherVault",
-        "identifier" : "VaultTests",
-        "name" : "VaultTests"
-      }
-    },
-    {
-      "target" : {
-        "containerPath" : "container:Packages/CypherVault",
-        "identifier" : "StoresTests",
-        "name" : "StoresTests"
-      }
     }
   ],
   "version" : 1

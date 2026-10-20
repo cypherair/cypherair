@@ -6,7 +6,7 @@
 
 **CI runs no `xcodebuild test` at all.** The local macOS unit lane is the source of truth for Swift validation, in every case. Hosted runners carry no CypherAir signing material by policy — signed app builds stay local and on Xcode Cloud — and a hosted-image mismatch skips the affected Apple platform probe rather than failing; **a skipped probe never stands in for release validation.**
 
-**The vault package's tests are part of the unit lane**: the unit plan runs them with the app's tests on macOS. They run on the package's sandbox composition — the software enclave, rows in memory, no prompt — behind a recording wrapper that keeps every access policy it is handed, and never reach LocalAuthentication.
+**The vault package's tests are their own lane**: `swift test --package-path Packages/CypherVault` runs them; the unit plan does not. They run on the package's sandbox composition — the software enclave, rows in memory, no prompt — behind a recording wrapper that keeps every access policy it is handed, and never reach LocalAuthentication.
 
 **Service tests run over a real sandbox vault, never a mock of it.** `TestHelpers.makeSandbox()` opens the same composition under a known passphrase in a temporary directory; `reopen()` locks and unlocks it through that passphrase, which is how a test proves something survived to disk. The UI-test container is the same composition: under `UITEST_REQUIRE_MANUAL_AUTH=1` the app boots locked and the test types `UITEST_VAULT_PASSPHRASE`, and nothing prompts.
 

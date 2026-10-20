@@ -9,8 +9,6 @@ import Vault
 /// signer, and for the post-quantum families the classical half sealed against
 /// the identity wrapping key. Any failure undoes what was created.
 final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
-    typealias GenerationCheckpoint = @Sendable () async throws -> Void
-
     private let certificateBuilder: any SecureEnclaveCustodyCertificateBuilding
     private let vault: AppVault
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
@@ -21,7 +19,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let commitCoordinator: KeyProvisioningCommitCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator?
-    private let afterIdentityCommitCheckpoint: GenerationCheckpoint?
 
     init(
         certificateBuilder: any SecureEnclaveCustodyCertificateBuilding,
@@ -33,8 +30,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         resolver: PGPKeyCapabilityResolver,
         invalidationGate: KeyProvisioningInvalidationGate,
         commitCoordinator: KeyProvisioningCommitCoordinator,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
-        afterIdentityCommitCheckpoint: GenerationCheckpoint? = nil
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil
     ) {
         self.certificateBuilder = certificateBuilder
         self.vault = vault
@@ -46,7 +42,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.invalidationGate = invalidationGate
         self.commitCoordinator = commitCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
     func generateKey(
@@ -178,9 +173,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             )
             try catalogStore.storeNewIdentity(identity)
             didStore(identity.fingerprint)
-            if let afterIdentityCommitCheckpoint {
-                try await afterIdentityCommitCheckpoint()
-            }
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
             return identity
