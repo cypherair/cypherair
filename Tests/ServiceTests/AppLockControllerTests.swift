@@ -3,6 +3,7 @@ import Sealing
 import Vault
 import XCTest
 @testable import CypherAir
+import Stores
 
 /// The lock lifecycle over a sandbox vault: what opens it, what closes it,
 /// and what a wrong passphrase or damaged data leaves behind.

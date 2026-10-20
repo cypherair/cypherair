@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 @testable import CypherAir
+import Stores
 
 /// Private operations route by custody kind, and every device-bound route
 /// fails closed the moment the vault is locked.

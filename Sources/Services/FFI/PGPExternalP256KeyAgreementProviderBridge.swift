@@ -1,4 +1,5 @@
 import Foundation
+import Sealing
 import Stores
 
 final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementProvider, @unchecked Sendable {

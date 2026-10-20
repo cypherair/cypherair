@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 /// Generated Device-Bound Post-Quantum material. Unlike the P-256 result this
 /// carries the freshly generated classical component secrets, which the caller

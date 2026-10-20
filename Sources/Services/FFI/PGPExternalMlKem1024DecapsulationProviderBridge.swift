@@ -1,4 +1,5 @@
 import Foundation
+import Sealing
 import Stores
 
 /// Bridges a loaded Secure Enclave composite key-agreement handle into the

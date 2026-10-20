@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 @testable import CypherAir
+import Stores
 
 /// Reset All Local Data must leave nothing behind that the next first run
 /// could find: no sealed root, no rows, no domain files, no session state.

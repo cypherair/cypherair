@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 struct PGPSecureEnclaveCustodyGeneratedMaterial: Sendable {
     let publicKeyData: Data

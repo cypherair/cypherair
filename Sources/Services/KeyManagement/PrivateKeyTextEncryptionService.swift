@@ -1,4 +1,5 @@
 import Foundation
+import Stores
 
 protocol TextMessageEncrypting: Sendable {
     func encryptText(
