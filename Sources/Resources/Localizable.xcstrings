@@ -5786,13 +5786,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Encrypted File"
+            "value" : "Save Encrypted File"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享加密文件"
+            "value" : "保存加密文件"
           }
         }
       }
@@ -13532,13 +13532,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share .sig File"
+            "value" : "Save .sig File"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享 .sig 文件"
+            "value" : "保存 .sig 文件"
           }
         }
       }
