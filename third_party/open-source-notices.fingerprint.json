@@ -1,7 +1,7 @@
 {
   "generatedBy": "scripts/generate_open_source_notices.py",
   "generationInputs": {
-    "pgp-mobile/Cargo.lock": "b1e5dd13bfc154c5a8eec0547f82b071a3f57ccb6a38598d81264bf9f3e275a0",
+    "pgp-mobile/Cargo.lock": "ea07f16c4bccb6fd1d1034a76ed69680d1bb8f4f9ef6ca204aa3e922ec01307f",
     "pgp-mobile/Cargo.toml": "6a34ed90201445f6caf718896c184fd5191d4574c1fba0638a60fbda5513596d",
     "scripts/generate_open_source_notices.py": "b5c7354a9c35a2935f593979fb59a8247aa969ec292350ddf650b54c3904fc20"
   },
@@ -73,7 +73,7 @@
       "nom-7.1.3.txt": "4dbda04344456f09a7a588140455413a9ac59b6b26a1ef7cdf9c800c012d87f0",
       "once_cell-1.21.4.txt": "9cd007cffd77fe58f45c38f25c9d25a6953942033dfeafa10f51c4c43e38bc26",
       "openssl-0.10.81.txt": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
-      "openssl-src-300.5.8-3.5.8.txt": "85cb3b754c751b8d02c77b629b426e2bf359e951b672f8509a084f7f928a7db0",
+      "openssl-src-300.5.9-3.5.9.txt": "85cb3b754c751b8d02c77b629b426e2bf359e951b672f8509a084f7f928a7db0",
       "openssl-sys-0.9.117.txt": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
       "ossl-1.5.3.txt": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
       "password-hash-0.5.0.txt": "4d49310fe960b00056f611c1da5621f891ed60328b358659c64494ae64210270",
@@ -136,7 +136,7 @@
   "notices": {
     "path": "Sources/Resources/OpenSourceNotices/open_source_notices.json",
     "recordCount": 122,
-    "sha256": "1b58bc84586f45a43c087f7cc0e9364789a5c9f05e5a3fe04049cf47992b1aff"
+    "sha256": "e986d56443fcb5815435874fb46a5d62aed7abbe473a4b261da1def64cd9e21d"
   },
   "regenerateCommand": "python3 scripts/generate_open_source_notices.py",
   "schemaVersion": 2
