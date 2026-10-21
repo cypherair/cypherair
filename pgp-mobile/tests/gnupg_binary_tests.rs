@@ -14,8 +14,9 @@
 
 mod common;
 
-use common::gnupg::{assert_gpg_status_good_signature, gpg_cmd, gpg_import_key, setup_gpg_home};
-use common::load_fixture;
+use common::gnupg::{
+    assert_gpg_status_good_signature, gpg_cmd, gpg_generate_key, gpg_import_key, setup_gpg_home,
+};
 use pgp_mobile::armor;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeySuite, KeyValidity};
@@ -88,18 +89,19 @@ fn test_gpg_imports_sequoia_legacy_pubkey() {
     );
 }
 
-/// Verify that `gpg --decrypt` successfully decrypts a Sequoia-encrypted message.
+/// Verify that `gpg --decrypt` decrypts a Sequoia-encrypted message addressed to a
+/// key gpg generated.
 #[test]
 fn test_gpg_decrypts_sequoia_encrypted_message() {
     let gpg = require_gpg!();
     let gnupghome = setup_gpg_home();
-
-    // Import the GnuPG fixture secret key into the temp keyring
-    let gpg_secretkey = load_fixture("gpg_secretkey.asc");
-    gpg_import_key(&gpg, &gnupghome, &gpg_secretkey);
-
-    // Load GnuPG fixture public key for encryption
-    let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
+    let gpg_pubkey = gpg_generate_key(
+        &gpg,
+        &gnupghome,
+        "GnuPG Test User <gnupg-test@example.com>",
+        "ed25519",
+        "cv25519",
+    );
 
     // Encrypt a message with Sequoia to the GnuPG public key
     let plaintext = b"Hello GnuPG! This message was encrypted by Sequoia.";
@@ -274,10 +276,13 @@ fn test_gpg_rejects_sequoia_modern_high_pubkey() {
 fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
     let gpg = require_gpg!();
     let gnupghome = setup_gpg_home();
-
-    // Import the GnuPG fixture secret key (recipient)
-    let gpg_secretkey = load_fixture("gpg_secretkey.asc");
-    gpg_import_key(&gpg, &gnupghome, &gpg_secretkey);
+    let gpg_pubkey = gpg_generate_key(
+        &gpg,
+        &gnupghome,
+        "GnuPG Test User <gnupg-test@example.com>",
+        "ed25519",
+        "cv25519",
+    );
 
     // Generate a Legacy signing key with Sequoia
     let signer = keys::generate_key_with_suite(
@@ -292,9 +297,6 @@ fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
     let armored_signer_pubkey =
         armor::armor_public_key(&signer.public_key_data).expect("Armor should succeed");
     gpg_import_key(&gpg, &gnupghome, &armored_signer_pubkey);
-
-    // Load GnuPG fixture public key (recipient)
-    let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
 
     // Encrypt + sign with Sequoia
     let plaintext = b"Signed and encrypted by Sequoia for GnuPG.";

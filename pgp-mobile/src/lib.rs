@@ -1,6 +1,6 @@
 //! pgp-mobile: OpenPGP wrapper for CypherAir iOS app.
 //!
-//! Wraps Sequoia PGP 2.4.1 behind a UniFFI-annotated API.
+//! Wraps Sequoia PGP behind a UniFFI-annotated API.
 //! Exposes suite-aware OpenPGP operations across the supported key families.
 //! All Sequoia internal types are hidden behind this boundary.
 

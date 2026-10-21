@@ -4,8 +4,8 @@
 //! signer, external key-agreement decrypt) with the shared software-P256 stand-in
 //! and exercises real interop against the `gpg` binary for the device-bound
 //! *compatible* (v4) family. Because the software lane holds both secret halves, it
-//! imports a gpg-importable TSK so GnuPG can sign and decrypt as the SE certificate —
-//! giving full bidirectional evidence in CI with no hardware.
+//! imports a gpg-importable TSK so GnuPG can sign as the SE certificate — giving
+//! full bidirectional evidence in CI with no hardware.
 //!
 //! Skip behavior: these tests skip when `gpg` is absent, unless
 //! `CYPHERAIR_REQUIRE_GPG=1` (the mandatory CI interop lane), in which case a missing
@@ -14,7 +14,8 @@
 mod common;
 
 use common::gnupg::{
-    assert_gpg_status_good_signature, gpg_cmd, gpg_import_key, require_gpg_or_skip, setup_gpg_home,
+    assert_gpg_status_good_signature, gpg_cmd, gpg_generate_key, gpg_import_key,
+    require_gpg_or_skip, setup_gpg_home,
 };
 use common::secure_enclave::SoftwareP256Material;
 use pgp_mobile::keys::KeyValidity;
@@ -261,8 +262,8 @@ fn test_se_v4_gpg_signed_encrypted_decrypts_and_verifies_through_production_seam
 }
 
 /// (5) Bidirectional sign+encrypt. Direction A: the SE external signer signs and
-/// encrypts to the SE certificate; GnuPG decrypts and verifies the SE signature.
-/// Direction B (GnuPG-originated → production decrypt+verify) is covered by
+/// encrypts to a P-256 key GnuPG generated; GnuPG decrypts and verifies the SE
+/// signature. Direction B (GnuPG-originated → production decrypt+verify) is covered by
 /// `test_se_v4_gpg_signed_encrypted_decrypts_and_verifies_through_production_seam`.
 #[test]
 fn test_se_v4_bidirectional_sign_plus_encrypt() {
@@ -271,15 +272,20 @@ fn test_se_v4_bidirectional_sign_plus_encrypt() {
     };
     let material = build_v4_material();
     let gnupghome = setup_gpg_home();
-    let tsk = material
-        .export_gpg_importable_tsk()
-        .expect("gpg-importable TSK export should succeed");
-    gpg_import_key(&gpg, &gnupghome, &tsk);
+    let armored = armor::armor_public_key(&material.public_key_data).expect("armor should succeed");
+    gpg_import_key(&gpg, &gnupghome, &armored);
+    let gnupg_recipient = gpg_generate_key(
+        &gpg,
+        &gnupghome,
+        "GnuPG Recipient <gnupg-recipient@example.test>",
+        "nistp256",
+        "nistp256",
+    );
 
     let plaintext = b"Secure Enclave custody to GnuPG v4, signed and encrypted";
     let ciphertext = encrypt::encrypt_with_external_p256_signer(
         plaintext,
-        &[material.public_key_data.clone()],
+        &[gnupg_recipient],
         &material.public_key_data,
         &material.signing_key_fingerprint,
         material.signing_provider(),
