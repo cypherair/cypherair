@@ -960,12 +960,12 @@
     ]
   },
   {
-    "id": "openssl-src@300.5.8+3.5.8",
+    "id": "openssl-src@300.5.9+3.5.9",
     "displayName": "openssl-src",
-    "version": "300.5.8+3.5.8",
+    "version": "300.5.9+3.5.9",
     "repositoryURL": "https://github.com/alexcrichton/openssl-src-rs",
     "licenseName": "MIT/Apache-2.0",
-    "licenseFileResourceName": "openssl-src-300.5.8-3.5.8.txt",
+    "licenseFileResourceName": "openssl-src-300.5.9-3.5.9.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",

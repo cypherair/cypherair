@@ -8,6 +8,11 @@ set -euo pipefail
 # this is the belt for local developer shells.
 unset GH_TOKEN GITHUB_TOKEN GITHUB_PAT ASC_ISSUER_ID ASC_KEY_ID ASC_PRIVATE_KEY ASC_PRIVATE_KEY_PATH
 
+# Each slice is built for the app target's deployment target (see
+# read_app_deployment_targets); one inherited from the caller would leak into
+# every build.
+unset MACOSX_DEPLOYMENT_TARGET IPHONEOS_DEPLOYMENT_TARGET XROS_DEPLOYMENT_TARGET
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/pgp-mobile/Cargo.toml"
@@ -263,6 +268,45 @@ bindgen_clang_args_for_target() {
     printf -- '--target=%s -isysroot %q' "$clang_target" "$(xcrun --sdk "$sdk" --show-sdk-path)"
 }
 
+# cc compiles the vendored OpenSSL for the deployment target in the platform's
+# variable, else for the selected SDK's version, which can be newer than the
+# app. Each slice gets the app target's value as Xcode resolves it. rustc and
+# cc read one variable per platform, shared by device and simulator, and only
+# the slice's own is set: a clang call that names no platform rejects several
+# as conflicting.
+read_app_deployment_targets() {
+    local settings
+    settings="$(env -u GH_TOKEN -u GITHUB_TOKEN \
+        xcodebuild -project "$REPO_ROOT/CypherAir.xcodeproj" -target CypherAir -showBuildSettings)"
+    APP_MACOSX_DEPLOYMENT_TARGET="$(app_deployment_target MACOSX_DEPLOYMENT_TARGET "$settings")"
+    APP_IPHONEOS_DEPLOYMENT_TARGET="$(app_deployment_target IPHONEOS_DEPLOYMENT_TARGET "$settings")"
+    APP_XROS_DEPLOYMENT_TARGET="$(app_deployment_target XROS_DEPLOYMENT_TARGET "$settings")"
+    echo "App deployment targets: macOS $APP_MACOSX_DEPLOYMENT_TARGET, iOS $APP_IPHONEOS_DEPLOYMENT_TARGET, visionOS $APP_XROS_DEPLOYMENT_TARGET"
+}
+
+app_deployment_target() {
+    local name="$1"
+    local value
+    value="$(awk -v name="$name" '$1 == name && $2 == "=" { print $3; exit }' <<<"$2")"
+    if ! [[ "$value" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+        echo "error: the CypherAir target resolves no usable $name (got '$value')" >&2
+        exit 1
+    fi
+    printf '%s\n' "$value"
+}
+
+deployment_target_for_target() {
+    case "$1" in
+        *-apple-darwin) printf 'MACOSX_DEPLOYMENT_TARGET=%s' "$APP_MACOSX_DEPLOYMENT_TARGET" ;;
+        *-apple-ios | *-apple-ios-sim) printf 'IPHONEOS_DEPLOYMENT_TARGET=%s' "$APP_IPHONEOS_DEPLOYMENT_TARGET" ;;
+        *-apple-visionos | *-apple-visionos-sim) printf 'XROS_DEPLOYMENT_TARGET=%s' "$APP_XROS_DEPLOYMENT_TARGET" ;;
+        *)
+            echo "error: no deployment target is defined for $1" >&2
+            return 1
+            ;;
+    esac
+}
+
 build_rust_artifact() {
     local label="$1"
     local target="$2"
@@ -271,17 +315,21 @@ build_rust_artifact() {
     local bindgen_env_name="BINDGEN_EXTRA_CLANG_ARGS_${target//-/_}"
     local bindgen_args
     bindgen_args="$(bindgen_clang_args_for_target "$target")"
+    local deployment_target
+    deployment_target="$(deployment_target_for_target "$target")"
 
     log_step "$label" "Building ${target}..."
     if [[ "$target" == arm64e-* ]]; then
         env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
+            "$deployment_target" \
             "$bindgen_env_name=$bindgen_args" \
             RUSTC="$ARM64E_RUSTC" \
             cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     else
         env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
+            "$deployment_target" \
             "$bindgen_env_name=$bindgen_args" \
             cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     fi
@@ -332,8 +380,12 @@ generate_bindings() {
     MANIFEST_BACKUP_CREATED=1
     perl -0pi -e 's/crate-type = \["lib", "staticlib"\]/crate-type = ["lib", "staticlib", "cdylib"]/g' "$MANIFEST"
 
+    # The macOS arm64e slice's environment, so its dependencies are reused.
+    local deployment_target
+    deployment_target="$(deployment_target_for_target arm64e-apple-darwin)"
     env -u GH_TOKEN -u GITHUB_TOKEN \
         CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
+        "$deployment_target" \
         RUSTC="$ARM64E_RUSTC" \
         cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" --target arm64e-apple-darwin --manifest-path "$MANIFEST"
 
@@ -469,6 +521,7 @@ ensure_rustup_target "$STABLE_TOOLCHAIN" aarch64-apple-darwin
 ensure_rustup_target "$STABLE_TOOLCHAIN" aarch64-apple-visionos
 ensure_rustup_target "$STABLE_TOOLCHAIN" aarch64-apple-visionos-sim
 
+read_app_deployment_targets
 mkdir -p "$CARGO_TARGET_DIR" "$UNIVERSAL_LIB_DIR"
 
 build_rust_artifact "ios-device-arm64" aarch64-apple-ios
