@@ -12668,13 +12668,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Report"
+            "value" : "Save Report"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享报告"
+            "value" : "保存报告"
           }
         }
       }
