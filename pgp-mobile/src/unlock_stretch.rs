@@ -4,7 +4,7 @@
 //! Swift side. The salt is public metadata; the parameters are bounded here so
 //! a misbehaving caller cannot request an absurd allocation.
 
-use argon2::{Algorithm, Argon2, Params, Version};
+use argon2::{Algorithm, Argon2, Block, Params, Version};
 use zeroize::Zeroizing;
 
 use crate::error::PgpError;
@@ -14,6 +14,9 @@ const MIN_SALT_LENGTH: usize = 16;
 const MEMORY_KIB: std::ops::RangeInclusive<u32> = 8_192..=1_048_576;
 const ITERATIONS: std::ops::RangeInclusive<u32> = 1..=16;
 const PARALLELISM: std::ops::RangeInclusive<u32> = 1..=8;
+/// Stack overwritten once a derivation returns; it has to exceed the depth
+/// argon2 and its BLAKE2b hashing reach below `derive`.
+const STACK_SCRUB_BYTES: usize = 64 * 1024;
 
 pub(crate) fn derive_unlock_secret(
     passphrase: Vec<u8>,
@@ -40,12 +43,26 @@ pub(crate) fn derive_unlock_secret(
     }
     let params = Params::new(memory_kib, iterations, parallelism, Some(OUTPUT_LENGTH))
         .map_err(|error| refuse(&error.to_string()))?;
-    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    let mut blocks = Zeroizing::new(vec![Block::new(); params.block_count()]);
     let mut output = vec![0u8; OUTPUT_LENGTH];
-    argon2
-        .hash_password_into(&passphrase, salt, &mut output)
-        .map_err(|error| refuse(&error.to_string()))?;
+    let derived = derive(&passphrase, salt, params, &mut blocks, &mut output);
+    zeroize::zeroize_stack::<STACK_SCRUB_BYTES>();
+    derived.map_err(|error| refuse(&error.to_string()))?;
     Ok(output)
+}
+
+/// Out of line so that argon2's frames lie below the caller's, where the stack
+/// scrub reaches them.
+#[inline(never)]
+fn derive(
+    passphrase: &[u8],
+    salt: &[u8],
+    params: Params,
+    blocks: &mut [Block],
+    output: &mut [u8],
+) -> argon2::Result<()> {
+    Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
+        .hash_password_into_with_memory(passphrase, salt, output, blocks)
 }
 
 #[cfg(test)]
