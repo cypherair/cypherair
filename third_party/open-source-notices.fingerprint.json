@@ -1,8 +1,8 @@
 {
   "generatedBy": "scripts/generate_open_source_notices.py",
   "generationInputs": {
-    "pgp-mobile/Cargo.lock": "ea07f16c4bccb6fd1d1034a76ed69680d1bb8f4f9ef6ca204aa3e922ec01307f",
-    "pgp-mobile/Cargo.toml": "6a34ed90201445f6caf718896c184fd5191d4574c1fba0638a60fbda5513596d",
+    "pgp-mobile/Cargo.lock": "6c89b3a69873f9fcea56364c896e4fd82a1e9f7a112324a8fa07837ff2c57781",
+    "pgp-mobile/Cargo.toml": "002d4fd5b1dc26e7202e4b0505c80f6bd304fb19326e02516cb95b59a3dd16b1",
     "scripts/generate_open_source_notices.py": "b5c7354a9c35a2935f593979fb59a8247aa969ec292350ddf650b54c3904fc20"
   },
   "licenseTexts": {
