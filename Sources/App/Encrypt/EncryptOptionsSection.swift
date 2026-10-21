@@ -48,6 +48,13 @@ struct EncryptOptionsSection: View {
                     }
                 }
             }
+        } footer: {
+            if !model.hasOwnKey {
+                Text(String(
+                    localized: "encrypt.options.noOwnKey",
+                    defaultValue: "Sign Message and Encrypt to Self need a key of your own. Generate or import one in Keys to turn them on."
+                ))
+            }
         }
     }
 }

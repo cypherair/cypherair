@@ -77,14 +77,22 @@ private struct UnlockView: View {
     @FocusState private var isPassphraseFocused: Bool
 
     var body: some View {
-        ViewThatFits(in: .vertical) {
-            unlockContent
-            ScrollView {
-                unlockContent
+        CypherSplitArrangement { isSplit in
+            scrollingIfNeeded {
+                VStack(spacing: 28) {
+                    LockHeader(subtitle: String(localized: "privacy.locked.title", defaultValue: "Locked"))
+
+                    if !isSplit {
+                        unlockForm
+                    }
+                }
+                .padding(24)
             }
-        }
-        .onAppear {
-            isPassphraseFocused = true
+        } secondary: {
+            scrollingIfNeeded {
+                unlockForm
+                    .padding(24)
+            }
         }
         .onChange(of: appLockController.lockState) { _, state in
             if case .failed = state {
@@ -93,68 +101,80 @@ private struct UnlockView: View {
         }
     }
 
-    private var unlockContent: some View {
-        VStack(spacing: 28) {
-            LockHeader(subtitle: String(localized: "privacy.locked.title", defaultValue: "Locked"))
-            VStack(spacing: 14) {
-                HStack(spacing: CypherSpacing.compact) {
-                    CypherSecureTextField(
-                        String(localized: "vault.unlock.field", defaultValue: "Passphrase"),
-                        text: $passphrase,
-                        isRevealed: isRevealed,
-                        submitLabel: .go,
-                        onSubmit: submit
-                    )
-                    .font(isRevealed ? .system(.body, design: .monospaced) : .body)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($isPassphraseFocused)
-                    .disabled(!appLockController.acceptsPassphrase)
-                    .accessibilityIdentifier("appLock.passphrase")
-                    PassphraseRevealToggle(isRevealed: $isRevealed)
-                }
-                if let message = failureMessage {
-                    Text(message)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("appLock.failure")
-                }
-                Button(action: submit) {
-                    if appLockController.isUnlocking {
-                        ProgressView()
-                            .frame(minWidth: 200)
-                    } else {
-                        Label(
-                            String(localized: "vault.unlock.action", defaultValue: "Unlock"),
-                            systemImage: biometricIconName
-                        )
-                        .font(.headline)
-                        .frame(minWidth: 200)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!canSubmit)
-                .accessibilityIdentifier("appLock.unlock")
-                Text(String(
-                    localized: "vault.unlock.hint",
-                    defaultValue: "Your passphrase, then confirm it is you."
-                ))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                Button(String(localized: "vault.unlock.forgot", defaultValue: "Forgot Passphrase…")) {
-                    resetFlow.request()
-                }
-                .buttonStyle(.plain)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .disabled(appLockController.isUnlocking)
-                .accessibilityIdentifier("appLock.forgotPassphrase")
+    private func scrollingIfNeeded(@ViewBuilder _ content: () -> some View) -> some View {
+        let content = content()
+        return ViewThatFits(in: .vertical) {
+            content
+            ScrollView {
+                content
             }
-            .frame(maxWidth: 440)
         }
-        .padding(24)
+        .alignedTowardSplit()
+    }
+
+    private var unlockForm: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: CypherSpacing.compact) {
+                CypherSecureTextField(
+                    String(localized: "vault.unlock.field", defaultValue: "Passphrase"),
+                    text: $passphrase,
+                    isRevealed: isRevealed,
+                    submitLabel: .go,
+                    onSubmit: submit
+                )
+                .font(isRevealed ? .system(.body, design: .monospaced) : .body)
+                .textFieldStyle(.roundedBorder)
+                .focused($isPassphraseFocused)
+                .disabled(!appLockController.acceptsPassphrase)
+                .accessibilityIdentifier("appLock.passphrase")
+                PassphraseRevealToggle(isRevealed: $isRevealed)
+            }
+            if let message = failureMessage {
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("appLock.failure")
+            }
+            Button(action: submit) {
+                if appLockController.isUnlocking {
+                    ProgressView()
+                        .frame(minWidth: 200)
+                } else {
+                    Label(
+                        String(localized: "vault.unlock.action", defaultValue: "Unlock"),
+                        systemImage: biometricIconName
+                    )
+                    .font(.headline)
+                    .frame(minWidth: 200)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!canSubmit)
+            .accessibilityIdentifier("appLock.unlock")
+            Text(String(
+                localized: "vault.unlock.hint",
+                defaultValue: "Your passphrase, then confirm it is you."
+            ))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            Button(String(localized: "vault.unlock.forgot", defaultValue: "Forgot Passphrase…")) {
+                resetFlow.request()
+            }
+            .buttonStyle(.plain)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .disabled(appLockController.isUnlocking)
+            .accessibilityIdentifier("appLock.forgotPassphrase")
+        }
+        .frame(maxWidth: 440)
+        // The form moves between panes as the device folds and unfolds, and
+        // takes the focus back with it.
+        .onAppear {
+            isPassphraseFocused = true
+        }
     }
 
     private var canSubmit: Bool {
@@ -218,63 +238,84 @@ private struct VaultSetupView: View {
     let appLockController: AppLockController
     @State private var passphrase = ""
     @State private var confirmation = ""
+    @State private var passphraseDisplay = CypherPassphraseEntry.Display()
     @FocusState private var focus: CypherPassphraseEntry.Field?
 
     var body: some View {
-        Form {
-            Section {
-                VStack(alignment: .leading, spacing: CypherSpacing.compact) {
-                    Text(String(localized: "vault.setup.title", defaultValue: "Choose Your Passphrase"))
-                        .font(.title2.weight(.semibold))
-                    Text(String(
-                        localized: "vault.setup.body",
-                        defaultValue: "Everything CypherAir X keeps on this device is sealed under this passphrase together with this device's Secure Enclave. It is never stored, and nobody can recover it: if you forget it, the only way forward is a reset that erases everything."
-                    ))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        CypherSplitArrangement { isSplit in
+            Form {
+                introSection
+
+                if !isSplit {
+                    entrySections
                 }
-                .padding(.vertical, 4)
             }
-            Section {
-                CypherPassphraseEntry(
-                    passphrase: $passphrase,
-                    confirmation: $confirmation,
-                    focus: $focus
-                )
-            }
-            Section {
-                Button(action: create) {
-                    if appLockController.isUnlocking {
-                        ProgressView()
-                            .cypherPrimaryActionLabelFrame()
-                    } else {
-                        Text(String(localized: "vault.setup.action", defaultValue: "Create Vault"))
-                            .cypherPrimaryActionLabelFrame()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!canCreate)
-                .accessibilityIdentifier("vault.setup.create")
-                if let failure = appLockController.setupFailure {
-                    Text(failure.message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .accessibilityIdentifier("vault.setup.failure")
-                }
-            } footer: {
-                Text(String(
-                    localized: "vault.setup.footer",
-                    defaultValue: "Creating the vault asks you to confirm it is you once. Unlocking later takes the passphrase and one confirmation."
-                ))
+        } secondary: {
+            Form {
+                entrySections
             }
         }
+        .groupedPaneBackground()
         #if os(macOS)
         .formStyle(.grouped)
         #endif
         .cypherMacReadableContent(maxWidth: MacPresentationWidth.onboarding)
         .screenReady("vault.setup.ready")
+    }
+
+    private var introSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: CypherSpacing.compact) {
+                Text(String(localized: "vault.setup.title", defaultValue: "Choose Your Passphrase"))
+                    .font(.title2.weight(.semibold))
+                Text(String(
+                    localized: "vault.setup.body",
+                    defaultValue: "Everything CypherAir X keeps on this device is sealed under this passphrase together with this device's Secure Enclave. It is never stored, and nobody can recover it: if you forget it, the only way forward is a reset that erases everything."
+                ))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var entrySections: some View {
+        Section {
+            CypherPassphraseEntry(
+                passphrase: $passphrase,
+                confirmation: $confirmation,
+                display: $passphraseDisplay,
+                focus: $focus
+            )
+        }
+        Section {
+            Button(action: create) {
+                if appLockController.isUnlocking {
+                    ProgressView()
+                        .cypherPrimaryActionLabelFrame()
+                } else {
+                    Text(String(localized: "vault.setup.action", defaultValue: "Create Vault"))
+                        .cypherPrimaryActionLabelFrame()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!canCreate)
+            .accessibilityIdentifier("vault.setup.create")
+            if let failure = appLockController.setupFailure {
+                Text(failure.message)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("vault.setup.failure")
+            }
+        } footer: {
+            Text(String(
+                localized: "vault.setup.footer",
+                defaultValue: "Creating the vault asks you to confirm it is you once. Unlocking later takes the passphrase and one confirmation."
+            ))
+        }
     }
 
     private var canCreate: Bool {
@@ -382,6 +423,8 @@ private struct VaultIntegrityFailureView: View {
         )) { target in
             NavigationStack {
                 BackupKeyView(fingerprint: target.fingerprint)
+                    .toolbarTitleDisplayMode(.inline)
+                    .navigationTitleStaysVisible()
             }
             #if os(macOS)
             .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 560)

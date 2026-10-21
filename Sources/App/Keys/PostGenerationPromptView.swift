@@ -53,22 +53,28 @@ private struct PostGenerationPromptHostView: View {
     var body: some View {
         let exportController = model.exportController
 
-        List {
-            if model.isDeviceBound {
-                deviceBoundHeaderSection
-                deviceBoundActionsSection
-            } else {
-                softwareHeaderSection
-                softwareActionsSection
+        CypherSplitArrangement { isSplit in
+            List {
+                headerSection
+
+                if !isSplit {
+                    actionsSection
+                }
+            }
+        } secondary: {
+            List {
+                actionsSection
             }
         }
+        .groupedPaneBackground()
         .cypherMacReadableContent()
         .accessibilityIdentifier("postgen.root")
         .screenReady("postgen.ready")
         .navigationTitle(String(localized: "postgen.title", defaultValue: "Key Ready"))
+        .toolbarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button(String(localized: "postgen.done", defaultValue: "Done")) {
+            ToolbarItem(placement: .sheetDone) {
+                Button(role: .confirm) {
                     handleDone()
                 }
                 .accessibilityIdentifier("postgen.done")
@@ -95,6 +101,24 @@ private struct PostGenerationPromptHostView: View {
         }
         .onDisappear {
             model.handleDisappear()
+        }
+    }
+
+    @ViewBuilder
+    private var headerSection: some View {
+        if model.isDeviceBound {
+            deviceBoundHeaderSection
+        } else {
+            softwareHeaderSection
+        }
+    }
+
+    @ViewBuilder
+    private var actionsSection: some View {
+        if model.isDeviceBound {
+            deviceBoundActionsSection
+        } else {
+            softwareActionsSection
         }
     }
 

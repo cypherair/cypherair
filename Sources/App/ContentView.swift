@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// Root view with TabView for main navigation.
-/// Liquid Glass: TabView auto-adopts floating glass capsule — no manual styling needed.
 struct ContentView: View {
     @State private var selectedTab: AppShellTab = .home
 
@@ -26,24 +24,22 @@ struct MacAppShellView: View {
             columnVisibility: $navigationState.columnVisibility,
             preferredCompactColumn: $navigationState.preferredCompactColumn
         ) {
-            List(selection: $navigationState.selectedTab) {
+            List(selection: $navigationState.selection) {
                 Section {
-                    sidebarRow(.home)
-                    sidebarRow(.keys)
-                    sidebarRow(.contacts)
-                    sidebarRow(.settings)
+                    ForEach(AppShellTab.allCases, id: \.self) { tab in
+                        sidebarRow(.tab(tab))
+                    }
                 }
 
                 Section(String(localized: "tab.section.tools", defaultValue: "Tools")) {
-                    sidebarRow(.encrypt)
-                    sidebarRow(.decrypt)
-                    sidebarRow(.sign)
-                    sidebarRow(.verify)
+                    ForEach(AppTool.allCases, id: \.self) { tool in
+                        sidebarRow(.tool(tool))
+                    }
                 }
             }
             .navigationTitle(AppProductIdentity.localizedDisplayName)
         } detail: {
-            detailContent(for: navigationState.selectedTab)
+            detailContent(for: navigationState.selection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .screenReady("main.ready")
@@ -64,55 +60,52 @@ struct MacAppShellView: View {
         navigationState.activePresentation = .onboarding(initialPage: 0)
     }
 
-    private func sidebarRow(_ tab: AppShellTab) -> some View {
-        Label(
-            AppShellComposition.title(for: tab),
-            systemImage: AppShellComposition.systemImage(for: tab)
-        )
-        .tag(tab)
-        .accessibilityIdentifier("sidebar.\(tab.rawValue)")
+    private func sidebarRow(_ item: MacSidebarItem) -> some View {
+        Label(item.title, systemImage: item.systemImage)
+            .tag(item)
+            .accessibilityIdentifier("sidebar.\(item.identifier)")
     }
 
     @ViewBuilder
-    private func detailContent(for tab: AppShellTab) -> some View {
-        // Per-tab identity (.id below) gives each sidebar tab its own
+    private func detailContent(for item: MacSidebarItem) -> some View {
+        // Per-item identity (.id below) gives each sidebar destination its own
         // NavigationStack instance, and the binding ignores writes made once
-        // the tab is no longer selected — the outgoing stack clears its path
-        // during teardown, which would otherwise erase the stored per-tab
-        // navigation on every switch.
+        // the item is no longer selected — the outgoing stack clears its path
+        // during teardown, which would otherwise erase the stored navigation
+        // on every switch.
         AppRouteHost(
-            resolver: macRouteResolver(for: tab),
+            resolver: macRouteResolver(for: item),
             path: Binding(
-                get: { navigationState.path(for: tab) },
+                get: { navigationState.path(for: item) },
                 set: { newPath in
-                    guard navigationState.selectedTab == tab else { return }
-                    navigationState.setPath(newPath, for: tab)
+                    guard navigationState.selection == item else { return }
+                    navigationState.setPath(newPath, for: item)
                 }
             )
         ) {
-            switch tab {
-            case .home:
+            switch item {
+            case .tab(.home):
                 HomeView()
-            case .keys:
+            case .tab(.keys):
                 MyKeysView()
-            case .contacts:
+            case .tab(.contacts):
                 ContactsView()
-            case .settings:
+            case .tab(.settings):
                 SettingsView()
-            case .encrypt:
+            case .tool(.encrypt):
                 EncryptView()
-            case .decrypt:
+            case .tool(.decrypt):
                 DecryptView()
-            case .sign:
+            case .tool(.sign):
                 SignView()
-            case .verify:
+            case .tool(.verify):
                 VerifyView()
             }
         }
-        .id(tab)
+        .id(item)
     }
 
-    private func macRouteResolver(for tab: AppShellTab) -> AppRouteDestinationResolver {
+    private func macRouteResolver(for item: MacSidebarItem) -> AppRouteDestinationResolver {
         AppRouteDestinationResolver { route in
             switch route {
             case .keyGeneration:
@@ -121,7 +114,7 @@ struct MacAppShellView: View {
                         configuration: KeyGenerationView.Configuration(
                             postGenerationBehavior: .externalPrompt,
                             onPostGenerationPromptRequested: { identity in
-                                navigationState.push(.postGenerationPrompt(identity: identity), for: tab)
+                                navigationState.push(.postGenerationPrompt(identity: identity), for: item)
                             }
                         )
                     )

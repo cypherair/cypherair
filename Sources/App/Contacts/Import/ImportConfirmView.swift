@@ -31,10 +31,12 @@ struct ImportConfirmView: View {
                 actionBar
             }
             .navigationTitle(String(localized: "import.confirm.title", defaultValue: "Import Public Key"))
+            .toolbarTitleDisplayMode(.inline)
+            .navigationTitleStaysVisible()
             .accessibilityIdentifier("importconfirm.root")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "import.cancel", defaultValue: "Cancel")) {
+                    Button(role: .cancel) {
                         onCancel()
                     }
                 }

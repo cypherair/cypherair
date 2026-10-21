@@ -5,7 +5,6 @@ struct EncryptScreenHostView: View {
     let appSettings: AppSettingsCoordinator
     let appSessionOrchestrator: AppSessionOrchestrator
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: EncryptScreenModel
 
     init(
@@ -32,36 +31,15 @@ struct EncryptScreenHostView: View {
 
     var body: some View {
         @Bindable var model = model
-        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
-            horizontalSizeClass: horizontalSizeClass
-        )
-
-        EncryptScreenFormView(model: model, showsModePicker: !usesToolbarModePicker)
+        EncryptScreenFormView(model: model)
         .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
         #endif
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
-        .toolbar {
-            if usesToolbarModePicker {
-                ToolbarItem(placement: .principal) {
-                    CypherModePicker(
-                        title: String(localized: "encrypt.mode", defaultValue: "Mode"),
-                        selection: $model.encryptMode,
-                        selectedValueLabel: model.encryptMode.label,
-                        isDisabled: model.operation.isRunning,
-                        accessibilityIdentifier: "encrypt.mode.picker"
-                    ) {
-                        ForEach(EncryptView.EncryptMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                }
-            }
-        }
         .cypherSearchable(
             text: $model.recipientSearchText,
-            prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")
+            prompt: String(localized: "encrypt.search.prompt", defaultValue: "Search recipients")
         )
         .encryptScreenPresentations(model: model)
         .onChange(of: runtimeSyncKey) { _, _ in

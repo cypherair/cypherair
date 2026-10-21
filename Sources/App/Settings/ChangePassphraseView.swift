@@ -9,6 +9,7 @@ struct ChangePassphraseView: View {
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
     @State private var model = ChangePassphraseModel()
+    @State private var passphraseDisplay = CypherPassphraseEntry.Display()
     @FocusState private var focus: CypherPassphraseEntry.Field?
     @FocusState private var isCurrentFocused: Bool
 
@@ -31,6 +32,7 @@ struct ChangePassphraseView: View {
                 CypherPassphraseEntry(
                     passphrase: $model.passphrase,
                     confirmation: $model.confirmation,
+                    display: $passphraseDisplay,
                     focus: $focus
                 )
             } header: {
@@ -57,16 +59,21 @@ struct ChangePassphraseView: View {
         #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .navigationTitleStaysVisible()
         .interactiveDismissDisabled(model.isSaving)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                Button(role: .cancel) {
                     dismiss()
                 }
                 .disabled(model.isSaving)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button(String(localized: "changePassphrase.save", defaultValue: "Change")) {
+                Button(
+                    String(localized: "changePassphrase.save", defaultValue: "Change"),
+                    systemImage: "checkmark",
+                    role: .confirm
+                ) {
                     Task {
                         if await model.save(using: appLockController) {
                             dismiss()

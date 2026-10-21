@@ -64,148 +64,32 @@ struct AppRouteDestinationView: View {
 
 @MainActor
 enum AppShellComposition {
-    static func definition(
-        for tab: AppShellTab,
-        content: AnyView
-    ) -> AppShellTabDefinition {
-        AppShellTabDefinition(
-            tab: tab,
-            title: title(for: tab),
-            systemImage: systemImage(for: tab),
-            section: section(for: tab),
-            content: content
-        )
-    }
-
-    static func title(for tab: AppShellTab) -> String {
-        switch tab {
-        case .home:
-            String(localized: "tab.home", defaultValue: "Home")
-        case .keys:
-            String(localized: "tab.keys", defaultValue: "Keys")
-        case .contacts:
-            String(localized: "tab.contacts", defaultValue: "Contacts")
-        case .settings:
-            String(localized: "tab.settings", defaultValue: "Settings")
-        case .encrypt:
-            String(localized: "home.encrypt", defaultValue: "Encrypt")
-        case .decrypt:
-            String(localized: "home.decrypt", defaultValue: "Decrypt")
-        case .sign:
-            String(localized: "home.sign", defaultValue: "Sign")
-        case .verify:
-            String(localized: "home.verify", defaultValue: "Verify")
-        }
-    }
-
-    static func systemImage(for tab: AppShellTab) -> String {
-        switch tab {
-        case .home:
-            "house"
-        case .keys:
-            "key"
-        case .contacts:
-            "person.2"
-        case .settings:
-            "gearshape"
-        case .encrypt:
-            "lock.fill"
-        case .decrypt:
-            "lock.open.fill"
-        case .sign:
-            "signature"
-        case .verify:
-            "checkmark.seal"
-        }
-    }
-
-    static func section(for tab: AppShellTab) -> AppShellTabSection {
-        switch tab {
-        case .home, .keys, .contacts, .settings:
-            .primary
-        case .encrypt, .decrypt, .sign, .verify:
-            .tools
-        }
-    }
-
-    static func content(
-        for tab: AppShellTab,
-        resolver: AppRouteDestinationResolver
-    ) -> AnyView {
-        switch tab {
-        case .home:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    HomeView()
-                }
-            )
-        case .keys:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    MyKeysView()
-                }
-            )
-        case .contacts:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    ContactsView()
-                }
-            )
-        case .settings:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    SettingsView()
-                }
-            )
-        case .encrypt:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    EncryptView()
-                }
-            )
-        case .decrypt:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    DecryptView()
-                }
-            )
-        case .sign:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    SignView()
-                }
-            )
-        case .verify:
-            AnyView(
-                AppRouteHost(resolver: resolver) {
-                    VerifyView()
-                }
-            )
-        }
-    }
-
-    static func normalizedSelection(
-        _ selectedTab: AppShellTab,
-        sizeClass: UserInterfaceSizeClass?
-    ) -> AppShellTab {
-        guard sizeClass == .compact else { return selectedTab }
-
-        switch selectedTab {
-        case .encrypt, .decrypt, .sign, .verify:
-            return .home
-        default:
-            return selectedTab
-        }
-    }
-
     static func definitions(
         resolver: AppRouteDestinationResolver
     ) -> [AppShellTabDefinition] {
         AppShellTab.allCases.map { tab in
-            definition(
-                for: tab,
-                content: content(for: tab, resolver: resolver)
+            AppShellTabDefinition(
+                tab: tab,
+                content: AnyView(
+                    AppRouteHost(resolver: resolver) {
+                        root(for: tab)
+                    }
+                )
             )
+        }
+    }
+
+    @ViewBuilder
+    private static func root(for tab: AppShellTab) -> some View {
+        switch tab {
+        case .home:
+            HomeView()
+        case .keys:
+            MyKeysView()
+        case .contacts:
+            ContactsView()
+        case .settings:
+            SettingsView()
         }
     }
 }

@@ -71,6 +71,7 @@ struct KeyGenerationDetailsView: View {
         .navigationTitle(family.familyDisplayName)
         #if !os(macOS)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitleStaysVisible()
         #endif
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

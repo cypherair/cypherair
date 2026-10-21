@@ -152,9 +152,11 @@ struct EncryptQuantumSafetyHelpSheet: View {
                 localized: "encrypt.quantumSafe.helpTitle",
                 defaultValue: "Quantum Safety"
             ))
+            .toolbarTitleDisplayMode(.inline)
+            .navigationTitleStaysVisible()
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "common.done", defaultValue: "Done")) {
+                ToolbarItem(placement: .sheetDone) {
+                    Button(role: .confirm) {
                         dismiss()
                     }
                 }

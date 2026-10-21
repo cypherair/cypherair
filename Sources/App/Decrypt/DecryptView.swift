@@ -103,7 +103,7 @@ private struct DecryptScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
     let configuration: DecryptView.Configuration
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(KeyManagementService.self) private var keyManagement
     @State private var model: DecryptScreenModel
 
     init(
@@ -126,140 +126,147 @@ private struct DecryptScreenHostView: View {
         let operation = model.operation
         let exportController = model.exportController
         let fileImportRequestToken = model.fileImportRequestToken
-        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
-            horizontalSizeClass: horizontalSizeClass
-        )
 
-        CypherToolScreenLayout(hasOutput: hasOutput) {
-            if !usesToolbarModePicker {
-                Section {
-                    CypherModePicker(
-                        title: String(localized: "decrypt.mode", defaultValue: "Mode"),
-                        selection: $model.decryptMode,
-                        selectedValueLabel: model.decryptMode.label,
-                        isDisabled: operation.isRunning,
-                        accessibilityIdentifier: "decrypt.mode.picker"
-                    ) {
-                        ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                }
-            }
-
-            if model.decryptMode == .text {
-                textInputContent
-                    .disabled(operation.isRunning)
-            } else {
-                fileInputContent
-                    .disabled(operation.isRunning)
-            }
-
-            Section {
-                Button {
-                    if model.decryptMode == .text {
-                        model.parseRecipientsText()
-                    } else {
-                        model.parseRecipientsFile()
-                    }
-                } label: {
-                    CypherOperationButtonLabel(
-                        idleTitle: String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"),
-                        runningTitle: String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."),
-                        isRunning: operation.isRunning && !model.hasPhase1Result,
-                        isCancelling: operation.isCancelling,
-                        progressFraction: nil
+        Group {
+            if keyManagement.keys.isEmpty {
+                CypherToolKeyRequiredView(
+                    title: String(localized: "decrypt.keyRequired.title", defaultValue: "No Key to Decrypt With"),
+                    message: String(
+                        localized: "decrypt.keyRequired.message",
+                        defaultValue: "Decrypting a message needs a key of your own. Generate or import one in Keys."
                     )
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(model.decryptButtonDisabled || model.hasPhase1Result)
-            }
-
-            if let matchedKey = model.activeMatchedKey {
-                Section {
-                    LabeledContent(
-                        String(localized: "decrypt.matchedKey.name", defaultValue: "Key"),
-                        value: matchedKey.userId ?? matchedKey.shortKeyId
-                    )
-                    LabeledContent(
-                        String(localized: "decrypt.matchedKey.keyType", defaultValue: "Key Type"),
-                        value: matchedKey.keyFamily.familyDisplayName
-                    )
-                    FingerprintView(
-                        fingerprint: matchedKey.fingerprint,
-                        font: .system(.caption, design: .monospaced),
-                        foregroundColor: .secondary
-                    )
-                } header: {
-                    Text(String(localized: "decrypt.matchedKey", defaultValue: "Matched Key"))
-                }
-
-                Section {
-                    Button {
-                        if model.decryptMode == .text {
-                            model.decryptText()
-                        } else {
-                            model.decryptFile()
-                        }
-                    } label: {
-                        CypherOperationButtonLabel(
-                            idleTitle: String(localized: "decrypt.button", defaultValue: "Decrypt with \(matchedKey.userId ?? matchedKey.shortKeyId)"),
-                            runningTitle: String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."),
-                            isRunning: operation.isRunning,
-                            isCancelling: operation.isCancelling,
-                            progressFraction: model.decryptMode == .file ? operation.progress?.fractionCompleted : nil,
-                            minWidth: 240
-                        )
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(operation.isRunning)
-                }
-
-                if model.showsFileDecryptCancelAction {
-                    CypherOperationCancelSection(
-                        isCancelling: operation.isCancelling,
-                        cancel: operation.cancel
-                    )
-                }
-            }
-        } output: {
-            if model.decryptMode == .text,
-               let textDecryptionResult = model.textDecryptionResult {
-                Section {
-                    CypherOutputTextBlock(
-                        text: textDecryptionResult.plaintext,
-                        font: .body,
-                        minHeight: 80,
-                        maxHeight: 220
-                    )
-                } header: {
-                    Text(String(localized: "decrypt.result", defaultValue: "Decrypted Message"))
-                }
-            }
-
-            if model.decryptMode == .file, model.fileDecryptionResult != nil {
-                Section {
-                    Button {
-                        model.exportDecryptedFile()
-                    } label: {
-                        Label(
-                            String(localized: "fileDecrypt.save", defaultValue: "Save Decrypted File"),
-                            systemImage: "square.and.arrow.down"
-                        )
-                    }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(!model.configuration.allowsFileResultExport)
-                }
-            }
-
-            if let detailedVerification = model.activeDetailedSignatureVerification {
-                DetailedSignatureSectionView(
-                    verification: detailedVerification,
-                    resultTitle: "decrypt.signature",
-                    signerTitle: "decrypt.signer"
                 )
+            } else {
+                CypherToolScreenLayout(hasOutput: hasOutput) {
+                    Section {
+                        CypherModePicker(
+                            title: String(localized: "decrypt.mode", defaultValue: "Mode"),
+                            selection: $model.decryptMode,
+                            selectedValueLabel: model.decryptMode.label,
+                            isDisabled: operation.isRunning,
+                            accessibilityIdentifier: "decrypt.mode.picker"
+                        ) {
+                            ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                    }
+
+                    if model.decryptMode == .text {
+                        textInputContent
+                            .disabled(operation.isRunning)
+                    } else {
+                        fileInputContent
+                            .disabled(operation.isRunning)
+                    }
+
+                    Section {
+                        Button {
+                            if model.decryptMode == .text {
+                                model.parseRecipientsText()
+                            } else {
+                                model.parseRecipientsFile()
+                            }
+                        } label: {
+                            CypherOperationButtonLabel(
+                                idleTitle: String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"),
+                                runningTitle: String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."),
+                                isRunning: operation.isRunning && !model.hasPhase1Result,
+                                isCancelling: operation.isCancelling,
+                                progressFraction: nil
+                            )
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(model.decryptButtonDisabled || model.hasPhase1Result)
+                    }
+
+                    if let matchedKey = model.activeMatchedKey {
+                        Section {
+                            LabeledContent(
+                                String(localized: "decrypt.matchedKey.name", defaultValue: "Key"),
+                                value: matchedKey.userId ?? matchedKey.shortKeyId
+                            )
+                            LabeledContent(
+                                String(localized: "decrypt.matchedKey.keyType", defaultValue: "Key Type"),
+                                value: matchedKey.keyFamily.familyDisplayName
+                            )
+                            FingerprintView(
+                                fingerprint: matchedKey.fingerprint,
+                                font: .system(.caption, design: .monospaced),
+                                foregroundColor: .secondary
+                            )
+                        } header: {
+                            Text(String(localized: "decrypt.matchedKey", defaultValue: "Matched Key"))
+                        }
+
+                        Section {
+                            Button {
+                                if model.decryptMode == .text {
+                                    model.decryptText()
+                                } else {
+                                    model.decryptFile()
+                                }
+                            } label: {
+                                CypherOperationButtonLabel(
+                                    idleTitle: String(localized: "decrypt.button", defaultValue: "Decrypt with \(matchedKey.userId ?? matchedKey.shortKeyId)"),
+                                    runningTitle: String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."),
+                                    isRunning: operation.isRunning,
+                                    isCancelling: operation.isCancelling,
+                                    progressFraction: model.decryptMode == .file ? operation.progress?.fractionCompleted : nil,
+                                    minWidth: 240
+                                )
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.return, modifiers: .command)
+                            .disabled(operation.isRunning)
+                        }
+
+                        if model.showsFileDecryptCancelAction {
+                            CypherOperationCancelSection(
+                                isCancelling: operation.isCancelling,
+                                cancel: operation.cancel
+                            )
+                        }
+                    }
+                } output: {
+                    if model.decryptMode == .text,
+                       let textDecryptionResult = model.textDecryptionResult {
+                        Section {
+                            CypherOutputTextBlock(
+                                text: textDecryptionResult.plaintext,
+                                font: .body,
+                                minHeight: 80,
+                                maxHeight: 220
+                            )
+                        } header: {
+                            Text(String(localized: "decrypt.result", defaultValue: "Decrypted Message"))
+                        }
+                    }
+
+                    if model.decryptMode == .file, model.fileDecryptionResult != nil {
+                        Section {
+                            Button {
+                                model.exportDecryptedFile()
+                            } label: {
+                                Label(
+                                    String(localized: "fileDecrypt.save", defaultValue: "Save Decrypted File"),
+                                    systemImage: "square.and.arrow.down"
+                                )
+                            }
+                            .keyboardShortcut("s", modifiers: .command)
+                            .disabled(!model.configuration.allowsFileResultExport)
+                        }
+                    }
+
+                    if let detailedVerification = model.activeDetailedSignatureVerification {
+                        DetailedSignatureSectionView(
+                            verification: detailedVerification,
+                            resultTitle: "decrypt.signature",
+                            signerTitle: "decrypt.signer"
+                        )
+                    }
+                }
             }
         }
         .scrollDismissesKeyboardInteractivelyIfAvailable()
@@ -267,23 +274,6 @@ private struct DecryptScreenHostView: View {
         .formStyle(.grouped)
         #endif
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
-        .toolbar {
-            if usesToolbarModePicker {
-                ToolbarItem(placement: .principal) {
-                    CypherModePicker(
-                        title: String(localized: "decrypt.mode", defaultValue: "Mode"),
-                        selection: $model.decryptMode,
-                        selectedValueLabel: model.decryptMode.label,
-                        isDisabled: operation.isRunning,
-                        accessibilityIdentifier: "decrypt.mode.picker"
-                    ) {
-                        ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                }
-            }
-        }
         .fileImporter(
             isPresented: $model.showFileImporter,
             allowedContentTypes: allowedImportContentTypes,

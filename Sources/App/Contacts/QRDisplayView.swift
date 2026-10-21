@@ -36,48 +36,65 @@ private struct QRDisplayHostView: View {
     }
 
     var body: some View {
-        qrContent
-            .padding()
-            .cypherMacReadableContent(
-                maxWidth: MacPresentationWidth.qrContent,
-                alignment: .center,
-                outerAlignment: .center
-            )
-            .accessibilityIdentifier("qr.root")
-            .screenReady("qr.ready")
-            .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))
-            .task {
-                model.prepare()
+        CypherSplitArrangement { isSplit in
+            VStack(spacing: 24) {
+                code
+
+                if !isSplit {
+                    details
+                }
             }
+            .padding()
+            .alignedTowardSplit()
+        } secondary: {
+            details
+                .padding()
+                .alignedTowardSplit()
+        }
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.qrContent,
+            alignment: .center,
+            outerAlignment: .center
+        )
+        .accessibilityIdentifier("qr.root")
+        .screenReady("qr.ready")
+        .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))
+        .task {
+            model.prepare()
+        }
     }
 
-    private var qrContent: some View {
-        VStack(spacing: 24) {
-            if let unavailability = model.unavailability {
-                ContentUnavailableView(
-                    String(localized: "qr.unavailable.title", defaultValue: "QR Not Available"),
-                    systemImage: "qrcode",
-                    description: Text(Self.unavailabilityDescription(unavailability))
+    @ViewBuilder
+    private var code: some View {
+        if let unavailability = model.unavailability {
+            ContentUnavailableView(
+                String(localized: "qr.unavailable.title", defaultValue: "QR Not Available"),
+                systemImage: "qrcode",
+                description: Text(Self.unavailabilityDescription(unavailability))
+            )
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("qr.unavailable")
+        } else if let qrCGImage = model.qrCGImage {
+            Image(decorative: qrCGImage, scale: 1.0)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 280, maxHeight: 280)
+                #if os(visionOS)
+                .contentShape(.hoverEffect, .rect(cornerRadius: CypherRadius.card))
+                .hoverEffect(.lift)
+                #endif
+                .accessibilityLabel(
+                    String(localized: "qr.accessibility", defaultValue: "QR code containing public key")
                 )
-                .accessibilityIdentifier("qr.unavailable")
-            } else if let qrCGImage = model.qrCGImage {
-                Image(decorative: qrCGImage, scale: 1.0)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: 280, maxHeight: 280)
-                    #if os(visionOS)
-                    .contentShape(.hoverEffect, .rect(cornerRadius: CypherRadius.card))
-                    .hoverEffect(.lift)
-                    #endif
-                    .accessibilityLabel(
-                        String(localized: "qr.accessibility", defaultValue: "QR code containing public key")
-                    )
-            } else {
-                ProgressView()
-                    .frame(width: 280, height: 280)
-            }
+        } else {
+            ProgressView()
+                .frame(width: 280, height: 280)
+        }
+    }
 
+    private var details: some View {
+        VStack(spacing: 24) {
             Text(displayName)
                 .font(.headline)
 

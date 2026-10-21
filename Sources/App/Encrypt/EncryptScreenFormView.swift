@@ -2,21 +2,18 @@ import SwiftUI
 
 struct EncryptScreenFormView: View {
     let model: EncryptScreenModel
-    var showsModePicker = true
 
     var body: some View {
         @Bindable var model = model
         let operation = model.operation
 
         CypherToolScreenLayout(hasOutput: hasOutput) {
-            if showsModePicker {
-                Section {
-                    modePicker(
-                        selection: $model.encryptMode,
-                        selectedValueLabel: model.encryptMode.label,
-                        isDisabled: operation.isRunning
-                    )
-                }
+            Section {
+                modePicker(
+                    selection: $model.encryptMode,
+                    selectedValueLabel: model.encryptMode.label,
+                    isDisabled: operation.isRunning
+                )
             }
 
             if model.encryptMode == .text {

@@ -33,32 +33,22 @@ struct TutorialShellTabsView: View {
         return guidance
     }
 
+    /// The guidance rail sits beside the shell in regular width and takes a
+    /// third of the width there; the shell stays the same view either way.
     private var iOSLayout: some View {
-        Group {
-            if sizeClass == .regular {
-                HStack(spacing: 0) {
-                    SharedIOSTabShellView(
-                        selectedTab: $selectedTab,
-                        definitions: TutorialShellDefinitionsBuilder(
-                            store: tutorialStore,
-                            sizeClass: sizeClass
-                        ).definitions()
-                    )
+        HStack(spacing: 0) {
+            SharedIOSTabShellView(
+                selectedTab: $selectedTab,
+                definitions: TutorialShellDefinitionsBuilder(
+                    store: tutorialStore,
+                    sizeClass: sizeClass
+                ).definitions()
+            )
 
-                    if let currentGuidance {
-                        guidanceRail(currentGuidance)
-                            .frame(width: 300)
-                            .background(.background)
-                    }
-                }
-            } else {
-                SharedIOSTabShellView(
-                    selectedTab: $selectedTab,
-                    definitions: TutorialShellDefinitionsBuilder(
-                        store: tutorialStore,
-                        sizeClass: sizeClass
-                    ).definitions()
-                )
+            if sizeClass == .regular, let currentGuidance {
+                guidanceRail(currentGuidance)
+                    .containerRelativeFrame(.horizontal, count: 3, span: 1, spacing: 0)
+                    .background(.background)
             }
         }
     }
@@ -94,6 +84,7 @@ struct TutorialShellTabsView: View {
                     .background(.background)
             }
         }
+        .environment(\.appShellTabSelection, $selectedTab)
     }
     #endif
 

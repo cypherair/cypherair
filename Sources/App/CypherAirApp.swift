@@ -71,7 +71,7 @@ struct CypherAirApp: App {
             MacKeyboardCommands(navigationState: macShellNavigationState)
             CommandGroup(replacing: .appSettings) {
                 Button(String(localized: "settings.title", defaultValue: "Settings…")) {
-                    macShellNavigationState.selectedTab = .settings
+                    macShellNavigationState.selection = .tab(.settings)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }

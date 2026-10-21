@@ -83,7 +83,6 @@ private struct AddContactScreenHostView: View {
     let configuration: AddContactView.Configuration
     let dismissAction: @MainActor () -> Void
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: AddContactScreenModel
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var fallbackImportConfirmationCoordinator = ImportConfirmationCoordinator()
@@ -151,26 +150,21 @@ private struct AddContactScreenHostView: View {
     private var formContent: some View {
         @Bindable var model = model
         let fileImportRequestToken = model.fileImportRequestToken
-        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
-            horizontalSizeClass: horizontalSizeClass
-        )
 
         return Form {
-            if !usesToolbarModePicker {
-                Section {
-                    CypherModePicker(
-                        title: String(localized: "addcontact.mode", defaultValue: "Import Method"),
-                        selection: Binding(
-                            get: { model.importMode },
-                            set: { model.setImportMode($0) }
-                        ),
-                        selectedValueLabel: model.importMode.label,
-                        isDisabled: model.configuration.allowedImportModes.count == 1,
-                        accessibilityIdentifier: "addcontact.mode.picker"
-                    ) {
-                        ForEach(model.configuration.allowedImportModes, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
+            Section {
+                CypherModePicker(
+                    title: String(localized: "addcontact.mode", defaultValue: "Import Method"),
+                    selection: Binding(
+                        get: { model.importMode },
+                        set: { model.setImportMode($0) }
+                    ),
+                    selectedValueLabel: model.importMode.label,
+                    isDisabled: model.configuration.allowedImportModes.count == 1,
+                    accessibilityIdentifier: "addcontact.mode.picker"
+                ) {
+                    ForEach(model.configuration.allowedImportModes, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
                     }
                 }
             }
@@ -202,26 +196,6 @@ private struct AddContactScreenHostView: View {
         #endif
         .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "addcontact.title", defaultValue: "Add Contact"))
-        .toolbar {
-            if usesToolbarModePicker {
-                ToolbarItem(placement: .principal) {
-                    CypherModePicker(
-                        title: String(localized: "addcontact.mode", defaultValue: "Import Method"),
-                        selection: Binding(
-                            get: { model.importMode },
-                            set: { model.setImportMode($0) }
-                        ),
-                        selectedValueLabel: model.importMode.label,
-                        isDisabled: model.configuration.allowedImportModes.count == 1,
-                        accessibilityIdentifier: "addcontact.mode.picker"
-                    ) {
-                        ForEach(model.configuration.allowedImportModes, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                }
-            }
-        }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: Binding(

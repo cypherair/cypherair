@@ -42,12 +42,12 @@ private struct TagManagementHostView: View {
         .toolbar {
             if model.canManageTags {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
+                    Button(
+                        String(localized: "tagManagement.create", defaultValue: "Create Tag"),
+                        systemImage: "plus"
+                    ) {
                         isCreateTagSheetPresented = true
-                    } label: {
-                        Image(systemName: "plus")
                     }
-                    .accessibilityLabel(String(localized: "tagManagement.create", defaultValue: "Create Tag"))
                 }
             }
         }
@@ -145,15 +145,21 @@ private struct CreateTagSheet: View {
                 }
             }
             .navigationTitle(String(localized: "tagManagement.create.header", defaultValue: "New Tag"))
+            .toolbarTitleDisplayMode(.inline)
+            .navigationTitleStaysVisible()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                    Button(role: .cancel) {
                         model.createTagName = ""
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button(String(localized: "tagManagement.create", defaultValue: "Create Tag")) {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(
+                        String(localized: "tagManagement.create", defaultValue: "Create Tag"),
+                        systemImage: "checkmark",
+                        role: .confirm
+                    ) {
                         create()
                     }
                     .disabled(ContactTag.displayName(for: model.createTagName).isEmpty)

@@ -84,15 +84,21 @@ private struct ModifyExpiryScreenHostView: View {
         .accessibilityIdentifier("modifyexpiry.root")
         .screenReady("modifyexpiry.ready")
         .navigationTitle(String(localized: "keydetail.expiry.title", defaultValue: "Modify Expiry"))
+        .toolbarTitleDisplayMode(.inline)
+        .navigationTitleStaysVisible()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "keydetail.expiry.cancel", defaultValue: "Cancel")) {
+                Button(role: .cancel) {
                     model.handleDisappear()
                     dismiss()
                 }
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button(String(localized: "keydetail.expiry.save", defaultValue: "Save")) {
+                Button(
+                    String(localized: "keydetail.expiry.save", defaultValue: "Save"),
+                    systemImage: "checkmark",
+                    role: .confirm
+                ) {
                     model.saveSelectedExpiryDate()
                 }
                 .accessibilityIdentifier("modifyexpiry.save")

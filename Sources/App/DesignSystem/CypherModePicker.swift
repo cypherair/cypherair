@@ -1,17 +1,5 @@
 import SwiftUI
 
-enum CypherModePickerPlacement {
-    static func usesToolbar(horizontalSizeClass: UserInterfaceSizeClass?) -> Bool {
-        #if os(macOS)
-        true
-        #elseif os(iOS)
-        horizontalSizeClass != .compact
-        #else
-        false
-        #endif
-    }
-}
-
 struct CypherModePicker<SelectionValue: Hashable, PickerContent: View>: View {
     let title: String
     let selectedValueLabel: String

@@ -1,53 +1,23 @@
 import SwiftUI
 
+/// The iOS and visionOS shell: the same four tabs in every size class, so
+/// opening, folding or rotating never changes the tab set under a selection.
 struct SharedIOSTabShellView: View {
-    @Environment(\.horizontalSizeClass) private var sizeClass
-
     @Binding var selectedTab: AppShellTab
     let definitions: [AppShellTabDefinition]
 
     var body: some View {
-        let primaryTabs = definitions.filter { $0.section == .primary }
-        let toolTabs = definitions.filter { $0.section == .tools }
-
         TabView(selection: $selectedTab) {
-            ForEach(primaryTabs) { definition in
-                SwiftUI.Tab(
-                    definition.title,
-                    systemImage: definition.systemImage,
+            ForEach(definitions) { definition in
+                Tab(
+                    definition.tab.title,
+                    systemImage: definition.tab.systemImage,
                     value: definition.tab
                 ) {
                     definition.content
                 }
             }
-
-            TabSection {
-                ForEach(toolTabs) { definition in
-                    SwiftUI.Tab(
-                        definition.title,
-                        systemImage: definition.systemImage,
-                        value: definition.tab
-                    ) {
-                        definition.content
-                    }
-                }
-            } header: {
-                Label(
-                    String(localized: "tab.section.tools", defaultValue: "Tools"),
-                    systemImage: "wrench.and.screwdriver"
-                )
-            }
-            #if !os(visionOS)
-            .tabPlacement(.sidebarOnly)
-            #endif
-            .hidden(sizeClass == .compact)
         }
-        .tabViewStyle(.sidebarAdaptable)
-        .onChange(of: sizeClass) { _, newSizeClass in
-            selectedTab = AppShellComposition.normalizedSelection(
-                selectedTab,
-                sizeClass: newSizeClass
-            )
-        }
+        .environment(\.appShellTabSelection, $selectedTab)
     }
 }

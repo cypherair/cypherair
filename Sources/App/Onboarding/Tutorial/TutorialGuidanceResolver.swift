@@ -59,7 +59,7 @@ struct TutorialGuidanceResolver {
             )
 
         case .encryptDemoMessage:
-            if selectedTab == .encrypt || visibleRoute == .encrypt {
+            if visibleRoute == .encrypt {
                 return payload(
                     module,
                     body: String(localized: "guidedTutorial.encrypt.form", defaultValue: "Bob is preselected. Review the draft and encrypt the message."),
@@ -90,7 +90,7 @@ struct TutorialGuidanceResolver {
             )
 
         case .decryptAndVerify:
-            if selectedTab == .decrypt || visibleRoute == .decrypt {
+            if visibleRoute == .decrypt {
                 if session.artifacts.parseResult == nil {
                     return payload(
                         module,

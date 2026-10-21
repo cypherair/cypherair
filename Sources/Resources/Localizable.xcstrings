@@ -737,22 +737,6 @@
         }
       }
     },
-    "common.close" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Close"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭"
-          }
-        }
-      }
-    },
     "common.comingSoon" : {
       "localizations" : {
         "en" : {
@@ -3302,13 +3286,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Names, email, tags, fingerprints"
+            "value" : "Search contacts"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "姓名、邮箱、标签、指纹"
+            "value" : "搜索联系人"
           }
         }
       }
@@ -3501,6 +3485,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "加密消息"
+          }
+        }
+      }
+    },
+    "decrypt.keyRequired.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decrypting a message needs a key of your own. Generate or import one in Keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解密消息需要你自己的密钥。请在“密钥”中生成或导入一个。"
+          }
+        }
+      }
+    },
+    "decrypt.keyRequired.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Key to Decrypt With"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可用于解密的密钥"
           }
         }
       }
@@ -3953,6 +3969,22 @@
         }
       }
     },
+    "encrypt.options.noOwnKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign Message and Encrypt to Self need a key of your own. Generate or import one in Keys to turn them on."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“签名消息”和“同时加密给自己”需要你自己的密钥。在“密钥”中生成或导入一个后即可开启。"
+          }
+        }
+      }
+    },
     "encrypt.plaintext" : {
       "localizations" : {
         "en" : {
@@ -4280,13 +4312,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recipients, tags, fingerprints"
+            "value" : "Search recipients"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收件人、标签、指纹"
+            "value" : "搜索收件人"
           }
         }
       }
@@ -5754,13 +5786,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Encrypted File"
+            "value" : "Save Encrypted File"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享加密文件"
+            "value" : "保存加密文件"
           }
         }
       }
@@ -7626,13 +7658,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generate a key to start encrypting and signing messages."
+            "value" : "Generate a key of your own to decrypt messages sent to you and sign the ones you send."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成密钥以开始加密和签名消息。"
+            "value" : "生成你自己的密钥，即可解密发给你的消息，并为你发出的消息签名。"
           }
         }
       }
@@ -7745,22 +7777,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入密钥"
-          }
-        }
-      }
-    },
-    "import.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
           }
         }
       }
@@ -8513,22 +8529,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "到期时间"
-          }
-        }
-      }
-    },
-    "keydetail.expiry.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
           }
         }
       }
@@ -11783,22 +11783,6 @@
         }
       }
     },
-    "postgen.done" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成"
-          }
-        }
-      }
-    },
     "postgen.nextSteps" : {
       "localizations" : {
         "en" : {
@@ -12684,13 +12668,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Report"
+            "value" : "Save Report"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享报告"
+            "value" : "保存报告"
           }
         }
       }
@@ -13415,6 +13399,38 @@
         }
       }
     },
+    "sign.keyRequired.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing needs a key of your own. Generate or import one in Keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名需要你自己的密钥。请在“密钥”中生成或导入一个。"
+          }
+        }
+      }
+    },
+    "sign.keyRequired.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Key to Sign With"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可用于签名的密钥"
+          }
+        }
+      }
+    },
     "sign.mode" : {
       "localizations" : {
         "en" : {
@@ -13516,13 +13532,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share .sig File"
+            "value" : "Save .sig File"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享 .sig 文件"
+            "value" : "保存 .sig 文件"
           }
         }
       }
@@ -14611,6 +14627,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "管理标签"
+          }
+        }
+      }
+    },
+    "tool.keyRequired.openKeys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往密钥"
           }
         }
       }

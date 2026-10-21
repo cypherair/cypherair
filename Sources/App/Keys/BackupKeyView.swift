@@ -42,6 +42,7 @@ private struct BackupKeyScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
 
     @State private var model: BackupKeyScreenModel
+    @State private var passphraseDisplay = CypherPassphraseEntry.Display()
     @FocusState private var focusedField: CypherPassphraseEntry.Field?
 
     init(
@@ -97,6 +98,7 @@ private struct BackupKeyScreenHostView: View {
                 CypherPassphraseEntry(
                     passphrase: $model.passphrase,
                     confirmation: $model.passphraseConfirm,
+                    display: $passphraseDisplay,
                     focus: $focusedField
                 )
             } header: {
