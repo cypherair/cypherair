@@ -23,6 +23,7 @@
 ## 3. arm64e toolchain contract
 
 - **Device slices ship `arm64` alongside `arm64e`** because Apple distribution requires an `arm64` slice whenever a bundle contains `arm64e`.
+- **`UIRequiredDeviceCapabilities` is declared (`arm64`) in `CypherAir-Info.plist`** because Xcode injects it only while every architecture in `ARCHS` is arm64 or arm64e; the arm64e.x1 slice silences the injection, and App Store Connect rejects a 64-bit iOS binary without the key.
 - **`arm64e` builds use stable Cargo with `RUSTC` pointed at the pinned stage1 compiler and its prebuilt std payloads — never nightly Cargo, never `-Zbuild-std`.** The repo has no `rust-toolchain.toml`; every ordinary validation names its toolchain (`cargo +stable`).
 - **App-side Rust or UniFFI changes never require a new stage1 prerelease** — only a change to the Rust compiler fork itself does. The opposite assumption costs a publication cycle.
 - The pinned tag and the never-`latest` red line live in [ARM64E_STATUS.md](ARM64E_STATUS.md); the App Store candidate gate parses that file against `third_party/arm64e-stage1-toolchain.pin.json`.
