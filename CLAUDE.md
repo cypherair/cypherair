@@ -4,14 +4,14 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-o
 
 Everything below is either a project fact you cannot infer from the code or a place where this project wants something other than your default.
 
-## Zero-Compatibility Premise — Foundation Over Blast Radius
-
-**[Temporary — in force until the first public App Store release; internal TestFlight builds do not end it]** The app has never shipped: no users, no user data, no old on-disk state anywhere. Every persisted format, identifier, name, and schema may change freely — redesign from zero and update every reference together; never write migration or compatibility code for a past that does not exist, and never keep a version marker "for future migration". When another document conflicts with this premise, that document changes.
+Before you start, say in a line what you're about to do; brief updates while you work help the user follow along. Close with a short recap that stands on its own (what you found, what you did, and what's next), so a reader who only sees the last message has the full picture.
 
 ## Code
+
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
 
 - Much of this codebase is older-generation model output. Do not match it: write what is correct by your own judgment, and match local naming and formatting only where it costs nothing.
 - In code you touch, delete outdated comments rather than leaving them; most inline notes never needed recording.
 - Most changes need no new tests. Write one only where it guards behaviour a later change could quietly break; a test that restates the code is not worth committing.
-- Prefer the architecturally correct solution over the smallest patch. This sets the depth of a change, not its scope.
+- Prefer the architecturally correct solution over the smallest patch.
 - Docs state the current contracts a reader cannot recover from the code or the machinery: no history, no restating what the code shows.
