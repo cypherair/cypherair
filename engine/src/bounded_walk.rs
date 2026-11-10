@@ -127,6 +127,12 @@ impl Bound {
     }
 }
 
+/// A bound that fired outside the walks, such as the decryption helper's
+/// budget of unwrap attempts, in the shape `is_bound` recognises.
+pub(crate) fn bound_fired() -> openpgp::anyhow::Error {
+    Bound.into_sequoia_error()
+}
+
 /// Whether a Sequoia error chain carries a bound that fired.
 ///
 /// It reaches through `get_ref()` rather than following `source()`, because an

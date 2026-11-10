@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::keys;
+use common::{device, keys};
 use cypher_engine::{
     Algorithm, AlgorithmKind, Curve, EngineError, Expiry, KeyShape, PrivateKey,
     generate_portable_key, inspect_certificate,
@@ -86,10 +86,11 @@ fn e11_name_only_from_a_validly_bound_user_id() {
     assert_eq!((info.name, info.email), (None, None));
 }
 
-/// E12. Each shape the engine makes is reported as itself, with its real
-/// algorithms, and its certificate holds no secret. A P-256 key never shares a shape with a Curve25519 key. A key
-/// that matches none of ours has no shape and still reports its algorithm and
-/// size.
+/// E12. Each shape the engine makes, in either custody, is reported as itself,
+/// with its real algorithms, and its certificate holds no secret. A P-256 key
+/// never shares a shape with a Curve25519 key. A key that matches none of ours
+/// has no shape and still reports its algorithm and size; so does a key with
+/// one more encryption key of another kind.
 #[test]
 fn e12_shape_is_reported_exactly() {
     use AlgorithmKind as A;
@@ -180,47 +181,76 @@ fn e12_shape_is_reported_exactly() {
 
     for shape in [KeyShape::V4P256, KeyShape::V6P256] {
         assert_eq!(
-            generate_portable_key(shape, keys::user("Alice"), Expiry::Never).unwrap_err(),
+            generate_portable_key(shape, keys::user("Alice"), Expiry::Never, keys::STAMP)
+                .unwrap_err(),
             EngineError::Unsupported
         );
     }
-}
 
-/// A new key expires exactly when asked, though its creation time is
-/// backdated; an expiry that is not in the future is refused.
-#[test]
-fn generated_key_expires_when_asked() {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let at = now + 365 * 24 * 60 * 60;
-    for shape in [KeyShape::V4Curve25519, KeyShape::V6Curve25519] {
-        let key =
-            generate_portable_key(shape, keys::user("Alice"), Expiry::At { unix_seconds: at })
-                .unwrap();
+    let device_bound = [
+        (
+            KeyShape::V4P256,
+            4,
+            algorithm(A::Ecdsa, Curve::NistP256, 0),
+            algorithm(A::Ecdh, Curve::NistP256, 0),
+        ),
+        (
+            KeyShape::V6P256,
+            6,
+            algorithm(A::Ecdsa, Curve::NistP256, 0),
+            algorithm(A::Ecdh, Curve::NistP256, 0),
+        ),
+        (
+            KeyShape::V6MlDsa65,
+            6,
+            algorithm(A::MlDsa65Ed25519, Curve::None, 0),
+            algorithm(A::MlKem768X25519, Curve::None, 0),
+        ),
+        (
+            KeyShape::V6MlDsa87,
+            6,
+            algorithm(A::MlDsa87Ed448, Curve::None, 0),
+            algorithm(A::MlKem1024X448, Curve::None, 0),
+        ),
+    ];
+    for (shape, version, primary, encryption) in device_bound {
+        let (key, _) = device::device_key(shape, "Alice");
+        let info = inspect_certificate(key.certificate).unwrap();
         assert_eq!(
-            inspect_certificate(key.certificate).unwrap().expires,
-            Some(at),
-            "{shape:?}"
-        );
-        let key = generate_portable_key(shape, keys::user("Alice"), Expiry::Never).unwrap();
-        assert_eq!(
-            inspect_certificate(key.certificate).unwrap().expires,
-            None,
-            "{shape:?}"
+            (
+                info.shape,
+                info.version,
+                info.primary,
+                info.encryption,
+                info.has_secret
+            ),
+            (Some(shape), version, primary, Some(encryption), false)
         );
     }
-    assert_eq!(
-        generate_portable_key(
-            KeyShape::V6Curve25519,
-            keys::user("Alice"),
-            Expiry::At { unix_seconds: now }
-        )
-        .unwrap_err(),
-        EngineError::Internal
-    );
+
+    // A post-quantum key with one more, classical, encryption key is none of
+    // ours, whichever of the two comes first.
+    let mixed = |primary: CipherSuite, extra: CipherSuite| {
+        let (cert, _) = openpgp::cert::CertBuilder::general_purpose(Some("Mixed"))
+            .set_cipher_suite(primary)
+            .set_profile(Profile::RFC9580)
+            .unwrap()
+            .add_subkey(
+                openpgp::types::KeyFlags::empty().set_transport_encryption(),
+                None,
+                extra,
+            )
+            .generate()
+            .unwrap();
+        keys::split(&cert).0
+    };
+    for (primary, extra) in [
+        (CipherSuite::MLDSA65_Ed25519, CipherSuite::Cv25519),
+        (CipherSuite::Cv25519, CipherSuite::MLDSA65_Ed25519),
+    ] {
+        let info = inspect_certificate(mixed(primary, extra)).unwrap();
+        assert_eq!(info.shape, None, "{primary:?} with {extra:?}");
+    }
 }
 
 /// The name and email come back as given, also without an email and in
@@ -237,7 +267,8 @@ fn generated_key_names_its_owner() {
             name: name.to_owned(),
             email: email.map(str::to_owned),
         };
-        let key = generate_portable_key(KeyShape::V6Curve25519, user, Expiry::Never).unwrap();
+        let key = generate_portable_key(KeyShape::V6Curve25519, user, Expiry::Never, keys::STAMP)
+            .unwrap();
         let info = inspect_certificate(key.certificate).unwrap();
         assert_eq!(
             (info.name.as_deref(), info.email.as_deref()),

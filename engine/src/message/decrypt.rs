@@ -24,7 +24,7 @@ use zeroize::Zeroizing;
 use super::{header, verdict};
 use crate::bounded_walk::{self, BoundedHelper};
 use crate::error::{self, DecryptionFailure, DecryptionProgress, contained};
-use crate::key::{self, PrivateKey};
+use crate::key::{self, Decryptor, PrivateKey, Unwrapped};
 use crate::{Decrypted, EngineError, POLICY, Signature, Verdict};
 
 /// The most plaintext a message decrypted into memory may have.
@@ -58,6 +58,7 @@ pub fn decrypt(
             now,
             progress: Rc::clone(&progress),
             signature: None,
+            attempts: 0,
         };
         let failed = |error: openpgp::anyhow::Error| {
             error::failed_decryption(DecryptionFailure::Sequoia(&error), &progress)
@@ -119,18 +120,59 @@ fn append_erasing(buffer: &mut Zeroizing<Vec<u8>>, bytes: &[u8]) {
     buffer.extend_from_slice(bytes);
 }
 
+/// How many session-key packets one decryption may try to unwrap, across every
+/// call of the helper. Each try is a private-key operation, and with a
+/// device-bound key a call to the Secure Enclave. A message for the user has
+/// one packet per encryption key of the user's key, or one per recipient when
+/// the recipients are hidden; a message that needs more tries than this was
+/// not written for anyone.
+const MAX_UNWRAP_ATTEMPTS: u32 = 256;
+
 struct Helper<'a> {
     key: &'a PrivateKey,
     verifiers: &'a [Option<Cert>],
     now: SystemTime,
     progress: Rc<DecryptionProgress>,
     signature: Option<Signature>,
+    attempts: u32,
+}
+
+/// Why the helper stopped trying packets.
+enum Stop {
+    /// The custody failed.
+    Device(EngineError),
+    /// The budget of attempts ran out.
+    Budget,
 }
 
 impl Helper<'_> {
     fn refuse(&self, refusal: EngineError) -> openpgp::Result<Option<Cert>> {
         self.progress.refusal.set(Some(refusal));
         Err(openpgp::anyhow::anyhow!("refused"))
+    }
+
+    fn stop(&self, stop: Stop) -> openpgp::Result<Option<Cert>> {
+        match stop {
+            Stop::Device(failure) => {
+                self.progress.device.set(Some(failure));
+                Err(openpgp::anyhow::anyhow!("the device failed"))
+            }
+            Stop::Budget => Err(bounded_walk::bound_fired()),
+        }
+    }
+
+    /// Ask the handle to unwrap one packet with one key, within the budget.
+    fn attempt(
+        &mut self,
+        decryptor: &mut Decryptor,
+        pkesk: &PKESK,
+        sym_algo: Option<SymmetricAlgorithm>,
+    ) -> Result<Option<Unwrapped>, Stop> {
+        if self.attempts == MAX_UNWRAP_ATTEMPTS {
+            return Err(Stop::Budget);
+        }
+        self.attempts += 1;
+        decryptor.unwrap(pkesk, sym_algo).map_err(Stop::Device)
     }
 }
 
@@ -150,11 +192,13 @@ impl VerificationHelper for Helper<'_> {
 impl DecryptionHelper for Helper<'_> {
     /// Tries every session-key packet that names one of the key's encryption
     /// keys, then the hidden ones against every encryption key, until one opens
-    /// the message. If none does: a packet that names the key and unwrapped to
-    /// a cipher the engine refuses makes the failure `Unsupported`, else one
-    /// that did not unwrap makes it `Tampered`. A hidden packet that does not
-    /// open the message, also for a refused cipher, is someone else's and is
-    /// skipped.
+    /// the message, within one budget of attempts.
+    ///
+    /// If none opens it: a packet that names the key and unwrapped to a cipher
+    /// the engine refuses makes the failure `Unsupported`, else one that did
+    /// not unwrap makes it `Tampered`. A hidden packet that does not open the
+    /// message, also for a refused cipher, is someone else's and is skipped.
+    /// A failure of the device, for either kind of packet, stops at once.
     fn decrypt(
         &mut self,
         pkesks: &[PKESK],
@@ -175,26 +219,30 @@ impl DecryptionHelper for Helper<'_> {
             let handle = recipient(pkesk).expect("partitioned on the recipient");
             for decryptor in decryptors
                 .iter_mut()
-                .filter(|decryptor| handle.aliases(decryptor.public().key_handle()))
+                .filter(|decryptor| handle.aliases(decryptor.key_handle()))
             {
-                match unwrap(pkesk, decryptor.as_mut(), sym_algo) {
-                    Some((algorithm, _)) if refused(algorithm) => named_refused = true,
-                    Some((algorithm, session_key)) if decrypt(algorithm, &session_key) => {
+                match self.attempt(decryptor, pkesk, sym_algo) {
+                    Err(stop) => return self.stop(stop),
+                    Ok(Some((algorithm, _))) if refused(algorithm) => named_refused = true,
+                    Ok(Some((algorithm, session_key))) if decrypt(algorithm, &session_key) => {
                         self.progress.unwrapped.set(true);
                         return Ok(None);
                     }
-                    _ => named_failed = true,
+                    Ok(_) => named_failed = true,
                 }
             }
         }
         for pkesk in hidden {
             for decryptor in &mut decryptors {
-                if let Some((algorithm, session_key)) = unwrap(pkesk, decryptor.as_mut(), sym_algo)
-                    && !refused(algorithm)
-                    && decrypt(algorithm, &session_key)
-                {
-                    self.progress.unwrapped.set(true);
-                    return Ok(None);
+                match self.attempt(decryptor, pkesk, sym_algo) {
+                    Err(stop) => return self.stop(stop),
+                    Ok(Some((algorithm, session_key)))
+                        if !refused(algorithm) && decrypt(algorithm, &session_key) =>
+                    {
+                        self.progress.unwrapped.set(true);
+                        return Ok(None);
+                    }
+                    Ok(_) => {}
                 }
             }
         }
@@ -214,14 +262,6 @@ fn recipient(pkesk: &PKESK) -> Option<KeyHandle> {
         KeyHandle::KeyID(id) => !id.is_wildcard(),
         KeyHandle::Fingerprint(_) => true,
     })
-}
-
-fn unwrap(
-    pkesk: &PKESK,
-    decryptor: &mut dyn openpgp::crypto::Decryptor,
-    sym_algo: Option<SymmetricAlgorithm>,
-) -> Option<(Option<SymmetricAlgorithm>, SessionKey)> {
-    pkesk.decrypt(decryptor, sym_algo)
 }
 
 /// A known cipher that the backend lacks or the policy refuses, which a v3

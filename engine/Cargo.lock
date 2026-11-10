@@ -421,6 +421,7 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "openssl",
+ "ossl",
  "sequoia-openpgp",
  "tempfile",
  "thiserror",

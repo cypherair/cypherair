@@ -1,6 +1,7 @@
 //! Shared test utilities for the engine's integration tests.
 #![allow(dead_code)]
 
+pub mod device;
 pub mod fixtures;
 pub mod format;
 pub mod gnupg;

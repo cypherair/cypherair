@@ -10,7 +10,7 @@ use openpgp::types::{AEADAlgorithm, SymmetricAlgorithm};
 use sequoia_openpgp as openpgp;
 
 use super::{header, recipients};
-use crate::error::contained;
+use crate::error::{self, contained};
 use crate::{Encrypted, EngineError, POLICY, PrivateKey};
 
 /// Encrypt to every recipient, and sign with `signer` when given. The message
@@ -49,20 +49,20 @@ pub fn encrypt(
         if resolved.modern() {
             encryptor = encryptor.aead_algo(AEADAlgorithm::OCB);
         }
-        let mut message = encryptor.build().map_err(EngineError::internal)?;
+        // A device signs as the stream ends; its failure is told apart here.
+        let failed = |error: openpgp::anyhow::Error| error::failed_operation(&error);
+        let mut message = encryptor.build().map_err(failed)?;
         if let Some(signer) = signer {
             message = Signer::new(message, signer)
-                .map_err(EngineError::internal)?
+                .map_err(failed)?
                 .build()
-                .map_err(EngineError::internal)?;
+                .map_err(failed)?;
         }
-        let mut literal = LiteralWriter::new(message)
-            .build()
-            .map_err(EngineError::internal)?;
+        let mut literal = LiteralWriter::new(message).build().map_err(failed)?;
         literal
             .write_all(plaintext)
-            .map_err(|_| EngineError::Internal)?;
-        literal.finalize().map_err(EngineError::internal)?;
+            .map_err(|error| failed(error.into()))?;
+        literal.finalize().map_err(failed)?;
 
         let quantum_safe = header::read(&sink)?.quantum_safe();
         Ok(Encrypted {
