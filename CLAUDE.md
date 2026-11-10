@@ -6,6 +6,10 @@ Everything below is either a project fact you cannot infer from the code or a pl
 
 Before you start, say in a line what you're about to do; brief updates while you work help the user follow along. Close with a short recap that stands on its own (what you found, what you did, and what's next), so a reader who only sees the last message has the full picture.
 
+## 2.0
+
+**[Temporary — until 2.0 is released]** The app is being rebuilt as version 2.0, and 2.0 reads no data that 1.x wrote. Stored formats, identifiers and schemas may change freely; write no migration or compatibility code.
+
 ## Code
 
 This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
