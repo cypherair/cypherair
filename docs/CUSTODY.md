@@ -8,7 +8,7 @@ Secure Enclave custody is a **custody model, not an algorithm suite**: long-term
 
 - **Private material is never exportable in any operable form.** The export boundary refuses anything but software custody before touching any secret, and the UI never offers a backup flow for device-bound keys.
 - **Import into the enclave is not an operation**, and **existing private keys are never converted into Secure Enclave custody**; the product must not imply otherwise.
-- **A Keychain handle, public key, or locator is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
+- **An enclave key blob, a public key, or a copy of the sealed key list is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
 - **Never weaken portable software-key behavior to make custody integration easier** — the second stop-and-review condition.
 - **Rust owns all OpenPGP semantics**; the enclave performs only the private primitive through narrow callbacks that never carry secret certificate material (§5).
 - **Device-bound keys always require biometrics**, fixed at creation, with no passcode fallback. Keys survive a change of the enrolled biometric set, and biometric-set invalidation must **never** be offered as a user option — for a non-exportable key it is permanent key loss.
@@ -16,7 +16,7 @@ Secure Enclave custody is a **custody model, not an algorithm suite**: long-term
 
 ## 3. Operation routing
 
-- **Find before authentication.** Finding a key's material never prompts: a portable key's row is looked up by the name in the key list, and a device-bound key's blobs are part of the key list. Missing material blocks the operation **without ever showing a biometric sheet**. A blob that does not match its certificate fails closed when it is loaded.
+- **Check before authentication.** Checking a key's stored material never prompts, because it is part of the key list. Material that is missing or has the wrong form blocks the operation **without ever showing a biometric sheet**. A blob that does not match its certificate fails closed when it is loaded.
 - **One approval per operation.** A single authenticated window covers the enclave-handle load and, for split custody, the classical-component unwrap; the operation context carries the identity credential silently.
 - **Roles are distinct handles.** Signing and key agreement route by required role; wrong-role or wrong-public-binding requests fail closed. A Secure Enclave route never falls back to software material.
 

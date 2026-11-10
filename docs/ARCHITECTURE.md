@@ -9,7 +9,7 @@ The structure of CypherAir 2.0. Every piece of the 2.0 plan is built against thi
 | **App** | the Xcode app target | Screens, navigation, the lock surface, the privacy cover, texts, and small platform adapters (clipboard, file pickers) | Nothing |
 | **Core** | `Packages/CypherCore` | Keys, contacts, messages, settings, the lock, the only path to a private key, every stored shape | Observable objects, operations, one error type |
 | **Engine** | `engine/` (Rust), reached through `Packages/CypherEngine` | All OpenPGP | 28 functions, one key-handle object, two callbacks, one error type |
-| **Vault** | `Packages/CypherVault` (kept) | The sealed root, unlock, sealed files, Keychain rows, Secure Enclave keys | As today, with the changes in section 3 |
+| **Vault** | `Packages/CypherVault` (kept) | The sealed root, unlock, sealed files, the sealing of secrets, Secure Enclave keys | As today, with the changes in section 3 |
 
 The directions are one-way: App → Core → Engine and Vault. What enforces it:
 
@@ -33,12 +33,12 @@ A new Rust crate on `sequoia-openpgp` with the OpenSSL backend, exposed through 
 
 **The key handle.** `PrivateKey` is a UniFFI object, made in one of two ways:
 
-- *portable:* from the certificate and the secret key that the vault unsealed;
+- *portable:* from the certificate and the secret key packets that the vault unsealed;
 - *device-bound:* from the certificate, a callback object that Swift implements (`DeviceKey`), and, for the post-quantum families, the classical halves that the vault unsealed.
 
 Every operation that needs a private key takes a `PrivateKey`. No function has a variant per custody.
 
-**The certificate is the authority.** A portable handle is built from the *public certificate* in the key list and the *secret key* in the vault. The engine joins them and refuses if they are not the same key. An expiry change or a revocation changes only the certificate. So the sealed secret is written once and never rewritten.
+**The certificate is the authority.** A portable handle is built from the *public certificate* and the *secret key packets* that the vault unsealed. The secret holds the primary key and the subkeys alone, without User IDs or signatures. The engine joins the two and refuses a secret key that is not a key of the certificate. An expiry change or a revocation changes only the certificate. So the secret is sealed once and never sealed again.
 
 **No text in errors.** `EngineError` is a `Copy` type, so it cannot hold a string. Where an error must point at a recipient, it carries the position in the list the caller passed, never a fingerprint.
 
@@ -103,8 +103,8 @@ struct CertificateInfo {
 
 struct NewKey {
     certificate: Vec<u8>,
-    secret: Option<Vec<u8>>,      // what the vault must seal: the secret key (portable), the classical
-                                  // halves (device-bound post-quantum), nothing (device-bound P-256)
+    secret: Option<Vec<u8>>,      // what the vault must seal: the secret key packets alone (portable), the
+                                  // classical halves (device-bound post-quantum), nothing (device-bound P-256)
     revocation: Vec<u8>,
 }
 struct DeviceKeySlots { signing_public_key: Vec<u8>, agreement_public_key: Vec<u8> }
@@ -212,7 +212,7 @@ Notes:
 - **File functions** write beside `output` and rename on success. On a failure or a cancel they erase what they wrote. `erase_file` is the one erase policy, used by the engine and the core.
 - **`DeviceKeyError`** is a rich UniFFI error, not a flat one, and it converts from UniFFI's unexpected-callback error to `Failed`. Without that, an unexpected Swift error becomes a Rust panic.
 - **A wrong device key.** `PrivateKey::device` cannot see whether the device key belongs to the certificate. It is caught elsewhere: the vault compares the public keys when it loads the handle; every signature is verified before release; a wrong shared secret cannot unwrap a session key.
-- **Panics.** The crate keeps `panic = unwind`, so UniFFI can catch a panic inside a dependency. The core maps one to `internalFailure`. A fixture pins it.
+- **Panics.** The crate keeps `panic = unwind`, so UniFFI can catch a panic inside a dependency. The core maps one to `internalFailure`. A deliberate panic in test-only code pins it.
 
 ### 2.2 Modules
 
@@ -367,7 +367,7 @@ public enum CoreError: Error, Sendable, Equatable {
 **One path to a private key.** One function, `PrivateKeyAccess.use`, is the only code that touches private-key material. Its steps never change:
 
 1. Find the key in the key list.
-2. Find its stored material **without any prompt**. If something is missing, stop. The user never sees a Face ID sheet for an operation that cannot work.
+2. Check its stored material **without any prompt**. If something is missing or has the wrong form, stop with `keyMaterialMissing`. The user never sees a Face ID sheet for an operation that cannot work.
 3. For a backup, check that there is enough memory.
 4. Ask for **one approval**. A portable key: Face ID or Touch ID, with the device passcode as the system's fallback. A device-bound key: Face ID or Touch ID only.
 5. Load the material, build the engine handle, run the engine function.
@@ -375,8 +375,8 @@ public enum CoreError: Error, Sendable, Equatable {
 
 | | Portable | Device-bound P-256 | Device-bound post-quantum |
 |---|---|---|---|
-| Found by | its sealed row, by the name in the key list | its two key blobs in the key list | its two key blobs and its sealed halves in the key list |
-| Loaded | the secret key | the handle for the needed role | that handle and the classical halves |
+| Checked before the prompt | its sealed secret decodes and has the right kind | both key blobs are there, no halves are there, and the public keys from `device_key_slots` have the right length | both key blobs are there, the sealed halves decode and have the right kind, and the public keys have the right length |
+| Loaded | the secret key packets | the handle for the needed role | that handle and the classical halves |
 
 Operations with private keys run one at a time. `DeviceKeyBridge` is the Swift object behind the engine's `DeviceKey`: it holds the loaded handle and calls it. `device_key_slots` gives the public keys that a loaded handle must match.
 
@@ -384,11 +384,11 @@ Operations with private keys run one at a time. `DeviceKeyBridge` is the Swift o
 
 - The engine says which of the user's keys can open a message. The core takes the default key if it is among them, else the first. The user is not asked. A message whose recipients are all hidden is `noMatchingKey`.
 - The first key becomes the default. Deleting the default makes the first remaining key the default.
-- Deleting a portable key saves the list first and then deletes its row. A leftover row is harmless. A list entry without its row would fail only at use. A device-bound key is deleted with its entry, because its material is in the list.
+- Making a key and deleting a key are each one write of the key list, because every key's material is inside it. If the write fails, nothing changed.
 - Revoking needs no approval and cannot be undone. The screens treat it like a delete, with an explicit confirmation.
 - Adding a contact with a known fingerprint updates that contact. It keeps its id and its verified mark.
 - A backup needs up to 2 GiB. The core refuses above 75% of the memory the process may use, before the prompt. Weaker parameters are never used instead.
-- Making a device-bound key: the vault creates the two Secure Enclave keys, the engine signs through them, the classical halves are sealed, and everything is saved with the key list in one write. If a step fails, nothing was stored. Making a portable key seals its row first and saves the list second; if saving fails, the row is deleted.
+- Making a device-bound key: the vault creates the two Secure Enclave keys, the engine signs through them, the classical halves are sealed, and everything is saved with the key list in that one write. A Secure Enclave key exists only as its blob, so if a step fails, nothing is left behind.
 - The engine writes file results itself. The core creates the folder with complete file protection and checks the protection of the file after the call.
 
 **Stored data.** Three sealed files, at schema version 3. Versions 1 and 2 belong to 1.x. The vault refuses a file of another version before it decrypts it, so no 1.x file is ever decoded.
@@ -396,16 +396,17 @@ Operations with private keys run one at a time. `DeviceKeyBridge` is the Swift o
 ```swift
 struct KeysPayload     { var keys: [StoredKey]; var defaultKey: String? }
 struct StoredKey       {
-    let fingerprint: String        // the key's identity inside the sealed list; never the name of a row
+    let fingerprint: String        // the key's identity inside the sealed list
     var certificate: Data          // the authority for expiry and revocation
-    let material: KeyMaterial      // where the private part lives; it also says the custody
+    let material: KeyMaterial      // the private part; it also says the custody
     let revocation: Data           // made with the key
     var backedUp: Bool
 }
 enum KeyMaterial {
-    case portable(row: String)     // the random name of the Keychain row that holds the sealed secret key
-    case deviceBound(signing: Data, agreement: Data, classicalHalves: Data?)
-                                   // the two Secure Enclave key blobs; for a post-quantum key also the sealed halves
+    case portable(sealedSecret: Data)
+                                   // the secret key packets, sealed to the identity wrapping key
+    case deviceBound(signing: Data, agreement: Data, sealedHalves: Data?)
+                                   // the two Secure Enclave key blobs; for a post-quantum key also the sealed classical halves
 }
 struct ContactsPayload { var contacts: [StoredContact] }
 struct StoredContact   { let id: UUID; var certificate: Data; var verified: Bool; let added: Date }
@@ -420,13 +421,15 @@ struct SettingsPayload {
 - Names, expiry dates, shapes and "revoked" are not stored. The engine computes them from the certificate at unlock, so they cannot disagree with it.
 - A store changes its value in memory only after the file was written. If saving fails, nothing changes and the caller gets an error.
 - At unlock, a file that is missing, damaged or made by another version leads to the `damaged` phase, never to default values. Only keys from a key list that can be read can be backed up there.
+- A device that still holds the data of 1.x lands in the `damaged` phase, with its files named as made by another version. The app says so, and the only way on is a reset. Nothing of 1.x is read, and nothing is rescued.
 
-**Nothing readable in the Keychain identifies a key.** Keychain rows have no access control, so their names, their attributes and the public fields of their values can be read without unlocking the app. None of these may come from a key's fingerprint or public key.
+**Nothing readable identifies a key.** Two things can be read without unlocking the app: its Keychain rows, with their names, attributes, dates and public fields, and its files, with their names, sizes and dates. Nothing in them may point at one of the user's keys.
 
-- *A portable key:* its sealed secret sits in a Keychain row with a random name. The envelope's authenticated data is that name too. The key list holds the name.
-- *A device-bound key:* its two Secure Enclave key blobs, and for a post-quantum key its sealed classical halves, sit inside the sealed key list. It has no Keychain row. So no public key is readable anywhere, also not inside a blob.
-- *Why two ways:* a portable secret is a whole key, and in its own row it survives a damaged key list. Device-bound material is useless without its certificate, which is in the key list.
-- *What the Keychain still shows:* how many portable keys exist, and the size of each sealed secret. Not which keys they are.
+- *The Keychain holds one row, the sealed root.* Its dates say when the vault was made and when the passphrase last changed. A row per key would carry the date of that key, and a key's creation time is public.
+- *All key material is inside the sealed key list:* a portable key's sealed secret, a device-bound key's two Secure Enclave key blobs, and a post-quantum key's sealed classical halves. No name, no public key and no date of a key exists outside it.
+- *Every sealed file is padded* to a multiple of 16 KiB before it is sealed. So a file's size does not confirm a guess about which keys or contacts it holds.
+- *The sealed files stay out of device backups.* Only the vault that wrote a copy could open it, so a copy in a backup could only serve to put old state back.
+- *What still shows:* that the three files exist, their size in steps of 16 KiB, and when each last changed. Right after a key is made, the key list's time is that key's creation time, which is public. The app cannot hide a file's time from someone who can read the file.
 
 **The changes to the vault package**
 
@@ -435,17 +438,22 @@ struct SettingsPayload {
 - `UnlockedSession` gets the authenticator when the vault creates it, and one new function: `approve(_ kind:, reason:) async throws(VaultError) -> OperationApproval`.
 - The kind is `.presence` for a portable key (the device passcode is the fallback) or `.biometrics` for a device-bound key. This follows the constraint that the key already has.
 - After a successful approval the context disallows interaction, so the Secure Enclave can never show a sheet of its own. The approval invalidates its context when the operation ends.
-- Five public calls take an `LAContext` today. `IdentityEnvelopeStore.open`, `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair` take the `OperationApproval` instead. `UnlockedSession.openIdentityEnvelope` takes it too and becomes visible to the package only. `UnlockedSession.operationContext` goes.
+- Five public calls take an `LAContext` today. After the changes, three public calls take the `OperationApproval`: the function that opens a sealed value (change 3), `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair`. `UnlockedSession.openIdentityEnvelope` takes it too and becomes visible to the package only. `UnlockedSession.operationContext` goes.
 - So the core never imports LocalAuthentication, also not for making a device-bound key.
 
 *2. A file made by another version is reported as such,* apart from "damaged". The sealing layer already refuses such a file with an error of its own, and the store folds that error into "damaged". The change keeps the two apart.
 
-*3. Nothing readable in a Keychain row identifies a key.*
+*3. All key material lives in the sealed key list. The Keychain holds only the sealed root.*
 
-- `IdentityEnvelopeStore` holds the portable secrets only. It makes a random name when it seals a secret and returns it. The envelope's authenticated data is that name, not the fingerprint.
-- The classical halves are sealed and opened as values, with the session's two functions for that. They have no row.
-- `CustodyKeyStore` has no rows. `createPair` returns the two handles with their blobs. `loadHandle` takes a blob and the expected public key, and still compares the Secure Enclave key's own public key with it. `locatePair`, `inventory`, `deletePair` and `deleteAll` go. `RowStore` loses its readable attribute.
-- Reset deletes every Keychain item of the app, whatever its service or name, and then the files. So a row that nothing names, or that an earlier version left, goes too.
+- `IdentityEnvelopeStore` and its rows go. In their place `Stores` has one public pair of functions: `seal(_ secret:, kind:, session:) -> Data` and `open(_ sealed:, kind:, approval:) -> SensitiveBuffer`. They serve the portable secrets and the classical halves. The core stores the sealed value in the key list.
+- The authenticated data of such a value is a constant. The key list binds each value to its entry, and the engine refuses a secret that does not belong to the certificate.
+- The payload kind `secret-certificate` becomes `secret-keys`, because that is what it holds now.
+- `CustodyKeyStore` has no rows. `createPair(tier:session:approval:)` returns the two handles with their blobs. `loadHandle(role:tier:blob:expectedPublicKey:approval:)` rebuilds one key and still compares the Secure Enclave key's own public key with the expected one. The tier comes from the certificate's shape, and the role from the operation. A loaded handle keeps its role, its tier and that public key.
+- Gone with the rows: `CustodyHandleReference`, `CustodyPublicBinding`, `CustodyHandlePair`, `CustodyInventory`, `locatePair`, `inventory`, `deletePair`, `deleteAll`, the readable attribute of `RowStore`, and the error cases that exist only for rows (`invalidHandleSetIdentifier`, `ambiguousPrivateHandle`, `partialHandlePair`, `privateHandleMissing`, `cleanupOrRollbackFailed`).
+
+*4. The sealed files are padded and stay out of backups.* `SealedDomain.save` pads the payload to a multiple of 16 KiB before it seals it; the padded form carries the payload's length. `ProtectedDataDirectory` excludes its folder from device backups.
+
+*5. Reset deletes every Keychain item of the app.* One vault function deletes every item of the app in the data-protection Keychain, whatever its service. So a row that an earlier version left goes too. The software composition gets one shared in-memory Keychain behind its row stores, so that a test can plant a row under another service and see it go.
 
 Not changed: the core composes the vault and its stores itself, in one file, with the constructors the package already has. Swift does not look inside the classical halves. The engine makes that value and checks it.
 
@@ -476,7 +484,7 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 |---|---|---|
 | E1 | When authentication fails, no plaintext is returned | #1046 |
 | E2 | A failed decryption gives exactly the error of the table in section 2. A tampered container is `Tampered`, in both containers, in the first block and in a later one. A recipient packet that names the key and does not unwrap is `Tampered`. A message for someone else is `NoMatchingKey`. The fixtures tamper where no bound can fire | #1046 |
-| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`, also after a key was unwrapped. A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app | #1046, and each piece for its own inputs |
+| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`, also after a key was unwrapped. A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
 | E4 | An outgoing message is never compressed, uses AES-256, and uses the new container only if every recipient supports it. The preview equals the message | #1046 |
 | E5 | The quantum-safe flag comes from the message. A cut-off message is an error | #1046 |
 | E6 | An expired or revoked recipient is refused, by position | #1046 |
@@ -503,14 +511,14 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 | C1 | While locked, no workspace exists. An old reference throws `locked` | #1062 |
 | C2 | A file that is missing, damaged or from another version leads to the damaged phase, never to default values | #1062 |
 | C3 | A save that fails changes nothing in memory | #1062 |
-| C4 | A key whose stored material is missing never shows a prompt | #1063 |
+| C4 | A key whose stored material is missing or has the wrong form never shows a prompt, for a portable key and for a device-bound key | #1063 |
 | C5 | One operation takes one approval | #1063 |
 | C6 | A device-bound key is never exported or backed up | #1063 |
 | C7 | A family name is given only to a pair of shape and custody that the app can make. An imported P-256 key has none | #1063 |
-| C8 | After a reset nothing is left: no row, no file, no Secure Enclave key | #1065 |
+| C8 | After a reset nothing is left: no file, and no Keychain item under any service, also not one that the test planted under another service | #1065 |
 | C9 | A wrong passphrase, a failed approval and a tampered message are three errors | #1066 |
 | C10 | No plaintext file remains after an operation ends or fails, or when the app locks in the middle of a file operation | #1066 |
-| C11 | Nothing readable in a Keychain row identifies a key. After one key of every family is made, no row's name or value holds a fingerprint or a public key of the user | #1063 |
+| C11 | After one key of every family is made, the Keychain holds exactly one row, the sealed root. The row has no attribute. Its name and its value hold no fingerprint, key ID, public key or User ID of those keys, as text or as bytes. The test's rows have no dates; with one row there is none to check | #1063 |
 
 **The harness and the fixtures** are copied from `pgp-mobile/tests/` into `engine/tests/` in #1046, because the 1.x engine stays untouched until #1049 removes it with its own copy. Five harness files do not depend on the engine and are copied unchanged. `sq.rs` and the two stand-ins for the Secure Enclave are tied to the old engine. The stand-ins become one software `DeviceKey` that can also cancel, fail and answer wrongly. With `CYPHERAIR_REQUIRE_GPG=1` and `CYPHERAIR_REQUIRE_SQ=1` a missing tool fails instead of skipping. A `sq` without post-quantum support fails as well. CI sets both. The tests of #1046 need expired and revoked keys before #1049 exists; they build them with Sequoia directly.
 
@@ -620,7 +628,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 | #1047 | The six custody modules (brought in, with the three required fixes of section 2.3), `DeviceKey`, the device handle, the two device functions, the software stand-in |
 | #1048 | Signatures, files, `recognise`, the header functions, `erase_file` |
 | #1049 | Expiry, revocation, update, backup with `backup_s2k` (brought in). Then the 1.x engine is removed |
-| #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the three vault changes, `CoreError` with every case, `preview()` |
+| #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the five vault changes, `CoreError` with every case, `preview()` |
 | #1063 | `PrivateKeyAccess`, `DeviceKeyBridge`, the memory guard, everything in `Keys` |
 | #1064 | Everything in `Contacts` |
 | #1065 | The timing rules of the lock, passphrase change, reset, and what `Recovery` can do |
