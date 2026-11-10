@@ -247,3 +247,39 @@ fn e3_key_material_beyond_its_bounds() {
         EngineError::LimitsExceeded
     );
 }
+
+/// Too many session-key packets to try: one decryption tries at most 256
+/// packets with a private key, hidden ones and ones that name the key alike,
+/// and then stops with `LimitsExceeded`. Each try is a call to the device.
+#[test]
+fn e3_too_many_unwrap_attempts() {
+    let (alice, device) = common::device::device_key(KeyShape::V4P256, "Alice");
+    let (bob, _) = common::device::device_key(KeyShape::V4P256, "Bob");
+    let handle = common::device::device_handle(&alice, &device);
+    let literal = messages::literal(PLAINTEXT);
+    let repeated = |message: Vec<u8>, change: fn(&mut Vec<u8>)| {
+        let end = messages::session_key_packet_ends(&message)[0];
+        let mut packet = message[..end].to_vec();
+        change(&mut packet);
+        let mut flooded = packet.repeat(300);
+        flooded.extend_from_slice(&message[end..]);
+        flooded
+    };
+
+    let hidden_for_bob = repeated(
+        messages::encrypted_raw(&[&cert_of(&bob)], &literal, SystemTime::now(), true),
+        |_| {},
+    );
+    let named_but_broken = repeated(
+        messages::encrypted_raw(&[&cert_of(&alice)], &literal, SystemTime::now(), false),
+        |packet| *packet.last_mut().unwrap() ^= 0x01,
+    );
+    for message in [hidden_for_bob, named_but_broken] {
+        let before = device.agreements();
+        assert_eq!(
+            decrypt(message, handle.clone(), vec![]).unwrap_err(),
+            EngineError::LimitsExceeded
+        );
+        assert_eq!(device.agreements() - before, 256);
+    }
+}

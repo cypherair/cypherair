@@ -1,5 +1,5 @@
 //! Rule E21 with `sq`: `sq` reads what the v6 and post-quantum families write,
-//! and the engine reads what `sq` writes. The fixture tests need no `sq`; the
+//! in both custodies, and the engine reads what `sq` writes. The fixture tests need no `sq`; the
 //! live ones skip without it unless `CYPHERAIR_REQUIRE_SQ=1`, which also
 //! requires an `sq` that reads the final post-quantum encoding.
 
@@ -8,7 +8,7 @@ mod common;
 use std::path::PathBuf;
 
 use common::keys::{self, PLAINTEXT};
-use common::sq;
+use common::{device, sq};
 use cypher_engine::{KeyShape, Signature, Verdict, decrypt, encrypt, inspect_certificate};
 use openpgp::Cert;
 use openpgp::parse::Parse;
@@ -152,6 +152,101 @@ fn e21_engine_reads_sq_messages() {
 
         let message = std::fs::read(&message_path).unwrap();
         let decrypted = decrypt(message, keys::handle(&alice), vec![keys::split(&bob).0]).unwrap();
+        assert_eq!(decrypted.plaintext, PLAINTEXT, "{shape:?}");
+        assert_eq!(
+            decrypted.signature,
+            Signature {
+                verdict: Verdict::Verified,
+                signer: Some(0)
+            },
+            "{shape:?}"
+        );
+        assert_eq!(decrypted.quantum_safe, is_post_quantum(shape), "{shape:?}");
+    }
+}
+
+/// The v6 device-bound families. The engine encrypts to a portable key and
+/// signs with the device; `sq` decrypts and authenticates the signature. `sq`
+/// encrypts to the device-bound key and signs; the engine decrypts through the
+/// device and verifies.
+#[test]
+fn e21_sq_and_device_bound_families() {
+    for (shape, cipher_suite) in [
+        (KeyShape::V6P256, "cv25519"),
+        (KeyShape::V6MlDsa65, "mldsa65-ed25519"),
+        (KeyShape::V6MlDsa87, "mldsa87-ed448"),
+    ] {
+        let Some(sq_path) = require_sq(shape) else {
+            continue;
+        };
+        let home = sq::setup_sq_home();
+        let (alice, device) = device::device_key(shape, "Alice");
+        let handle = device::device_handle(&alice, &device);
+        let alice_path = home.path().join("alice.asc");
+        std::fs::write(&alice_path, keys::armored_certificate(&alice.certificate)).unwrap();
+
+        let carol = keys::new_key(KeyShape::V6Curve25519, "Carol");
+        let carol_path = home.path().join("carol-secret.asc");
+        let message_path = home.path().join("to-carol.asc");
+        let output_path = home.path().join("from-alice.txt");
+        std::fs::write(&carol_path, keys::tsk(&carol)).unwrap();
+        let message = encrypt(
+            PLAINTEXT,
+            vec![carol.certificate.clone()],
+            Some(handle.clone()),
+        )
+        .unwrap();
+        std::fs::write(&message_path, &message.message).unwrap();
+        let mut decrypt_cmd = sq::sq_cmd(&sq_path, &home);
+        decrypt_cmd
+            .args(["decrypt", "--signatures", "1"])
+            .arg("--recipient-file")
+            .arg(&carol_path)
+            .arg("--signer-file")
+            .arg(&alice_path)
+            .arg("--output")
+            .arg(&output_path)
+            .arg(&message_path);
+        sq::run_sq(decrypt_cmd, &format!("decrypt ({shape:?})"));
+        assert_eq!(std::fs::read(&output_path).unwrap(), PLAINTEXT, "{shape:?}");
+
+        let bob_secret_path = home.path().join("bob-secret.asc");
+        let plaintext_path = home.path().join("plaintext.txt");
+        let message_path = home.path().join("to-alice.asc");
+        std::fs::write(&plaintext_path, PLAINTEXT).unwrap();
+        let mut generate = sq::sq_cmd(&sq_path, &home);
+        generate
+            .args(["key", "generate", "--own-key", "--without-password"])
+            .args(["--name", "Bob", "--email", "bob@example.org"])
+            .args([
+                "--cipher-suite",
+                cipher_suite,
+                "--profile",
+                "rfc9580",
+                "--expiration",
+                "never",
+            ])
+            .arg("--output")
+            .arg(&bob_secret_path)
+            .arg("--rev-cert")
+            .arg(home.path().join("bob-revocation.asc"));
+        sq::run_sq(generate, "key generate");
+        let bob = Cert::from_bytes(&std::fs::read(&bob_secret_path).unwrap()).unwrap();
+
+        let mut encrypt_cmd = sq::sq_cmd(&sq_path, &home);
+        encrypt_cmd
+            .arg("encrypt")
+            .arg("--for-file")
+            .arg(&alice_path)
+            .arg("--signer-file")
+            .arg(&bob_secret_path)
+            .arg("--output")
+            .arg(&message_path)
+            .arg(&plaintext_path);
+        sq::run_sq(encrypt_cmd, &format!("encrypt ({shape:?})"));
+
+        let message = std::fs::read(&message_path).unwrap();
+        let decrypted = decrypt(message, handle, vec![keys::split(&bob).0]).unwrap();
         assert_eq!(decrypted.plaintext, PLAINTEXT, "{shape:?}");
         assert_eq!(
             decrypted.signature,
