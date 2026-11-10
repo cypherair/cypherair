@@ -42,4 +42,4 @@ CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classica
 - **Evidence and diagnostic output never carry** plaintext, private-key material, shared secrets, session keys, KEKs, Keychain locators or handle-set identifiers, stable fingerprints, or temporary capability paths — only pass/fail, scenario labels, sanitized failure categories, algorithm/curve identifiers, packet versions and tags, counts, and the gpg version string.
 - **Coverage honesty.** v6 third-party AEAD interop is verified by composition only — no non-Sequoia RFC 9580 implementation is exercised.
 - **A platform-specific custody claim requires that platform's own capture**; the shared CryptoKit substrate justifies exposure, not claims.
-- **Accepted risks:** visionOS is exposed without dedicated evidence — no Vision Pro hardware; based on the shared substrate, the visionOS build probe, and macOS capture. iPad capture is deferred and not required for release.
+- **Accepted risks:** visionOS is exposed without dedicated evidence — no Vision Pro hardware; based on the shared substrate. iPad capture is deferred and not required for release.
