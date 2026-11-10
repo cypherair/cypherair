@@ -1,6 +1,9 @@
 //! The engine's one error type, and the only place where a Sequoia error
 //! becomes one.
 
+use std::cell::Cell;
+use std::sync::Once;
+
 use sequoia_openpgp as openpgp;
 
 use crate::bounded_walk;
@@ -60,15 +63,35 @@ pub enum EngineError {
     Internal,
 }
 
+thread_local! {
+    /// Whether this thread is inside `contained`, where a panic is caught.
+    static CONTAINING: Cell<bool> = const { Cell::new(false) };
+}
+
 /// Runs the body of an exported function. Every exported function runs its
 /// body through this, so that a panic anywhere below the boundary becomes
 /// `Internal`: it neither crashes the app nor reaches Swift as UniFFI's panic
 /// error, which would carry the panic's text.
+///
+/// A caught panic is also kept off standard error: the first call wraps the
+/// process's panic hook so that it stays silent inside `contained` and works
+/// as before everywhere else. The engine is the only Rust code in the app.
 pub(crate) fn contained<T>(
     body: impl FnOnce() -> Result<T, EngineError>,
 ) -> Result<T, EngineError> {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(body))
-        .unwrap_or(Err(EngineError::Internal))
+    static QUIET_HOOK: Once = Once::new();
+    QUIET_HOOK.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if !CONTAINING.with(Cell::get) {
+                previous(info);
+            }
+        }));
+    });
+    let outer = CONTAINING.with(|containing| containing.replace(true));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(body));
+    CONTAINING.with(|containing| containing.set(outer));
+    result.unwrap_or(Err(EngineError::Internal))
 }
 
 impl EngineError {
@@ -87,24 +110,25 @@ impl EngineError {
 #[derive(Default)]
 pub(crate) struct DecryptionProgress {
     /// The helper's own verdict on the session-key packets, when it refused.
-    pub(crate) refusal: std::cell::Cell<Option<EngineError>>,
+    pub(crate) refusal: Cell<Option<EngineError>>,
     /// A session key was unwrapped and accepted by the container.
-    pub(crate) unwrapped: std::cell::Cell<bool>,
+    pub(crate) unwrapped: Cell<bool>,
 }
 
-/// The error of a failed decryption. The first line that applies wins:
-/// a bound that fired, then the helper's refusal, then any failure after the
-/// session key was unwrapped, and otherwise input that did not parse.
+/// The error of a failed decryption. The first line that applies wins: a
+/// bound that fired; then any failure after a session key was unwrapped, also
+/// a refusal from a later call of the helper for a nested container; then the
+/// helper's refusal; and otherwise input that did not parse.
 pub(crate) fn failed_decryption(
     error: &openpgp::anyhow::Error,
     progress: &DecryptionProgress,
 ) -> EngineError {
     if bounded_walk::is_bound(error) {
         EngineError::LimitsExceeded
-    } else if let Some(refusal) = progress.refusal.get() {
-        refusal
     } else if progress.unwrapped.get() {
         EngineError::Tampered
+    } else if let Some(refusal) = progress.refusal.get() {
+        refusal
     } else {
         EngineError::Malformed
     }

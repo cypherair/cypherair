@@ -72,19 +72,29 @@ pub(crate) fn secret_keys(bytes: &[u8]) -> Result<Vec<SecretKey>, EngineError> {
     Ok(keys)
 }
 
-/// Write the portable secret of a certificate that holds its secret keys.
+/// Write the portable secret of a certificate that holds its secret keys. The
+/// buffer gets its exact size first, so that it never reallocates and leaves
+/// a copy of the secret behind.
 pub(crate) fn write_secret_keys(cert: &Cert) -> Result<Zeroizing<Vec<u8>>, EngineError> {
-    let mut secret = Zeroizing::new(Vec::new());
-    for key in cert.keys().secret() {
-        let packet = if key.primary() {
-            Packet::SecretKey(key.key().clone().role_into_primary())
-        } else {
-            Packet::SecretSubkey(key.key().clone().role_into_subordinate())
-        };
+    let packets: Vec<Packet> = cert
+        .keys()
+        .secret()
+        .map(|key| {
+            if key.primary() {
+                Packet::SecretKey(key.key().clone().role_into_primary())
+            } else {
+                Packet::SecretSubkey(key.key().clone().role_into_subordinate())
+            }
+        })
+        .collect();
+    let size = packets.iter().map(|packet| packet.serialized_len()).sum();
+    let mut secret = Zeroizing::new(Vec::with_capacity(size));
+    for packet in &packets {
         packet
             .serialize(&mut *secret)
             .map_err(EngineError::internal)?;
     }
+    debug_assert_eq!(secret.capacity(), size);
     Ok(secret)
 }
 

@@ -218,12 +218,13 @@ pub(crate) enum PrefixEnd {
 }
 
 /// Walk the session-key packets of a message held in memory, up to and
-/// including the encrypted container. `visit` sees each session-key packet,
-/// also one of a version Sequoia does not parse, and the SEIP packet.
+/// including the encrypted container. `visit` sees each session-key packet and
+/// the SEIP packet.
 ///
 /// A container without authentication (the old tag-9 packet), or one this
 /// engine cannot open (the withdrawn tag-20 AEAD packet, or an unknown SEIP
-/// version), is `Unsupported`.
+/// version), is `Unsupported`; so is a session-key packet of a version Sequoia
+/// does not parse, because its decryptor cannot read past one.
 pub(crate) fn walk_message_prefix<V>(message: &[u8], mut visit: V) -> Result<PrefixEnd, EngineError>
 where
     V: FnMut(&openpgp::Packet),
@@ -240,6 +241,9 @@ where
 
     while let PacketParserResult::Some(pp) = ppr {
         match &pp.packet {
+            openpgp::Packet::Unknown(packet) if matches!(packet.tag(), Tag::PKESK | Tag::SKESK) => {
+                return Err(EngineError::Unsupported);
+            }
             packet if matches!(packet.tag(), Tag::PKESK | Tag::SKESK) => {
                 budget
                     .charge(&pp)

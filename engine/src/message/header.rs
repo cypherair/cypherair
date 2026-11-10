@@ -12,7 +12,7 @@ use crate::{EngineError, POLICY};
 
 pub(crate) struct Header {
     /// The public-key algorithm of each session-key packet for a key, `None`
-    /// for one of a version Sequoia does not read.
+    /// for a kind of packet the engine does not know.
     recipients: Vec<Option<PublicKeyAlgorithm>>,
     /// Session-key packets for a password.
     passwords: usize,

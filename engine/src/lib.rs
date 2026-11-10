@@ -4,6 +4,15 @@
 //! input may be armored or binary; certificates it writes are binary. Lists of
 //! certificates keep the caller's order, and results point into them by
 //! position. Times are Unix seconds.
+//!
+//! Every exported function runs its body through `error::contained`, so that a
+//! panic anywhere below it becomes `EngineError::Internal`. That needs panics
+//! to unwind, in every profile and for every target.
+
+#[cfg(panic = "abort")]
+compile_error!(
+    "the engine needs `panic = \"unwind\"`: every exported function contains its panics"
+);
 
 use sequoia_openpgp::policy::StandardPolicy;
 

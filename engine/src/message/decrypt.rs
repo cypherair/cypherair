@@ -83,7 +83,7 @@ pub fn decrypt(
             if read > MAX_PLAINTEXT_BYTES - plaintext.len() {
                 return Err(EngineError::LimitsExceeded);
             }
-            plaintext.extend_from_slice(&chunk[..read]);
+            append_erasing(&mut plaintext, &chunk[..read]);
         }
 
         let helper = decryptor.into_helper().into_inner();
@@ -96,6 +96,19 @@ pub fn decrypt(
             quantum_safe: header.quantum_safe(),
         })
     })
+}
+
+/// Append to a buffer of secret bytes without leaving a copy behind: where
+/// `Vec` would reallocate and free the old allocation as it is, the bytes move
+/// into a larger buffer and the old one is erased as it drops.
+fn append_erasing(buffer: &mut Zeroizing<Vec<u8>>, bytes: &[u8]) {
+    let needed = buffer.len() + bytes.len();
+    if needed > buffer.capacity() {
+        let mut grown = Zeroizing::new(Vec::with_capacity(needed.max(2 * buffer.capacity())));
+        grown.extend_from_slice(buffer);
+        *buffer = grown;
+    }
+    buffer.extend_from_slice(bytes);
 }
 
 struct Helper<'a> {
