@@ -23,7 +23,7 @@ use zeroize::Zeroizing;
 
 use super::{header, verdict};
 use crate::bounded_walk::{self, BoundedHelper};
-use crate::error::{self, DecryptionProgress, contained};
+use crate::error::{self, DecryptionFailure, DecryptionProgress, contained};
 use crate::key::{self, PrivateKey};
 use crate::{Decrypted, EngineError, POLICY, Signature, Verdict};
 
@@ -51,7 +51,7 @@ pub fn decrypt(
             .map(|verifier| key::certificate(verifier).ok())
             .collect();
 
-        let progress = Rc::new(DecryptionProgress::default());
+        let progress = Rc::new(DecryptionProgress::new(header.old_container()));
         let helper = Helper {
             key: &key,
             verifiers: &verifiers,
@@ -59,7 +59,9 @@ pub fn decrypt(
             progress: Rc::clone(&progress),
             signature: None,
         };
-        let failed = |error: openpgp::anyhow::Error| error::failed_decryption(&error, &progress);
+        let failed = |error: openpgp::anyhow::Error| {
+            error::failed_decryption(DecryptionFailure::Sequoia(&error), &progress)
+        };
 
         let mut decryptor = DecryptorBuilder::from_bytes(&message)
             .map_err(|_| EngineError::Malformed)?
@@ -84,7 +86,10 @@ pub fn decrypt(
                 break;
             }
             if read > MAX_PLAINTEXT_BYTES - plaintext.len() {
-                return Err(EngineError::LimitsExceeded);
+                return Err(error::failed_decryption(
+                    DecryptionFailure::Ceiling,
+                    &progress,
+                ));
             }
             append_erasing(&mut plaintext, &chunk[..read]);
         }

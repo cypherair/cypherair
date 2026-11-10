@@ -224,7 +224,8 @@ pub(crate) enum PrefixEnd {
 /// A container without authentication (the old tag-9 packet), or one this
 /// engine cannot open (the withdrawn tag-20 AEAD packet, or an unknown SEIP
 /// version), is `Unsupported`; so is a session-key packet of a version Sequoia
-/// does not parse, because its decryptor cannot read past one.
+/// does not parse, because its decryptor cannot read past one. A damaged one
+/// of a version it parses is `Malformed`.
 pub(crate) fn walk_message_prefix<V>(message: &[u8], mut visit: V) -> Result<PrefixEnd, EngineError>
 where
     V: FnMut(&openpgp::Packet),
@@ -239,11 +240,13 @@ where
         .map_err(|_| EngineError::Malformed)?;
     let mut budget = WalkBudget::message_prefix();
 
-    while let PacketParserResult::Some(pp) = ppr {
+    while let PacketParserResult::Some(mut pp) = ppr {
+        if let openpgp::Packet::Unknown(packet) = &pp.packet
+            && matches!(packet.tag(), Tag::PKESK | Tag::SKESK)
+        {
+            return Err(unparsed_session_key_packet(&mut pp, &mut budget));
+        }
         match &pp.packet {
-            openpgp::Packet::Unknown(packet) if matches!(packet.tag(), Tag::PKESK | Tag::SKESK) => {
-                return Err(EngineError::Unsupported);
-            }
             packet if matches!(packet.tag(), Tag::PKESK | Tag::SKESK) => {
                 budget
                     .charge(&pp)
@@ -283,6 +286,31 @@ where
     }
 
     Ok(PrefixEnd::End)
+}
+
+/// A session-key packet that Sequoia returned unparsed. Sequoia does that for a
+/// version it does not read, which is `Unsupported`, and for a damaged packet of
+/// a version it reads, which is `Malformed`. Its first byte, the version, tells
+/// them apart; the packet is charged before its body is read.
+fn unparsed_session_key_packet(pp: &mut PacketParser, budget: &mut WalkBudget) -> EngineError {
+    let known_versions: &[u8] = if pp.packet.tag() == Tag::PKESK {
+        &[3, 6]
+    } else {
+        &[4, 6]
+    };
+    if budget.charge(pp).is_err() {
+        return EngineError::LimitsExceeded;
+    }
+    match pp.buffer_unread_content() {
+        Ok(body)
+            if body
+                .first()
+                .is_some_and(|version| !known_versions.contains(version)) =>
+        {
+            EngineError::Unsupported
+        }
+        _ => EngineError::Malformed,
+    }
 }
 
 // ── Sequoia's walk to the literal data ──────────────────────────────────

@@ -1,5 +1,6 @@
-//! The engine's one error type, and the only place where a Sequoia error
-//! becomes one.
+//! The engine's one error type, the containment of panics, and the
+//! classification of a failed decryption. Elsewhere a Sequoia error is replaced
+//! by the error its place implies; no code reads an error's text.
 
 use std::cell::Cell;
 use std::sync::Once;
@@ -75,7 +76,10 @@ thread_local! {
 ///
 /// A caught panic is also kept off standard error: the first call wraps the
 /// process's panic hook so that it stays silent inside `contained` and works
-/// as before everywhere else. The engine is the only Rust code in the app.
+/// as before everywhere else. The engine is the only Rust code in the app. The
+/// accepted cost: a panic inside `contained` that cannot unwind, such as one
+/// during another panic's unwinding, aborts the app without a message; the
+/// crash report still has the stack.
 pub(crate) fn contained<T>(
     body: impl FnOnce() -> Result<T, EngineError>,
 ) -> Result<T, EngineError> {
@@ -107,23 +111,55 @@ impl EngineError {
 /// Sequoia reports a failed decryption without saying where it happened, and
 /// it swallows the error a decryption helper returns. So the helper records
 /// both as it goes, and the failure is classified from that record.
-#[derive(Default)]
 pub(crate) struct DecryptionProgress {
+    /// The container is the old one (SEIPDv1), which proves that it is
+    /// genuine only at its end.
+    pub(crate) old_container: bool,
     /// The helper's own verdict on the session-key packets, when it refused.
     pub(crate) refusal: Cell<Option<EngineError>>,
     /// A session key was unwrapped and accepted by the container.
     pub(crate) unwrapped: Cell<bool>,
 }
 
-/// The error of a failed decryption. The first line that applies wins: a
-/// bound that fired; then any failure after a session key was unwrapped, also
-/// a refusal from a later call of the helper for a nested container; then the
-/// helper's refusal; and otherwise input that did not parse.
+impl DecryptionProgress {
+    pub(crate) fn new(old_container: bool) -> Self {
+        Self {
+            old_container,
+            refusal: Cell::new(None),
+            unwrapped: Cell::new(false),
+        }
+    }
+}
+
+/// What stopped a decryption.
+pub(crate) enum DecryptionFailure<'a> {
+    /// An error out of Sequoia.
+    Sequoia(&'a openpgp::anyhow::Error),
+    /// The plaintext grew past what decrypting into memory may hold.
+    Ceiling,
+}
+
+/// The error of a failed decryption. The first line that applies wins:
+///
+/// 1. A session key was unwrapped and the container is the old one:
+///    `Tampered`. Until its end, that container's content may have been
+///    changed, so nothing the content decides is reported, not even a bound.
+/// 2. A bound fired, or the plaintext ceiling: `LimitsExceeded`.
+/// 3. A session key was unwrapped: `Tampered`, also for a refusal from a later
+///    call of the helper for a nested container.
+/// 4. The helper's refusal.
+/// 5. Input that did not parse: `Malformed`.
 pub(crate) fn failed_decryption(
-    error: &openpgp::anyhow::Error,
+    failure: DecryptionFailure,
     progress: &DecryptionProgress,
 ) -> EngineError {
-    if bounded_walk::is_bound(error) {
+    let bound = match failure {
+        DecryptionFailure::Sequoia(error) => bounded_walk::is_bound(error),
+        DecryptionFailure::Ceiling => true,
+    };
+    if progress.unwrapped.get() && progress.old_container {
+        EngineError::Tampered
+    } else if bound {
         EngineError::LimitsExceeded
     } else if progress.unwrapped.get() {
         EngineError::Tampered

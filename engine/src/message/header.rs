@@ -78,6 +78,12 @@ impl Header {
         Ok(())
     }
 
+    /// The old container (SEIPDv1), which proves that it is genuine only at
+    /// its end.
+    pub(crate) fn old_container(&self) -> bool {
+        matches!(self.container, Container::V1)
+    }
+
     /// Every session-key packet is for a post-quantum KEM, and the container
     /// is AES-256: no recipient's copy of the session key, and not the cipher,
     /// falls to a quantum computer.
