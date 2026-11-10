@@ -94,7 +94,7 @@ struct CertificateInfo {
     name: Option<String>,         // only from a User ID with a valid binding
     email: Option<String>,
     created: u64,
-    newest_self_signature: u64,   // the time of its newest self-signature (section 2.5)
+    newest_self_signature: u64,   // the latest creation time among its verified self-signatures (section 2.5)
     expires: Option<u64>,
     status: KeyStatus,
     can_encrypt: bool,
@@ -158,6 +158,7 @@ enum EngineError {
     NotExportable,
     WrongPassphrase,
     KdfOutOfRange,      // a backup asks for more than the format allows
+    TimeOutOfRange,     // a later stamp that is not strictly later, or a time beyond OpenPGP's range (section 2.5)
     RecipientUnusable { position: u32 },
     NoMatchingKey,
     Tampered,
@@ -173,7 +174,7 @@ enum EngineError {
 | `stretch_unlock_passphrase(passphrase, salt, memory_kib, iterations, parallelism)` | 32 bytes | #1046 |
 | `inspect_certificate(certificate)` | `CertificateInfo` | #1046 |
 | `armor(kind, data)` | text | #1046 |
-| `generate_portable_key(shape, user, expiry, stamp)` | `NewKey` | #1046 |
+| `generate_portable_key(shape, user, expiry, stamp)` | `NewKey` | #1046; the stamp in #1047 |
 | `PrivateKey::portable(certificate, secret)` | handle | #1046 |
 | `outgoing_format(recipients)` | `OutgoingFormat` | #1046 |
 | `encrypt(plaintext, recipients, signer?)` | `Encrypted`, armored | #1046 |
@@ -207,7 +208,7 @@ Notes:
 - **The quantum-safe flag** is read from the produced or received message, never from the list of recipients.
 - **`verify_signed`** takes a cleartext-signed text and also an inline-signed message, as `gpg --sign` makes. It returns the content.
 - **Several signatures.** The summary is `Verified` if any signature is verified, and it names that signer. Else it is the first that applies of: `Invalid`, `SignerRevoked`, `SignerExpired`, `UnknownSigner`, `Unverifiable`.
-- **Revocation.** A revocation certificate made by the app states no reason. OpenPGP treats that as final: from then on no signature by the key verifies, whatever its date. It carries the key's creation time (section 2.5). `apply_revocation` serves two features: revoking your own key (with the stored certificate; no private key is needed) and accepting a revocation for a contact.
+- **Revocation.** A revocation certificate made by the app gives no reason for the revocation. OpenPGP treats that as final: from then on no signature by the key verifies, whatever its date. It carries the key's creation time (section 2.5). `apply_revocation` serves two features: revoking your own key (with the stored certificate; no private key is needed) and accepting a revocation for a contact.
 - **`import_backup`** also takes a key without passphrase protection. It refuses a file where the primary secret key is missing, as `gpg --export-secret-subkeys` makes, with `Unsupported`: without it there is no expiry change and no revocation. It makes a new revocation certificate for the key.
 - **Key material has bounds too.** Every certificate, revocation or backup that the engine parses is limited in size and in packet count. The numbers are set in #1046.
 - **File functions** write beside `output` and rename on success. On a failure or a cancel they erase what they wrote. `erase_file` is the one erase policy, used by the engine and the core.
@@ -275,28 +276,48 @@ A key's creation time is public: it is in every copy of the certificate. Two tim
 | `STAMP_MIN_AGE` | 60 seconds | So that a slow clock elsewhere never sees a time in the future |
 | `MIN_EXPIRY_DAYS` | 365 | The shortest expiry a user can choose: one year |
 
-The three constants live in the core, in the one file that makes stamps. The core checks when it is compiled that `MIN_EXPIRY_DAYS` is at least four windows. With a window of 45 days, a key with the shortest expiry lasts between 320 and 365 days from the day it was really made.
+The three constants live in the core, in the one file that makes stamps. A test checks that `MIN_EXPIRY_DAYS` is at least four windows, so that a key keeps at least three quarters of the period that was chosen. With a window of 45 days, a key with the shortest expiry lasts between 320 and 365 days from the day it was really made.
 
-**The stamp.** When the app makes a key, the core takes the clock's time and goes back by a random number of seconds, drawn between `STAMP_MIN_AGE` and `STAMP_WINDOW`. The result is the key's stamp. The core gives it to the engine, and the engine writes it into everything made with the key: the primary key, the subkeys, every self-signature and the prepared revocation. The stamp is not rounded. With such a shift, nothing finer than about a day in it carries meaning, and those digits stay random, so that the key carries no mark of this app.
+**The stamp.** When the app makes a key, the core takes the clock's time and goes back by a random number of seconds, drawn between `STAMP_MIN_AGE` and `STAMP_WINDOW`. The result is the key's stamp. The core gives it to the engine, and the engine writes it into everything made with the key: the primary key, the subkeys, every self-signature and the prepared revocation. The stamp is not rounded. With such a shift, nothing finer than about a day in it carries meaning, and those digits stay random, so that the key carries no further mark of this app.
 
 **The draw comes from the system's secure random generator, and from nothing else.** This is essential. With a weak generator, or one that depends on the time, someone could try every possible moment, find the one that gives the stamp, and so undo the shift.
 
-- *The call.* The core takes its random bytes from the vault's `Randomness.bytes`, which calls `SecRandomCopyBytes(kSecRandomDefault, …)` (`Packages/CypherVault/Sources/Sealing/Encoding.swift`). The engine and its OpenSSL generator take no part.
-- *The range.* The core turns the bytes into a number of seconds with the standard library's `UInt64.random(in:using:)`. That draw is uniform over the whole range, without bias.
-- *Failure.* If the generator fails, no key is made. There is no fallback.
-- *What a test can show.* A test can fix the generator, but it cannot show that the app's own one is the system's. That is one line of code, and a review keeps it.
+- *The call.* The core draws with Swift's `SystemRandomNumberGenerator`. On Apple's platforms that is `arc4random_buf`, the system's generator. Swift documents it as cryptographically secure, and it cannot fail. The engine and its OpenSSL generator take no part.
+- *The range.* The draw is `UInt64.random(in:using:)` over the seconds from `STAMP_MIN_AGE` to `STAMP_WINDOW`, both ends included. The standard library makes it uniform, without bias. The core writes no sampling code of its own.
+- *One draw per stamp.* A draw is used for one stamp and never again.
+- *What a test can show.* A test passes its own generator. It cannot show that the app's own one is the system's. That is one line of code, and a review keeps it.
 
 **The engine reads no clock and draws nothing for a key.** It takes the stamp as an argument of `generate_portable_key`, `generate_device_key` and `change_expiry`. So the engine's tests state every time exactly, and the core's tests fix the clock and the generator.
 
-**Expiry is a period counted from the stamp.** `Expiry` is `Never` or a number of days, and the engine sets the expiry to the stamp plus the period. So a key with "two years" expires up to one window earlier than two years from today. An expiry on a day counted from today would undo the shift: the expiry date is public, and "expiry minus two years" would be the real day. Because the engine takes a period and not a date, the core cannot pass the real day by mistake. The core offers no period below `MIN_EXPIRY_DAYS`, so an expiry always lies in the future. The app shows the real expiry date once the key is made.
+- The engine sets the creation time of every signature it makes for a key itself, to the stamp. It uses no function of Sequoia that reads the clock. Sequoia's own expiry functions sign with the current time, and a signature that is built from an older one picks a time of its own when none is set. So `change_expiry` builds each signature by hand, as the 1.x `keys/expiry.rs` does: the direct-key signature, one for each User ID that is not revoked, one for each subkey, and each new back-signature.
+- The device-bound generation takes the stamp in the three places where the 1.x code reads the system time.
+- The engine refuses, as `TimeOutOfRange`, a later stamp that is not strictly later than the newest self-signature, and a stamp or an expiry that does not fit OpenPGP's 32-bit time. It cannot check that a stamp lies in the past. That is the core's part.
 
-**A later self-signature,** made for an expiry change, gets a stamp of its own. The core draws it between the clock minus `STAMP_WINDOW` and the clock minus `STAMP_MIN_AGE`, and strictly later than the newest self-signature, whose time the engine reports in `CertificateInfo`. The engine refuses a stamp that is not strictly later. Every stamp of the app is at least 60 seconds old, so a later second is always free and nothing waits. A key made elsewhere can have a newest self-signature that is less than 60 seconds old. Then the stamp is the second after it, and if that second is not yet in the past, the core waits for it, up to two seconds.
+**Expiry is a period counted from the stamp.** `Expiry` is `Never` or a number of days, and the key expires at the stamp plus the period. For an expiry change, that is the stamp of the change. OpenPGP stores an expiry in each key packet's signature as a period from that packet's own creation time, so the engine converts it for each key packet. A key that is older than the period is therefore valid again after a change.
 
-**A revocation needs no new time.** The prepared revocation states no reason, which is final, and carries the key's creation time. Revoking applies it and signs nothing, so the moment of a revocation appears nowhere. The revocation that `import_backup` makes for a key from elsewhere carries that key's own creation time too. No revocation whose meaning depends on its time is ever made.
+An expiry on a day counted from today would undo the shift: the expiry date is public, and "expiry minus two years" would be the real day. Because the engine takes a period and not a date, the core cannot pass the real day by mistake. The core offers no period below `MIN_EXPIRY_DAYS`, so an expiry always lies in the future.
 
-**Not touched.** A signature on a message carries the real time. A key made elsewhere keeps its own times.
+*What a user can no longer do.* There is no exact expiry date, and no expiry sooner than about 320 days from now. So a user cannot let a key run out soon instead of revoking it, and cannot match a date that was set elsewhere. A key expires up to one window before the day the user counted on. The app shows the real expiry date once it is set.
 
-**What remains.** Someone who reads the two times learns that a key of the user was stamped within one window before them. That does not point at one key among all the keys that are published in such a window. For a key of a rare kind the list can still be short.
+**A later self-signature,** made for an expiry change, gets a stamp of its own. The *newest self-signature* is the latest creation time among all verified self-signatures of the certificate, whatever their date. The engine reports it in `CertificateInfo`, and the core reads it from the certificate it is about to change.
+
+- If the newest self-signature lies inside the window, that is, not earlier than the clock minus `STAMP_WINDOW`, the new stamp is the second after it. Nothing is drawn.
+- Otherwise the new stamp is drawn like a new key's stamp.
+- If the second after the newest self-signature is less than `STAMP_MIN_AGE` old, the change is refused as `tooSoon`. For a key the app made, this does not happen in practice. It concerns a key from elsewhere that was signed within the last minute, or one that carries a self-signature dated in the future.
+
+A fresh draw at every change would be wrong. The previous stamp would cut its range short, so each quick change would move the newest stamp closer to the real moment: after five changes it would lie within a day of it four times out of five. With the rule above, each real moment is known only to lie within one window after its stamp, however many changes are made.
+
+**A revocation needs no new time.** The prepared revocation gives no reason for the revocation, which makes it final, and it carries the key's creation time. Revoking applies it and signs nothing, so the moment of a revocation appears nowhere. Other tools then show the key as revoked since its creation. The revocation that `import_backup` makes for a key from elsewhere carries that key's own creation time too. No revocation whose meaning depends on its time is ever made.
+
+**Not touched.** A signature on a message carries the real time. A key made elsewhere keeps its own times, and so does a contact's key.
+
+**Nothing else the app writes dates a key.** The name that the app offers when a public key, a revocation or a backup is saved carries no date, and the armor carries no header with one.
+
+**The guarantee, and where it ends.** For a key that the app made: whoever knows the real moment exactly learns only that the stamp lies within one window before it. This holds for the two times above, and for any other record of when the app was used.
+
+- That does not point at one key among all the keys that are published in such a window. For a key of a rare kind the list can still be short.
+- A key made elsewhere is outside the guarantee. If it was made shortly before it was imported, its creation time is close to the key list's time. The same holds for a contact's key and the time of the contact list.
+- The shift hides the times inside a key, not the moment a key first shows up elsewhere: when it is published, sent, or first used to sign. If that moment is close to a readable time, the two can still be matched.
 
 ## 3. The core
 
@@ -380,14 +401,14 @@ public enum CoreError: Error, Sendable, Equatable {
     case authenticationFailed, authenticationUnavailable, wrongPassphrase
     case notOpenPGP, wrongKindOfData, unsupported, tooComplex
     case tampered, noMatchingKey
-    case keyExpired, keyRevoked, keyUnusable, recipientUnusable(Recipient)
+    case keyExpired, keyRevoked, keyUnusable, tooSoon, recipientUnusable(Recipient)
     case notExportable, keyMaterialMissing, deviceKeyFailed
     case notEnoughMemory, outOfSpace, fileFailed
     case alreadyPresent, storageDamaged, storageFailed, internalFailure
 }
 ```
 
-- **A `Key`** has: id, name, email, fingerprint, custody, shape, version, the real algorithm and size of its primary and its encryption key, created, added, expires, status, default, backed up, quantum-safe. `created` is the stamp inside the key, which is early on purpose (section 2.5). `added` is the real moment the key was made or imported on this device. **A `Contact`** has the same without custody, default and backed up, and with can-encrypt and verified.
+- **A `Key`** has: id, name, email, fingerprint, custody, shape, version, the real algorithm and size of its primary and its encryption key, created, added, expires, status, default, backed up, quantum-safe. `created` is the creation time inside the key. For a key that the app made it is the stamp, which is early on purpose (section 2.5). For a key from elsewhere it is that key's own creation time. `added` is the real moment the key was made or imported on this device. **A `Contact`** has the same without custody, default and backed up, and with can-encrypt and verified.
 - **The family name** is a label for a pair of shape and custody that the app can make. There are nine such pairs. A key outside them, for example an imported P-256 or RSA key, has no family name and shows only its real details. For a contact the custody is unknown, so only the shape gives a label.
 - **A `ContactCandidate`** says what adding it does (new, update, revocation, already present) and lists look-alikes: contacts with the same email or the same User ID but another key. A bare revocation does not name its contact, so the core tries it against each contact's certificate.
 - **A `DecryptedMessage`** holds text or, when the bytes are not UTF-8, data. Every result names its signer as one of the user's keys or a contact.
@@ -464,7 +485,7 @@ struct SettingsPayload {
 - *All key material is inside the sealed key list:* a portable key's sealed secret, a device-bound key's two Secure Enclave key blobs, and a post-quantum key's sealed classical halves. No name, no public key and no date of a key exists outside it.
 - *Every sealed file is padded* to a multiple of 16 KiB before it is sealed. So a file's size does not confirm a guess about which keys or contacts it holds.
 - *The sealed files stay out of device backups.* Only the vault that wrote a copy could open it, so a copy in a backup could only serve to put old state back.
-- *What still shows:* that the three files exist, their size in steps of 16 KiB, when each last changed, and when the vault was made. The app cannot hide these times. They match no time inside a key, because the engine stamps a key, and each self-signature it adds later, a random amount earlier than the real moment (section 2.5). A readable time says only that a key of the user was stamped within one window before it.
+- *What still shows:* that the three files exist, their size in steps of 16 KiB, when each last changed, when the vault was made, and when its passphrase last changed. The app cannot hide these times. For a key that the app made, they match no time inside it, because the key carries a stamp that lies a random amount before the real moment (section 2.5). Such a time says only that a key of the user was stamped within one window before it. A key made elsewhere keeps its own times and is outside this.
 
 **The changes to the vault package**
 
@@ -538,7 +559,7 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 | E19 | A revocation revokes only its own key. An update must be the same key and never removes a revocation | #1049 |
 | E20 | A backup file that asks for too much is refused before any derivation. A wrong passphrase is told apart from a file that is no backup. A device-bound key is not exportable | #1049 |
 | E21 | `gpg` reads what the Legacy families write, and the engine reads what `gpg` writes. The same with `sq` for the v6 and post-quantum families | every piece |
-| E22 | Everything made with a key carries the stamp that the caller gave: the primary key, the subkeys, every self-signature and the prepared revocation. The key expires at the stamp plus the period. A later self-signature carries its own given stamp, and one that is not strictly later than the newest self-signature is refused. `gpg` and `sq` accept the results | #1047; the later self-signature in #1049 |
+| E22 | Everything made with a key carries the stamp that the caller gave, for every key shape: the primary key, the subkeys, every signature packet with its back-signature inside, and the prepared revocation. The key expires at the stamp plus the period. An expiry change does the same with its own stamp, also for a key that is older than the period. A stamp that is equal to the newest self-signature, or earlier, is refused, and so is a time beyond OpenPGP's range. The prepared revocation still revokes after a later self-signature. `gpg` and `sq` accept the results | #1047; the expiry change in #1049 |
 
 **Core rules** (Swift tests in the core package, on the vault's software enclave and the real engine)
 
@@ -555,7 +576,7 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 | C9 | A wrong passphrase, a failed approval and a tampered message are three errors | #1066 |
 | C10 | No plaintext file remains after an operation ends or fails, or when the app locks in the middle of a file operation | #1066 |
 | C11 | After one key of every family is made, the Keychain holds exactly one row, the sealed root. The row has no attribute. Its name and its value hold no fingerprint, key ID, public key or User ID of those keys, as text or as bytes. The test's rows have no dates; with one row there is none to check | #1063 |
-| C12 | With a fixed clock and a fixed generator, a new key's stamp is the clock minus the draw: minus `STAMP_MIN_AGE` for the smallest draw, minus `STAMP_WINDOW` for the largest. A later stamp lies in its own window and after the newest self-signature. No period below `MIN_EXPIRY_DAYS` is accepted. A generator that fails makes no key | #1063 |
+| C12 | With a fixed clock and a generator that gives a new value at each call, a new key's stamp is the clock minus its own draw: minus `STAMP_MIN_AGE` for the smallest draw, minus `STAMP_WINDOW` for the largest, both included. Two keys never share a draw. For an expiry change the core reads the newest self-signature from the certificate it changes. Inside the window, the new stamp is the second after it and nothing is drawn. Outside, it is the clock minus a new draw. When that second is less than `STAMP_MIN_AGE` old, the change is `tooSoon`. No period below `MIN_EXPIRY_DAYS` is accepted, and `MIN_EXPIRY_DAYS` is at least four windows | #1063 |
 
 **The harness and the fixtures** are copied from `pgp-mobile/tests/` into `engine/tests/` in #1046, because the 1.x engine stays untouched until #1049 removes it with its own copy. Five harness files do not depend on the engine and are copied unchanged. `sq.rs` and the two stand-ins for the Secure Enclave are tied to the old engine. The stand-ins become one software `DeviceKey` that can also cancel, fail and answer wrongly. With `CYPHERAIR_REQUIRE_GPG=1` and `CYPHERAIR_REQUIRE_SQ=1` a missing tool fails instead of skipping. A `sq` without post-quantum support fails as well. CI sets both. The tests of #1046 need expired and revoked keys before #1049 exists; they build them with Sequoia directly.
 
@@ -657,7 +678,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 - Making the revocation certificate moves from #1049 to #1046 and #1047. A key is born with it. #1049 keeps `apply_revocation`.
 - The grading of signatures, the quantum-safe flag and `outgoing_format` land in #1046, because `encrypt` and `decrypt` return or share them.
 
-**One exception to that rule.** #1046 lands `generate_portable_key` without a stamp and `Expiry` as a moment. #1047 adds the stamp argument, turns `Expiry` into a period, and adds the newest self-signature to `CertificateInfo`, before any core piece uses them.
+**One exception to that rule.** #1046 lands `generate_portable_key` without a stamp and `Expiry` as a moment. #1047 adds the stamp argument, turns `Expiry` into a period, and adds the newest self-signature to `CertificateInfo` and `TimeOutOfRange` to the errors, before any core piece uses them.
 
 **Two clarifications.** #1062 detects damaged data and shows the phase; #1065 adds what the user can do there. #1046 copies the harness and the fixtures; #1049 deletes the old copies with `pgp-mobile/`.
 
