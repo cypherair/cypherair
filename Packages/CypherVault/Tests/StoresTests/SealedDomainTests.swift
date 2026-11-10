@@ -52,6 +52,16 @@ final class SealedDomainTests: XCTestCase {
         XCTAssertEqual(contacts.integrity(key: SymmetricKey(size: .bits256)), .damaged, "a wrong key reads as damage, never as empty")
     }
 
+    func test_fileFromAnotherVersion_isNamedApartFromDamage() throws {
+        let older = SealedDomain<Contacts>(domain: "contacts", schemaVersion: 2, directory: directory)
+        try older.save(Contacts(names: ["a"]), key: key)
+        XCTAssertEqual(contacts.integrity(key: key), .otherVersion)
+        XCTAssertThrowsError(try contacts.load(key: key)) { XCTAssertEqual($0 as? StoreError, .otherVersion) }
+        let settings = SealedDomain<Contacts>(domain: "settings", schemaVersion: 2, directory: directory)
+        try FileManager.default.copyItem(at: directory.url.appending(path: "contacts.sealed"), to: directory.url.appending(path: "settings.sealed"))
+        XCTAssertEqual(settings.integrity(key: key), .damaged, "a file of another domain is damage, whatever its version")
+    }
+
     func test_strayTemporaryFile_isIgnoredAndSwept() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
         let stray = directory.url.appending(path: "contacts.\(UUID().uuidString).tmp")

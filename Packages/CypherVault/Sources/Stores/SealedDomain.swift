@@ -6,6 +6,7 @@ public enum DomainIntegrity: Equatable, Sendable {
     case intact
     case missing
     case damaged
+    case otherVersion
 }
 
 /// One protected-data domain: a single sealed file, replaced atomically, opened
@@ -32,6 +33,8 @@ public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
         do {
             let snapshot = try SealedSnapshotCodec.decode(data, domain: domain, schemaVersion: schemaVersion)
             plaintext = try SealedSnapshotCodec.open(snapshot, domain: domain, schemaVersion: schemaVersion, key: key)
+        } catch .otherSchemaVersion {
+            throw .otherVersion
         } catch {
             throw .damaged
         }
@@ -81,13 +84,16 @@ public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
         }
     }
 
-    /// Whether the file is intact, missing, or damaged, without returning it.
+    /// Whether the file is intact, missing, damaged, or from another version,
+    /// without returning it.
     public func integrity(key: SymmetricKey) -> DomainIntegrity {
         do {
             _ = try load(key: key)
             return .intact
         } catch .missing {
             return .missing
+        } catch .otherVersion {
+            return .otherVersion
         } catch {
             return .damaged
         }

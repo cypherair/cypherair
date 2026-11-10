@@ -19,7 +19,7 @@ final class SealedSnapshotTests: XCTestCase {
             XCTAssertEqual($0 as? SealingError, .bindingMismatch)
         }
         XCTAssertThrowsError(try SealedSnapshotCodec.open(snapshot, domain: "contacts", schemaVersion: 2, key: key)) {
-            XCTAssertEqual($0 as? SealingError, .bindingMismatch)
+            XCTAssertEqual($0 as? SealingError, .otherSchemaVersion)
         }
         let renamed = SealedSnapshot(magic: snapshot.magic, domain: "settings", schemaVersion: 1, nonce: snapshot.nonce, ciphertext: snapshot.ciphertext, tag: snapshot.tag)
         XCTAssertThrowsError(try SealedSnapshotCodec.open(renamed, domain: "settings", schemaVersion: 1, key: key)) {
