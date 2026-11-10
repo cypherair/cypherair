@@ -14,8 +14,7 @@ fn hex(bytes: &[u8]) -> String {
 /// every user out of their vault.
 #[test]
 fn e13_pinned_answer() {
-    let output =
-        stretch_unlock_passphrase(PASSPHRASE.to_vec(), SALT.to_vec(), 65_536, 3, 1).unwrap();
+    let output = stretch_unlock_passphrase(PASSPHRASE, SALT.to_vec(), 65_536, 3, 1).unwrap();
     assert_eq!(
         hex(&output),
         "2059d35e11f775944efac46541cfcd82013946a4ce55030871f5891aacf73b07"
@@ -25,14 +24,14 @@ fn e13_pinned_answer() {
 #[test]
 fn e13_refuses_inputs_out_of_range() {
     let refused = [
-        (Vec::new(), SALT.to_vec(), 8_192, 1, 1),
-        (PASSPHRASE.to_vec(), SALT[..15].to_vec(), 8_192, 1, 1),
-        (PASSPHRASE.to_vec(), SALT.to_vec(), 8_191, 1, 1),
-        (PASSPHRASE.to_vec(), SALT.to_vec(), 1_048_577, 1, 1),
-        (PASSPHRASE.to_vec(), SALT.to_vec(), 8_192, 0, 1),
-        (PASSPHRASE.to_vec(), SALT.to_vec(), 8_192, 17, 1),
-        (PASSPHRASE.to_vec(), SALT.to_vec(), 8_192, 1, 0),
-        (PASSPHRASE.to_vec(), SALT.to_vec(), 8_192, 1, 9),
+        (&[][..], SALT.to_vec(), 8_192, 1, 1),
+        (PASSPHRASE, SALT[..15].to_vec(), 8_192, 1, 1),
+        (PASSPHRASE, SALT.to_vec(), 8_191, 1, 1),
+        (PASSPHRASE, SALT.to_vec(), 1_048_577, 1, 1),
+        (PASSPHRASE, SALT.to_vec(), 8_192, 0, 1),
+        (PASSPHRASE, SALT.to_vec(), 8_192, 17, 1),
+        (PASSPHRASE, SALT.to_vec(), 8_192, 1, 0),
+        (PASSPHRASE, SALT.to_vec(), 8_192, 1, 9),
     ];
     for (passphrase, salt, memory_kib, iterations, parallelism) in refused {
         assert_eq!(
@@ -45,7 +44,7 @@ fn e13_refuses_inputs_out_of_range() {
     for (memory_kib, iterations, parallelism) in [(8_192, 16, 1), (8_192, 1, 8)] {
         assert!(
             stretch_unlock_passphrase(
-                PASSPHRASE.to_vec(),
+                PASSPHRASE,
                 SALT.to_vec(),
                 memory_kib,
                 iterations,

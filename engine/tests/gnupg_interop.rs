@@ -58,7 +58,7 @@ fn e21_gnupg_reads_legacy_messages() {
     let alice = keys::new_key(KeyShape::V4Curve25519, "Alice");
     gnupg::gpg_import_key(&gpg, &home, &keys::armored_certificate(&alice.certificate));
 
-    let message = encrypt(PLAINTEXT.to_vec(), vec![bob], Some(keys::handle(&alice))).unwrap();
+    let message = encrypt(PLAINTEXT, vec![bob], Some(keys::handle(&alice))).unwrap();
     let message_path = home.path().join("message.asc");
     std::fs::write(&message_path, &message.message).unwrap();
     let output = gnupg::gpg_cmd(&gpg, &home)

@@ -53,7 +53,7 @@ fn e4_outgoing_message_format() {
             .collect();
         assert_eq!(outgoing_format(certificates.clone()).unwrap(), expected);
 
-        let message = encrypt(PLAINTEXT.to_vec(), certificates, Some(signer.clone())).unwrap();
+        let message = encrypt(PLAINTEXT, certificates, Some(signer.clone())).unwrap();
         let layers = messages::layers(
             &messages::binary(&message.message),
             &tsk_cert(recipients[0]),
@@ -89,7 +89,7 @@ fn e5_quantum_safe_flag_comes_from_the_message() {
             .iter()
             .map(|key| key.certificate.clone())
             .collect();
-        let message = encrypt(PLAINTEXT.to_vec(), certificates, None).unwrap();
+        let message = encrypt(PLAINTEXT, certificates, None).unwrap();
         assert_eq!(message.quantum_safe, quantum_safe);
         let decrypted = decrypt(message.message, keys::handle(recipients[0]), vec![]).unwrap();
         assert_eq!(decrypted.quantum_safe, quantum_safe);
@@ -101,7 +101,7 @@ fn e5_quantum_safe_flag_comes_from_the_message() {
 #[test]
 fn e5_cut_off_message_is_an_error() {
     let pq = keys::new_key(KeyShape::V6MlDsa65, "Quinn");
-    let message = encrypt(vec![0x42; 16 * 1024], vec![pq.certificate.clone()], None).unwrap();
+    let message = encrypt(&vec![0x42; 16 * 1024], vec![pq.certificate.clone()], None).unwrap();
     let binary = messages::binary(&message.message);
     let container = messages::container_offset(&binary);
 
@@ -131,10 +131,7 @@ fn e6_expired_or_revoked_recipient_is_refused_by_position() {
     ] {
         let expected = EngineError::RecipientUnusable { position };
         assert_eq!(outgoing_format(recipients.clone()).unwrap_err(), expected);
-        assert_eq!(
-            encrypt(PLAINTEXT.to_vec(), recipients, None).unwrap_err(),
-            expected
-        );
+        assert_eq!(encrypt(PLAINTEXT, recipients, None).unwrap_err(), expected);
     }
 }
 
@@ -143,14 +140,16 @@ fn e6_expired_or_revoked_recipient_is_refused_by_position() {
 fn e8_expired_or_revoked_key_does_not_sign() {
     let bob = keys::new_key(KeyShape::V6Curve25519, "Bob");
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
-    let revoked_alice =
-        cypher_engine::PrivateKey::portable(keys::revoked(&alice), alice.secret.clone().unwrap())
-            .unwrap();
+    let revoked_alice = cypher_engine::PrivateKey::portable(
+        keys::revoked(&alice),
+        alice.secret.as_deref().unwrap(),
+    )
+    .unwrap();
     let expired = keys::handle_of(&keys::expired_cert("Erin"));
 
     assert_eq!(
         encrypt(
-            PLAINTEXT.to_vec(),
+            PLAINTEXT,
             vec![bob.certificate.clone()],
             Some(revoked_alice)
         )
@@ -158,12 +157,7 @@ fn e8_expired_or_revoked_key_does_not_sign() {
         EngineError::KeyRevoked
     );
     assert_eq!(
-        encrypt(
-            PLAINTEXT.to_vec(),
-            vec![bob.certificate.clone()],
-            Some(expired)
-        )
-        .unwrap_err(),
+        encrypt(PLAINTEXT, vec![bob.certificate.clone()], Some(expired)).unwrap_err(),
         EngineError::KeyExpired
     );
 }
@@ -195,7 +189,7 @@ fn e5_other_session_key_packets_make_the_flag_false() {
         (PLAINTEXT, false)
     );
 
-    let message = encrypt(PLAINTEXT.to_vec(), vec![pq.certificate.clone()], None).unwrap();
+    let message = encrypt(PLAINTEXT, vec![pq.certificate.clone()], None).unwrap();
     let mut with_unknown_version = vec![0xC0 | 1, 40, 99];
     with_unknown_version.resize(2 + 40, 0);
     with_unknown_version.extend_from_slice(&messages::binary(&message.message));

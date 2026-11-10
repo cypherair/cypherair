@@ -47,7 +47,7 @@ fn to_bob(cast: &Cast, inner: &[u8]) -> Vec<u8> {
 fn e9_verified_unknown_signer_and_not_signed() {
     let cast = cast();
     let signed = encrypt(
-        PLAINTEXT.to_vec(),
+        PLAINTEXT,
         vec![cast.bob.certificate.clone()],
         Some(keys::handle(&cast.alice)),
     )
@@ -64,7 +64,7 @@ fn e9_verified_unknown_signer_and_not_signed() {
     let decrypted = decrypt(signed, keys::handle(&cast.bob), vec![]).unwrap();
     assert_eq!(decrypted.signature, signature(Verdict::UnknownSigner, None));
 
-    let unsigned = encrypt(PLAINTEXT.to_vec(), vec![cast.bob.certificate.clone()], None)
+    let unsigned = encrypt(PLAINTEXT, vec![cast.bob.certificate.clone()], None)
         .unwrap()
         .message;
     let decrypted = decrypt(
@@ -98,7 +98,7 @@ fn e9_invalid_signature_is_invalid() {
 fn e9_signer_revoked() {
     let cast = cast();
     let signed = encrypt(
-        PLAINTEXT.to_vec(),
+        PLAINTEXT,
         vec![cast.bob.certificate.clone()],
         Some(keys::handle(&cast.alice)),
     )
@@ -194,4 +194,61 @@ fn e9_verified_signature_wins_over_invalid_one() {
             );
         }
     }
+}
+
+/// A signature dated a minute ahead of this device's clock is `Verified`:
+/// Sequoia allows 30 minutes, which passing a time of its own would turn off.
+#[test]
+fn e9_signature_dated_a_minute_ahead_is_verified() {
+    let cast = cast();
+    let alice = tsk_cert(&cast.alice);
+    let now = SystemTime::now();
+    let ahead = now + std::time::Duration::from_secs(60);
+    let signed = messages::signed_at(PLAINTEXT, messages::signing_pair(&alice, now), ahead, None);
+    let decrypted = decrypt(
+        to_bob(&cast, &signed),
+        keys::handle(&cast.bob),
+        vec![cast.alice.certificate.clone()],
+    )
+    .unwrap();
+    assert_eq!(decrypted.signature, signature(Verdict::Verified, Some(0)));
+}
+
+/// A correct signature outside its own time is `Unverifiable`: one dated an
+/// hour ahead, and one past its own expiry. A forged one with a wrong date
+/// stays `Invalid`.
+#[test]
+fn e9_signature_outside_its_own_time_is_unverifiable() {
+    use std::time::Duration;
+    let cast = cast();
+    let hour = Duration::from_secs(60 * 60);
+    let owen = keys::old_cert("Owen");
+    let (owen_certificate, _) = keys::split(&owen);
+    let now = SystemTime::now();
+    let (made, _) = keys::expired_window();
+    let pair = || messages::signing_pair(&owen, now);
+
+    let an_hour_ahead = messages::signed_at(PLAINTEXT, pair(), now + hour, None);
+    let expired = messages::signed_at(PLAINTEXT, pair(), made + hour, Some(hour));
+    for signed in [an_hour_ahead.clone(), expired] {
+        let decrypted = decrypt(
+            to_bob(&cast, &signed),
+            keys::handle(&cast.bob),
+            vec![owen_certificate.clone()],
+        )
+        .unwrap();
+        assert_eq!(
+            decrypted.signature,
+            signature(Verdict::Unverifiable, Some(0))
+        );
+    }
+
+    let forged = messages::corrupt_signature(&an_hour_ahead, &owen);
+    let decrypted = decrypt(
+        to_bob(&cast, &forged),
+        keys::handle(&cast.bob),
+        vec![owen_certificate],
+    )
+    .unwrap();
+    assert_eq!(decrypted.signature, signature(Verdict::Invalid, Some(0)));
 }

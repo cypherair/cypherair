@@ -109,6 +109,31 @@ pub fn signed(text: &[u8], signers: Vec<KeyPair>) -> Vec<u8> {
     sink
 }
 
+/// A message signed by `signer` around a literal packet of `text`,
+/// unencrypted, with the signature dated `created` and valid for `validity`.
+pub fn signed_at(
+    text: &[u8],
+    signer: KeyPair,
+    created: SystemTime,
+    validity: Option<std::time::Duration>,
+) -> Vec<u8> {
+    let mut template =
+        openpgp::packet::signature::SignatureBuilder::new(openpgp::types::SignatureType::Binary);
+    if let Some(validity) = validity {
+        template = template.set_signature_validity_period(validity).unwrap();
+    }
+    let mut sink = Vec::new();
+    let signer = Signer::with_template(Message::new(&mut sink), signer, template)
+        .unwrap()
+        .creation_time(created)
+        .build()
+        .unwrap();
+    let mut writer = LiteralWriter::new(signer).build().unwrap();
+    writer.write_all(text).unwrap();
+    writer.finalize().unwrap();
+    sink
+}
+
 /// `signed` with the signature value of `issuer`'s signature corrupted.
 pub fn corrupt_signature(signed: &[u8], issuer: &Cert) -> Vec<u8> {
     let pile = openpgp::PacketPile::from_bytes(signed).unwrap();

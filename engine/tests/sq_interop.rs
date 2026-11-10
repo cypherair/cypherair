@@ -79,7 +79,7 @@ fn e21_sq_reads_engine_messages() {
         std::fs::write(&cert_path, keys::armored_certificate(&alice.certificate)).unwrap();
 
         let message = encrypt(
-            PLAINTEXT.to_vec(),
+            PLAINTEXT,
             vec![alice.certificate.clone()],
             Some(keys::handle(&alice)),
         )

@@ -23,7 +23,7 @@ fn e1_no_plaintext_when_authentication_fails() {
     let large = vec![0x42u8; 1024 * 1024];
     for shape in [KeyShape::V4Curve25519, KeyShape::V6Curve25519] {
         let alice = keys::new_key(shape, "Alice");
-        let message = encrypt(large.clone(), vec![alice.certificate.clone()], None).unwrap();
+        let message = encrypt(&large, vec![alice.certificate.clone()], None).unwrap();
         let binary = messages::binary(&message.message);
         let tampered = flip(&binary, binary.len() - 8);
         assert_eq!(
@@ -41,7 +41,7 @@ fn e2_tampered_container_is_tampered() {
     for shape in [KeyShape::V4Curve25519, KeyShape::V6Curve25519] {
         let alice = keys::new_key(shape, "Alice");
         let text = vec![0x42u8; 64 * 1024];
-        let message = encrypt(text, vec![alice.certificate.clone()], None).unwrap();
+        let message = encrypt(&text, vec![alice.certificate.clone()], None).unwrap();
         let binary = messages::binary(&message.message);
         let container = messages::container_offset(&binary);
         let first_block = container + 48;
@@ -66,7 +66,7 @@ fn e2_named_recipient_packet_that_does_not_unwrap_is_tampered() {
         KeyShape::V6MlDsa65,
     ] {
         let alice = keys::new_key(shape, "Alice");
-        let message = encrypt(PLAINTEXT.to_vec(), vec![alice.certificate.clone()], None).unwrap();
+        let message = encrypt(PLAINTEXT, vec![alice.certificate.clone()], None).unwrap();
         let binary = messages::binary(&message.message);
         // The last bytes of the only session-key packet: the wrapped key.
         let wrapped_key = messages::container_offset(&binary) - 4;
@@ -84,7 +84,7 @@ fn e2_named_recipient_packet_that_does_not_unwrap_is_tampered() {
 fn e2_message_for_someone_else_is_no_matching_key() {
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
     let bob = keys::new_key(KeyShape::V6Curve25519, "Bob");
-    let to_bob = encrypt(PLAINTEXT.to_vec(), vec![bob.certificate.clone()], None).unwrap();
+    let to_bob = encrypt(PLAINTEXT, vec![bob.certificate.clone()], None).unwrap();
     assert_eq!(
         decrypt(to_bob.message, keys::handle(&alice), vec![]).unwrap_err(),
         EngineError::NoMatchingKey
@@ -164,6 +164,44 @@ fn e2_failure_after_the_unwrap_is_tampered() {
     );
 }
 
+/// E2. A recipient packet that names the key and unwraps to a cipher the
+/// engine refuses is `Unsupported`. Only the old container keeps its cipher
+/// inside that packet.
+#[test]
+fn e2_named_packet_with_a_refused_cipher_is_unsupported() {
+    use openpgp::policy::StandardPolicy;
+    use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
+    use openpgp::types::SymmetricAlgorithm;
+    use sequoia_openpgp as openpgp;
+    use std::io::Write;
+
+    let alice = keys::new_key(KeyShape::V4Curve25519, "Alice");
+    let cert = sequoia_cert(&alice);
+    let policy = StandardPolicy::new();
+    let valid = cert.with_policy(&policy, None).unwrap();
+    // Old ciphers on purpose: these are the ones the policy refuses.
+    #[allow(deprecated)]
+    let refused = [SymmetricAlgorithm::CAST5, SymmetricAlgorithm::TripleDES];
+    for cipher in refused {
+        let mut message = Vec::new();
+        let encryptor = Encryptor::for_recipients(
+            Message::new(&mut message),
+            valid.keys().for_transport_encryption(),
+        )
+        .symmetric_algo(cipher)
+        .build()
+        .unwrap();
+        let mut literal = LiteralWriter::new(encryptor).build().unwrap();
+        literal.write_all(PLAINTEXT).unwrap();
+        literal.finalize().unwrap();
+        assert_eq!(
+            decrypt(message, keys::handle(&alice), vec![]).unwrap_err(),
+            EngineError::Unsupported,
+            "{cipher:?}"
+        );
+    }
+}
+
 /// E2. Input that does not parse is `Malformed`; OpenPGP that is not an
 /// encrypted message is `WrongKind`.
 #[test]
@@ -187,9 +225,9 @@ fn e2_input_that_is_not_an_encrypted_message() {
 #[test]
 fn e7_expired_or_revoked_key_still_decrypts() {
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
-    let message = encrypt(PLAINTEXT.to_vec(), vec![alice.certificate.clone()], None).unwrap();
+    let message = encrypt(PLAINTEXT, vec![alice.certificate.clone()], None).unwrap();
     let revoked =
-        PrivateKey::portable(keys::revoked(&alice), alice.secret.clone().unwrap()).unwrap();
+        PrivateKey::portable(keys::revoked(&alice), alice.secret.as_deref().unwrap()).unwrap();
     assert_eq!(
         decrypt(message.message, revoked, vec![]).unwrap().plaintext,
         PLAINTEXT

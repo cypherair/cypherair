@@ -29,7 +29,7 @@ pub fn new_key(shape: KeyShape, name: &str) -> NewKey {
 pub fn handle(key: &NewKey) -> Arc<PrivateKey> {
     PrivateKey::portable(
         key.certificate.clone(),
-        key.secret.clone().expect("a portable secret"),
+        key.secret.as_deref().expect("a portable secret"),
     )
     .expect("build the portable handle")
 }
@@ -37,7 +37,7 @@ pub fn handle(key: &NewKey) -> Arc<PrivateKey> {
 /// The handle for a certificate with secrets built by Sequoia.
 pub fn handle_of(cert: &Cert) -> Arc<PrivateKey> {
     let (certificate, secret) = split(cert);
-    PrivateKey::portable(certificate, secret).expect("build the portable handle")
+    PrivateKey::portable(certificate, &secret).expect("build the portable handle")
 }
 
 /// A certificate with secrets, as the stored certificate and the portable
@@ -99,6 +99,24 @@ pub fn expired_cert(name: &str) -> Cert {
     .unwrap()
     .set_creation_time(created)
     .set_validity_period(Duration::from_secs(24 * 60 * 60))
+    .generate()
+    .unwrap()
+    .0
+}
+
+/// A v6 Curve25519 certificate with secrets, made two days ago, that never
+/// expires.
+pub fn old_cert(name: &str) -> Cert {
+    let (created, _) = expired_window();
+    CertBuilder::general_purpose(Some(format!(
+        "{name} <{}@example.org>",
+        name.to_lowercase()
+    )))
+    .set_cipher_suite(CipherSuite::Cv25519)
+    .set_profile(Profile::RFC9580)
+    .unwrap()
+    .set_creation_time(created)
+    .set_validity_period(None)
     .generate()
     .unwrap()
     .0

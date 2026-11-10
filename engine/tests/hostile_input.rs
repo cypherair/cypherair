@@ -32,7 +32,7 @@ fn to(key: &cypher_engine::NewKey, inner: &[u8]) -> Vec<u8> {
 fn e3_too_many_packets_before_the_container() {
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
     let message = messages::binary(
-        &encrypt(PLAINTEXT.to_vec(), vec![alice.certificate.clone()], None)
+        &encrypt(PLAINTEXT, vec![alice.certificate.clone()], None)
             .unwrap()
             .message,
     );
@@ -84,7 +84,7 @@ fn e3_too_many_packets_while_reading() {
 fn e3_too_deep_nesting() {
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
     let message = messages::binary(
-        &encrypt(PLAINTEXT.to_vec(), vec![alice.certificate.clone()], None)
+        &encrypt(PLAINTEXT, vec![alice.certificate.clone()], None)
             .unwrap()
             .message,
     );
@@ -152,7 +152,7 @@ fn e3_too_much_plaintext() {
 fn e3_container_without_authentication_is_unsupported() {
     let alice = keys::new_key(KeyShape::V4Curve25519, "Alice");
     let message = messages::binary(
-        &encrypt(PLAINTEXT.to_vec(), vec![alice.certificate.clone()], None)
+        &encrypt(PLAINTEXT, vec![alice.certificate.clone()], None)
             .unwrap()
             .message,
     );
@@ -170,7 +170,7 @@ fn e3_container_without_authentication_is_unsupported() {
 #[test]
 fn e3_key_material_beyond_its_bounds() {
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
-    let secret = alice.secret.clone().unwrap();
+    let secret = alice.secret.as_deref().unwrap();
 
     let mut too_large = alice.certificate.clone();
     too_large.resize(1024 * 1024 + 1, 0);
@@ -188,7 +188,7 @@ fn e3_key_material_beyond_its_bounds() {
             EngineError::LimitsExceeded
         );
         assert_eq!(
-            PrivateKey::portable(certificate.clone(), secret.clone()).unwrap_err(),
+            PrivateKey::portable(certificate.clone(), secret).unwrap_err(),
             EngineError::LimitsExceeded
         );
         assert_eq!(
@@ -197,10 +197,10 @@ fn e3_key_material_beyond_its_bounds() {
         );
     }
 
-    let mut too_large_secret = secret.clone();
+    let mut too_large_secret = secret.to_vec();
     too_large_secret.resize(1024 * 1024 + 1, 0);
     assert_eq!(
-        PrivateKey::portable(alice.certificate.clone(), too_large_secret).unwrap_err(),
+        PrivateKey::portable(alice.certificate.clone(), &too_large_secret).unwrap_err(),
         EngineError::LimitsExceeded
     );
     let mut too_large_revocation = alice.revocation.clone();

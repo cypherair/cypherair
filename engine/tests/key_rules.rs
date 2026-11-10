@@ -25,7 +25,8 @@ fn e10_secret_of_another_certificate_is_refused() {
     let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
     let bob = keys::new_key(KeyShape::V6Curve25519, "Bob");
     assert_eq!(
-        PrivateKey::portable(alice.certificate.clone(), bob.secret.clone().unwrap()).unwrap_err(),
+        PrivateKey::portable(alice.certificate.clone(), bob.secret.as_deref().unwrap())
+            .unwrap_err(),
         EngineError::KeyMismatch
     );
 
@@ -47,7 +48,7 @@ fn e10_secret_of_another_certificate_is_refused() {
             mixed.extend_from_slice(&packet.to_vec().unwrap());
         }
         assert_eq!(
-            PrivateKey::portable(alice.certificate.clone(), mixed).unwrap_err(),
+            PrivateKey::portable(alice.certificate.clone(), &mixed).unwrap_err(),
             EngineError::KeyMismatch,
             "foreign secret at {foreign}"
         );
