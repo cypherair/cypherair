@@ -1,5 +1,4 @@
 import Foundation
-import LocalAuthentication
 import Sealing
 import Vault
 
@@ -42,8 +41,8 @@ public struct IdentityEnvelopeStore: Sendable {
         do { try rows.write(account: account, data: encoded) } catch { throw .vault(error) }
     }
 
-    /// Opens the secret for `fingerprint`. Blocking while the enclave prompts.
-    public func open(fingerprint: String, session: UnlockedSession, context: LAContext) throws(StoreError) -> SensitiveBuffer {
+    /// Opens the secret for `fingerprint` with the operation's approval. Blocking.
+    public func open(fingerprint: String, session: UnlockedSession, approval: OperationApproval) throws(StoreError) -> SensitiveBuffer {
         let account = try Self.normalize(fingerprint)
         let data: Data?
         do { data = try rows.read(account: account) } catch { throw .vault(error) }
@@ -52,7 +51,7 @@ public struct IdentityEnvelopeStore: Sendable {
         do { envelope = try EnclaveSealedEnvelopeCodec.decode(data, expectedKind: kind) } catch { throw .damaged }
         guard envelope.associatedData == Data(account.utf8) else { throw .damaged }
         do {
-            return try session.openIdentityEnvelope(envelope, kind: kind, context: context)
+            return try session.openIdentityEnvelope(envelope, kind: kind, approval: approval)
         } catch {
             throw .vault(error)
         }

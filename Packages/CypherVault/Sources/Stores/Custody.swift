@@ -253,15 +253,15 @@ public struct CustodyKeyStore: Sendable {
     }
 
     /// Creates both keys of a new identity under one fresh handle-set
-    /// identifier. Failure after the first key removes it again. Blocking while
-    /// the enclave works; the caller's context should already be authenticated.
-    public func createPair(tier: CustodyTier, session: UnlockedSession, context: LAContext) throws(CustodyError) -> (signing: LoadedCustodyHandle, keyAgreement: LoadedCustodyHandle) {
+    /// identifier, with the operation's biometric approval. Failure after the
+    /// first key removes it again. Blocking.
+    public func createPair(tier: CustodyTier, session: UnlockedSession, approval: OperationApproval) throws(CustodyError) -> (signing: LoadedCustodyHandle, keyAgreement: LoadedCustodyHandle) {
         let identifier = try CustodyHandleReference.generateHandleSetIdentifier()
         let signingReference = try CustodyHandleReference(handleSetIdentifier: identifier, role: .signing, tier: tier)
         let keyAgreementReference = try CustodyHandleReference(handleSetIdentifier: identifier, role: .keyAgreement, tier: tier)
-        let signing = try create(signingReference, session: session, context: context)
+        let signing = try create(signingReference, session: session, context: approval.context)
         do {
-            let keyAgreement = try create(keyAgreementReference, session: session, context: context)
+            let keyAgreement = try create(keyAgreementReference, session: session, context: approval.context)
             return (signing, keyAgreement)
         } catch {
             do { try delete([signingReference, keyAgreementReference]) } catch { throw .cleanupOrRollbackFailed }
@@ -271,7 +271,7 @@ public struct CustodyKeyStore: Sendable {
 
     /// Reconstructs one key and checks the enclave's answer against the public
     /// key the caller expects.
-    public func loadHandle(reference: CustodyHandleReference, expectedPublicKeyRaw: Data, session: UnlockedSession, context: LAContext) throws(CustodyError) -> LoadedCustodyHandle {
+    public func loadHandle(reference: CustodyHandleReference, expectedPublicKeyRaw: Data, session: UnlockedSession, approval: OperationApproval) throws(CustodyError) -> LoadedCustodyHandle {
         guard CustodyPublicBinding.hasExpectedPublicKeyShape(expectedPublicKeyRaw, role: reference.role, tier: reference.tier) else {
             throw .invalidPublicKey(reference.role)
         }
@@ -281,7 +281,7 @@ public struct CustodyKeyStore: Sendable {
         guard let blob else { throw .privateHandleMissing(reference.role) }
         let key: any EnclaveCustodyKey
         do {
-            key = try reconstruct(reference.keyType, blob: blob, session: session, context: context)
+            key = try reconstruct(reference.keyType, blob: blob, session: session, context: approval.context)
         } catch {
             throw CustodyError.fromEnclave(error, role: reference.role)
         }

@@ -15,17 +15,20 @@ public final class UnlockedSession: @unchecked Sendable {
     public let identityWrappingKeyBlob: Data
     public let identityWrappingPublicKeyX963: Data
     private let enclave: any Enclave
+    private let authenticator: any Authenticator
     private let values: OSAllocatedUnfairLock<Values?>
 
     init(
         rootSecret: borrowing SensitiveBuffer,
         identityWrappingKeyBlob: Data,
         identityWrappingPublicKeyX963: Data,
-        enclave: any Enclave
+        enclave: any Enclave,
+        authenticator: any Authenticator
     ) {
         self.identityWrappingKeyBlob = identityWrappingKeyBlob
         self.identityWrappingPublicKeyX963 = identityWrappingPublicKeyX963
         self.enclave = enclave
+        self.authenticator = authenticator
         values = OSAllocatedUnfairLock(initialState: Values(
             wrappingRootKey: RootDerivations.wrappingRootKey(rootSecret: rootSecret),
             identityCredential: SensitiveKeyBox(RootDerivations.identityCredential(rootSecret: rootSecret))
@@ -46,18 +49,28 @@ public final class UnlockedSession: @unchecked Sendable {
         return try body(box.buffer)
     }
 
-    /// A fresh context for one private operation: no biometric reuse, no
-    /// passcode fallback. The caller evaluates the key's constraint on it inside
-    /// the operation-prompt window, then disallows interaction, so the enclave
-    /// never prompts on its own.
-    public func operationContext(reason: String? = nil) -> LAContext {
+    /// Asks for the one approval of one private-key operation: a fresh context
+    /// with no biometric reuse, evaluated once for `kind`, then barred from
+    /// interaction. Biometrics offer no passcode fallback.
+    public func approve(_ kind: ApprovalKind, reason: String) async throws(VaultError) -> OperationApproval {
+        guard !isLocked else { throw .locked }
         let context = LAContext()
         context.touchIDAuthenticationAllowableReuseDuration = 0
-        context.localizedFallbackTitle = ""
-        if let reason {
-            context.localizedReason = reason
+        if kind == .biometrics {
+            context.localizedFallbackTitle = ""
         }
-        return context
+        do throws(VaultError) {
+            switch kind {
+            case .presence: try await authenticator.authenticate(context: context, reason: reason)
+            case .biometrics: try await authenticator.authenticateBiometrics(context: context, reason: reason)
+            }
+            guard !isLocked else { throw .locked }
+        } catch {
+            context.invalidate()
+            throw error
+        }
+        context.interactionNotAllowed = true
+        return OperationApproval(kind: kind, context: context)
     }
 
     /// Seals `plaintext` against the identity wrapping key. Pure software, no prompt.
@@ -81,19 +94,18 @@ public final class UnlockedSession: @unchecked Sendable {
     }
 
     /// Opens an identity envelope: reconstructs the identity wrapping key with
-    /// `context` and the identity credential, runs the agreement in the enclave,
-    /// then opens in software. Blocking while the enclave prompts; call off the
-    /// main actor.
-    public func openIdentityEnvelope(
+    /// the approval's context and the identity credential, runs the agreement in
+    /// the enclave, then opens in software. Blocking; call off the main actor.
+    package func openIdentityEnvelope(
         _ envelope: EnclaveSealedEnvelope,
         kind: SealedPayloadKind,
-        context: LAContext
+        approval: OperationApproval
     ) throws(VaultError) -> SensitiveBuffer {
         guard envelope.sealingKeyBlob == identityWrappingKeyBlob else { throw .sealedRootCorrupt }
         let shared: SharedSecret
         do {
             shared = try withIdentityCredential { credential in
-                let key = try enclave.keyAgreementKey(from: identityWrappingKeyBlob, credential: credential, context: context)
+                let key = try enclave.keyAgreementKey(from: identityWrappingKeyBlob, credential: credential, context: approval.context)
                 return try key.sharedSecret(withEphemeralPublicKeyX963: envelope.ephemeralPublicKeyX963)
             }
         } catch let error as VaultError {

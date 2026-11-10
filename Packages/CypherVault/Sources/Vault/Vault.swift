@@ -163,7 +163,8 @@ public struct Vault: Sendable {
             rootSecret: root,
             identityWrappingKeyBlob: metadata.identityWrappingKeyBlob,
             identityWrappingPublicKeyX963: metadata.identityWrappingPublicKeyX963,
-            enclave: vault.enclave
+            enclave: vault.enclave,
+            authenticator: vault.authenticator
         )
         return BootstrapResult(encodedEnvelope: encoded, session: session)
     }
@@ -282,7 +283,8 @@ public final class UnlockAttempt {
             rootSecret: root,
             identityWrappingKeyBlob: sealed.metadata.identityWrappingKeyBlob,
             identityWrappingPublicKeyX963: sealed.metadata.identityWrappingPublicKeyX963,
-            enclave: vault.enclave
+            enclave: vault.enclave,
+            authenticator: vault.authenticator
         )
     }
 

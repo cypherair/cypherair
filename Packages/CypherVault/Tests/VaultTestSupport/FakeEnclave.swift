@@ -63,21 +63,34 @@ public extension InMemoryRowStore {
 
 public typealias FakeStretcher = SandboxStretcher
 
+/// Presence that is never shown: it records each request by its kind and
+/// fails with `failure` when one is set.
 public final class CountingAuthenticator: Authenticator, @unchecked Sendable {
-    private let count = OSAllocatedUnfairLock(initialState: 0)
-    public var failure: VaultError?
+    private let state = OSAllocatedUnfairLock(initialState: (presence: 0, biometrics: 0, failure: VaultError?.none))
 
     public init() {}
 
-    public var prompts: Int { count.withLock { $0 } }
+    public var failure: VaultError? {
+        get { state.withLock { $0.failure } }
+        set { state.withLock { $0.failure = newValue } }
+    }
+
+    public var prompts: Int { state.withLock { $0.presence + $0.biometrics } }
+    public var biometricPrompts: Int { state.withLock { $0.biometrics } }
 
     public func authenticate(context: LAContext, reason: String) async throws(VaultError) {
-        count.withLock { $0 += 1 }
+        let failure = state.withLock { state in
+            state.presence += 1
+            return state.failure
+        }
         if let failure { throw failure }
     }
 
     public func authenticateBiometrics(context: LAContext, reason: String) async throws(VaultError) {
-        count.withLock { $0 += 1 }
+        let failure = state.withLock { state in
+            state.biometrics += 1
+            return state.failure
+        }
         if let failure { throw failure }
     }
 }

@@ -90,7 +90,7 @@ final class VaultTests: XCTestCase {
         let after = try await unlock("new one")
         XCTAssertEqual(keyBytes(try after.domainKey("contacts")), contactsKey, "root secret must survive a passphrase change")
         XCTAssertEqual(after.identityWrappingKeyBlob, before.identityWrappingKeyBlob, "identity keys never change with the passphrase")
-        let opened = try after.openIdentityEnvelope(envelope, kind: .secretCertificate, context: after.operationContext())
+        let opened = try after.openIdentityEnvelope(envelope, kind: .secretCertificate, approval: try await after.approve(.presence, reason: "test"))
         XCTAssertTrue(opened.contentEquals(.text("portable key")))
         XCTAssertEqual(enclave.createdPolicies.count, 3, "a passphrase change creates exactly one new key")
     }
@@ -121,11 +121,54 @@ final class VaultTests: XCTestCase {
         let session = try await bootstrap()
         let secret = SensitiveBuffer.text("certificate")
         let envelope = try session.sealForIdentity(plaintext: secret, kind: .secretCertificate, associatedData: Data("fp".utf8))
-        let opened = try session.openIdentityEnvelope(envelope, kind: .secretCertificate, context: session.operationContext())
+        let opened = try session.openIdentityEnvelope(envelope, kind: .secretCertificate, approval: try await session.approve(.presence, reason: "test"))
         XCTAssertTrue(opened.contentEquals(.text("certificate")))
         // The fake enclave refuses the identity key without the exact credential,
         // exactly as the hardware does; a foreign credential must not open it.
         XCTAssertThrowsError(try enclave.keyAgreementKey(from: session.identityWrappingKeyBlob, credential: .text("not it"), context: LAContext()))
+    }
+
+    func test_approval_asksOnceForItsKind_andThenBarsInteraction() async throws {
+        let session = try await bootstrap()
+        let before = (all: authenticator.prompts, biometric: authenticator.biometricPrompts)
+
+        let presence = try await session.approve(.presence, reason: "test")
+        XCTAssertEqual(authenticator.prompts, before.all + 1)
+        XCTAssertEqual(authenticator.biometricPrompts, before.biometric)
+        XCTAssertEqual(presence.kind, .presence)
+        XCTAssertTrue(presence.context.interactionNotAllowed)
+
+        let biometrics = try await session.approve(.biometrics, reason: "test")
+        XCTAssertEqual(authenticator.prompts, before.all + 2)
+        XCTAssertEqual(authenticator.biometricPrompts, before.biometric + 1)
+        XCTAssertEqual(biometrics.kind, .biometrics)
+        XCTAssertTrue(biometrics.context.interactionNotAllowed)
+    }
+
+    func test_failedApproval_isReportedAsItsOwnCase() async throws {
+        let session = try await bootstrap()
+        for failure in [VaultError.authenticationCancelled, .authenticationFailed, .authenticationUnavailable] {
+            authenticator.failure = failure
+            do {
+                _ = try await session.approve(.presence, reason: "test")
+                XCTFail("approval succeeded while the authenticator failed")
+            } catch {
+                XCTAssertEqual(error, failure)
+            }
+        }
+    }
+
+    func test_lockedSession_givesNoApproval_andShowsNoPrompt() async throws {
+        let session = try await bootstrap()
+        session.relock()
+        let prompts = authenticator.prompts
+        do {
+            _ = try await session.approve(.presence, reason: "test")
+            XCTFail("a locked session gave an approval")
+        } catch {
+            XCTAssertEqual(error, .locked)
+        }
+        XCTAssertEqual(authenticator.prompts, prompts)
     }
 
     func test_damagedOrMissingRoot_isReportedAsSuch() async throws {
