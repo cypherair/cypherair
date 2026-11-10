@@ -64,9 +64,12 @@ pub fn decrypt(
         let mut decryptor = DecryptorBuilder::from_bytes(&message)
             .map_err(|_| EngineError::Malformed)?
             .buffer_size(bounded_walk::SETUP_BUFFER_BYTES)
+            // No time: Sequoia then reads the clock itself and allows a
+            // signature dated up to 30 minutes ahead. Given a time, it allows
+            // none, and a sender's clock a second fast would grade as forged.
             .with_policy(
                 &POLICY,
-                now,
+                None,
                 BoundedHelper::new(helper, message.len() as u64),
             )
             .map_err(failed)?;

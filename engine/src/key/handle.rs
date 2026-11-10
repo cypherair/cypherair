@@ -10,7 +10,6 @@ use openpgp::crypto;
 use openpgp::packet::key::{PublicParts, UnspecifiedRole};
 use openpgp::types::{KeyFlags, RevocationStatus};
 use sequoia_openpgp as openpgp;
-use zeroize::Zeroizing;
 
 use super::material::{self, SecretKey};
 use crate::error::contained;
@@ -38,11 +37,10 @@ impl PrivateKey {
     /// A portable key, from the stored certificate and the secret the vault
     /// unsealed. A secret that belongs to another certificate is `KeyMismatch`.
     #[uniffi::constructor]
-    pub fn portable(certificate: Vec<u8>, secret: Vec<u8>) -> Result<Arc<Self>, EngineError> {
+    pub fn portable(certificate: Vec<u8>, secret: &[u8]) -> Result<Arc<Self>, EngineError> {
         contained(|| {
-            let secret = Zeroizing::new(secret);
             let certificate = material::certificate(&certificate)?.strip_secret_key_material();
-            let secrets = material::secret_keys(&secret)?;
+            let secrets = material::secret_keys(secret)?;
 
             if secrets[0].fingerprint() != certificate.fingerprint() {
                 return Err(EngineError::KeyMismatch);

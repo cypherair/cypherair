@@ -1,9 +1,10 @@
 //! The verdict on a message's signatures.
 //!
 //! Sequoia reports each signature as good or as one of several errors. Where
-//! it rejected the signer's key before checking the signature, the engine
-//! checks the signature itself, so that a bad signature is never reported as
-//! something milder; and it asks the signer's key, not an error message,
+//! it rejected the signer's key, or the signature's own time, the engine checks
+//! the signature's value itself: a value that does not match is `Invalid` and
+//! is never reported as something milder, while a correct signature outside its
+//! own time is `Unverifiable`. It asks the signer's key, not an error message,
 //! whether the key is revoked or expired.
 
 use openpgp::cert::prelude::*;
@@ -59,7 +60,10 @@ fn grade_one(result: &VerificationResult, verifiers: &[Option<Cert>]) -> Signatu
         Ok(good) => (Verdict::Verified, Some(good.ka.cert())),
         Err(VerificationError::MissingKey { .. }) => (Verdict::UnknownSigner, None),
         Err(VerificationError::BadSignature { sig, ka, .. }) => {
-            let verdict = if checkable(sig) {
+            // `Invalid` only when the value does not match: a correct signature
+            // that is past its own expiry, dated too far ahead, or refused by
+            // the policy is `Unverifiable`.
+            let verdict = if checkable(sig) && sig.verify_document(ka.key()).is_err() {
                 Verdict::Invalid
             } else {
                 Verdict::Unverifiable

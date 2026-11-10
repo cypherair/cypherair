@@ -25,14 +25,13 @@ const STACK_SCRUB_BYTES: usize = 64 * 1024;
 /// its range is `KdfOutOfRange`.
 #[uniffi::export]
 pub fn stretch_unlock_passphrase(
-    passphrase: Vec<u8>,
+    passphrase: &[u8],
     salt: Vec<u8>,
     memory_kib: u32,
     iterations: u32,
     parallelism: u32,
 ) -> Result<Vec<u8>, EngineError> {
     contained(|| {
-        let passphrase = Zeroizing::new(passphrase);
         if passphrase.is_empty()
             || salt.len() < MIN_SALT_LENGTH
             || !MEMORY_KIB.contains(&memory_kib)
@@ -45,7 +44,7 @@ pub fn stretch_unlock_passphrase(
             .map_err(|_| EngineError::KdfOutOfRange)?;
         let mut blocks = Zeroizing::new(vec![Block::new(); params.block_count()]);
         let mut output = Zeroizing::new(vec![0u8; OUTPUT_LENGTH]);
-        let derived = derive(&passphrase, &salt, params, &mut blocks, &mut output);
+        let derived = derive(passphrase, &salt, params, &mut blocks, &mut output);
         zeroize::zeroize_stack::<STACK_SCRUB_BYTES>();
         derived.map_err(|_| EngineError::Internal)?;
         Ok(std::mem::take(&mut *output))
