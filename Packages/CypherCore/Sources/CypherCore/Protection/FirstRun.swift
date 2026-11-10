@@ -25,16 +25,18 @@ public final class FirstRun {
         defer { working = false }
         let locks = core.lockCount
 
-        let vault = composition.vault
-        let session: OpenSession
+        let new: NewVault
         do {
-            session = OpenSession(vaultSession: try await vault.bootstrap(passphrase: .passphrase(passphrase), reason: composition.prompts.createVault))
+            new = try await composition.vault.bootstrap(passphrase: .passphrase(passphrase), reason: composition.prompts.createVault)
         } catch {
             throw CoreError(error)
         }
+        let session = OpenSession(vaultSession: new.session)
         let domains = composition.domains
         await domains.takeAllTurns()
         defer { domains.passAllTurns() }
+        // The files first, then the sealed root: the root marks a finished
+        // first run, so a stop at any point leaves a device that starts over.
         let contents: WorkspaceContents
         do throws(CoreError) {
             let keys = try domains.keys(from: session)
@@ -46,11 +48,13 @@ public final class FirstRun {
             } catch {
                 throw CoreError(error)
             }
+            do {
+                try await Blocking.run { () throws(VaultError) in try new.store() }
+            } catch {
+                throw CoreError(error)
+            }
         } catch {
-            // A sealed root without its files would be damage at the next
-            // launch. Without the root, first run simply starts over.
             session.close()
-            try? await Blocking.run { () throws(VaultError) in try vault.reset() }
             throw error
         }
         guard isCurrent else {

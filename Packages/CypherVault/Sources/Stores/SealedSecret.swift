@@ -43,6 +43,7 @@ public enum SealedSecret {
     /// Opens a value made by `seal` with the same kind. A value of another kind,
     /// or one this vault did not seal, is `damaged`. Blocking.
     public static func open(_ sealed: Data, kind: Kind, approval: OperationApproval) throws(StoreError) -> SensitiveBuffer {
+        do { try approval.checkUsable() } catch { throw .vault(error) }
         guard let envelope = envelope(of: sealed, kind: kind, session: approval.session) else { throw .damaged }
         do {
             return try approval.session.openIdentityEnvelope(envelope, kind: kind.payloadKind, approval: approval)

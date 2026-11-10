@@ -21,7 +21,9 @@ final class VaultTests: XCTestCase {
     }
 
     private func bootstrap(_ passphrase: String = "correct horse") async throws -> UnlockedSession {
-        try await vault.bootstrap(passphrase: .text(passphrase), reason: "test")
+        let new = try await vault.bootstrap(passphrase: .text(passphrase), reason: "test")
+        try new.store()
+        return new.session
     }
 
     private func unlock(_ passphrase: String) async throws -> UnlockedSession {
@@ -203,6 +205,15 @@ final class VaultTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? VaultError, .sealedRootCorrupt)
         }
+    }
+
+    func test_bootstrap_storesNothing_untilTheVaultIsStored() async throws {
+        let new = try await vault.bootstrap(passphrase: .text("correct horse"), reason: "test")
+        XCTAssertFalse(try vault.sealedRootExists())
+        XCTAssertFalse(new.session.isLocked)
+        try new.store()
+        XCTAssertTrue(try vault.sealedRootExists())
+        XCTAssertThrowsError(try new.store()) { XCTAssertEqual($0 as? VaultError, .internalFailure("a sealed root already exists")) }
     }
 
     func test_reset_deletesTheRoot() async throws {

@@ -15,7 +15,7 @@ final class CustodyKeyStoreTests: XCTestCase {
         try await super.setUp()
         enclave = FakeEnclave()
         let vault = Vault(enclave: enclave, rootRows: InMemoryRowStore(), stretcher: FakeStretcher(), authenticator: CountingAuthenticator())
-        session = try await vault.bootstrap(passphrase: .text("pass"), reason: "test")
+        session = try await vault.bootstrap(passphrase: .text("pass"), reason: "test").session
         store = CustodyKeyStore(enclave: enclave)
     }
 
@@ -98,12 +98,43 @@ final class CustodyKeyStoreTests: XCTestCase {
         }
     }
 
-    func test_relockedSession_cannotLoadCredentialKeys() async throws {
+    func test_aPresenceApproval_loadsNoDeviceBoundKey() async throws {
         let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
+        do {
+            _ = try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: try await approval(.presence))
+            XCTFail("a presence approval loaded a device-bound key")
+        } catch {
+            XCTAssertEqual(error as? CustodyError, .approvalKindMismatch)
+        }
+    }
+
+    func test_anEndedApproval_makesAndLoadsNothing() async throws {
+        let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
+        let ended = try await approval()
+        ended.end()
+        XCTAssertThrowsError(try store.createPair(tier: .classicalP256, approval: ended)) {
+            XCTAssertEqual($0 as? CustodyError, .approvalEnded)
+        }
+        XCTAssertThrowsError(try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: ended)) {
+            XCTAssertEqual($0 as? CustodyError, .approvalEnded)
+        }
+    }
+
+    func test_relockedSession_makesAndLoadsNoKeyOfAnyType() async throws {
+        var handles: [LoadedCustodyHandle] = []
+        for tier in CustodyTier.allCases {
+            let pair = try store.createPair(tier: tier, approval: try await approval())
+            handles += [pair.signing, pair.keyAgreement]
+        }
         let approval = try await approval()
         session.relock()
-        XCTAssertThrowsError(try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: approval)) {
+        XCTAssertThrowsError(try store.createPair(tier: .postQuantum, approval: approval)) {
             XCTAssertEqual($0 as? CustodyError, .locked)
+        }
+        for handle in handles {
+            XCTAssertThrowsError(try store.loadHandle(role: handle.role, tier: handle.tier, blob: handle.blob, expectedPublicKey: handle.publicKey, approval: approval)) {
+                XCTAssertEqual($0 as? CustodyError, .locked, "\(handle.tier) \(handle.role)")
+            }
         }
     }
 }

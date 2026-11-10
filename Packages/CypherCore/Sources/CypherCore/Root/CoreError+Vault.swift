@@ -13,7 +13,7 @@ extension CoreError {
         case .locked: .locked
         case .noSealedRoot, .sealedRootCorrupt: .storageDamaged
         case .storage: .storageFailed
-        case .internalFailure: .internalFailure
+        case .approvalEnded, .internalFailure: .internalFailure
         }
     }
 
@@ -37,7 +37,7 @@ extension CoreError {
         case .localAuthenticationFailed: .authenticationFailed
         case .localAuthenticationUnavailable, .hardwareUnavailable: .authenticationUnavailable
         case .privateHandleInaccessible, .privateHandleUnauthorized, .handlePublicKeyBindingMismatch, .invalidPeerPublicKey: .deviceKeyFailed
-        case .invalidPublicKey, .approvalKindMismatch, .privateOperationRoleMismatch: .internalFailure
+        case .invalidPublicKey, .approvalKindMismatch, .approvalEnded, .privateOperationRoleMismatch: .internalFailure
         }
     }
 }

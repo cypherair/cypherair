@@ -50,6 +50,7 @@ public enum CustodyError: Error, Equatable, Sendable {
     /// A device-bound key needs a biometric approval; a presence approval may
     /// have been satisfied by the passcode.
     case approvalKindMismatch
+    case approvalEnded
     case localAuthenticationCancelled(CustodyRole)
     case localAuthenticationFailed(CustodyRole)
     case localAuthenticationUnavailable(CustodyRole)
@@ -153,7 +154,7 @@ public struct CustodyKeyStore: Sendable {
     /// biometric approval, with the identity credential of the session that
     /// gave it. Blocking.
     public func createPair(tier: CustodyTier, approval: OperationApproval) throws(CustodyError) -> (signing: LoadedCustodyHandle, keyAgreement: LoadedCustodyHandle) {
-        guard approval.kind == .biometrics else { throw .approvalKindMismatch }
+        try Self.check(approval)
         let signing = try create(tier: tier, role: .signing, approval: approval)
         let keyAgreement = try create(tier: tier, role: .keyAgreement, approval: approval)
         return (signing, keyAgreement)
@@ -169,7 +170,7 @@ public struct CustodyKeyStore: Sendable {
         expectedPublicKey: Data,
         approval: OperationApproval
     ) throws(CustodyError) -> LoadedCustodyHandle {
-        guard approval.kind == .biometrics else { throw .approvalKindMismatch }
+        try Self.check(approval)
         guard tier.acceptsPublicKey(expectedPublicKey, role: role) else { throw .invalidPublicKey(role) }
         let type = tier.keyType(for: role)
         let key: any EnclaveCustodyKey
@@ -186,6 +187,15 @@ public struct CustodyKeyStore: Sendable {
         }
         guard key.publicKeyRaw == expectedPublicKey else { throw .handlePublicKeyBindingMismatch(role) }
         return LoadedCustodyHandle(tier: tier, role: role, publicKey: expectedPublicKey, key: key)
+    }
+
+    private static func check(_ approval: OperationApproval) throws(CustodyError) {
+        do {
+            try approval.checkUsable()
+        } catch {
+            throw error == .approvalEnded ? .approvalEnded : .locked
+        }
+        guard approval.kind == .biometrics else { throw .approvalKindMismatch }
     }
 
     private func create(tier: CustodyTier, role: CustodyRole, approval: OperationApproval) throws(CustodyError) -> LoadedCustodyHandle {

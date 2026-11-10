@@ -41,7 +41,9 @@ public struct Vault: Sendable {
     /// Onboarding: one presence prompt, then a fresh root sealed under a new
     /// wrapping key whose password is the stretched passphrase, plus a new
     /// identity wrapping key whose password is the identity credential.
-    public func bootstrap(passphrase: consuming SensitiveBuffer, reason: String) async throws(VaultError) -> UnlockedSession {
+    /// Nothing is stored: the caller writes what the session protects first,
+    /// then stores the vault, so that a stop at any point leaves no root.
+    public func bootstrap(passphrase: consuming SensitiveBuffer, reason: String) async throws(VaultError) -> NewVault {
         guard enclave.isAvailable else { throw .enclaveUnavailable }
         guard try rootRows.read(account: Self.sealedRootAccount) == nil else { throw .internalFailure("a sealed root already exists") }
         let context = LAContext()
@@ -52,8 +54,7 @@ public struct Vault: Sendable {
             passphrase: SensitiveKeyBox(passphrase),
             context: ContextCarrier(context: context)
         )
-        try rootRows.write(account: Self.sealedRootAccount, data: result.encodedEnvelope)
-        return result.session
+        return NewVault(session: result.session, encodedRoot: result.encodedEnvelope, rows: rootRows)
     }
 
     /// Starts an unlock. The attempt owns one context: the first submission
@@ -235,6 +236,20 @@ public struct Vault: Sendable {
 
     static func randomSalt() throws(VaultError) -> Data {
         do { return try Randomness.bytes(count: UnlockStretchParameters.saltLength) } catch { throw .internalFailure("randomness unavailable") }
+    }
+}
+
+/// A vault that `bootstrap` made and nothing stores yet. Its session works;
+/// the device holds no root until `store()`.
+public struct NewVault: Sendable {
+    public let session: UnlockedSession
+    let encodedRoot: Data
+    let rows: any RowStore
+
+    /// Writes the sealed root's row. From then on the device has a vault.
+    public func store() throws(VaultError) {
+        guard try rows.read(account: Vault.sealedRootAccount) == nil else { throw .internalFailure("a sealed root already exists") }
+        try rows.write(account: Vault.sealedRootAccount, data: encodedRoot)
     }
 }
 
