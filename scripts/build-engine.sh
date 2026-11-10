@@ -25,6 +25,8 @@ PACKAGE="$REPO_ROOT/Packages/CypherEngine"
 XCFRAMEWORK="$PACKAGE/CypherEngineFFI.xcframework"
 BINDINGS="$PACKAGE/Sources/CypherEngine/cypher_engine.swift"
 SOURCE_HASH_FILE="$XCFRAMEWORK/source-hash"
+# One line per slice: its platform, as Xcode names it, and its architectures.
+SLICES_FILE="$XCFRAMEWORK/slices"
 PIN="$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ENGINE/target}"
 OUT="$CARGO_TARGET_DIR/apple"
@@ -57,10 +59,27 @@ source_hash() {
         | shasum -a 256 | cut -d ' ' -f 1
 }
 
+# Fail unless the library has a slice for `platform` with each architecture.
+# arm64e.x1 links the arm64e objects.
+require_slice() {
+    local platform="$1" slice arch
+    shift
+    slice="$(grep "^$platform " "$SLICES_FILE" || true)"
+    for arch in "" "$@"; do
+        arch="${arch%.x1}"
+        if [ -z "$slice" ] || { [ -n "$arch" ] && [[ " $slice " != *" $arch "* ]]; }; then
+            echo "error: the engine library has no ${arch:+$arch }slice for $platform. Run scripts/build-engine.sh" >&2
+            exit 1
+        fi
+    done
+}
+
 # The app's "Check engine library" phase runs this, sandboxed: it may read only
 # the files that engine/inputs.xcfilelist declares, which this script writes.
+# There it checks the platform and architectures Xcode is building; run by hand,
+# it checks all eight targets.
 if [ "${1:-}" = "--check" ]; then
-    if [ ! -f "$SOURCE_HASH_FILE" ] || [ ! -f "$BINDINGS" ]; then
+    if [ ! -f "$SOURCE_HASH_FILE" ] || [ ! -f "$SLICES_FILE" ] || [ ! -f "$BINDINGS" ]; then
         echo "error: the engine library is missing. Run scripts/build-engine.sh" >&2
         exit 1
     fi
@@ -71,6 +90,16 @@ if [ "${1:-}" = "--check" ]; then
     if [ "$(cat "$SOURCE_HASH_FILE")" != "$(source_hash)" ]; then
         echo "error: the engine library was built from other sources. Run scripts/build-engine.sh" >&2
         exit 1
+    fi
+    if [ -n "${PLATFORM_NAME:-}" ]; then
+        # shellcheck disable=SC2086  # ARCHS is a list
+        require_slice "$PLATFORM_NAME" ${ARCHS:-}
+    else
+        require_slice iphoneos arm64 arm64e
+        require_slice iphonesimulator arm64
+        require_slice macosx arm64 arm64e
+        require_slice xros arm64 arm64e
+        require_slice xrsimulator arm64
     fi
     exit 0
 fi
@@ -197,19 +226,22 @@ build_target() {
 
 library() { echo "$CARGO_TARGET_DIR/$1/release/libcypher_engine.a"; }
 
-# One library per XCFramework slice: device slices join arm64 and arm64e.
+# One library per XCFramework slice, named by its platform as Xcode names it:
+# device slices join arm64 and arm64e. Each slice built is listed in the slices file.
 slice() {
-    local name="$1"; shift
-    local libraries=() target
+    local platform="$1"; shift
+    local libraries=() architectures="" target
     for target in "$@"; do
         if [[ " ${TARGETS[*]} " == *" $target "* ]]; then
             libraries+=("$(library "$target")")
+            architectures="$architectures ${target%%-*}"
         fi
     done
     [ ${#libraries[@]} -gt 0 ] || return 0
-    mkdir -p "$OUT/$name"
-    lipo -create "${libraries[@]}" -output "$OUT/$name/libcypher_engine.a"
-    XCFRAMEWORK_ARGS+=(-library "$OUT/$name/libcypher_engine.a" -headers "$OUT/headers")
+    mkdir -p "$OUT/$platform"
+    lipo -create "${libraries[@]}" -output "$OUT/$platform/libcypher_engine.a"
+    XCFRAMEWORK_ARGS+=(-library "$OUT/$platform/libcypher_engine.a" -headers "$OUT/headers")
+    echo "$platform${architectures//aarch64/arm64}" >>"$OUT/slices"
 }
 
 for target in "${TARGETS[@]}"; do
@@ -236,13 +268,16 @@ cp "$OUT/bindings/cypher_engineFFI.modulemap" "$OUT/headers/module.modulemap"
 
 step "Creating the XCFramework"
 XCFRAMEWORK_ARGS=()
-slice ios aarch64-apple-ios arm64e-apple-ios
-slice ios-simulator aarch64-apple-ios-sim
-slice macos aarch64-apple-darwin arm64e-apple-darwin
+slice iphoneos aarch64-apple-ios arm64e-apple-ios
+slice iphonesimulator aarch64-apple-ios-sim
+slice macosx aarch64-apple-darwin arm64e-apple-darwin
 slice xros aarch64-apple-visionos arm64e-apple-visionos
-slice xros-simulator aarch64-apple-visionos-sim
+slice xrsimulator aarch64-apple-visionos-sim
 rm -rf "$XCFRAMEWORK" "$BINDINGS"
 xcodebuild -create-xcframework "${XCFRAMEWORK_ARGS[@]}" -output "$XCFRAMEWORK"
+cp "$OUT/slices" "$SLICES_FILE"
+# Git keeps no empty folder, and the bindings are all this one holds.
+mkdir -p "$(dirname "$BINDINGS")"
 cp "$OUT/bindings/cypher_engine.swift" "$BINDINGS"
 inputs | sed 's|^|$(SRCROOT)/|' >"$ENGINE/inputs.xcfilelist"
 # Written last: a run that fails earlier leaves no hash that claims the library is current.

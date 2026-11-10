@@ -51,6 +51,7 @@
             "$(SRCROOT)/engine/uniffi-bindgen",
             "$(SRCROOT)/engine/inputs.xcfilelist",
             "$(SRCROOT)/Packages/CypherEngine/CypherEngineFFI.xcframework/source-hash",
+            "$(SRCROOT)/Packages/CypherEngine/CypherEngineFFI.xcframework/slices",
             "$(SRCROOT)/Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift",
           ],
           "input-file-list-paths": [
