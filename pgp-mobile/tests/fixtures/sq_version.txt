@@ -1,3 +1,0 @@
-sq 1.4.0
-using sequoia-openpgp 2.4.0
-with cryptographic backend OpenSSL 3.6.3

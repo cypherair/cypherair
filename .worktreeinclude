@@ -1,6 +1,2 @@
-PgpMobile.xcframework/
-PgpMobile.arm64e-build-manifest.json
-bindings/
-Sources/PgpMobile/
 Packages/CypherEngine/CypherEngineFFI.xcframework/
 Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
