@@ -5,6 +5,8 @@ import os
 /// atomically. Production is `ProtectedDataDirectory`; the software composition
 /// keeps the files in memory.
 public protocol DomainFiles: Sendable {
+    /// The file's bytes, or nil when there is no file. A file that exists but
+    /// cannot be read throws.
     func read(_ name: String) throws(StoreError) -> Data?
     /// Replaces the file's bytes. A crash leaves the old bytes or the new ones,
     /// never a mix.

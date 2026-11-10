@@ -22,6 +22,9 @@ public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
         self.files = files
     }
 
+    /// The payload. Throws `missing` when there is no file, `otherVersion` or
+    /// `damaged` when it cannot be used, and the files' own error when it
+    /// cannot be read.
     public func load(key: SymmetricKey) throws(StoreError) -> Payload {
         guard let data = try files.read(domain) else { throw .missing }
         let padded: Data

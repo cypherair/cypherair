@@ -52,8 +52,16 @@ public struct ProtectedDataDirectory: DomainFiles {
         url.appending(path: "\(name).\(UUID().uuidString).tmp", directoryHint: .notDirectory)
     }
 
+    /// The file's bytes, or nil when there is no file. Any other failure to
+    /// read is an error, never "missing".
     public func read(_ name: String) throws(StoreError) -> Data? {
-        FileManager.default.contents(atPath: fileURL(name).path)
+        do {
+            return try Data(contentsOf: fileURL(name))
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return nil
+        } catch {
+            throw .io("read failed")
+        }
     }
 
     /// Writes the bytes to a temporary file under complete protection and

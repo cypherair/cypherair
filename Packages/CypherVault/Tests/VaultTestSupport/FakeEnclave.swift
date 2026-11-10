@@ -61,19 +61,27 @@ public extension InMemoryRowStore {
     }
 }
 
-/// Domain files in memory whose writes can be made to fail.
+/// Domain files in memory whose reads or writes can be made to fail.
 public final class FailableDomainFiles: DomainFiles, @unchecked Sendable {
     public let files = InMemoryDomainFiles()
-    private let failing = OSAllocatedUnfairLock(initialState: false)
+    private let failing = OSAllocatedUnfairLock(initialState: (reads: false, writes: false))
 
     public init() {}
 
-    public var failsWrites: Bool {
-        get { failing.withLock { $0 } }
-        set { failing.withLock { $0 = newValue } }
+    public var failsReads: Bool {
+        get { failing.withLock { $0.reads } }
+        set { failing.withLock { $0.reads = newValue } }
     }
 
-    public func read(_ name: String) throws(StoreError) -> Data? { try files.read(name) }
+    public var failsWrites: Bool {
+        get { failing.withLock { $0.writes } }
+        set { failing.withLock { $0.writes = newValue } }
+    }
+
+    public func read(_ name: String) throws(StoreError) -> Data? {
+        guard !failsReads else { throw .io("read refused by the test") }
+        return try files.read(name)
+    }
 
     public func replace(_ name: String, with data: Data) throws(StoreError) {
         guard !failsWrites else { throw .io("write refused by the test") }

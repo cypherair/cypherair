@@ -111,10 +111,22 @@ final class ProtectedDataDirectoryTests: XCTestCase {
         XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
     }
 
-    func test_directory_isExcludedFromBackups() throws {
+    func test_directory_isExcludedFromBackups_atEveryStart() throws {
         var url = directory.url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = false
+        try url.setResourceValues(values)
+
+        _ = try ProtectedDataDirectory(url: directory.url)
+
         url.removeAllCachedResourceValues()
         XCTAssertEqual(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
+    }
+
+    func test_aFileThatCannotBeRead_isAnError_notMissing() throws {
+        try FileManager.default.createDirectory(at: directory.url.appending(path: "contacts.sealed"), withIntermediateDirectories: false)
+        XCTAssertThrowsError(try directory.read("contacts")) { XCTAssertEqual($0 as? StoreError, .io("read failed")) }
+        XCTAssertNil(try directory.read("settings"))
     }
 
     func test_eraseAll_removesEveryFile() throws {
