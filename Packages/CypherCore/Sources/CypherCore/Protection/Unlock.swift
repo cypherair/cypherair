@@ -65,8 +65,8 @@ public final class Unlock {
         switch opened {
         case .intact(let contents):
             core.phase = .unlocked(Workspace(core: core, composition: composition, session: session, contents: contents))
-        case .damaged(let report, let keys, let recoverableKeys):
-            core.phase = .damaged(Recovery(core: core, composition: composition, session: session, report: report, keys: keys, recoverableKeys: recoverableKeys))
+        case .damaged(let report):
+            core.phase = .damaged(Recovery(core: core, composition: composition, session: session, report: report))
         }
     }
 
@@ -93,14 +93,12 @@ public final class Unlock {
 /// The files as unlock found them, with the lists computed off the main actor.
 private enum Opened: Sendable {
     case intact(WorkspaceContents)
-    case damaged(DamageReport, keys: KeysPayload?, recoverableKeys: [Key])
+    case damaged(DamageReport)
 
     init(_ reading: Domains.Reading) {
         switch reading {
-        case .intact(let payloads):
-            self = .intact(WorkspaceContents(payloads))
-        case .damaged(let report, let keys):
-            self = .damaged(report, keys: keys, recoverableKeys: keys.map(Keys.list(of:)) ?? [])
+        case .intact(let payloads): self = .intact(WorkspaceContents(payloads))
+        case .damaged(let report): self = .damaged(report)
         }
     }
 }

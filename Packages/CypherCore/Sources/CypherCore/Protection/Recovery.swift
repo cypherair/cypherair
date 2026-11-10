@@ -1,23 +1,19 @@
 /// The phase of an app whose sealed files cannot all be used. Nothing was
-/// repaired and nothing fell back to a first value.
+/// repaired, nothing fell back to a first value, and nothing is rescued: the
+/// report says what is wrong, and the only way on is a reset.
 @MainActor
 public final class Recovery {
     public let report: DamageReport
-    /// The keys of the key list when it is intact; empty when it is not.
-    public let recoverableKeys: [Key]
 
-    let keys: KeysPayload?
     let session: OpenSession
     let composition: Composition
     weak var core: AppCore?
 
-    init(core: AppCore, composition: Composition, session: OpenSession, report: DamageReport, keys: KeysPayload?, recoverableKeys: [Key]) {
+    init(core: AppCore, composition: Composition, session: OpenSession, report: DamageReport) {
         self.core = core
         self.composition = composition
         self.session = session
         self.report = report
-        self.keys = keys
-        self.recoverableKeys = recoverableKeys
     }
 
     func close() {

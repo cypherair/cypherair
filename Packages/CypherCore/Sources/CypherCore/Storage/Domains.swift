@@ -62,9 +62,7 @@ struct Domains: Sendable {
 
     enum Reading: Sendable {
         case intact(Payloads)
-        /// The key list, when it is intact, so that its portable keys can
-        /// still be backed up.
-        case damaged(DamageReport, keys: KeysPayload?)
+        case damaged(DamageReport)
     }
 
     /// Reads all three files. Any file that is missing, damaged or from another
@@ -78,7 +76,7 @@ struct Domains: Sendable {
         if let keysPayload = keysFile.payload, let contactsPayload = contactsFile.payload, let settingsPayload = settingsFile.payload {
             return .intact(Payloads(keys: keysPayload, contacts: contactsPayload, settings: settingsPayload))
         }
-        return .damaged(DamageReport(keys: keysFile.state, contacts: contactsFile.state, settings: settingsFile.state), keys: keysFile.payload)
+        return .damaged(DamageReport(keys: keysFile.state, contacts: contactsFile.state, settings: settingsFile.state))
     }
 
     private static func read<Payload>(_ domain: SealedDomain<Payload>, key: SymmetricKey) throws(StoreError) -> (payload: Payload?, state: FileState) {

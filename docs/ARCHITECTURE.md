@@ -350,9 +350,7 @@ public final class Unlock {
 }
 public final class Recovery {
     let report: DamageReport                                     // per file: intact, missing, damaged, or made by another version
-    let recoverableKeys: [Key]                                   // empty when the key list itself cannot be read
-    func exportBackup(of: Key.ID, passphrase: String) async throws(CoreError) -> TemporaryFile
-    func resetAllLocalData() async throws(CoreError)
+    func resetAllLocalData() async throws(CoreError)             // the only way on
 }
 public final class Workspace {
     let keys: Keys, contacts: Contacts, messages: Messages, settings: Settings
@@ -424,7 +422,7 @@ public enum CoreError: Error, Sendable, Equatable {
 - **A `TemporaryFile`** is a file in the app's protected temporary folder, with the name to offer when saving. The name exists only in memory. Lock erases every one.
 - **`PromptTexts`** holds the sentences for the Face ID sheets. The app owns every text, so it hands them to the core once.
 - **Status is computed at unlock.** A key that expires while the app stays unlocked shows as valid until the next unlock. That is accepted: the engine refuses at use. No timer is added for it.
-- **The lists exist before the workspace.** Unlock reads the three files and computes the keys and the contacts from their certificates in one call off the main actor, with `Keys.list(of:)` and `Contacts.list(of:)`. Only then does it publish the phase. A damaged reading keeps a key list that is intact, and `Recovery.recoverableKeys` comes from it.
+- **The lists exist before the workspace.** Unlock reads the three files and computes the keys and the contacts from their certificates in one call off the main actor, with `Keys.list(of:)` and `Contacts.list(of:)`. Only then does it publish the phase.
 - No `CoreError` case carries text, a fingerprint or a path. The app turns each case into one sentence.
 - A passphrase that the user chooses and that `Passphrase.problems` faults is refused with `passphraseTooWeak`, before any prompt. So the rule does not depend on a screen.
 
@@ -488,7 +486,7 @@ struct SettingsPayload {
 - Names, expiry dates, shapes and "revoked" are not stored. The engine computes them from the certificate at unlock, so they cannot disagree with it.
 - A store changes its value in memory only after the file was written. If saving fails, nothing changes and the caller gets an error.
 - Each file has one turn that outlives every session. A store holds it while it writes, and unlock and first run hold all three. So a write that began before a lock ends before the next unlock reads the file.
-- At unlock, a file that is missing, damaged or made by another version leads to the `damaged` phase, never to default values. Only keys from a key list that can be read can be backed up there. A file that exists but cannot be read is none of these: the unlock fails with `storageFailed`, and the app stays locked.
+- At unlock, a file that is missing, damaged or made by another version leads to the `damaged` phase, never to default values. Nothing is rescued there: the phase names what is wrong, and the only way on is a reset. A file that exists but cannot be read is none of these: the unlock fails with `storageFailed`, and the app stays locked.
 - A device that still holds the data of 1.x lands in the `damaged` phase, with its files named as made by another version. The app says so, and the only way on is a reset. Nothing of 1.x is read, and nothing is rescued.
 
 **Nothing readable identifies a key.** Two things can be read without unlocking the app: its Keychain rows, with their names, attributes, dates and public fields, and its files, with their names, sizes and dates. Nothing in them may point at one of the user's keys.
@@ -697,7 +695,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 
 **One exception to that rule.** #1046 lands `generate_portable_key` without a stamp and `Expiry` as a moment. #1047 adds the stamp argument, turns `Expiry` into a period, and adds the newest self-signature to `CertificateInfo` and `TimeOutOfRange` to the errors, before any core piece uses them.
 
-**Two clarifications.** #1062 detects damaged data and shows the phase; #1065 adds what the user can do there. #1046 copies the harness and the fixtures; #1049 deletes the old copies with `pgp-mobile/`.
+**Two clarifications.** #1062 detects damaged data and shows the phase; #1065 adds the reset there, which is all the user can do. #1046 copies the harness and the fixtures; #1049 deletes the old copies with `pgp-mobile/`.
 
 | Piece | Adds |
 |---|---|
@@ -708,7 +706,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 | #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the vault changes of section 3, `CoreError` with every case, `preview()` |
 | #1063 | `PrivateKeyAccess`, `DeviceKeyBridge`, the memory guard, everything in `Keys`, the stamp and its draw (section 2.5) |
 | #1064 | Everything in `Contacts` |
-| #1065 | The timing rules of the lock, passphrase change, reset, and what `Recovery` can do |
+| #1065 | The timing rules of the lock, passphrase change, and reset, also the reset in `Recovery` |
 | #1066 | Everything in `Messages`, temporary files |
 | #1067 | The debug screen in `App/Bench/`, which runs the real path on the owner's devices |
 
