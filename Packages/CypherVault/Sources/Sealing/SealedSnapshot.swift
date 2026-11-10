@@ -19,8 +19,9 @@ public struct SealedSnapshot: Codable, Equatable, Sendable {
 
     func validate(expectedDomain: String, expectedSchemaVersion: Int) throws(SealingError) {
         guard magic == Self.magic else { throw .malformed("snapshot magic") }
-        guard domain == expectedDomain, schemaVersion == expectedSchemaVersion else { throw .bindingMismatch }
         guard schemaVersion > 0 else { throw .malformed("schema version") }
+        guard domain == expectedDomain else { throw .bindingMismatch }
+        guard schemaVersion == expectedSchemaVersion else { throw .otherSchemaVersion }
         guard nonce.count == Self.nonceLength else { throw .malformed("nonce length") }
         guard tag.count == Self.tagLength else { throw .malformed("tag length") }
     }

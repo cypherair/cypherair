@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import LocalAuthentication
 import Sealing
 import Stores
 import Vault
@@ -11,108 +10,131 @@ final class CustodyKeyStoreTests: XCTestCase {
     private var enclave: FakeEnclave!
     private var session: UnlockedSession!
     private var store: CustodyKeyStore!
-    private var rowStores: [String: InMemoryRowStore] = [:]
 
     override func setUp() async throws {
         try await super.setUp()
         enclave = FakeEnclave()
         let vault = Vault(enclave: enclave, rootRows: InMemoryRowStore(), stretcher: FakeStretcher(), authenticator: CountingAuthenticator())
-        session = try await vault.bootstrap(passphrase: .text("pass"), reason: "test")
-        let shared = OSAllocatedUnfairLockBox<[String: InMemoryRowStore]>([:])
-        store = CustodyKeyStore(enclave: enclave) { tier, role in
-            shared.withLock { stores in
-                let key = "\(tier.rawValue).\(role.rawValue)"
-                if let existing = stores[key] { return existing }
-                let created = InMemoryRowStore(); stores[key] = created; return created
-            }
-        }
+        session = try await vault.bootstrap(passphrase: .text("pass"), reason: "test").session
+        store = CustodyKeyStore(enclave: enclave)
     }
 
-    func test_createPair_usesThePasswordPolicyEverywhereButMLKEM() throws {
+    private func approval(_ kind: ApprovalKind = .biometrics) async throws -> OperationApproval {
+        try await session.approve(kind, reason: "test")
+    }
+
+    private func load(_ handle: LoadedCustodyHandle, expecting publicKey: Data? = nil) async throws -> LoadedCustodyHandle {
+        try store.loadHandle(
+            role: handle.role,
+            tier: handle.tier,
+            blob: handle.blob,
+            expectedPublicKey: publicKey ?? handle.publicKey,
+            approval: try await approval()
+        )
+    }
+
+    func test_createPair_usesThePasswordPolicyEverywhereButMLKEM() async throws {
         let policiesBefore = enclave.createdPolicies.count
-        _ = try store.createPair(tier: .classicalP256, session: session, context: session.operationContext())
-        _ = try store.createPair(tier: .postQuantum, session: session, context: session.operationContext())
-        _ = try store.createPair(tier: .postQuantumHigh, session: session, context: session.operationContext())
+        for tier in CustodyTier.allCases {
+            _ = try store.createPair(tier: tier, approval: try await approval())
+        }
         XCTAssertEqual(Array(enclave.createdPolicies.dropFirst(policiesBefore)), [
             .biometricAndPassword, .biometricAndPassword,
             .biometricAndPassword, .biometricOnly,
             .biometricAndPassword, .biometricOnly,
         ])
-        XCTAssertEqual(try store.inventory().bindings.count, 6)
-        XCTAssertEqual(try store.inventory().malformedRowCount, 0)
     }
 
-    func test_locateLoadAndOperate_p256() throws {
-        let pair = try store.createPair(tier: .classicalP256, session: session, context: session.operationContext())
-        let located = try store.locatePair(tier: .classicalP256, signingPublicKeyRaw: pair.signing.binding.publicKeyRaw, keyAgreementPublicKeyRaw: pair.keyAgreement.binding.publicKeyRaw)
-        XCTAssertEqual(located.handleSetIdentifier, pair.signing.reference.handleSetIdentifier)
+    func test_blobsLoadAndOperate_p256() async throws {
+        let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
 
-        let signing = try store.loadHandle(reference: located.signing.reference, expectedPublicKeyRaw: located.signing.publicKeyRaw, session: session, context: session.operationContext())
+        let signing = try await load(pair.signing)
         let digest = Data(SHA256.hash(data: Data("message".utf8)))
         let (r, s) = try signing.signDigest(digest)
         XCTAssertEqual(r.count + s.count, 64)
 
-        let agreement = try store.loadHandle(reference: located.keyAgreement.reference, expectedPublicKeyRaw: located.keyAgreement.publicKeyRaw, session: session, context: session.operationContext())
+        let agreement = try await load(pair.keyAgreement)
         let ephemeral = P256.KeyAgreement.PrivateKey()
-        let secret = try agreement.sharedSecret(recipientPublicKeyX963: located.keyAgreement.publicKeyRaw, ephemeralPublicKeyX963: ephemeral.publicKey.x963Representation)
-        let expected = try ephemeral.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: located.keyAgreement.publicKeyRaw))
+        let secret = try agreement.sharedSecret(recipientPublicKeyX963: pair.keyAgreement.publicKey, ephemeralPublicKeyX963: ephemeral.publicKey.x963Representation)
+        let expected = try ephemeral.sharedSecretFromKeyAgreement(with: P256.KeyAgreement.PublicKey(x963Representation: pair.keyAgreement.publicKey))
         XCTAssertEqual(secret.withUnsafeBytes { Data($0) }, expected.withUnsafeBytes { Data($0) })
         do {
-            _ = try agreement.sharedSecret(recipientPublicKeyX963: located.signing.publicKeyRaw, ephemeralPublicKeyX963: ephemeral.publicKey.x963Representation)
+            _ = try agreement.sharedSecret(recipientPublicKeyX963: pair.signing.publicKey, ephemeralPublicKeyX963: ephemeral.publicKey.x963Representation)
             XCTFail("a request naming another public key must be refused")
         } catch {
-            XCTAssertEqual(error as? CustodyError, .handlePublicKeyBindingMismatch(.keyAgreement))
+            XCTAssertEqual(error, .handlePublicKeyBindingMismatch(.keyAgreement))
         }
     }
 
-    func test_loadAndOperate_postQuantum() throws {
-        let pair = try store.createPair(tier: .postQuantum, session: session, context: session.operationContext())
-        let signing = try store.loadHandle(reference: pair.signing.reference, expectedPublicKeyRaw: pair.signing.binding.publicKeyRaw, session: session, context: session.operationContext())
+    func test_blobsLoadAndOperate_postQuantum() async throws {
+        let pair = try store.createPair(tier: .postQuantum, approval: try await approval())
+        let signing = try await load(pair.signing)
         let signature = try signing.signMessage(Data("composite".utf8))
-        XCTAssertTrue(try MLDSA65.PublicKey(rawRepresentation: pair.signing.binding.publicKeyRaw).isValidSignature(signature, for: Data("composite".utf8)))
+        XCTAssertTrue(try MLDSA65.PublicKey(rawRepresentation: pair.signing.publicKey).isValidSignature(signature, for: Data("composite".utf8)))
 
-        let kem = try store.loadHandle(reference: pair.keyAgreement.reference, expectedPublicKeyRaw: pair.keyAgreement.binding.publicKeyRaw, session: session, context: session.operationContext())
-        let encapsulation = try MLKEM768.PublicKey(rawRepresentation: pair.keyAgreement.binding.publicKeyRaw).encapsulate()
+        let kem = try await load(pair.keyAgreement)
+        let encapsulation = try MLKEM768.PublicKey(rawRepresentation: pair.keyAgreement.publicKey).encapsulate()
         let secret = try kem.decapsulate(encapsulation.encapsulated)
         XCTAssertEqual(secret.withUnsafeBytes { Data($0) }, encapsulation.sharedSecret.withUnsafeBytes { Data($0) })
     }
 
-    func test_bindingMismatch_partialPair_andMissing_areDistinguished() throws {
-        let pair = try store.createPair(tier: .classicalP256, session: session, context: session.operationContext())
+    func test_aBlobThatIsNotTheExpectedKey_isRefused() async throws {
+        let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
         let other = P256.Signing.PrivateKey().publicKey.x963Representation
-        XCTAssertThrowsError(try store.locatePair(tier: .classicalP256, signingPublicKeyRaw: other, keyAgreementPublicKeyRaw: pair.keyAgreement.binding.publicKeyRaw)) {
-            XCTAssertEqual($0 as? CustodyError, .handlePublicKeyBindingMismatch(.signing))
+        do {
+            _ = try await load(pair.signing, expecting: other)
+            XCTFail("a blob loaded against another public key")
+        } catch {
+            XCTAssertEqual(error as? CustodyError, .handlePublicKeyBindingMismatch(.signing))
         }
-        XCTAssertThrowsError(try store.loadHandle(reference: pair.signing.reference, expectedPublicKeyRaw: other, session: session, context: session.operationContext())) {
-            XCTAssertEqual($0 as? CustodyError, .handlePublicKeyBindingMismatch(.signing))
-        }
-        try store.deletePair(try CustodyHandlePair(signing: pair.signing.binding, keyAgreement: pair.keyAgreement.binding))
-        XCTAssertThrowsError(try store.locatePair(tier: .classicalP256, signingPublicKeyRaw: pair.signing.binding.publicKeyRaw, keyAgreementPublicKeyRaw: pair.keyAgreement.binding.publicKeyRaw)) {
-            XCTAssertEqual($0 as? CustodyError, .privateHandleMissing(.signing))
-        }
-        XCTAssertEqual(try store.inventory().totalRowCount, 0)
     }
 
-    func test_relockedSession_cannotLoadCredentialKeys() throws {
-        let pair = try store.createPair(tier: .classicalP256, session: session, context: session.operationContext())
+    func test_aPresenceApproval_doesNotReachADeviceBoundKey() async throws {
+        do {
+            _ = try store.createPair(tier: .classicalP256, approval: try await approval(.presence))
+            XCTFail("a presence approval made a device-bound key")
+        } catch {
+            XCTAssertEqual(error as? CustodyError, .approvalKindMismatch)
+        }
+    }
+
+    func test_aPresenceApproval_loadsNoDeviceBoundKey() async throws {
+        let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
+        do {
+            _ = try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: try await approval(.presence))
+            XCTFail("a presence approval loaded a device-bound key")
+        } catch {
+            XCTAssertEqual(error as? CustodyError, .approvalKindMismatch)
+        }
+    }
+
+    func test_anEndedApproval_makesAndLoadsNothing() async throws {
+        let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
+        let ended = try await approval()
+        ended.end()
+        XCTAssertThrowsError(try store.createPair(tier: .classicalP256, approval: ended)) {
+            XCTAssertEqual($0 as? CustodyError, .approvalEnded)
+        }
+        XCTAssertThrowsError(try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: ended)) {
+            XCTAssertEqual($0 as? CustodyError, .approvalEnded)
+        }
+    }
+
+    func test_relockedSession_makesAndLoadsNoKeyOfAnyType() async throws {
+        var handles: [LoadedCustodyHandle] = []
+        for tier in CustodyTier.allCases {
+            let pair = try store.createPair(tier: tier, approval: try await approval())
+            handles += [pair.signing, pair.keyAgreement]
+        }
+        let approval = try await approval()
         session.relock()
-        XCTAssertThrowsError(try store.loadHandle(reference: pair.signing.reference, expectedPublicKeyRaw: pair.signing.binding.publicKeyRaw, session: session, context: LAContext())) {
+        XCTAssertThrowsError(try store.createPair(tier: .postQuantum, approval: approval)) {
             XCTAssertEqual($0 as? CustodyError, .locked)
         }
+        for handle in handles {
+            XCTAssertThrowsError(try store.loadHandle(role: handle.role, tier: handle.tier, blob: handle.blob, expectedPublicKey: handle.publicKey, approval: approval)) {
+                XCTAssertEqual($0 as? CustodyError, .locked, "\(handle.tier) \(handle.role)")
+            }
+        }
     }
-
-    func test_deleteAll_clearsEveryTier() throws {
-        _ = try store.createPair(tier: .classicalP256, session: session, context: session.operationContext())
-        _ = try store.createPair(tier: .postQuantumHigh, session: session, context: session.operationContext())
-        try store.deleteAll()
-        XCTAssertEqual(try store.inventory().totalRowCount, 0)
-    }
-}
-
-/// A tiny lock box for the test's shared row stores.
-private final class OSAllocatedUnfairLockBox<T>: @unchecked Sendable {
-    private var value: T
-    private let lock = NSLock()
-    init(_ value: T) { self.value = value }
-    func withLock<R>(_ body: (inout T) -> R) -> R { lock.lock(); defer { lock.unlock() }; return body(&value) }
 }

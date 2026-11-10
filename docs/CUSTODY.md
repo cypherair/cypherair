@@ -2,7 +2,7 @@
 
 ## 1. The custody model
 
-Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates OpenPGP **configuration** (version/algorithms/format), private-key **custody** (software secret certificate vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state) — validity is decided by *family*, never by suite alone. All four device-bound families are exposed wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risks: §7).
+Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates OpenPGP **configuration** (version/algorithms/format), private-key **custody** (software secret keys vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state) — validity is decided by *family*, never by suite alone. All four device-bound families are exposed wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risks: §7).
 
 ## 2. Custody promises
 
@@ -10,7 +10,7 @@ Secure Enclave custody is a **custody model, not an algorithm suite**: long-term
 - **Import into the enclave is not an operation**, and **existing private keys are never converted into Secure Enclave custody**; the product must not imply otherwise.
 - **An enclave key blob, a public key, or a copy of the sealed key list is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
 - **Never weaken portable software-key behavior to make custody integration easier** — the second stop-and-review condition.
-- **Rust owns all OpenPGP semantics**; the enclave performs only the private primitive through narrow callbacks that never carry secret certificate material (§5).
+- **Rust owns all OpenPGP semantics**; the enclave performs only the private primitive through narrow callbacks that never carry secret-key material (§5).
 - **Device-bound keys always require biometrics**, fixed at creation, with no passcode fallback. Keys survive a change of the enrolled biometric set, and biometric-set invalidation must **never** be offered as a user option — for a non-exportable key it is permanent key loss.
 - **Device-bound keys also require the passphrase.** Every enclave custody key is created with the identity credential as its application password, so a borrowed biometric alone cannot use one — with the single exception of the ML-KEM half (§4), which the enclave cannot decapsulate under the option. A passphrase change never touches custody keys, and there is no mode or policy switch that could.
 

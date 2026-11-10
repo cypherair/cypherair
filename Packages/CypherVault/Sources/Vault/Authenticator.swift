@@ -7,9 +7,7 @@ public protocol Authenticator: Sendable {
     /// Presence for unlock, bootstrap and passphrase change: biometrics with
     /// the device passcode or Mac password as the system's own fallback.
     func authenticate(context: LAContext, reason: String) async throws(VaultError)
-    /// Biometrics alone, the constraint every device-bound key carries. The
-    /// caller runs it inside the operation-prompt window and then disallows
-    /// interaction on the context, so the enclave never prompts on its own.
+    /// Biometrics alone, the constraint every device-bound key carries.
     func authenticateBiometrics(context: LAContext, reason: String) async throws(VaultError)
 }
 

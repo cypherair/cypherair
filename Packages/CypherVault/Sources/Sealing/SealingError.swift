@@ -8,6 +8,9 @@ public enum SealingError: Error, Equatable, Sendable {
     case payloadKindMismatch
     /// The public metadata does not match what the caller expects.
     case bindingMismatch
+    /// A snapshot written under another schema version, refused before any
+    /// decryption.
+    case otherSchemaVersion
     /// AES-GCM refused the ciphertext: tampering, or the wrong key.
     case authenticationFailed
     /// A secure random number could not be produced.

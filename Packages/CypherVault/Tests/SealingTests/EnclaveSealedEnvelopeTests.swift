@@ -39,7 +39,7 @@ final class EnclaveSealedEnvelopeTests: XCTestCase {
     }
 
     func test_wrongKind_isRefusedBeforeAnyCryptography() throws {
-        let envelope = try seal([1, 2, 3], kind: .secretCertificate)
+        let envelope = try seal([1, 2, 3], kind: .secretKeys)
         let encoded = try EnclaveSealedEnvelopeCodec.encode(envelope)
         XCTAssertThrowsError(try EnclaveSealedEnvelopeCodec.decode(encoded, expectedKind: .rootSecret)) { error in
             XCTAssertEqual(error as? SealingError, .payloadKindMismatch)
@@ -111,7 +111,7 @@ final class EnclaveSealedEnvelopeTests: XCTestCase {
         let ephemeral = try P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 0x22, count: 32))
         let plaintext = SensitiveBuffer(count: 8) { $0.copyBytes(from: Array("vector01".utf8)) }
         let envelope = try EnclaveSealedEnvelopeCodec.seal(
-            plaintext: plaintext, kind: .secretCertificate, associatedData: Data("fp".utf8),
+            plaintext: plaintext, kind: .secretKeys, associatedData: Data("fp".utf8),
             sealingKeyBlob: Data("blob".utf8), sealingPublicKeyX963: staticKey.publicKey.x963Representation,
             ephemeralPrivateKey: ephemeral, salt: Data(repeating: 0x33, count: 32), nonce: Data(repeating: 0x44, count: 12)
         )
