@@ -101,6 +101,69 @@ fn e2_message_for_someone_else_is_no_matching_key() {
     assert_eq!(decrypted.plaintext, PLAINTEXT);
 }
 
+/// E2. Recipient packets of both kinds in one message: a packet for the key
+/// that does not unwrap does not stop a hidden one that does; a packet for
+/// someone else is passed over; and a failed packet for the key outranks a
+/// hidden packet for someone else.
+#[test]
+fn e2_named_and_hidden_packets_together() {
+    let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
+    let bob = keys::new_key(KeyShape::V6Curve25519, "Bob");
+    let (alice_cert, bob_cert) = (sequoia_cert(&alice), sequoia_cert(&bob));
+    let literal = messages::literal(PLAINTEXT);
+    let now = SystemTime::now();
+    // The last bytes of the first session-key packet: its wrapped key.
+    let break_first = |message: Vec<u8>| {
+        let first_end = messages::session_key_packet_ends(&message)[0];
+        flip(&message, first_end - 4)
+    };
+
+    let broken_named_then_hidden = break_first(messages::encrypted_mixed(
+        &[(&alice_cert, false), (&alice_cert, true)],
+        &literal,
+        now,
+    ));
+    let decrypted = decrypt(broken_named_then_hidden, keys::handle(&alice), vec![]).unwrap();
+    assert_eq!(decrypted.plaintext, PLAINTEXT);
+
+    let other_named_then_hidden =
+        messages::encrypted_mixed(&[(&bob_cert, false), (&alice_cert, true)], &literal, now);
+    let decrypted = decrypt(other_named_then_hidden, keys::handle(&alice), vec![]).unwrap();
+    assert_eq!(decrypted.plaintext, PLAINTEXT);
+
+    let broken_named_then_other_hidden = break_first(messages::encrypted_mixed(
+        &[(&alice_cert, false), (&bob_cert, true)],
+        &literal,
+        now,
+    ));
+    assert_eq!(
+        decrypt(broken_named_then_other_hidden, keys::handle(&alice), vec![]).unwrap_err(),
+        EngineError::Tampered
+    );
+}
+
+/// E2. A failure after a session key was unwrapped is `Tampered`, also when it
+/// is a later refusal. Here the container, opened through a hidden packet,
+/// holds a second encrypted message for someone else; Sequoia asks the helper
+/// again, and that call finds no key.
+#[test]
+fn e2_failure_after_the_unwrap_is_tampered() {
+    let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
+    let bob = keys::new_key(KeyShape::V6Curve25519, "Bob");
+    let now = SystemTime::now();
+    let to_bob = messages::encrypted_raw(
+        &[&sequoia_cert(&bob)],
+        &messages::literal(PLAINTEXT),
+        now,
+        false,
+    );
+    let nested = messages::encrypted_raw(&[&sequoia_cert(&alice)], &to_bob, now, true);
+    assert_eq!(
+        decrypt(nested, keys::handle(&alice), vec![]).unwrap_err(),
+        EngineError::Tampered
+    );
+}
+
 /// E2. Input that does not parse is `Malformed`; OpenPGP that is not an
 /// encrypted message is `WrongKind`.
 #[test]

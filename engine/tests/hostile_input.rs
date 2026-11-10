@@ -63,6 +63,22 @@ fn e3_too_many_packets_after_the_key_was_unwrapped() {
     );
 }
 
+/// Too many packets while the plaintext is being read: the message is larger
+/// than Sequoia's setup buffer, and the packets follow the literal data, so
+/// the bound fires inside `Decryptor::read`, not while the decryptor is built.
+#[test]
+fn e3_too_many_packets_while_reading() {
+    let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
+    let mut inner = messages::literal(&vec![0x42; 128 * 1024]);
+    for _ in 0..2100 {
+        inner.extend_from_slice(&[0xC0 | 21, 1, 0]);
+    }
+    assert_eq!(
+        decrypt(to(&alice, &inner), keys::handle(&alice), vec![]).unwrap_err(),
+        EngineError::LimitsExceeded
+    );
+}
+
 /// Too deep nesting, outside the container and inside it.
 #[test]
 fn e3_too_deep_nesting() {

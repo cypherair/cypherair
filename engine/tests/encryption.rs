@@ -167,3 +167,40 @@ fn e8_expired_or_revoked_key_does_not_sign() {
         EngineError::KeyExpired
     );
 }
+
+/// E5. A password packet beside a post-quantum packet for the key makes the
+/// message not quantum-safe. A session-key packet of a version the engine does
+/// not read is refused as `Unsupported`, so it cannot pass as quantum-safe.
+#[test]
+fn e5_other_session_key_packets_make_the_flag_false() {
+    use openpgp::policy::StandardPolicy;
+    use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
+    use std::io::Write;
+
+    let pq = keys::new_key(KeyShape::V6MlDsa65, "Quinn");
+    let cert = Cert::from_bytes(&pq.certificate).unwrap();
+    let policy = StandardPolicy::new();
+    let valid = cert.with_policy(&policy, None).unwrap();
+    let mut with_password = Vec::new();
+    let message = Encryptor::with_passwords(Message::new(&mut with_password), Some("password"))
+        .add_recipients(valid.keys().for_transport_encryption())
+        .build()
+        .unwrap();
+    let mut literal = LiteralWriter::new(message).build().unwrap();
+    literal.write_all(PLAINTEXT).unwrap();
+    literal.finalize().unwrap();
+    let decrypted = decrypt(with_password, keys::handle(&pq), vec![]).unwrap();
+    assert_eq!(
+        (decrypted.plaintext.as_slice(), decrypted.quantum_safe),
+        (PLAINTEXT, false)
+    );
+
+    let message = encrypt(PLAINTEXT.to_vec(), vec![pq.certificate.clone()], None).unwrap();
+    let mut with_unknown_version = vec![0xC0 | 1, 40, 99];
+    with_unknown_version.resize(2 + 40, 0);
+    with_unknown_version.extend_from_slice(&messages::binary(&message.message));
+    assert_eq!(
+        decrypt(with_unknown_version, keys::handle(&pq), vec![]).unwrap_err(),
+        EngineError::Unsupported
+    );
+}

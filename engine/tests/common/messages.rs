@@ -48,6 +48,23 @@ pub fn container_offset(binary: &[u8]) -> usize {
     panic!("no encrypted container")
 }
 
+/// Where each session-key packet ends, as Sequoia writes them.
+pub fn session_key_packet_ends(binary: &[u8]) -> Vec<usize> {
+    let mut ends = Vec::new();
+    let mut offset = 0;
+    let mut ppr = PacketParser::from_bytes(binary).unwrap();
+    while let PacketParserResult::Some(pp) = ppr {
+        if matches!(pp.packet, Packet::SEIP(_)) {
+            return ends;
+        }
+        let (packet, next) = pp.next().unwrap();
+        offset += packet.to_vec().unwrap().len();
+        ends.push(offset);
+        ppr = next;
+    }
+    panic!("no encrypted container")
+}
+
 /// A literal data packet holding `text`.
 pub fn literal(text: &[u8]) -> Vec<u8> {
     let mut sink = Vec::new();
@@ -132,15 +149,22 @@ pub fn signing_pair(cert: &Cert, at: SystemTime) -> KeyPair {
 /// certificates' encryption keys as they were at `at`; with `hidden`, the
 /// session-key packets name no recipient.
 pub fn encrypted_raw(recipients: &[&Cert], inner: &[u8], at: SystemTime, hidden: bool) -> Vec<u8> {
+    let recipients: Vec<_> = recipients.iter().map(|cert| (*cert, hidden)).collect();
+    encrypted_mixed(&recipients, inner, at)
+}
+
+/// `encrypted_raw` with a choice per recipient whose packet is hidden, in the
+/// order given.
+pub fn encrypted_mixed(recipients: &[(&Cert, bool)], inner: &[u8], at: SystemTime) -> Vec<u8> {
     let valid: Vec<_> = recipients
         .iter()
-        .map(|cert| cert.with_policy(&POLICY, at).unwrap())
+        .map(|(cert, hidden)| (cert.with_policy(&POLICY, at).unwrap(), *hidden))
         .collect();
     let mut keys = Vec::new();
-    for valid in &valid {
+    for (valid, hidden) in &valid {
         for key in valid.keys().for_transport_encryption() {
             let features = valid.features();
-            keys.push(if hidden {
+            keys.push(if *hidden {
                 Recipient::new(features, None::<KeyHandle>, key.key())
             } else {
                 Recipient::from(key)

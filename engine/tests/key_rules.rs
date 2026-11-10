@@ -86,7 +86,7 @@ fn e11_name_only_from_a_validly_bound_user_id() {
 }
 
 /// E12. Each shape the engine makes is reported as itself, with its real
-/// algorithms. A P-256 key never shares a shape with a Curve25519 key. A key
+/// algorithms, and its certificate holds no secret. A P-256 key never shares a shape with a Curve25519 key. A key
 /// that matches none of ours has no shape and still reports its algorithm and
 /// size.
 #[test]
@@ -127,8 +127,14 @@ fn e12_shape_is_reported_exactly() {
     for (shape, version, primary, encryption) in generated {
         let info = inspect_certificate(keys::new_key(shape, "Alice").certificate).unwrap();
         assert_eq!(
-            (info.shape, info.version, info.primary, info.encryption),
-            (Some(shape), version, primary, Some(encryption))
+            (
+                info.shape,
+                info.version,
+                info.primary,
+                info.encryption,
+                info.has_secret
+            ),
+            (Some(shape), version, primary, Some(encryption), false)
         );
     }
 
@@ -237,4 +243,24 @@ fn generated_key_names_its_owner() {
             (Some(name), email)
         );
     }
+}
+
+/// A certificate that is shared is armored without the secret keys it may
+/// carry.
+#[test]
+fn armored_certificate_holds_no_secret() {
+    let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
+    let with_secrets = keys::tsk(&alice);
+    assert!(
+        inspect_certificate(with_secrets.clone())
+            .unwrap()
+            .has_secret
+    );
+    let armored =
+        cypher_engine::armor(cypher_engine::ArmorKind::Certificate, with_secrets).unwrap();
+    let info = inspect_certificate(armored.into_bytes()).unwrap();
+    assert_eq!(
+        (info.has_secret, info.shape),
+        (false, Some(KeyShape::V6Curve25519))
+    );
 }
