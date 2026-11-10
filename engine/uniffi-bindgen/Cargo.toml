@@ -1,0 +1,14 @@
+[package]
+name = "uniffi-bindgen"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later OR MPL-2.0"
+description = "Generates the engine's Swift bindings; a package of its own so that the engine library does not build the generator for every target"
+publish = false
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "main.rs"
+
+[dependencies]
+uniffi = { version = "0.32", features = ["cli"] }

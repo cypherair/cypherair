@@ -1,0 +1,40 @@
+[package]
+name = "cypher-engine"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later OR MPL-2.0"
+description = "The OpenPGP engine of CypherAir, on Sequoia"
+publish = false
+
+[workspace]
+members = ["uniffi-bindgen"]
+
+[lib]
+crate-type = ["lib", "staticlib"]
+name = "cypher_engine"
+
+[dependencies]
+sequoia-openpgp = { version = "=2.4.2", default-features = false, features = [
+    "crypto-openssl",
+    "compression-deflate",
+] }
+uniffi = "0.32"
+openssl = { version = "0.10", features = ["vendored"] }
+zeroize = { version = "1.9", features = ["derive"] }
+argon2 = { version = "0.5", features = ["zeroize"] }
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+# LTO and strip stay off: either breaks the link with the vendored OpenSSL.
+# The default `panic = "unwind"` stays too, so that UniFFI can catch a panic.
+[profile.release]
+lto = false
+strip = "none"
+codegen-units = 1
+
+# The fork adds the Apple arm64e targets to OpenSSL's Configure, which upstream
+# lacks. The manifest names the branch; Cargo.lock pins the commit.
+[patch.crates-io]
+openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", branch = "carry/apple-arm64e-openssl-fork" }
