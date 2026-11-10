@@ -6,6 +6,10 @@
 //! held to a size and a packet count. A real certificate is a handful of
 //! packets and a few kilobytes; a post-quantum one with several subkeys stays
 //! under 100 KiB.
+//!
+//! The app has no web of trust. So certifications of a User ID by other keys
+//! are dropped as a certificate is read: they are not counted, never reach
+//! Sequoia's certificate code, and are not kept or passed on.
 
 use openpgp::cert::prelude::*;
 use openpgp::packet::Tag;
@@ -33,7 +37,7 @@ pub(crate) type SecretKey = openpgp::packet::Key<SecretParts, UnspecifiedRole>;
 /// certificate (a message, a signature, a keyring) is `WrongKind`; a key of a
 /// version Sequoia does not read is `Unsupported`.
 pub(crate) fn certificate(bytes: &[u8]) -> Result<Cert, EngineError> {
-    let packets = packets(bytes)?;
+    let packets = packets(bytes, Certifications::OwnOnly)?;
     match packets.first() {
         Some(Packet::PublicKey(_) | Packet::SecretKey(_)) => {}
         Some(packet) if is_primary_key(packet.tag()) => return Err(EngineError::Unsupported),
@@ -55,7 +59,7 @@ pub(crate) fn certificate(bytes: &[u8]) -> Result<Cert, EngineError> {
 /// `Malformed`.
 pub(crate) fn secret_keys(bytes: &[u8]) -> Result<Vec<SecretKey>, EngineError> {
     let mut keys = Vec::new();
-    for (index, packet) in packets(bytes)?.into_iter().enumerate() {
+    for (index, packet) in packets(bytes, Certifications::All)?.into_iter().enumerate() {
         let key = match packet {
             Packet::SecretKey(key) if index == 0 => key.role_into_unspecified(),
             Packet::SecretSubkey(key) if index > 0 => key.role_into_unspecified(),
@@ -100,7 +104,7 @@ pub(crate) fn write_secret_keys(cert: &Cert) -> Result<Zeroizing<Vec<u8>>, Engin
 
 /// Read a revocation: one signature that revokes a certificate.
 pub(crate) fn revocation(bytes: &[u8]) -> Result<openpgp::packet::Signature, EngineError> {
-    let mut packets = packets(bytes)?;
+    let mut packets = packets(bytes, Certifications::All)?;
     match (packets.pop(), packets.is_empty()) {
         (Some(Packet::Signature(signature)), true)
             if signature.typ() == SignatureType::KeyRevocation =>
@@ -145,9 +149,19 @@ fn is_primary_key(tag: Tag) -> bool {
     matches!(tag, Tag::PublicKey | Tag::SecretKey)
 }
 
+/// Which certifications of a User ID a read keeps.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Certifications {
+    All,
+    /// Those that name no issuer or name the first packet's key; a
+    /// certificate keeps no certification by another key.
+    OwnOnly,
+}
+
 /// Read the packets of one piece of key material, within the bounds. The
 /// parser does not descend into containers, which key material never holds.
-fn packets(bytes: &[u8]) -> Result<Vec<Packet>, EngineError> {
+/// A dropped certification costs one pass of the parser and is not counted.
+fn packets(bytes: &[u8], certifications: Certifications) -> Result<Vec<Packet>, EngineError> {
     if bytes.len() > MAX_BYTES {
         return Err(EngineError::LimitsExceeded);
     }
@@ -157,14 +171,44 @@ fn packets(bytes: &[u8]) -> Result<Vec<Packet>, EngineError> {
         .max_recursion_depth(0)
         .build()
         .map_err(|_| EngineError::Malformed)?;
-    let mut packets = Vec::new();
+    let mut packets: Vec<Packet> = Vec::new();
     while let PacketParserResult::Some(pp) = ppr {
+        let (packet, next) = pp.next().map_err(|_| EngineError::Malformed)?;
+        ppr = next;
+        if certifications == Certifications::OwnOnly
+            && packets
+                .first()
+                .is_some_and(|first| certified_by_another(&packet, first))
+        {
+            continue;
+        }
         if packets.len() == MAX_PACKETS {
             return Err(EngineError::LimitsExceeded);
         }
-        let (packet, next) = pp.next().map_err(|_| EngineError::Malformed)?;
         packets.push(packet);
-        ppr = next;
     }
     Ok(packets)
+}
+
+/// A certification of a User ID that names an issuer, none of them `first`'s
+/// key. A signature without an issuer stays: Sequoia may find it to be a
+/// self-signature.
+fn certified_by_another(packet: &Packet, first: &Packet) -> bool {
+    let Packet::Signature(signature) = packet else {
+        return false;
+    };
+    let primary = match first {
+        Packet::PublicKey(key) => key.key_handle(),
+        Packet::SecretKey(key) => key.key_handle(),
+        _ => return false,
+    };
+    let issuers = signature.get_issuers();
+    matches!(
+        signature.typ(),
+        SignatureType::GenericCertification
+            | SignatureType::PersonaCertification
+            | SignatureType::CasualCertification
+            | SignatureType::PositiveCertification
+    ) && !issuers.is_empty()
+        && !issuers.iter().any(|issuer| issuer.aliases(&primary))
 }
