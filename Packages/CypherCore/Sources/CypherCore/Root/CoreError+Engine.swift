@@ -24,7 +24,7 @@ extension CoreError {
         case .DeviceFailed: .deviceKeyFailed
         case .OutOfSpace: .outOfSpace
         case .FileFailed: .fileFailed
-        case .Internal: .internalFailure
+        case .TimeOutOfRange, .Internal: .internalFailure
         }
     }
 }
