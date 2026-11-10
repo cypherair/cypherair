@@ -265,3 +265,59 @@ fn armored_certificate_holds_no_secret() {
         (false, Some(KeyShape::V6Curve25519))
     );
 }
+
+/// Certifications of a User ID by other keys are dropped when a certificate is
+/// read: a key with more of them than the packet bound can be added, its name
+/// still comes from its own binding, and what the engine writes back carries
+/// none of them.
+#[test]
+fn certifications_by_others_are_dropped() {
+    use openpgp::packet::signature::SignatureBuilder;
+    use openpgp::types::SignatureType;
+    use std::time::{Duration, SystemTime};
+
+    let alice =
+        Cert::from_bytes(&keys::new_key(KeyShape::V6Curve25519, "Alice").certificate).unwrap();
+    let bob = Cert::from_bytes(&keys::tsk(&keys::new_key(KeyShape::V6Curve25519, "Bob"))).unwrap();
+    let mut certifier = bob
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .unwrap()
+        .into_keypair()
+        .unwrap();
+    let user_id = alice.userids().next().unwrap().userid().clone();
+    let start = SystemTime::now() - Duration::from_secs(3600);
+    let certifications: Vec<Packet> = (0..1100)
+        .map(|second| {
+            SignatureBuilder::new(SignatureType::GenericCertification)
+                .set_signature_creation_time(start + Duration::from_secs(second))
+                .unwrap()
+                .sign_userid_binding(&mut certifier, alice.primary_key().key(), &user_id)
+                .unwrap()
+                .into()
+        })
+        .collect();
+    let fingerprint = alice.fingerprint();
+    let (certified, _) = alice.insert_packets(certifications).unwrap();
+    let certificate = certified.to_vec().unwrap();
+    assert!(
+        PacketPile::from_bytes(&certificate)
+            .unwrap()
+            .children()
+            .count()
+            > 1024
+    );
+
+    let info = inspect_certificate(certificate.clone()).unwrap();
+    assert_eq!(info.name.as_deref(), Some("Alice"));
+    let written = cypher_engine::armor(cypher_engine::ArmorKind::Certificate, certificate).unwrap();
+    let written = Cert::from_bytes(written.as_bytes()).unwrap();
+    let kept: usize = written
+        .userids()
+        .map(|user_id| user_id.certifications().count())
+        .sum();
+    assert_eq!(kept, 0);
+    assert_eq!(written.fingerprint(), fingerprint);
+}
