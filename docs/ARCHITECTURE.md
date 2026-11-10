@@ -273,13 +273,18 @@ A key's creation time is public: it is in every copy of the certificate. Two tim
 |---|---|---|
 | `STAMP_WINDOW` | 45 days | The owner's number |
 | `STAMP_MIN_AGE` | 60 seconds | So that a slow clock elsewhere never sees a time in the future |
-| `MIN_EXPIRY_DAYS` | 365 | At least four windows; checked when the core is compiled |
+| `MIN_EXPIRY_DAYS` | 365 | The shortest expiry a user can choose: one year |
 
-The three constants live in the core, in the one file that makes stamps.
+The three constants live in the core, in the one file that makes stamps. The core checks when it is compiled that `MIN_EXPIRY_DAYS` is at least four windows. With a window of 45 days, a key with the shortest expiry lasts between 320 and 365 days from the day it was really made.
 
 **The stamp.** When the app makes a key, the core takes the clock's time and goes back by a random number of seconds, drawn between `STAMP_MIN_AGE` and `STAMP_WINDOW`. The result is the key's stamp. The core gives it to the engine, and the engine writes it into everything made with the key: the primary key, the subkeys, every self-signature and the prepared revocation. The stamp is not rounded. With such a shift, nothing finer than about a day in it carries meaning, and those digits stay random, so that the key carries no mark of this app.
 
-**The draw comes from the system's secure random generator,** `SecRandomCopyBytes`, the one the vault uses. This is essential. With a weak generator, or one that depends on the time, someone could try every possible moment, find the one that gives the stamp, and so undo the shift. The draw is uniform over the whole range, in seconds, without bias. If the generator fails, no key is made. There is no fallback. A test can fix the generator, but it cannot show that the app's own one is the system's. That is one line of code, and a review keeps it.
+**The draw comes from the system's secure random generator, and from nothing else.** This is essential. With a weak generator, or one that depends on the time, someone could try every possible moment, find the one that gives the stamp, and so undo the shift.
+
+- *The call.* The core takes its random bytes from the vault's `Randomness.bytes`, which calls `SecRandomCopyBytes(kSecRandomDefault, …)` (`Packages/CypherVault/Sources/Sealing/Encoding.swift`). The engine and its OpenSSL generator take no part.
+- *The range.* The core turns the bytes into a number of seconds with the standard library's `UInt64.random(in:using:)`. That draw is uniform over the whole range, without bias.
+- *Failure.* If the generator fails, no key is made. There is no fallback.
+- *What a test can show.* A test can fix the generator, but it cannot show that the app's own one is the system's. That is one line of code, and a review keeps it.
 
 **The engine reads no clock and draws nothing for a key.** It takes the stamp as an argument of `generate_portable_key`, `generate_device_key` and `change_expiry`. So the engine's tests state every time exactly, and the core's tests fix the clock and the generator.
 
