@@ -13,6 +13,10 @@ use sequoia_openpgp as openpgp;
 
 pub const PLAINTEXT: &[u8] = b"Meet me at the old harbour at nine.";
 
+/// The stamp of every key the harness makes: 2026-01-01, in the past of every
+/// run.
+pub const STAMP: u64 = 1_767_225_600;
+
 pub fn user(name: &str) -> UserId {
     UserId {
         name: name.to_owned(),
@@ -22,7 +26,7 @@ pub fn user(name: &str) -> UserId {
 
 /// A portable key made by the engine.
 pub fn new_key(shape: KeyShape, name: &str) -> NewKey {
-    generate_portable_key(shape, user(name), Expiry::Never).expect("generate a portable key")
+    generate_portable_key(shape, user(name), Expiry::Never, STAMP).expect("generate a portable key")
 }
 
 /// The handle for a key made by the engine.

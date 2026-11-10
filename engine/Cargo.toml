@@ -26,6 +26,10 @@ thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"
+# ML-KEM decapsulation in the software stand-in for the Secure Enclave. The
+# release and features Sequoia's OpenSSL backend already uses, so no second
+# OpenSSL enters the graph.
+ossl = { version = "=1.5.3", default-features = false, features = ["openssl-sys"] }
 
 # LTO and strip stay off: either breaks the link with the vendored OpenSSL.
 # The default `panic = "unwind"` stays too, so that UniFFI can catch a panic.

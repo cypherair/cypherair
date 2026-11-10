@@ -2,7 +2,15 @@ $(SRCROOT)/Packages/CypherEngine/Package.swift
 $(SRCROOT)/engine/Cargo.lock
 $(SRCROOT)/engine/Cargo.toml
 $(SRCROOT)/engine/src/bounded_walk.rs
+$(SRCROOT)/engine/src/custody/classical.rs
+$(SRCROOT)/engine/src/custody/combiner.rs
+$(SRCROOT)/engine/src/custody/composite_decryptor.rs
+$(SRCROOT)/engine/src/custody/composite_signer.rs
+$(SRCROOT)/engine/src/custody/mod.rs
+$(SRCROOT)/engine/src/custody/p256_decryptor.rs
+$(SRCROOT)/engine/src/custody/p256_signer.rs
 $(SRCROOT)/engine/src/error.rs
+$(SRCROOT)/engine/src/key/device.rs
 $(SRCROOT)/engine/src/key/generate.rs
 $(SRCROOT)/engine/src/key/handle.rs
 $(SRCROOT)/engine/src/key/inspect.rs

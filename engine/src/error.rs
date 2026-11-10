@@ -1,8 +1,9 @@
 //! The engine's one error type, the containment of panics, and the
-//! classification of a failed decryption. Elsewhere a Sequoia error is replaced
-//! by the error its place implies; no code reads an error's text.
+//! classification of a failed decryption or stream. Elsewhere a Sequoia error is
+//! replaced by the error its place implies; no code reads an error's text.
 
 use std::cell::Cell;
+use std::fmt;
 use std::sync::Once;
 
 use sequoia_openpgp as openpgp;
@@ -33,7 +34,7 @@ pub enum EngineError {
     /// No key in the certificate can do this.
     #[error("key unusable")]
     KeyUnusable,
-    /// The secret key does not belong to the certificate.
+    /// The secret key or the classical halves do not belong to the certificate.
     #[error("key mismatch")]
     KeyMismatch,
     #[error("not exportable")]
@@ -43,6 +44,10 @@ pub enum EngineError {
     /// A key derivation asked for parameters outside the allowed range.
     #[error("key derivation out of range")]
     KdfOutOfRange,
+    /// A later stamp that is not strictly later, or a time beyond OpenPGP's
+    /// 32-bit range.
+    #[error("time out of range")]
+    TimeOutOfRange,
     #[error("recipient unusable")]
     RecipientUnusable { position: u32 },
     #[error("no matching key")]
@@ -106,6 +111,57 @@ impl EngineError {
     }
 }
 
+/// The device failed, refused or was cancelled while it signed. Its own type,
+/// so that it can be recognised after the trip through Sequoia, which reports
+/// a signer's error as one failure among others.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DeviceFailure(pub(crate) EngineError);
+
+impl fmt::Display for DeviceFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the device failed")
+    }
+}
+
+impl std::error::Error for DeviceFailure {}
+
+impl DeviceFailure {
+    /// Hand the failure to Sequoia as an `io::Error`, the shape that survives
+    /// every route through its writers and readers, as a bound does.
+    pub(crate) fn into_sequoia_error(self) -> openpgp::anyhow::Error {
+        std::io::Error::other(self).into()
+    }
+}
+
+/// The device failure an error chain carries, also inside `io::Error`s,
+/// whose `source()` skips the error they wrap.
+fn device_failure(error: &openpgp::anyhow::Error) -> Option<EngineError> {
+    fn inside(error: &(dyn std::error::Error + 'static)) -> Option<EngineError> {
+        if let Some(DeviceFailure(failure)) = error.downcast_ref::<DeviceFailure>() {
+            return Some(*failure);
+        }
+        error
+            .downcast_ref::<std::io::Error>()
+            .and_then(std::io::Error::get_ref)
+            .and_then(|inner| inside(inner))
+    }
+    error.chain().find_map(inside)
+}
+
+/// The error of a Sequoia step that failed outside a decryption: writing or
+/// finishing a stream, or making a signature. A bound that fired is
+/// `LimitsExceeded`, a failure of the device is its own case, anything else is
+/// `Internal`.
+pub(crate) fn failed_operation(error: &openpgp::anyhow::Error) -> EngineError {
+    if bounded_walk::is_bound(error) {
+        EngineError::LimitsExceeded
+    } else if let Some(failure) = device_failure(error) {
+        failure
+    } else {
+        EngineError::Internal
+    }
+}
+
 /// How far a decryption got before it failed.
 ///
 /// Sequoia reports a failed decryption without saying where it happened, and
@@ -115,6 +171,8 @@ pub(crate) struct DecryptionProgress {
     /// The container is the old one (SEIPDv1), which proves that it is
     /// genuine only at its end.
     pub(crate) old_container: bool,
+    /// The device failed, refused or was cancelled while it unwrapped.
+    pub(crate) device: Cell<Option<EngineError>>,
     /// The helper's own verdict on the session-key packets, when it refused.
     pub(crate) refusal: Cell<Option<EngineError>>,
     /// A session key was unwrapped and accepted by the container.
@@ -125,6 +183,7 @@ impl DecryptionProgress {
     pub(crate) fn new(old_container: bool) -> Self {
         Self {
             old_container,
+            device: Cell::new(None),
             refusal: Cell::new(None),
             unwrapped: Cell::new(false),
         }
@@ -141,10 +200,12 @@ pub(crate) enum DecryptionFailure<'a> {
 
 /// The error of a failed decryption. The first line that applies wins:
 ///
-/// 1. A session key was unwrapped and the container is the old one:
-///    `Tampered`. Until its end, that container's content may have been
-///    changed, so nothing the content decides is reported, not even a bound.
-/// 2. A bound fired, or the plaintext ceiling: `LimitsExceeded`.
+/// 1. A bound fired, or the plaintext ceiling: `LimitsExceeded`. Not once a
+///    session key was unwrapped in the old container: until its end, that
+///    container's content may have been changed, so nothing the content
+///    decides is reported.
+/// 2. The device failed, refused or was cancelled: that error. A failure of
+///    the device is not a failure of the message.
 /// 3. A session key was unwrapped: `Tampered`, also for a refusal from a later
 ///    call of the helper for a nested container.
 /// 4. The helper's refusal.
@@ -157,10 +218,10 @@ pub(crate) fn failed_decryption(
         DecryptionFailure::Sequoia(error) => bounded_walk::is_bound(error),
         DecryptionFailure::Ceiling => true,
     };
-    if progress.unwrapped.get() && progress.old_container {
-        EngineError::Tampered
-    } else if bound {
+    if bound && !(progress.unwrapped.get() && progress.old_container) {
         EngineError::LimitsExceeded
+    } else if let Some(failure) = progress.device.get() {
+        failure
     } else if progress.unwrapped.get() {
         EngineError::Tampered
     } else if let Some(refusal) = progress.refusal.get() {

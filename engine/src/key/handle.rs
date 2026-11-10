@@ -1,23 +1,31 @@
 //! The private-key handle. It is the only code that branches on custody: an
 //! operation picks a key from the certificate and asks the handle for a signer
 //! or a decryptor for it.
+//!
+//! A decryptor unwraps a session key itself and answers one of three things:
+//! unwrapped, not this key, or an error, which stops the operation. Sequoia
+//! would turn a failure of the device into "did not unwrap". A signer's
+//! failure of the device crosses Sequoia as an `error::DeviceFailure`.
 
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use openpgp::cert::prelude::*;
-use openpgp::crypto;
+use openpgp::crypto::{self, KeyPair, SessionKey};
+use openpgp::packet::PKESK;
 use openpgp::packet::key::{PublicParts, UnspecifiedRole};
-use openpgp::types::{KeyFlags, RevocationStatus};
+use openpgp::types::{KeyFlags, RevocationStatus, SymmetricAlgorithm};
+use openpgp::{Fingerprint, KeyHandle};
 use sequoia_openpgp as openpgp;
 
+use super::device::{self, DeviceKey};
 use super::material::{self, SecretKey};
+use crate::custody::{CompositeDecryptor, CompositeSigner, Halves, P256Decryptor, P256Signer};
 use crate::error::contained;
 use crate::{EngineError, POLICY};
 
 type PublicKey = openpgp::packet::Key<PublicParts, UnspecifiedRole>;
 pub(crate) type BoxedSigner = Box<dyn crypto::Signer + Send + Sync>;
-pub(crate) type BoxedDecryptor = Box<dyn crypto::Decryptor + Send + Sync>;
 
 /// A certificate and the means to use its private keys.
 #[derive(uniffi::Object)]
@@ -30,6 +38,14 @@ pub struct PrivateKey {
 enum Custody {
     /// The secret keys, joined from what the vault sealed.
     Portable { secrets: Vec<SecretKey> },
+    /// The device's two keys and, for the post-quantum families, the classical
+    /// halves.
+    Device {
+        device: Arc<dyn DeviceKey>,
+        signing: Fingerprint,
+        agreement: Fingerprint,
+        halves: Option<Halves>,
+    },
 }
 
 #[uniffi::export]
@@ -58,6 +74,61 @@ impl PrivateKey {
             Ok(Arc::new(Self {
                 certificate,
                 custody: Custody::Portable { secrets },
+            }))
+        })
+    }
+
+    /// A device-bound key, from the stored certificate, the classical halves
+    /// the vault unsealed (empty for P-256, which has none), and the device.
+    ///
+    /// A certificate that is not one of the four device-bound shapes is
+    /// `Unsupported`. Halves that do not belong to the certificate are
+    /// `KeyMismatch`, before the device is ever asked. Whether the device's
+    /// keys belong to the certificate cannot be seen here: the vault compares
+    /// their public keys with `device_key_slots`, every signature is verified
+    /// before it is released, and a wrong shared secret unwraps nothing.
+    #[uniffi::constructor]
+    pub fn device(
+        certificate: Vec<u8>,
+        secret: &[u8],
+        device: Arc<dyn DeviceKey>,
+    ) -> Result<Arc<Self>, EngineError> {
+        contained(|| {
+            let certificate = material::certificate(&certificate)?.strip_secret_key_material();
+            let layout = device::layout(&certificate)?;
+            let halves = match layout.tier {
+                None if secret.is_empty() => None,
+                None => return Err(EngineError::KeyMismatch),
+                Some(tier) => {
+                    let halves = Halves::read(tier, secret).ok_or(EngineError::KeyMismatch)?;
+                    let belong = CompositeSigner::new(
+                        layout.signing.clone(),
+                        tier,
+                        halves.eddsa(),
+                        Arc::clone(&device),
+                    )
+                    .is_some()
+                        && CompositeDecryptor::new(
+                            layout.agreement.clone(),
+                            tier,
+                            halves.ecdh(),
+                            Arc::clone(&device),
+                        )
+                        .is_some();
+                    if !belong {
+                        return Err(EngineError::KeyMismatch);
+                    }
+                    Some(halves)
+                }
+            };
+            Ok(Arc::new(Self {
+                custody: Custody::Device {
+                    device,
+                    signing: layout.signing.fingerprint(),
+                    agreement: layout.agreement.fingerprint(),
+                    halves,
+                },
+                certificate,
             }))
         })
     }
@@ -98,7 +169,7 @@ impl PrivateKey {
 
     /// A decryptor for every key of the certificate that may decrypt. Expiry
     /// and revocation do not matter here, so that old messages stay readable.
-    pub(crate) fn decryptors(&self, now: SystemTime) -> Vec<BoxedDecryptor> {
+    pub(crate) fn decryptors(&self, now: SystemTime) -> Vec<Decryptor> {
         let Ok(valid) = self.certificate.with_policy(&POLICY, now) else {
             return Vec::new();
         };
@@ -119,14 +190,98 @@ impl PrivateKey {
                 let pair = secret_for(secrets, key)?.clone().into_keypair().ok()?;
                 Some(Box::new(pair))
             }
+            Custody::Device {
+                device,
+                signing,
+                halves,
+                ..
+            } if key.fingerprint() == *signing => {
+                let device = Arc::clone(device);
+                match halves {
+                    None => Some(Box::new(P256Signer::new(key.clone(), device)?)),
+                    Some(halves) => Some(Box::new(CompositeSigner::new(
+                        key.clone(),
+                        halves.tier(),
+                        halves.eddsa(),
+                        device,
+                    )?)),
+                }
+            }
+            Custody::Device { .. } => None,
         }
     }
 
-    fn decryptor_for(&self, key: &PublicKey) -> Option<BoxedDecryptor> {
-        match &self.custody {
+    fn decryptor_for(&self, key: &PublicKey) -> Option<Decryptor> {
+        let custody = match &self.custody {
             Custody::Portable { secrets } => {
-                let pair = secret_for(secrets, key)?.clone().into_keypair().ok()?;
-                Some(Box::new(pair))
+                CustodyDecryptor::Portable(secret_for(secrets, key)?.clone().into_keypair().ok()?)
+            }
+            Custody::Device {
+                device,
+                agreement,
+                halves,
+                ..
+            } if key.fingerprint() == *agreement => {
+                let device = Arc::clone(device);
+                match halves {
+                    None => CustodyDecryptor::P256(P256Decryptor::new(key.clone(), device)?),
+                    Some(halves) => CustodyDecryptor::Composite(CompositeDecryptor::new(
+                        key.clone(),
+                        halves.tier(),
+                        halves.ecdh(),
+                        device,
+                    )?),
+                }
+            }
+            Custody::Device { .. } => return None,
+        };
+        Some(Decryptor(custody))
+    }
+}
+
+/// One of the key's decryption keys, as an operation sees it.
+pub(crate) struct Decryptor(CustodyDecryptor);
+
+enum CustodyDecryptor {
+    Portable(KeyPair),
+    P256(P256Decryptor),
+    Composite(CompositeDecryptor),
+}
+
+/// A session key with the cipher a v3 session-key packet names.
+pub(crate) type Unwrapped = (Option<SymmetricAlgorithm>, SessionKey);
+
+impl Decryptor {
+    pub(crate) fn key_handle(&self) -> KeyHandle {
+        self.public().key_handle()
+    }
+
+    fn public(&self) -> &PublicKey {
+        use crypto::Decryptor as _;
+        match &self.0 {
+            CustodyDecryptor::Portable(pair) => pair.public(),
+            CustodyDecryptor::P256(decryptor) => decryptor.public(),
+            CustodyDecryptor::Composite(decryptor) => decryptor.public(),
+        }
+    }
+
+    /// Unwrap the session key of `pkesk`: `Some` when it unwrapped, `None`
+    /// when the packet is not for this key, and an error when the custody
+    /// failed, which stops the operation.
+    pub(crate) fn unwrap(
+        &mut self,
+        pkesk: &PKESK,
+        sym_algo: Option<SymmetricAlgorithm>,
+    ) -> Result<Option<Unwrapped>, EngineError> {
+        match &mut self.0 {
+            CustodyDecryptor::Portable(pair) => Ok(pkesk.decrypt(pair, sym_algo)),
+            CustodyDecryptor::P256(decryptor) => {
+                let unwrapped = pkesk.decrypt(decryptor, sym_algo);
+                decryptor.take_failure().map_or(Ok(unwrapped), Err)
+            }
+            CustodyDecryptor::Composite(decryptor) => {
+                let unwrapped = pkesk.decrypt(decryptor, sym_algo);
+                decryptor.take_failure().map_or(Ok(unwrapped), Err)
             }
         }
     }

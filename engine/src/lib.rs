@@ -1,7 +1,8 @@
 //! The OpenPGP engine of CypherAir, on Sequoia, exposed to Swift through UniFFI.
 //!
-//! The engine has no state, no logging and no expiry policy of its own. Every
-//! input may be armored or binary; certificates it writes are binary. Lists of
+//! The engine has no state, no logging and no expiry policy of its own. For the
+//! times inside a key it reads no clock: the caller gives them. Every input may
+//! be armored or binary; certificates it writes are binary. Lists of
 //! certificates keep the caller's order, and results point into them by
 //! position. Times are Unix seconds.
 //!
@@ -19,13 +20,17 @@ use sequoia_openpgp::policy::StandardPolicy;
 uniffi::setup_scaffolding!();
 
 mod bounded_walk;
+mod custody;
 mod error;
 mod key;
 mod message;
 mod unlock_stretch;
 
 pub use error::EngineError;
-pub use key::{PrivateKey, armor, generate_portable_key, inspect_certificate};
+pub use key::{
+    DeviceKey, DeviceKeyError, PrivateKey, armor, device_key_slots, generate_device_key,
+    generate_portable_key, inspect_certificate,
+};
 pub use message::{decrypt, encrypt, outgoing_format};
 pub use unlock_stretch::stretch_unlock_passphrase;
 
@@ -94,10 +99,11 @@ pub struct Algorithm {
     pub bits: u32,
 }
 
+/// When a key expires: never, or a number of days after its stamp.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum Expiry {
     Never,
-    At { unix_seconds: u64 },
+    After { days: u32 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -124,13 +130,17 @@ pub struct CertificateInfo {
     pub primary: Algorithm,
     /// The key a message to this certificate is encrypted to.
     pub encryption: Option<Algorithm>,
-    /// Only when the version, the primary key and the encryption key all match
+    /// Only when the version, the primary key and every encryption key match
     /// one of the shapes this app makes.
     pub shape: Option<KeyShape>,
     /// Only from a User ID with a valid binding.
     pub name: Option<String>,
     pub email: Option<String>,
     pub created: u64,
+    /// The latest creation time among the certificate's verified
+    /// self-signatures and self-revocations, whatever their date; the key's
+    /// creation time when it has none. A later stamp must be strictly later.
+    pub newest_self_signature: u64,
     pub expires: Option<u64>,
     pub status: KeyStatus,
     /// `encrypt` accepts this certificate as a recipient now.
@@ -144,8 +154,10 @@ pub struct CertificateInfo {
 #[derive(Clone, PartialEq, Eq, uniffi::Record)]
 pub struct NewKey {
     pub certificate: Vec<u8>,
-    /// What the vault must seal. For a portable key: its secret key packets,
-    /// which `PrivateKey::portable` joins with the certificate.
+    /// What the vault must seal: the secret key packets of a portable key,
+    /// which `PrivateKey::portable` joins with the certificate; the classical
+    /// halves of a device-bound post-quantum key; nothing for a device-bound
+    /// P-256 key.
     pub secret: Option<Vec<u8>>,
     /// A revocation signature that states no specific reason, so that applying
     /// it is final.
@@ -166,6 +178,13 @@ impl std::fmt::Debug for NewKey {
             )
             .finish()
     }
+}
+
+/// The public keys that the device's two keys must have.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct DeviceKeySlots {
+    pub signing_public_key: Vec<u8>,
+    pub agreement_public_key: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]

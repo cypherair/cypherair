@@ -55,10 +55,11 @@ fn describe(cert: &Cert, now: SystemTime) -> CertificateInfo {
         version,
         primary,
         encryption,
-        shape: shape(version, primary, encryption),
+        shape: shape(version, primary, &encryption_keys),
         name,
         email,
         created: unix_seconds(primary_key.creation_time()),
+        newest_self_signature: newest_self_signature(cert),
         expires: valid
             .as_ref()
             .and_then(|valid| valid.primary_key().key_expiration_time())
@@ -116,9 +117,43 @@ fn owner(valid: &ValidCert) -> Option<(Option<String>, Option<String>)> {
     }
 }
 
-fn shape(version: u8, primary: Algorithm, encryption: Option<Algorithm>) -> Option<KeyShape> {
+/// The latest creation time among the self-signatures, revocations included,
+/// that Sequoia verified as it read the certificate.
+fn newest_self_signature(cert: &Cert) -> u64 {
+    let primary = cert.primary_key();
+    let signatures = primary
+        .self_signatures()
+        .chain(primary.self_revocations())
+        .chain(
+            cert.userids()
+                .flat_map(|user_id| user_id.self_signatures().chain(user_id.self_revocations())),
+        )
+        .chain(cert.user_attributes().flat_map(|attribute| {
+            attribute
+                .self_signatures()
+                .chain(attribute.self_revocations())
+        }))
+        .chain(
+            cert.keys()
+                .subkeys()
+                .flat_map(|subkey| subkey.self_signatures().chain(subkey.self_revocations())),
+        );
+    signatures
+        .filter_map(|signature| signature.signature_creation_time())
+        .map(unix_seconds)
+        .max()
+        .unwrap_or_else(|| unix_seconds(primary.key().creation_time()))
+}
+
+/// The shape, when the version, the primary key and every key a message is
+/// encrypted to match one of ours. One more encryption key of another kind
+/// makes a certificate none of ours.
+fn shape(version: u8, primary: Algorithm, encryption_keys: &[Algorithm]) -> Option<KeyShape> {
     use AlgorithmKind as A;
-    let encryption = encryption?;
+    let (&encryption, others) = encryption_keys.split_first()?;
+    if others.iter().any(|other| *other != encryption) {
+        return None;
+    }
     let shape = match (
         version,
         primary.kind,
