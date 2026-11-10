@@ -138,8 +138,8 @@ pub struct CertificateInfo {
     pub email: Option<String>,
     pub created: u64,
     /// The latest creation time among the certificate's verified
-    /// self-signatures, whatever their date; the key's creation time when it
-    /// has none. A later stamp must be strictly later.
+    /// self-signatures and self-revocations, whatever their date; the key's
+    /// creation time when it has none. A later stamp must be strictly later.
     pub newest_self_signature: u64,
     pub expires: Option<u64>,
     pub status: KeyStatus,

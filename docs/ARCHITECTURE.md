@@ -95,7 +95,7 @@ struct CertificateInfo {
     version: u8,                  // 4 or 6
     primary: Algorithm,           // the real algorithm and size, for every key
     encryption: Option<Algorithm>,
-    shape: Option<KeyShape>,      // only when version, primary key and encryption key all match one of ours
+    shape: Option<KeyShape>,      // only when the version, the primary key and every encryption key match one of ours
     name: Option<String>,         // only from a User ID with a valid binding
     email: Option<String>,
     created: u64,
@@ -558,7 +558,7 @@ The core composes the vault and its stores itself, in one file. The software com
 |---|---|---|
 | E1 | When authentication fails, no plaintext is returned | #1046 |
 | E2 | A failed decryption gives exactly the error of the table in section 2. A tampered container is `Tampered`, in both containers, in the first block and in a later one. A recipient packet that names the key and does not unwrap is `Tampered`. A message for someone else is `NoMatchingKey`. The fixtures tamper where no bound can fire | #1046 |
-| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`. In the new container this holds also after a key was unwrapped. In the old container that case is `Tampered` (section 2). A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
+| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`. In the new container this holds also after a key was unwrapped. In the old container that case is `Tampered` (section 2). Too many session-key packets to try (256 attempts, across nested containers): `LimitsExceeded`. A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
 | E4 | An outgoing message is never compressed, uses AES-256, and uses the new container only if every recipient supports it. The preview equals the message | #1046 |
 | E5 | The quantum-safe flag comes from the message. A cut-off message is an error | #1046 |
 | E6 | An expired or revoked recipient is refused, by position | #1046 |
