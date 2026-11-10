@@ -7,7 +7,7 @@ import VaultTestSupport
 
 @MainActor
 @Suite struct ProtectionTests {
-    @Test func firstRun_createsTheVaultBehindOnePrompt_andUnlocks() async throws {
+    @Test func `A first run creates the vault behind one prompt and unlocks`() async throws {
         let harness = Harness()
         await harness.core.start()
         _ = try harness.firstRun()
@@ -22,7 +22,7 @@ import VaultTestSupport
         }
     }
 
-    @Test func aPassphraseWithAProblem_isRefusedBeforeAnyPrompt() async throws {
+    @Test func `A passphrase with a problem is refused before any prompt`() async throws {
         let harness = Harness()
         await harness.core.start()
 
@@ -35,7 +35,7 @@ import VaultTestSupport
         _ = try harness.firstRun()
     }
 
-    @Test func aFirstRunThatCannotWriteItsFiles_leavesNoVault() async throws {
+    @Test func `A first run that cannot write its files leaves no vault`() async throws {
         let harness = Harness()
         await harness.core.start()
         harness.files.failsWrites = true
@@ -51,7 +51,7 @@ import VaultTestSupport
         guard case .firstRun = next.phase else { throw UnexpectedPhase(description: "\(next.phase)") }
     }
 
-    @Test func aRelaunch_findsTheVault_andStartsLocked() async throws {
+    @Test func `A relaunch finds the vault and starts locked`() async throws {
         let harness = Harness()
         _ = try await harness.created()
 
@@ -61,7 +61,7 @@ import VaultTestSupport
         guard case .locked = next.phase else { throw UnexpectedPhase(description: "\(next.phase)") }
     }
 
-    @Test func lockThenUnlock_opensWhatWasSaved() async throws {
+    @Test func `Lock then unlock opens what was saved`() async throws {
         let harness = Harness()
         let workspace = try await harness.created()
         try await workspace.settings.update { $0.signByDefault = false }
@@ -72,7 +72,7 @@ import VaultTestSupport
         #expect(try harness.workspace().settings.values.signByDefault == false)
     }
 
-    @Test func aWrongPassphrase_keepsTheAppLocked_andTheRetryShowsNoSecondPrompt() async throws {
+    @Test func `A wrong passphrase keeps the app locked, and the retry shows no second prompt`() async throws {
         let harness = Harness()
         try await harness.created().lock()
         let unlock = try harness.unlock()
@@ -88,7 +88,7 @@ import VaultTestSupport
         #expect(harness.authenticator.prompts == prompts + 1)
     }
 
-    @Test func aDeviceLockDuringAnUnlock_keepsTheAppLocked_andTheNextSubmissionPromptsAgain() async throws {
+    @Test func `A device lock during an unlock keeps the app locked, and the next submission prompts again`() async throws {
         let harness = Harness()
         try await harness.created().lock()
         let core = harness.core
@@ -106,7 +106,7 @@ import VaultTestSupport
         #expect(harness.authenticator.prompts == prompts + 1)
     }
 
-    @Test func aDeviceLockDuringAFirstRun_leavesTheNewVaultLocked() async throws {
+    @Test func `A device lock during a first run leaves the new vault locked`() async throws {
         let harness = Harness()
         await harness.core.start()
         let core = harness.core
@@ -122,7 +122,7 @@ import VaultTestSupport
     }
 
     @Test(arguments: [PresenceEvent.wentAway, .deviceLocked])
-    func afterAWrongPassphrase_goingAwayOrADeviceLock_bringsThePromptBack(event: PresenceEvent) async throws {
+    func `After a wrong passphrase, going away or a device lock brings the prompt back`(event: PresenceEvent) async throws {
         let harness = Harness()
         try await harness.created().lock()
         await #expect(throws: CoreError.wrongPassphrase) {
@@ -142,7 +142,7 @@ import VaultTestSupport
     }
 
     @Test(arguments: [(OpenPhase.damaged, PresenceEvent.wentAway), (.damaged, .deviceLocked), (.unlocked, .deviceLocked)])
-    func aReportedEvent_locksAnOpenSession(phase: OpenPhase, event: PresenceEvent) async throws {
+    func `A reported event locks an open session`(phase: OpenPhase, event: PresenceEvent) async throws {
         let harness = Harness()
         try await harness.created().lock()
         if phase == .damaged {
@@ -160,7 +160,7 @@ import VaultTestSupport
         #expect(session.vaultSession.isLocked)
     }
 
-    @Test func aFileThatCannotBeRead_keepsTheAppLocked_andIsNotDamage() async throws {
+    @Test func `A file that cannot be read keeps the app locked and is not damage`() async throws {
         let harness = Harness()
         try await harness.created().lock()
         harness.files.failsReads = true
@@ -175,7 +175,7 @@ import VaultTestSupport
         _ = try harness.workspace()
     }
 
-    @Test func anEmptyPassphrase_isWrong_beforeAnyPrompt() async throws {
+    @Test func `An empty passphrase is wrong before any prompt`() async throws {
         let harness = Harness()
         try await harness.created().lock()
         let prompts = harness.authenticator.prompts
@@ -188,7 +188,7 @@ import VaultTestSupport
     }
 
     @Test(arguments: [(VaultError.authenticationCancelled, CoreError.cancelled), (.authenticationFailed, .authenticationFailed), (.authenticationUnavailable, .authenticationUnavailable)])
-    func aFailedPrompt_keepsTheAppLocked(failure: VaultError, expected: CoreError) async throws {
+    func `A failed prompt keeps the app locked`(failure: VaultError, expected: CoreError) async throws {
         let harness = Harness()
         try await harness.created().lock()
         harness.authenticator.failure = failure
@@ -200,7 +200,7 @@ import VaultTestSupport
         _ = try harness.unlock()
     }
 
-    @Test func concurrentChanges_eachApplyToTheValueBeforeThem() async throws {
+    @Test func `Concurrent changes each apply to the value before them`() async throws {
         let harness = Harness()
         let workspace = try await harness.created()
 
@@ -215,7 +215,7 @@ import VaultTestSupport
         #expect(values.clipboardNotice == false)
     }
 
-    @Test func thePreview_isUnlocked() throws {
+    @Test func `The preview is unlocked`() throws {
         guard case .unlocked = AppCore.preview().phase else { throw UnexpectedPhase(description: "not unlocked") }
     }
 }

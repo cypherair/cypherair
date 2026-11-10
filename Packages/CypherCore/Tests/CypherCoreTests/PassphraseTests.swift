@@ -16,7 +16,7 @@ import Testing
         #expect(Passphrase.problems(in: passphrase) == expected)
     }
 
-    @Test func suggestions_passTheRule_andDiffer() {
+    @Test func `Suggestions pass the rule and differ`() {
         let suggestions = (0..<500).map { _ in Passphrase.suggestion() }
         for suggestion in suggestions {
             #expect(Passphrase.problems(in: suggestion).isEmpty)
