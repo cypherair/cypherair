@@ -243,7 +243,7 @@ An exported function lives in the module that does the work. There is no separat
 
 ### 2.3 Brought in from the 1.x engine
 
-Each module enters through a line-by-line review that ends in keep, fix or rewrite. Its unit tests come with it only if the review keeps them. The 1.x engine is no longer in the tree. Its files are read from git history at commit `bdfb0149`, under `pgp-mobile/src/`: for example `git show bdfb0149:pgp-mobile/src/keys/s2k.rs`.
+Each module enters through a line-by-line review that ends in keep, fix or rewrite. Its unit tests come with it only if the review keeps them. The 1.x engine is no longer in the tree. Its files are read from git history at commit `bdfb0149`, under `pgp-mobile/`: for example `git show bdfb0149:pgp-mobile/src/keys/s2k.rs`.
 
 | 1.x file | Piece | What must change when it enters |
 |---|---|---|
@@ -695,7 +695,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 
 **One exception to that rule.** #1046 lands `generate_portable_key` without a stamp and `Expiry` as a moment. #1047 adds the stamp argument, turns `Expiry` into a period, and adds the newest self-signature to `CertificateInfo` and `TimeOutOfRange` to the errors, before any core piece uses them.
 
-**Two clarifications.** #1062 detects damaged data and shows the phase; #1065 adds the reset there, which is all the user can do. #1046 copies the harness and the fixtures; #1076, not #1049, removes the 1.x engine with the old copies.
+**One clarification.** #1062 detects damaged data and shows the phase; #1065 adds the reset there, which is all the user can do.
 
 | Piece | Adds |
 |---|---|
