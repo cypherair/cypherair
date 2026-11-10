@@ -239,11 +239,11 @@ engine/src/
 engine/tests/   common/ (the harness), fixtures/, and the tests for the rules in section 6
 ```
 
-An exported function lives in the module that does the work. There is no separate interface layer. Its dependencies are those of `pgp-mobile`, without `base64`.
+An exported function lives in the module that does the work. There is no separate interface layer. Its dependencies are those of the 1.x engine, without `base64`.
 
 ### 2.3 Brought in from the 1.x engine
 
-Each module enters through a line-by-line review that ends in keep, fix or rewrite. Its unit tests come with it only if the review keeps them.
+Each module enters through a line-by-line review that ends in keep, fix or rewrite. Its unit tests come with it only if the review keeps them. The 1.x engine is no longer in the tree. Its files are read from git history at commit `bdfb0149`, under `pgp-mobile/src/`: for example `git show bdfb0149:pgp-mobile/src/keys/s2k.rs`.
 
 | 1.x file | Piece | What must change when it enters |
 |---|---|---|
@@ -258,7 +258,7 @@ The three parts in bold are known defects, and fixing them is required in #1047.
 
 ### 2.4 Behaviour that exists only in the 1.x code
 
-The new code must keep these. A session that writes the module reads the 1.x file first.
+The new code must keep these. A session that writes the module reads the 1.x file first, from git history as section 2.3 says.
 
 - Sequoia's parser has two limits of its own: 16 levels of nesting and 1 MiB per packet that is not a container. Its decryptor and verifier have no limit on the number of packets or on expansion. The only hook for those is `VerificationHelper::inspect`. While plaintext is being read, a limit raised there must travel as an `io::Error` to survive. During setup it comes back unchanged.
 - Sequoia swallows the error of a custom decryptor. The custody decryptors keep it in a side channel.
@@ -593,7 +593,7 @@ The core composes the vault and its stores itself, in one file. The software com
 | C11 | After one key of every family is made, the Keychain holds exactly one row, the sealed root. The row has no attribute. Its name and its value hold no fingerprint, key ID, public key or User ID of those keys, as text or as bytes. The test's rows have no dates; with one row there is none to check | #1063 |
 | C12 | With a fixed clock and a generator that gives a new value at each call, a new key's stamp is the clock minus its own draw: minus `STAMP_MIN_AGE` for the smallest draw, minus `STAMP_WINDOW` for the largest, both included. Two keys never share a draw. For an expiry change the core reads the newest self-signature from the certificate it changes. Inside the window, the new stamp is the second after it and nothing is drawn. Outside, it is the clock minus a new draw. When that second is less than `STAMP_MIN_AGE` old, the change is `tooSoon`. No period below `MIN_EXPIRY_DAYS` is accepted, and `MIN_EXPIRY_DAYS` is at least four windows | #1063 |
 
-**The harness and the fixtures** are copied from `pgp-mobile/tests/` into `engine/tests/` in #1046, because the 1.x engine stays untouched until #1049 removes it with its own copy. Five harness files do not depend on the engine and are copied unchanged. `sq.rs` and the two stand-ins for the Secure Enclave are tied to the old engine. The stand-ins become one software `DeviceKey` that can also cancel, fail and answer wrongly. With `CYPHERAIR_REQUIRE_GPG=1` and `CYPHERAIR_REQUIRE_SQ=1` a missing tool fails instead of skipping. A `sq` without post-quantum support fails as well. CI sets both. The tests of #1046 need expired and revoked keys before #1049 exists; they build them with Sequoia directly.
+**The harness and the fixtures** are copied from the tests of the 1.x engine into `engine/tests/` in #1046. Five harness files do not depend on the engine and are copied unchanged. `sq.rs` and the two stand-ins for the Secure Enclave are tied to the old engine. The stand-ins become one software `DeviceKey` that can also cancel, fail and answer wrongly. With `CYPHERAIR_REQUIRE_GPG=1` and `CYPHERAIR_REQUIRE_SQ=1` a missing tool fails instead of skipping. A `sq` without post-quantum support fails as well. CI sets both. The tests of #1046 need expired and revoked keys before #1049 exists; they build them with Sequoia directly.
 
 **The test suites**
 
@@ -695,14 +695,14 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 
 **One exception to that rule.** #1046 lands `generate_portable_key` without a stamp and `Expiry` as a moment. #1047 adds the stamp argument, turns `Expiry` into a period, and adds the newest self-signature to `CertificateInfo` and `TimeOutOfRange` to the errors, before any core piece uses them.
 
-**Two clarifications.** #1062 detects damaged data and shows the phase; #1065 adds the reset there, which is all the user can do. #1046 copies the harness and the fixtures; #1049 deletes the old copies with `pgp-mobile/`.
+**Two clarifications.** #1062 detects damaged data and shows the phase; #1065 adds the reset there, which is all the user can do. #1046 copies the harness and the fixtures; #1076, not #1049, removes the 1.x engine with the old copies.
 
 | Piece | Adds |
 |---|---|
 | #1046 | The crate, the portable handle, the first eight functions of the table, the bounded walk and the unlock stretch (brought in), the harness and fixtures, the build script and the engine package |
 | #1047 | The six custody modules (brought in, with the three required fixes of section 2.3), `DeviceKey`, the device handle, the two device functions, the software stand-in, and the way a device failure reaches the operation's error (section 2), which changes the handle's inner interface, `decrypt` and `encrypt`. For section 2.5: both generation functions take the stamp, `Expiry` is a period, and `CertificateInfo` reports the newest self-signature |
 | #1048 | Signatures, files, `recognise`, the header functions, `erase_file` |
-| #1049 | Expiry, revocation, update, backup with `backup_s2k` (brought in). For section 2.5: `change_expiry` takes its stamp, and the revocation made at import carries the key's creation time. Then the 1.x engine is removed |
+| #1049 | Expiry, revocation, update, backup with `backup_s2k` (brought in). For section 2.5: `change_expiry` takes its stamp, and the revocation made at import carries the key's creation time |
 | #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the vault changes of section 3, `CoreError` with every case, `preview()` |
 | #1063 | `PrivateKeyAccess`, `DeviceKeyBridge`, the memory guard, everything in `Keys`, the stamp and its draw (section 2.5) |
 | #1064 | Everything in `Contacts` |

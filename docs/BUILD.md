@@ -12,23 +12,15 @@
 - **App-side Rust or UniFFI changes never require a new stage1 prerelease** — only a change to the Rust compiler fork itself does. The opposite assumption costs a publication cycle.
 - The pinned tag and the never-`latest` red line live in [ARM64E_STATUS.md](ARM64E_STATUS.md).
 
-**Re-pin rule.** A new stage1 prerelease becomes the official input only when every pinned location rotates in the same PR. Two parts of a rotation are not derivable from the scripts: refresh every per-asset SHA-256 and byte size for both host triples, confirmed against a real download rather than an API-reported digest; and revisit the semantic constants in `scripts/validate_arm64e_stage1_toolchain.py` only when the new release changes a semantic contract, not when it merely rotates the build identity — the prefix names the publishing family and carries no version, and the Rust series is pinned solely by the stable-base constants.
+**Re-pin rule.** A new stage1 prerelease becomes the official input only when every pinned location rotates in the same PR. One part of a rotation is not derivable from the scripts: refresh every per-asset SHA-256 and byte size for both host triples, confirmed against a real download rather than an API-reported digest.
 
 ## 4. Owned carry chains
 
-`engine/Cargo.toml`, and `pgp-mobile/Cargo.toml` until it goes, patch `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — the entire reason the chain exists. `Cargo.lock`, never prose, is the truth for the current heads; the branches stay downstream until equivalent arm64e support lands upstream. The compiler fork (`cypherair/rust`, plus its LLVM work) has no output-time `ptrauth` operand-bundle stripper — each layer enforces its own contract — and production stage1 forces the unmodified bundled-LLVM gitlink.
+`engine/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — the entire reason the chain exists. `Cargo.lock`, never prose, is the truth for the current heads; the branches stay downstream until equivalent arm64e support lands upstream. The compiler fork (`cypherair/rust`, plus its LLVM work) has no output-time `ptrauth` operand-bundle stripper — each layer enforces its own contract — and production stage1 forces the unmodified bundled-LLVM gitlink.
 
 ## 5. FFI artifact shape
 
-`PgpMobile.xcframework` is a **static-library** XCFramework built locally from the pinned stage1: static linking is what preserves the single-binary MIE posture. **The generated UniFFI outputs are build products and are never committed**; they ride inside the bundle under `cypherair-generated-bindings/`, and `scripts/restore_generated_bindings.sh` is the only thing that writes them into a checkout. Reopen the decision if a second consumer must link PgpMobile, it is vended as a SwiftPM binary target, or a UniFFI release beyond the pinned 0.32.x changes the generated layout.
-
-## 6. The sync contract
-
-```bash
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
-```
-
-`PgpMobileSourceInputs.xcfilelist` is generated but tracked, and is committed whenever it changes.
+The engine is a **static-library** XCFramework: static linking is what preserves the single-binary MIE posture.
 
 ## 7. Swift packages
 
