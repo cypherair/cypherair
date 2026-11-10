@@ -12,11 +12,17 @@ final class SealedDomainTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         let url = FileManager.default.temporaryDirectory.appending(path: "SealedDomainTests-\(UUID().uuidString)")
-        directory = try ProtectedDataDirectory(url: url)
+        do {
+            directory = try ProtectedDataDirectory(url: url)
+        } catch .fileProtectionUnsupported {
+            // Virtual machines, such as hosted CI runners, have no Data Protection.
+            try? FileManager.default.removeItem(at: url)
+            throw XCTSkip("the volume holding the temporary directory has no file protection")
+        }
     }
 
     override func tearDownWithError() throws {
-        try? FileManager.default.removeItem(at: directory.url)
+        if let directory { try? FileManager.default.removeItem(at: directory.url) }
         try super.tearDownWithError()
     }
 
