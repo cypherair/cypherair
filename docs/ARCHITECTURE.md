@@ -65,7 +65,7 @@ Two accepted limits, both because an RSA unwrap has only a 16-bit check. For a h
 
 Conventions:
 
-- Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary. A secret argument is `&[u8]`: UniFFI passes it without a copy.
+- Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary. A secret argument is `&[u8]`: UniFFI passes it without a copy. UniFFI lends only a top-level `&[u8]`, so a secret that may be absent is empty when it is.
 - Lists of certificates are in the caller's order, and results point into them by position.
 - A signer is *named* by its certificate. A signature is *made* with the certificate's signing key, which is a subkey where there is one.
 - The engine has no state, no logging and no expiry policy of its own. For the times inside a key it reads no clock and draws no random number: the caller gives them (section 2.5). Its one piece of state is a panic hook, set at the first call, that keeps a caught panic off standard error.
@@ -99,7 +99,7 @@ struct CertificateInfo {
     name: Option<String>,         // only from a User ID with a valid binding
     email: Option<String>,
     created: u64,
-    newest_self_signature: u64,   // the latest creation time among its verified self-signatures (section 2.5)
+    newest_self_signature: u64,   // the latest creation time among its verified self-signatures and self-revocations (section 2.5)
     expires: Option<u64>,
     status: KeyStatus,
     can_encrypt: bool,
@@ -133,8 +133,9 @@ struct Merged     { certificate: Vec<u8>, changed: bool }
 #[derive(uniffi::Object)]
 struct PrivateKey { /* certificate and custody; private */ }
 impl PrivateKey {
-    fn portable(certificate: Vec<u8>, secret: Vec<u8>) -> Result<Arc<Self>, EngineError>;
-    fn device(certificate: Vec<u8>, secret: Option<Vec<u8>>, device: Arc<dyn DeviceKey>) -> Result<Arc<Self>, EngineError>;
+    fn portable(certificate: Vec<u8>, secret: &[u8]) -> Result<Arc<Self>, EngineError>;
+    fn device(certificate: Vec<u8>, secret: &[u8], device: Arc<dyn DeviceKey>) -> Result<Arc<Self>, EngineError>;
+                                  // secret: the classical halves; empty for P-256
 }
 
 #[uniffi::export(foreign)]
@@ -186,7 +187,7 @@ enum EngineError {
 | `decrypt(message, key, verifiers)` | `Decrypted` | #1046 |
 | `device_key_slots(certificate)` | `DeviceKeySlots` | #1047 |
 | `generate_device_key(shape, user, expiry, stamp, signing_public_key, agreement_public_key, device)` | `NewKey` | #1047 |
-| `PrivateKey::device(certificate, secret?, device)` | handle | #1047 |
+| `PrivateKey::device(certificate, secret, device)` | handle | #1047 |
 | `recognise(input)` | `InputKind` | #1048 |
 | `message_header(message, candidates)` | `MessageHeader` | #1048 |
 | `message_header_of_file(path, candidates)` | `MessageHeader` | #1048 |
@@ -220,6 +221,7 @@ Notes:
 - **Certifications by other people** are dropped when a certificate is read. The app has no web of trust, so it does not read them, does not keep them and does not pass them on. They do not count towards the 1,024 packets, so a key that many people have certified can still be added. A certificate of more than 1 MiB is still refused; that takes thousands of certifications, or a large photo.
 - **File functions** write beside `output` and rename on success. On a failure or a cancel they erase what they wrote. `erase_file` is the one erase policy, used by the engine and the core.
 - **`DeviceKeyError`** is a rich UniFFI error, not a flat one, and it converts from UniFFI's unexpected-callback error to `Failed`. Without that, an unexpected Swift error becomes a Rust panic.
+- **A device-bound certificate** is what `generate_device_key` makes: a primary key that certifies and signs, and exactly one subkey, for key agreement. `device_key_slots` and `PrivateKey::device` take only such a certificate of the four device-bound shapes; any other is `Unsupported`. Classical halves that do not belong to the certificate are `KeyMismatch`, before the device is asked. `generate_device_key` refuses public keys that are not what the Secure Enclave makes as `Internal`. The device signs four times per new key: the direct-key signature, the User ID binding, the subkey binding and the revocation.
 - **A wrong device key.** `PrivateKey::device` cannot see whether the device key belongs to the certificate. It is caught elsewhere: the vault compares the public keys when it loads the handle; every signature is verified before release; a wrong shared secret cannot unwrap a session key.
 - **Panics.** Every exported function runs its body through one function in `error.rs`, which catches a panic and returns `Internal`. Nothing checks that a new function does this, so a review keeps it. The crate refuses to build with `panic = abort`. The core maps `Internal` to `internalFailure`. A deliberate panic in test-only code pins it.
 
@@ -229,12 +231,13 @@ Notes:
 engine/src/
   lib.rs        UniFFI setup, the exported types, the one Sequoia policy
   error.rs      EngineError, the containment of panics, and the classification of a failed
-                decryption. Elsewhere a Sequoia error is replaced by the error its place
+                decryption or stream. Elsewhere a Sequoia error is replaced by the error its place
                 implies; no code reads an error's text
   key/          the handle (the only code that branches on custody), DeviceKey, inspect,
                 generate, expiry, revocation and update, backup
   message/      recipients and format, encrypt, decrypt, sign and verify, verdict, header, files
-  custody/      the six modules brought in
+  custody/      the six modules brought in: the P-256 signer and decryptor, the composite
+                signer and decryptor, the combiner, the classical curve operations
   bounded_walk.rs   unlock_stretch.rs   backup_s2k.rs        brought in
 engine/tests/   common/ (the harness), fixtures/, and the tests for the rules in section 6
 ```
@@ -254,7 +257,7 @@ Each module enters through a line-by-line review that ends in keep, fix or rewri
 | `composite_kem.rs`, `composite_classical.rs` | #1047 | **The combiner gets a known-answer test** from the vectors in RFC 9980, appendix A |
 | `keys/s2k.rs` | #1049 | It decides by key version, not by a family name |
 
-The three parts in bold are known defects, and fixing them is required in #1047. The first one matters most. As it stands, the P-256 decryptor checks only the shape of a point, so a crafted packet with an off-curve point reaches the device. The device call is expected to fail then, and a device failure stops the whole decryption. So one bad packet placed before the real one would block a valid message. With the check, a bad point in a hidden packet is skipped, and a bad point in a packet that names the key is `Tampered`.
+The three parts in bold were known defects of the 1.x modules. The first one matters most. A device call with an off-curve point fails, and a device failure stops the whole decryption, so one bad packet placed before the real one would block a valid message. So the point is checked before the device is asked: a bad point in a hidden packet is skipped, and a bad point in a packet that names the key is `Tampered`.
 
 ### 2.4 Behaviour that exists only in the 1.x code
 
@@ -299,16 +302,16 @@ The three constants live in the core, in the one file that makes stamps. A test 
 **The engine reads no clock and draws nothing for a key.** It takes the stamp as an argument of `generate_portable_key`, `generate_device_key` and `change_expiry`. So the engine's tests state every time exactly, and the core's tests fix the clock and the generator.
 
 - The engine sets the creation time of every signature it makes for a key itself, to the stamp. It uses no function of Sequoia that reads the clock. Sequoia's own expiry functions sign with the current time, and a signature that is built from an older one picks a time of its own when none is set. So `change_expiry` builds each signature by hand, as the 1.x `keys/expiry.rs` does: the direct-key signature, one for each User ID that is not revoked, one for each subkey, and each new back-signature.
-- The device-bound generation takes the stamp in the three places where the 1.x code reads the system time.
+- The device-bound generation writes the stamp into both keys and sets it on every signature, where the 1.x code reads the system time or lets Sequoia read it.
 - The engine refuses, as `TimeOutOfRange`, a later stamp that is not strictly later than the newest self-signature, and a stamp or an expiry that does not fit OpenPGP's 32-bit time. It cannot check that a stamp lies in the past. That is the core's part. The core's own rule never gives such a stamp, so the core reports this error as `internalFailure`: it means a mistake in the core, or a time after the year 2106.
 
-**Expiry is a period counted from the stamp.** `Expiry` is `Never` or a number of days, and the key expires at the stamp plus the period. For an expiry change, that is the stamp of the change. OpenPGP stores an expiry in each key packet's signature as a period from that packet's own creation time, so the engine converts it for each key packet. A key that is older than the period is therefore valid again after a change.
+**Expiry is a period counted from the stamp.** `Expiry` is `Never` or a number of days, and the key expires at the stamp plus the period. For an expiry change, that is the stamp of the change. OpenPGP stores an expiry in each key packet's signature as a period from that packet's own creation time, so the engine converts it for each key packet. A key that is older than the period is therefore valid again after a change. A period of zero days would read as "never" in OpenPGP; the engine refuses it as `Internal`, and the core never offers it.
 
 An expiry on a day counted from today would undo the shift: the expiry date is public, and "expiry minus two years" would be the real day. Because the engine takes a period and not a date, the core cannot pass the real day by mistake. The core offers no period below `MIN_EXPIRY_DAYS`, so an expiry always lies in the future.
 
 *What a user can no longer do.* There is no exact expiry date, and no expiry sooner than about 320 days from now. So a user cannot let a key run out soon instead of revoking it, and cannot match a date that was set elsewhere. A key expires up to one window before the day the user counted on. The app shows the real expiry date once it is set.
 
-**A later self-signature,** made for an expiry change, gets a stamp of its own. The *newest self-signature* is the latest creation time among all verified self-signatures of the certificate, whatever their date. The engine reports it in `CertificateInfo`, and the core reads it from the certificate it is about to change.
+**A later self-signature,** made for an expiry change, gets a stamp of its own. The *newest self-signature* is the latest creation time among all verified self-signatures of the certificate, its revocations by itself included, whatever their date. A certificate with none gives its key's creation time. The engine reports it in `CertificateInfo`, and the core reads it from the certificate it is about to change.
 
 - If the newest self-signature lies inside the window, that is, not earlier than the clock minus `STAMP_WINDOW`, the new stamp is the second after it. Nothing is drawn.
 - Otherwise the new stamp is drawn like a new key's stamp.
