@@ -1,1 +1,0 @@
-Hello from sq! This is a CypherAir cross-tool interop fixture (issue #567).

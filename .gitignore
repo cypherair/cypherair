@@ -1,11 +1,5 @@
 # Rust build artifacts
-pgp-mobile/target/
 target/
-
-# Generated UniFFI outputs, written by ./build-xcframework.sh: the C interop
-# header and module map Xcode reads, and the Swift binding it compiles.
-/bindings/
-/Sources/PgpMobile/
 
 # macOS
 .DS_Store
@@ -20,7 +14,6 @@ build/
 
 # XCFramework (built artifact, not source)
 *.xcframework/
-PgpMobile.arm64e-build-manifest.json
 
 # Claude Code local/personal config (not shared project config)
 .claude/worktrees/
@@ -31,8 +24,4 @@ CLAUDE.local.md
 # Local Codex/agent helper config
 .codex/
 .agents/
-
-# Python bytecode caches
-__pycache__/
-*.pyc
 .claude/skills/
