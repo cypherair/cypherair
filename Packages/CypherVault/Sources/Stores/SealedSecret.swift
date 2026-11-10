@@ -33,12 +33,17 @@ public enum SealedSecret {
         do { return try EnclaveSealedEnvelopeCodec.encode(envelope) } catch { throw .internalFailure("envelope encoding failed") }
     }
 
+    /// Checks, without any prompt, that `open` can be tried: the value decodes,
+    /// has the kind, and is sealed to this session's identity wrapping key. A
+    /// value that passes can still fail to open if its ciphertext was changed.
+    public static func check(_ sealed: Data, kind: Kind, session: UnlockedSession) throws(StoreError) {
+        guard envelope(of: sealed, kind: kind, session: session) != nil else { throw .damaged }
+    }
+
     /// Opens a value made by `seal` with the same kind. A value of another kind,
     /// or one this vault did not seal, is `damaged`. Blocking.
     public static func open(_ sealed: Data, kind: Kind, approval: OperationApproval) throws(StoreError) -> SensitiveBuffer {
-        let envelope: EnclaveSealedEnvelope
-        do { envelope = try EnclaveSealedEnvelopeCodec.decode(sealed, expectedKind: kind.payloadKind) } catch { throw .damaged }
-        guard envelope.associatedData == associatedData else { throw .damaged }
+        guard let envelope = envelope(of: sealed, kind: kind, session: approval.session) else { throw .damaged }
         do {
             return try approval.session.openIdentityEnvelope(envelope, kind: kind.payloadKind, approval: approval)
         } catch {
@@ -47,5 +52,15 @@ public enum SealedSecret {
             case .vault(let error): throw .vault(error)
             }
         }
+    }
+
+    private static func envelope(of sealed: Data, kind: Kind, session: UnlockedSession) -> EnclaveSealedEnvelope? {
+        guard let envelope = try? EnclaveSealedEnvelopeCodec.decode(sealed, expectedKind: kind.payloadKind),
+              envelope.associatedData == associatedData,
+              envelope.sealingKeyBlob == session.identityWrappingKeyBlob,
+              envelope.sealingPublicKeyX963 == session.identityWrappingPublicKeyX963 else {
+            return nil
+        }
+        return envelope
     }
 }

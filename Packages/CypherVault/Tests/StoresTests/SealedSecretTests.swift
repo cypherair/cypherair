@@ -8,13 +8,15 @@ import XCTest
 final class SealedSecretTests: XCTestCase {
     private var enclave: FakeEnclave!
     private var keychain: InMemoryKeychain!
+    private var authenticator: CountingAuthenticator!
     private var session: UnlockedSession!
 
     override func setUp() async throws {
         try await super.setUp()
         enclave = FakeEnclave()
         keychain = InMemoryKeychain()
-        let vault = Vault(enclave: enclave, rootRows: keychain.rows(service: Vault.sealedRootService), stretcher: FakeStretcher(), authenticator: CountingAuthenticator())
+        authenticator = CountingAuthenticator()
+        let vault = Vault(enclave: enclave, rootRows: keychain.rows(service: Vault.sealedRootService), stretcher: FakeStretcher(), authenticator: authenticator)
         session = try await vault.bootstrap(passphrase: .text("pass"), reason: "test")
     }
 
@@ -61,6 +63,24 @@ final class SealedSecretTests: XCTestCase {
             .bootstrap(passphrase: .text("pass"), reason: "test")
         let sealed = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: other)
         try await assertOpenThrows(sealed, kind: .secretKeys, .damaged)
+    }
+
+    func test_check_refusesWhatCannotOpen_withoutAPrompt() throws {
+        let other = try UnlockedSession.sandbox(enclave: SoftwareEnclave())
+        var damaged = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session)
+        damaged[damaged.count / 2] ^= 0xFF
+        let refused = [
+            (try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: other), SealedSecret.Kind.secretKeys),
+            (try SealedSecret.seal(.text("halves"), kind: .classicalHalves, session: session), .secretKeys),
+            (Data("not a sealed value".utf8), .secretKeys),
+        ]
+        let prompts = authenticator.prompts
+
+        try SealedSecret.check(try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session), kind: .secretKeys, session: session)
+        for (sealed, kind) in refused {
+            XCTAssertThrowsError(try SealedSecret.check(sealed, kind: kind, session: session)) { XCTAssertEqual($0 as? StoreError, .damaged) }
+        }
+        XCTAssertEqual(authenticator.prompts, prompts)
     }
 
     func test_relockedSession_cannotSealOrOpen() async throws {
