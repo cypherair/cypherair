@@ -16,7 +16,7 @@
 
 ## 4. Owned carry chains
 
-`pgp-mobile/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — the entire reason the chain exists. `Cargo.lock`, never prose, is the truth for the current heads; the branches stay downstream until equivalent arm64e support lands upstream. The compiler fork (`cypherair/rust`, plus its LLVM work) has no output-time `ptrauth` operand-bundle stripper — each layer enforces its own contract — and production stage1 forces the unmodified bundled-LLVM gitlink.
+`engine/Cargo.toml`, and `pgp-mobile/Cargo.toml` until it goes, patch `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — the entire reason the chain exists. `Cargo.lock`, never prose, is the truth for the current heads; the branches stay downstream until equivalent arm64e support lands upstream. The compiler fork (`cypherair/rust`, plus its LLVM work) has no output-time `ptrauth` operand-bundle stripper — each layer enforces its own contract — and production stage1 forces the unmodified bundled-LLVM gitlink.
 
 ## 5. FFI artifact shape
 
@@ -33,3 +33,5 @@ ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 ## 7. Swift packages
 
 `Packages/CypherVault` is a local package the app links. Two rules keep it whole across all three device slices: the shared workspace setting `iOSPackagesShouldBuildARM64e` stays committed in the project's embedded workspace, and the manifest mirrors the project's Swift language mode and upcoming features. Both are Apple's mechanisms; neither is a workaround.
+
+`Packages/CypherEngine` holds the engine. `scripts/build-engine.sh` writes the static-library XCFramework and the generated Swift into it; neither is committed. Its platforms state the app's exact deployment target, because with `.v27` the linker warns once for every object file in the library. The script reads the deployment targets from that manifest. It stores a hash of the engine's sources, its lock file, the manifest, the compiler pin and itself beside the library, and the app's "Check engine library" phase fails when the checkout no longer matches it.
