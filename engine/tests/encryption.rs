@@ -164,7 +164,8 @@ fn e8_expired_or_revoked_key_does_not_sign() {
 
 /// E5. A password packet beside a post-quantum packet for the key makes the
 /// message not quantum-safe. A session-key packet of a version the engine does
-/// not read is refused as `Unsupported`, so it cannot pass as quantum-safe.
+/// not read is refused as `Unsupported`, so it cannot pass as quantum-safe; a
+/// damaged one of a version it reads stays `Malformed`.
 #[test]
 fn e5_other_session_key_packets_make_the_flag_false() {
     use openpgp::policy::StandardPolicy;
@@ -196,5 +197,16 @@ fn e5_other_session_key_packets_make_the_flag_false() {
     assert_eq!(
         decrypt(with_unknown_version, keys::handle(&pq), vec![]).unwrap_err(),
         EngineError::Unsupported
+    );
+
+    // Version 3 naming EdDSA, which cannot encrypt: Sequoia returns it unparsed.
+    let mut damaged = vec![0xC0 | 1, 40, 3];
+    damaged.extend_from_slice(&[0; 8]);
+    damaged.push(22);
+    damaged.resize(2 + 40, 0);
+    damaged.extend_from_slice(&messages::binary(&message.message));
+    assert_eq!(
+        decrypt(damaged, keys::handle(&pq), vec![]).unwrap_err(),
+        EngineError::Malformed
     );
 }

@@ -1,4 +1,6 @@
-//! Rule E3: hostile input is refused, each kind with one error. That a panic
+//! Rule E3: hostile input is refused, each kind with one error. A bound that
+//! fires after the unwrap is `LimitsExceeded` in the new container, and these
+//! tests use it; in the old container it is `Tampered`, which one test pins. That a panic
 //! below the boundary becomes `Internal` is pinned in `src/error.rs`, with a
 //! deliberate panic.
 //!
@@ -123,11 +125,11 @@ fn e3_too_much_expansion() {
 }
 
 /// Too much expansion of the plaintext itself, past what decrypting into
-/// memory may hold.
+/// memory may hold: `LimitsExceeded` in the new container, `Tampered` in the
+/// old one, where that ceiling is decided by content not yet authenticated.
 #[test]
 #[ignore = "needs 256 MiB; run with --ignored"]
 fn e3_too_much_plaintext() {
-    let alice = keys::new_key(KeyShape::V6Curve25519, "Alice");
     let mut inner = Vec::new();
     {
         use openpgp::serialize::stream::{Compressor, LiteralWriter, Message};
@@ -140,10 +142,45 @@ fn e3_too_much_plaintext() {
         }
         literal.finalize().unwrap();
     }
-    assert_eq!(
-        decrypt(to(&alice, &inner), keys::handle(&alice), vec![]).unwrap_err(),
-        EngineError::LimitsExceeded
-    );
+    for (shape, expected) in [
+        (KeyShape::V6Curve25519, EngineError::LimitsExceeded),
+        (KeyShape::V4Curve25519, EngineError::Tampered),
+    ] {
+        let alice = keys::new_key(shape, "Alice");
+        assert_eq!(
+            decrypt(to(&alice, &inner), keys::handle(&alice), vec![]).unwrap_err(),
+            expected,
+            "{shape:?}"
+        );
+    }
+}
+
+/// In the old container a bound that fires after the unwrap is `Tampered`,
+/// while the decryptor is built and while the plaintext is read: until its end
+/// that container's content may have been changed, so nothing it decides is
+/// reported.
+#[test]
+fn e3_bound_after_the_unwrap_in_the_old_container_is_tampered() {
+    let alice = keys::new_key(KeyShape::V4Curve25519, "Alice");
+    let padding = |count: usize| {
+        let mut packets = Vec::new();
+        for _ in 0..count {
+            packets.extend_from_slice(&[0xC0 | 21, 1, 0]);
+        }
+        packets
+    };
+    let mut while_built = padding(2100);
+    while_built.extend_from_slice(&messages::literal(PLAINTEXT));
+    let mut while_read = messages::literal(&vec![0x42; 128 * 1024]);
+    while_read.extend_from_slice(&padding(2100));
+    for inner in [while_built, while_read] {
+        let message = to(&alice, &inner);
+        assert_eq!(messages::container_version(&message), 1);
+        assert_eq!(
+            decrypt(message, keys::handle(&alice), vec![]).unwrap_err(),
+            EngineError::Tampered
+        );
+    }
 }
 
 /// A container without authentication (the old tag-9 packet) is

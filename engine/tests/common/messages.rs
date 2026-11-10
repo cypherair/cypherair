@@ -65,6 +65,18 @@ pub fn session_key_packet_ends(binary: &[u8]) -> Vec<usize> {
     panic!("no encrypted container")
 }
 
+/// The version of the encrypted container: 1 for SEIPDv1, 2 for SEIPDv2.
+pub fn container_version(binary: &[u8]) -> u8 {
+    let mut ppr = PacketParser::from_bytes(binary).unwrap();
+    while let PacketParserResult::Some(pp) = ppr {
+        if let Packet::SEIP(seip) = &pp.packet {
+            return seip.version();
+        }
+        ppr = pp.next().unwrap().1;
+    }
+    panic!("no encrypted container")
+}
+
 /// A literal data packet holding `text`.
 pub fn literal(text: &[u8]) -> Vec<u8> {
     let mut sink = Vec::new();
