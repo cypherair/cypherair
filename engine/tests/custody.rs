@@ -371,7 +371,7 @@ fn wrong_shared_secret_unwraps_nothing() {
 }
 
 /// `device_key_slots` gives the public keys the device stated, which the vault
-/// compares with the keys it loads. A certificate of another shape has none.
+/// compares with the keys it loads. A certificate of another layout has none.
 #[test]
 fn device_key_slots_are_the_devices_public_keys() {
     for shape in device::SHAPES {
@@ -383,11 +383,17 @@ fn device_key_slots_are_the_devices_public_keys() {
             "{shape:?}"
         );
     }
+    // A portable post-quantum key has the algorithms of a device-bound one,
+    // but a signing subkey too.
+    for shape in [KeyShape::V6Curve25519, KeyShape::V6MlDsa65] {
+        let portable = keys::new_key(shape, "Bob");
+        assert_eq!(
+            device_key_slots(portable.certificate).unwrap_err(),
+            EngineError::Unsupported,
+            "{shape:?}"
+        );
+    }
     let portable = keys::new_key(KeyShape::V6Curve25519, "Bob");
-    assert_eq!(
-        device_key_slots(portable.certificate.clone()).unwrap_err(),
-        EngineError::Unsupported
-    );
     let (_, device) = device::device_key(KeyShape::V6P256, "Carol");
     assert_eq!(
         PrivateKey::device(portable.certificate, &[], device).unwrap_err(),
