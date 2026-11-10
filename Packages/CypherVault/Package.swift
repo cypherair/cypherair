@@ -5,6 +5,7 @@ let swiftSettings: [SwiftSetting] = [
     .swiftLanguageMode(.v6),
     .enableUpcomingFeature("InferIsolatedConformances"),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
 ]
 
 let package = Package(
