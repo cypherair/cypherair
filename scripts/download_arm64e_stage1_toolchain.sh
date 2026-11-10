@@ -5,9 +5,7 @@
 # digests and byte sizes must match the committed consumer pin in
 # third_party/arm64e-stage1-toolchain.pin.json. These checks need no GitHub
 # token, so they are enforced unconditionally on every path, including
-# token-scrubbed CI fetches. Release-level immutability, tag→commit binding,
-# and build-provenance attestation checks (which need gh auth) live in
-# scripts/verify_arm64e_stage1_release.sh and run in CI after this download.
+# token-scrubbed CI fetches.
 
 set -euo pipefail
 

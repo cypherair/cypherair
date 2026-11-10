@@ -24,7 +24,7 @@ Secure Enclave custody is a **custody model, not an algorithm suite**: long-term
 
 CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classical curves, so a whole RFC 9980 composite key cannot be enclave-resident. Device-Bound Post-Quantum therefore splits custody: the PQ components are generated in and never leave the enclave; the classical components are sealed against the identity wrapping key in their own Keychain namespace with their own payload kind, so a software-custody consumer handed one fails closed rather than opening it. **The custody invariant:** every composite signature and decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt, and is never independently reachable through any export or backup path. Split custody needs both halves: an intact enclave handle pair says nothing about the sealed component.
 
-**The ML-KEM exception.** The enclave cannot decapsulate with an ML-KEM key created under the application-password option ([SECURITY.md](SECURITY.md) §10), so the ML-KEM half is the one enclave key created without it, under the biometric constraint alone. The passphrase still gates every composite decryption, because the classical half is sealed against the identity wrapping key, which demands it. The ML-DSA half carries the password like every other enclave key. The probe that records the limitation is written to fail the day the enclave starts honouring the option for ML-KEM, which is when this exception goes.
+**The ML-KEM exception.** The enclave cannot decapsulate with an ML-KEM key created under the application-password option ([SECURITY.md](SECURITY.md) §10), so the ML-KEM half is the one enclave key created without it, under the biometric constraint alone. The passphrase still gates every composite decryption, because the classical half is sealed against the identity wrapping key, which demands it. The ML-DSA half carries the password like every other enclave key.
 
 ## 5. Structural red lines
 
@@ -34,13 +34,12 @@ CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classica
 
 ## 6. Interop position
 
-- **The PQ families make no GnuPG claim, and product copy must never imply one.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only. Portable Legacy remains the GnuPG-compatibility story ([PRODUCT.md](PRODUCT.md)).
+- **The PQ families make no GnuPG claim, and product copy must never imply one.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only. Portable Legacy remains the GnuPG-compatibility story.
 - **The interop target for PQ artifacts is the Sequoia lineage** (`sq` at RFC 9980-capable releases). Device-Bound Modern (v6) likewise makes no GnuPG claim; Device-Bound Legacy (v4) is the GnuPG-oriented device-bound family.
-- **QR surfaces show an explicit unavailable state, never a silent omission** — PQ certificates exceed single-QR capacity, and multi-part QR is rejected by decision.
 
 ## 7. Evidence rules
 
 - **Evidence and diagnostic output never carry** plaintext, private-key material, shared secrets, session keys, KEKs, Keychain locators or handle-set identifiers, stable fingerprints, or temporary capability paths — only pass/fail, scenario labels, sanitized failure categories, algorithm/curve identifiers, packet versions and tags, counts, and the gpg version string.
-- **Coverage honesty.** v6 third-party AEAD interop is verified by composition only — no non-Sequoia RFC 9580 implementation is exercised. The unit lane drives the production seams over the sandbox vault's software enclave and **never substitutes for real-hardware evidence**. Interactive authentication-cancellation and biometric-lockout evidence is deliberately out of scope; fail-closed behavior is covered by the unit lane's routing tests over the sandbox vault.
+- **Coverage honesty.** v6 third-party AEAD interop is verified by composition only — no non-Sequoia RFC 9580 implementation is exercised.
 - **A platform-specific custody claim requires that platform's own capture**; the shared CryptoKit substrate justifies exposure, not claims.
 - **Accepted risks:** visionOS is exposed without dedicated evidence — no Vision Pro hardware; based on the shared substrate, the visionOS build probe, and macOS capture. iPad capture is deferred and not required for release.
