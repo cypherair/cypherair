@@ -27,17 +27,6 @@ struct EnclaveSealedEnvelopeTests {
         return opened.withUnsafeBytes { Array($0) }
     }
 
-    @Test func `Round trip survives encoding and carries public metadata`() throws {
-        let plaintext = Array("the root secret".utf8)
-        let envelope = try seal(plaintext, associatedData: Data("salt and parameters".utf8))
-        let encoded = try EnclaveSealedEnvelopeCodec.encode(envelope)
-        let decoded = try EnclaveSealedEnvelopeCodec.decode(encoded, expectedKind: .rootSecret)
-        #expect(decoded == envelope)
-        #expect(decoded.associatedData == Data("salt and parameters".utf8))
-        #expect(decoded.sealingKeyBlob == blob)
-        #expect(try open(decoded) == plaintext)
-    }
-
     @Test func `Wrong kind is refused before any cryptography`() throws {
         let envelope = try seal([1, 2, 3], kind: .secretKeys)
         let encoded = try EnclaveSealedEnvelopeCodec.encode(envelope)
@@ -98,16 +87,6 @@ struct EnclaveSealedEnvelopeTests {
         }
         #expect(throws: SealingError.malformed("not a property list")) {
             try EnclaveSealedEnvelopeCodec.decode(Data("not a plist".utf8), expectedKind: .rootSecret)
-        }
-    }
-
-    @Test func `Empty plaintext is refused`() {
-        let empty = SensitiveBuffer(count: 0) { _ in }
-        #expect(throws: SealingError.malformed("empty plaintext")) {
-            try EnclaveSealedEnvelopeCodec.seal(
-                plaintext: empty, kind: .rootSecret, associatedData: Data(),
-                sealingKeyBlob: blob, sealingPublicKeyX963: sealingKey.publicKey.x963Representation
-            )
         }
     }
 

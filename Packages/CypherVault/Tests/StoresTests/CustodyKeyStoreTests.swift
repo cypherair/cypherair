@@ -81,18 +81,14 @@ struct CustodyKeyStoreTests {
         }
     }
 
-    @Test func `A presence approval does not reach a device-bound key`() async throws {
-        let approval = try await approval(.presence)
-        #expect(throws: CustodyError.approvalKindMismatch) {
-            _ = try store.createPair(tier: .classicalP256, approval: approval)
-        }
-    }
-
-    @Test func `A presence approval loads no device-bound key`() async throws {
+    @Test func `A presence approval neither makes nor loads a device-bound key`() async throws {
         let pair = try store.createPair(tier: .classicalP256, approval: try await approval())
-        let approval = try await approval(.presence)
+        let presence = try await approval(.presence)
         #expect(throws: CustodyError.approvalKindMismatch) {
-            _ = try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: approval)
+            _ = try store.createPair(tier: .classicalP256, approval: presence)
+        }
+        #expect(throws: CustodyError.approvalKindMismatch) {
+            _ = try store.loadHandle(role: .signing, tier: .classicalP256, blob: pair.signing.blob, expectedPublicKey: pair.signing.publicKey, approval: presence)
         }
     }
 

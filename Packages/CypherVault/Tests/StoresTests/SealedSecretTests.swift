@@ -31,8 +31,7 @@ struct SealedSecretTests {
     func `Each kind opens as sealed and stores nothing`(kind: SealedSecret.Kind) async throws {
         let sealed = try SealedSecret.seal(.text("secret"), kind: kind, session: session)
         let opened = try SealedSecret.open(sealed, kind: kind, approval: try await approval())
-        let openedTheSecret = opened.contentEquals(.text("secret"))
-        #expect(openedTheSecret)
+        #expect(opened.withUnsafeBytes { Data($0) } == Data("secret".utf8))
         #expect(keychain.contents.map(\.service) == [Vault.sealedRootService])
         #expect(enclave.createdPolicies.count == 2, "sealing creates no enclave key")
     }

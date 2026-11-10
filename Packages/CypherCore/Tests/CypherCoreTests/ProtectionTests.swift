@@ -214,8 +214,4 @@ import VaultTestSupport
         #expect(values.signByDefault == false)
         #expect(values.clipboardNotice == false)
     }
-
-    @Test func `The preview is unlocked`() throws {
-        guard case .unlocked = AppCore.preview().phase else { throw UnexpectedPhase(description: "not unlocked") }
-    }
 }

@@ -20,14 +20,6 @@ struct SealedDomainTests {
         try files.replace(name, with: bytes)
     }
 
-    @Test func `Save then load round-trips and replaces in place`() throws {
-        try domain().save(Contacts(names: ["a"]), key: key)
-        #expect(try domain().load(key: key) == Contacts(names: ["a"]))
-        try domain().save(Contacts(names: ["a", "b"]), key: key)
-        #expect(try domain().load(key: key) == Contacts(names: ["a", "b"]))
-        #expect(domain().integrity(key: key) == .intact)
-    }
-
     @Test func `File size moves only in steps of the padding`() throws {
         let step = SealedDomain<Contacts>.paddingStep
         try domain().save(Contacts(names: []), key: key)

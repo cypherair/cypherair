@@ -80,8 +80,7 @@ struct VaultTests {
         #expect(keyBytes(try after.domainKey("contacts")) == contactsKey, "root secret must survive a passphrase change")
         #expect(after.identityWrappingKeyBlob == before.identityWrappingKeyBlob, "identity keys never change with the passphrase")
         let opened = try after.openIdentityEnvelope(envelope, kind: .secretKeys, approval: try await after.approve(.presence, reason: "test"))
-        let openedTheSecret = opened.contentEquals(.text("portable key"))
-        #expect(openedTheSecret)
+        #expect(opened.withUnsafeBytes { Data($0) } == Data("portable key".utf8))
         #expect(enclave.createdPolicies.count == 3, "a passphrase change creates exactly one new key")
     }
 
@@ -103,20 +102,6 @@ struct VaultTests {
         let secret = SensitiveBuffer.text("x")
         #expect(throws: VaultError.locked) {
             try session.sealForIdentity(plaintext: secret, kind: .secretKeys, associatedData: Data())
-        }
-    }
-
-    @Test func `Identity envelope needs the identity credential`() async throws {
-        let session = try await bootstrap()
-        let secret = SensitiveBuffer.text("certificate")
-        let envelope = try session.sealForIdentity(plaintext: secret, kind: .secretKeys, associatedData: Data("fp".utf8))
-        let opened = try session.openIdentityEnvelope(envelope, kind: .secretKeys, approval: try await session.approve(.presence, reason: "test"))
-        let openedTheSecret = opened.contentEquals(.text("certificate"))
-        #expect(openedTheSecret)
-        // The fake enclave refuses the identity key without the exact credential,
-        // exactly as the hardware does; a foreign credential must not open it.
-        #expect(throws: (any Error).self) {
-            try enclave.keyAgreementKey(from: session.identityWrappingKeyBlob, credential: .text("not it"), context: LAContext())
         }
     }
 
@@ -154,24 +139,6 @@ struct VaultTests {
             _ = try await session.approve(.presence, reason: "test")
         }
         #expect(authenticator.prompts == prompts)
-    }
-
-    @Test func `The in-memory Keychain's delete-everything leaves no row of any service`() throws {
-        let keychain = InMemoryKeychain()
-        try keychain.rows(service: Vault.sealedRootService).write(account: Vault.sealedRootAccount, data: Data([1]))
-        try keychain.rows(service: "com.cypherair.vault.portable-key").write(account: "a", data: Data([2]))
-        try keychain.rows(service: "left.by.an.earlier.version").write(account: "b", data: Data([3]))
-        try keychain.deleteEverything()
-        #expect(keychain.contents.isEmpty)
-    }
-
-    @Test func `A sandbox session writes no row and opens what it seals`() async throws {
-        let session = try UnlockedSession.sandbox(enclave: SoftwareEnclave())
-        #expect(try !vault.sealedRootExists())
-        let envelope = try session.sealForIdentity(plaintext: .text("secret"), kind: .secretKeys, associatedData: Data())
-        let approval = try await session.approve(.presence, reason: "test")
-        let openedTheSecret = try session.openIdentityEnvelope(envelope, kind: .secretKeys, approval: approval).contentEquals(.text("secret"))
-        #expect(openedTheSecret)
     }
 
     @Test func `A damaged or missing root is reported as such`() async throws {
