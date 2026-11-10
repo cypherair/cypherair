@@ -14,21 +14,16 @@ public enum DomainIntegrity: Equatable, Sendable {
 public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
     public let domain: String
     public let schemaVersion: Int
-    private let directory: ProtectedDataDirectory
+    private let files: any DomainFiles
 
-    public init(domain: String, schemaVersion: Int, directory: ProtectedDataDirectory) {
+    public init(domain: String, schemaVersion: Int, files: any DomainFiles) {
         self.domain = domain
         self.schemaVersion = schemaVersion
-        self.directory = directory
-    }
-
-    public var exists: Bool {
-        FileManager.default.fileExists(atPath: directory.fileURL(domain: domain).path)
+        self.files = files
     }
 
     public func load(key: SymmetricKey) throws(StoreError) -> Payload {
-        let fileURL = directory.fileURL(domain: domain)
-        guard let data = FileManager.default.contents(atPath: fileURL.path) else { throw .missing }
+        guard let data = try files.read(domain) else { throw .missing }
         let plaintext: Data
         do {
             let snapshot = try SealedSnapshotCodec.decode(data, domain: domain, schemaVersion: schemaVersion)
@@ -45,9 +40,8 @@ public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
         }
     }
 
-    /// Writes the new snapshot to a temporary file under complete protection and
-    /// renames it over the old one. A crash leaves either the old file or the new
-    /// one, never a mix, plus at most a temporary file the sweep removes.
+    /// Seals the payload and replaces the file with it. A crash leaves either
+    /// the old file or the new one, never a mix.
     public func save(_ payload: Payload, key: SymmetricKey) throws(StoreError) {
         let plaintext: Data
         do {
@@ -65,23 +59,7 @@ public struct SealedDomain<Payload: Codable & Sendable>: Sendable {
         } catch {
             throw .internalFailure("snapshot seal failed")
         }
-        let temporary = directory.temporaryURL(domain: domain)
-        do {
-            try encoded.write(to: temporary, options: [.atomic, .completeFileProtection])
-        } catch {
-            throw .io("temporary write failed")
-        }
-        do {
-            try ProtectedDataDirectory.protect(temporary)
-            _ = try FileManager.default.replaceItemAt(directory.fileURL(domain: domain), withItemAt: temporary)
-            try ProtectedDataDirectory.protect(directory.fileURL(domain: domain))
-        } catch let error as StoreError {
-            try? FileManager.default.removeItem(at: temporary)
-            throw error
-        } catch {
-            try? FileManager.default.removeItem(at: temporary)
-            throw .io("replace failed")
-        }
+        try files.replace(domain, with: encoded)
     }
 
     /// Whether the file is intact, missing, damaged, or from another version,

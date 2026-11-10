@@ -3,9 +3,58 @@ import Foundation
 import Stores
 import XCTest
 
-final class SealedDomainTests: XCTestCase {
-    private struct Contacts: Codable, Equatable, Sendable { var names: [String] }
+private struct Contacts: Codable, Equatable, Sendable { var names: [String] }
 
+/// The sealing rules of a domain, on files held in memory.
+final class SealedDomainTests: XCTestCase {
+    private let files = InMemoryDomainFiles()
+    private let key = SymmetricKey(size: .bits256)
+
+    private func domain(_ name: String = "contacts", version: Int = 1) -> SealedDomain<Contacts> {
+        SealedDomain(domain: name, schemaVersion: version, files: files)
+    }
+
+    private func flipByte(of name: String) throws {
+        var bytes = try XCTUnwrap(try files.read(name))
+        bytes[bytes.count / 2] ^= 0xFF
+        try files.replace(name, with: bytes)
+    }
+
+    func test_saveThenLoad_roundTrips_andReplacesInPlace() throws {
+        try domain().save(Contacts(names: ["a"]), key: key)
+        XCTAssertEqual(try domain().load(key: key), Contacts(names: ["a"]))
+        try domain().save(Contacts(names: ["a", "b"]), key: key)
+        XCTAssertEqual(try domain().load(key: key), Contacts(names: ["a", "b"]))
+        XCTAssertEqual(domain().integrity(key: key), .intact)
+    }
+
+    func test_missingAndDamaged_areDistinguished_andNeverDefault() throws {
+        XCTAssertEqual(domain().integrity(key: key), .missing)
+        XCTAssertThrowsError(try domain().load(key: key)) { XCTAssertEqual($0 as? StoreError, .missing) }
+        try domain().save(Contacts(names: ["a"]), key: key)
+        try flipByte(of: "contacts")
+        XCTAssertEqual(domain().integrity(key: key), .damaged)
+        XCTAssertThrowsError(try domain().load(key: key)) { XCTAssertEqual($0 as? StoreError, .damaged) }
+        try domain().save(Contacts(names: ["a"]), key: key)
+        XCTAssertEqual(domain().integrity(key: SymmetricKey(size: .bits256)), .damaged, "a wrong key reads as damage, never as empty")
+    }
+
+    func test_fileFromAnotherVersion_isNamedApartFromDamage() throws {
+        try domain(version: 2).save(Contacts(names: ["a"]), key: key)
+        XCTAssertEqual(domain(version: 3).integrity(key: key), .otherVersion)
+        XCTAssertThrowsError(try domain(version: 3).load(key: key)) { XCTAssertEqual($0 as? StoreError, .otherVersion) }
+    }
+
+    func test_aFileMovedBetweenDomains_isDamage_whateverItsVersion() throws {
+        try domain("contacts", version: 2).save(Contacts(names: ["a"]), key: key)
+        try files.replace("settings", with: try XCTUnwrap(try files.read("contacts")))
+        XCTAssertEqual(domain("settings", version: 2).integrity(key: key), .damaged)
+        XCTAssertEqual(domain("settings", version: 3).integrity(key: key), .damaged)
+    }
+}
+
+/// The protected directory on disk. Skips on a volume without file protection.
+final class ProtectedDataDirectoryTests: XCTestCase {
     private var directory: ProtectedDataDirectory!
     private let key = SymmetricKey(size: .bits256)
 
@@ -19,7 +68,7 @@ final class SealedDomainTests: XCTestCase {
         if values.allValues[.volumeSupportsFileProtectionKey] as? Bool == false {
             throw XCTSkip("the volume holding the temporary directory reports no file protection")
         }
-        directory = try ProtectedDataDirectory(url: temporary.appending(path: "SealedDomainTests-\(UUID().uuidString)"))
+        directory = try ProtectedDataDirectory(url: temporary.appending(path: "ProtectedDataDirectoryTests-\(UUID().uuidString)"))
     }
 
     override func tearDownWithError() throws {
@@ -27,39 +76,13 @@ final class SealedDomainTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    private var contacts: SealedDomain<Contacts> { SealedDomain(domain: "contacts", schemaVersion: 1, directory: directory) }
+    private var contacts: SealedDomain<Contacts> { SealedDomain(domain: "contacts", schemaVersion: 1, files: directory) }
 
-    func test_saveThenLoad_roundTrips_andReplacesInPlace() throws {
-        XCTAssertFalse(contacts.exists)
+    func test_saveThenLoad_onDisk_leavesNoTemporaryFile() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
-        XCTAssertTrue(contacts.exists)
-        XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a"]))
         try contacts.save(Contacts(names: ["a", "b"]), key: key)
         XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a", "b"]))
-        XCTAssertEqual(contacts.integrity(key: key), .intact)
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.url.path).count, 1, "no temporary file left behind")
-    }
-
-    func test_missingAndDamaged_areDistinguished_andNeverDefault() throws {
-        XCTAssertEqual(contacts.integrity(key: key), .missing)
-        XCTAssertThrowsError(try contacts.load(key: key)) { XCTAssertEqual($0 as? StoreError, .missing) }
-        try contacts.save(Contacts(names: ["a"]), key: key)
-        let fileURL = directory.url.appending(path: "contacts.sealed")
-        var bytes = try Data(contentsOf: fileURL); bytes[bytes.count / 2] ^= 0xFF
-        try bytes.write(to: fileURL)
-        XCTAssertEqual(contacts.integrity(key: key), .damaged)
-        XCTAssertThrowsError(try contacts.load(key: key)) { XCTAssertEqual($0 as? StoreError, .damaged) }
-        XCTAssertEqual(contacts.integrity(key: SymmetricKey(size: .bits256)), .damaged, "a wrong key reads as damage, never as empty")
-    }
-
-    func test_fileFromAnotherVersion_isNamedApartFromDamage() throws {
-        let older = SealedDomain<Contacts>(domain: "contacts", schemaVersion: 2, directory: directory)
-        try older.save(Contacts(names: ["a"]), key: key)
-        XCTAssertEqual(contacts.integrity(key: key), .otherVersion)
-        XCTAssertThrowsError(try contacts.load(key: key)) { XCTAssertEqual($0 as? StoreError, .otherVersion) }
-        let settings = SealedDomain<Contacts>(domain: "settings", schemaVersion: 2, directory: directory)
-        try FileManager.default.copyItem(at: directory.url.appending(path: "contacts.sealed"), to: directory.url.appending(path: "settings.sealed"))
-        XCTAssertEqual(settings.integrity(key: key), .damaged, "a file of another domain is damage, whatever its version")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.url.path), ["contacts.sealed"])
     }
 
     func test_strayTemporaryFile_isIgnoredAndSwept() throws {
@@ -69,21 +92,19 @@ final class SealedDomainTests: XCTestCase {
         XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a"]))
         directory.sweepTemporaries()
         XCTAssertFalse(FileManager.default.fileExists(atPath: stray.path))
-        XCTAssertTrue(contacts.exists)
-    }
-
-    func test_domainsDoNotReadEachOther() throws {
-        try contacts.save(Contacts(names: ["a"]), key: key)
-        let settings = SealedDomain<Contacts>(domain: "settings", schemaVersion: 1, directory: directory)
-        XCTAssertEqual(settings.integrity(key: key), .missing)
-        let renamed = directory.url.appending(path: "settings.sealed")
-        try FileManager.default.copyItem(at: directory.url.appending(path: "contacts.sealed"), to: renamed)
-        XCTAssertEqual(settings.integrity(key: key), .damaged, "a file moved between domains fails its binding")
+        XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a"]))
     }
 
     func test_savedFile_carriesCompleteProtection() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
         let attributes = try FileManager.default.attributesOfItem(atPath: directory.url.appending(path: "contacts.sealed").path)
         XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+    }
+
+    func test_eraseAll_removesEveryFile() throws {
+        try contacts.save(Contacts(names: ["a"]), key: key)
+        try Data("garbage".utf8).write(to: directory.url.appending(path: "contacts.\(UUID().uuidString).tmp"))
+        try directory.eraseAll()
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.url.path), [])
     }
 }

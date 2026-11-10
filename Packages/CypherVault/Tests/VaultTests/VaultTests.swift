@@ -180,6 +180,14 @@ final class VaultTests: XCTestCase {
         XCTAssertTrue(keychain.contents.isEmpty)
     }
 
+    func test_sandboxSession_writesNoRow_andOpensWhatItSeals() async throws {
+        let session = try UnlockedSession.sandbox(enclave: SoftwareEnclave())
+        XCTAssertFalse(try vault.sealedRootExists())
+        let envelope = try session.sealForIdentity(plaintext: .text("secret"), kind: .secretKeys, associatedData: Data())
+        let approval = try await session.approve(.presence, reason: "test")
+        XCTAssertTrue(try session.openIdentityEnvelope(envelope, kind: .secretKeys, approval: approval).contentEquals(.text("secret")))
+    }
+
     func test_damagedOrMissingRoot_isReportedAsSuch() async throws {
         do {
             _ = try await unlock("anything")

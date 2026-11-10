@@ -246,6 +246,28 @@ public struct SandboxStretcher: PassphraseStretcher {
     }
 }
 
+extension UnlockedSession {
+    /// A session over a fresh random root that no sealed root holds: a software
+    /// identity key, no prompt, nothing stored. For previews, never for user data.
+    public static func sandbox(enclave: SoftwareEnclave) throws(VaultError) -> UnlockedSession {
+        let root = try Vault.randomSecret(count: RootDerivations.rootSecretLength)
+        let identityCredential = RootDerivations.identityCredential(rootSecret: root)
+        let identityKey: any EnclaveKeyAgreementKey
+        do {
+            identityKey = try enclave.makeKeyAgreementKey(policy: .presenceAndPassword, credential: identityCredential, context: LAContext())
+        } catch {
+            throw .internalFailure("sandbox identity key failed")
+        }
+        return UnlockedSession(
+            rootSecret: root,
+            identityWrappingKeyBlob: identityKey.dataRepresentation,
+            identityWrappingPublicKeyX963: identityKey.publicKeyX963,
+            enclave: enclave,
+            authenticator: NoPromptAuthenticator()
+        )
+    }
+}
+
 /// Presence that is never asked for.
 public struct NoPromptAuthenticator: Authenticator {
     public init() {}

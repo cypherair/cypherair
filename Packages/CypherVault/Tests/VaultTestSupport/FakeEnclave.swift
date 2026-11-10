@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import LocalAuthentication
 import Sealing
+import Stores
 import Vault
 import os
 
@@ -57,6 +58,37 @@ public extension InMemoryRowStore {
         guard var data = try? read(account: account), !data.isEmpty else { return }
         data[data.count / 2] ^= 0xFF
         try? write(account: account, data: data)
+    }
+}
+
+/// Domain files in memory whose writes can be made to fail.
+public final class FailableDomainFiles: DomainFiles, @unchecked Sendable {
+    public let files = InMemoryDomainFiles()
+    private let failing = OSAllocatedUnfairLock(initialState: false)
+
+    public init() {}
+
+    public var failsWrites: Bool {
+        get { failing.withLock { $0 } }
+        set { failing.withLock { $0 = newValue } }
+    }
+
+    public func read(_ name: String) throws(StoreError) -> Data? { try files.read(name) }
+
+    public func replace(_ name: String, with data: Data) throws(StoreError) {
+        guard !failsWrites else { throw .io("write refused by the test") }
+        try files.replace(name, with: data)
+    }
+
+    public func eraseAll() throws(StoreError) { try files.eraseAll() }
+}
+
+public extension InMemoryDomainFiles {
+    /// Flips one byte in the middle of the file.
+    func corrupt(_ name: String) {
+        guard var data = try? read(name), !data.isEmpty else { return }
+        data[data.count / 2] ^= 0xFF
+        try? replace(name, with: data)
     }
 }
 
