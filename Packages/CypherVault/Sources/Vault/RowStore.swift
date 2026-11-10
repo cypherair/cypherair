@@ -1,21 +1,46 @@
 import Foundation
 import Security
 
-/// Rows under one service: an opaque value plus an optional public attribute
-/// readable without the value, used for custody handle bindings. Production is
-/// the data-protection Keychain; tests keep rows in memory.
+/// Rows under one service, each an opaque value. A row has no attribute of its
+/// own, so nothing about it is readable but its name and the public fields of
+/// its value. Production is the data-protection Keychain; tests keep rows in
+/// memory.
 public protocol RowStore: Sendable {
     func read(account: String) throws(VaultError) -> Data?
-    /// Creates the row, or replaces its value and attribute atomically.
-    func write(account: String, data: Data, attribute: Data?) throws(VaultError)
+    /// Creates the row, or replaces its value atomically.
+    func write(account: String, data: Data) throws(VaultError)
     func delete(account: String) throws(VaultError)
-    /// Every account under the service with its public attribute, no values.
-    func accounts() throws(VaultError) -> [(account: String, attribute: Data?)]
 }
 
-public extension RowStore {
-    func write(account: String, data: Data) throws(VaultError) {
-        try write(account: account, data: data, attribute: nil)
+/// Every Keychain item of the app, across services.
+public protocol Keychain: Sendable {
+    func rows(service: String) -> any RowStore
+    /// Deletes every item of the app, whatever its service or name. Part of
+    /// Reset All Local Data.
+    func deleteEverything() throws(VaultError)
+}
+
+/// The app's items in the data-protection Keychain.
+public struct SystemKeychain: Keychain {
+    public init() {}
+
+    public func rows(service: String) -> any RowStore {
+        KeychainRowStore(service: service)
+    }
+
+    public func deleteEverything() throws(VaultError) {
+        let classes = [kSecClassGenericPassword, kSecClassInternetPassword, kSecClassCertificate, kSecClassKey, kSecClassIdentity]
+        for itemClass in classes {
+            let query: [String: Any] = [
+                kSecClass as String: itemClass,
+                kSecUseDataProtectionKeychain as String: true,
+                kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            ]
+            let status = SecItemDelete(query as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                throw .storage("delete failed: \(status)")
+            }
+        }
     }
 }
 
@@ -46,9 +71,8 @@ public struct KeychainRowStore: RowStore {
         }
     }
 
-    public func write(account: String, data: Data, attribute: Data?) throws(VaultError) {
-        var update: [String: Any] = [kSecValueData as String: data]
-        update[kSecAttrGeneric as String] = attribute ?? Data()
+    public func write(account: String, data: Data) throws(VaultError) {
+        let update: [String: Any] = [kSecValueData as String: data]
         let updateStatus = SecItemUpdate(base(account: account) as CFDictionary, update as CFDictionary)
         switch updateStatus {
         case errSecSuccess:
@@ -56,7 +80,6 @@ public struct KeychainRowStore: RowStore {
         case errSecItemNotFound:
             var attributes = base(account: account)
             attributes[kSecValueData as String] = data
-            attributes[kSecAttrGeneric as String] = attribute ?? Data()
             attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
             let status = SecItemAdd(attributes as CFDictionary, nil)
             guard status == errSecSuccess else { throw .storage("add failed: \(status)") }
@@ -69,33 +92,6 @@ public struct KeychainRowStore: RowStore {
         let status = SecItemDelete(base(account: account) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw .storage("delete failed: \(status)")
-        }
-    }
-
-    public func accounts() throws(VaultError) -> [(account: String, attribute: Data?)] {
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecUseDataProtectionKeychain as String: true,
-            kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll,
-        ]
-        #if os(macOS)
-        query[kSecAttrSynchronizable as String] = false
-        #endif
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        switch status {
-        case errSecSuccess:
-            return (result as? [[String: Any]])?.compactMap { row in
-                guard let account = row[kSecAttrAccount as String] as? String else { return nil }
-                let attribute = row[kSecAttrGeneric as String] as? Data
-                return (account, attribute.flatMap { $0.isEmpty ? nil : $0 })
-            } ?? []
-        case errSecItemNotFound:
-            return []
-        default:
-            throw .storage("list failed: \(status)")
         }
     }
 

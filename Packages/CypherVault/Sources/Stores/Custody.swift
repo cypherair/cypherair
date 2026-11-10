@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import LocalAuthentication
 import Sealing
 import Vault
 
@@ -20,22 +19,21 @@ public enum CustodyTier: String, CaseIterable, Hashable, Sendable, Codable {
         }
     }
 
-    /// Public key lengths for the post-quantum tiers; P-256 uses the X9.63 shape.
-    public var postQuantumPublicKeyLengths: (signing: Int, keyAgreement: Int)? {
-        switch self {
-        case .classicalP256: nil
-        case .postQuantum: (signing: 1952, keyAgreement: 1184)
-        case .postQuantumHigh: (signing: 2592, keyAgreement: 1568)
+    /// Whether `publicKeyRaw` has the shape of this tier's key for `role`: an
+    /// uncompressed X9.63 point for P-256, the raw key's length for ML-DSA and ML-KEM.
+    public func acceptsPublicKey(_ publicKeyRaw: Data, role: CustodyRole) -> Bool {
+        switch (self, role) {
+        case (.classicalP256, _): Self.isUncompressedP256Point(publicKeyRaw)
+        case (.postQuantum, .signing): publicKeyRaw.count == 1952
+        case (.postQuantum, .keyAgreement): publicKeyRaw.count == 1184
+        case (.postQuantumHigh, .signing): publicKeyRaw.count == 2592
+        case (.postQuantumHigh, .keyAgreement): publicKeyRaw.count == 1568
         }
     }
 
-    /// Lengths of the classical scalars sealed as the split-custody half.
-    public var splitCustodyClassicalSecretLengths: (signing: Int, keyAgreement: Int)? {
-        switch self {
-        case .classicalP256: nil
-        case .postQuantum: (signing: 32, keyAgreement: 32)
-        case .postQuantumHigh: (signing: 57, keyAgreement: 56)
-        }
+    static func isUncompressedP256Point(_ data: Data) -> Bool {
+        guard data.count == 65, data.first == 0x04 else { return false }
+        return data.dropFirst().contains { $0 != 0 }
     }
 }
 
@@ -45,23 +43,20 @@ public enum CustodyRole: String, CaseIterable, Hashable, Sendable, Codable {
 }
 
 public enum CustodyError: Error, Equatable, Sendable {
-    case invalidHandleSetIdentifier
     case invalidPublicKey(CustodyRole)
     case invalidPeerPublicKey(CustodyRole)
     case hardwareUnavailable
     case locked
+    /// A device-bound key needs a biometric approval; a presence approval may
+    /// have been satisfied by the passcode.
+    case approvalKindMismatch
     case localAuthenticationCancelled(CustodyRole)
     case localAuthenticationFailed(CustodyRole)
     case localAuthenticationUnavailable(CustodyRole)
-    case privateHandleMissing(CustodyRole)
     case privateHandleInaccessible(CustodyRole)
     case privateHandleUnauthorized(CustodyRole)
-    case ambiguousPrivateHandle(CustodyRole)
     case privateOperationRoleMismatch(expected: CustodyRole, actual: CustodyRole)
     case handlePublicKeyBindingMismatch(CustodyRole)
-    case partialHandlePair
-    case cleanupOrRollbackFailed
-    case storage(String)
 
     static func fromEnclave(_ error: any Error, role: CustodyRole) -> CustodyError {
         let mapped = (error as? VaultError) ?? VaultError.fromEnclaveOperation(error)
@@ -72,142 +67,52 @@ public enum CustodyError: Error, Equatable, Sendable {
         case .enclaveUnavailable: return .hardwareUnavailable
         case .locked: return .locked
         case .passphraseRejected: return .privateHandleUnauthorized(role)
-        case .storage(let reason): return .storage(reason)
         default: return .privateHandleInaccessible(role)
         }
     }
 }
 
-/// One custody key's row: a random handle-set identifier shared by the pair, a
-/// role, and a tier. Never a fingerprint.
-public struct CustodyHandleReference: Hashable, Sendable {
-    public let handleSetIdentifier: String
-    public let role: CustodyRole
-    public let tier: CustodyTier
-
-    public init(handleSetIdentifier: String, role: CustodyRole, tier: CustodyTier) throws(CustodyError) {
-        guard Self.isValidHandleSetIdentifier(handleSetIdentifier) else { throw .invalidHandleSetIdentifier }
-        self.handleSetIdentifier = handleSetIdentifier
-        self.role = role
-        self.tier = tier
-    }
-
-    public var keyType: CustodyKeyType { tier.keyType(for: role) }
-
-    public static func generateHandleSetIdentifier() throws(CustodyError) -> String {
-        do {
-            return try Randomness.bytes(count: 16).map { String(format: "%02x", $0) }.joined()
-        } catch {
-            throw .storage("randomness unavailable")
-        }
-    }
-
-    public static func isValidHandleSetIdentifier(_ value: String) -> Bool {
-        guard !value.isEmpty, value.utf8.count <= 64 else { return false }
-        return value.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) }
-    }
-}
-
-/// A reference plus the public key its row advertises, readable without any
-/// prompt. Lookup and binding checks run on this; the enclave key is
-/// authoritative once loaded.
-public struct CustodyPublicBinding: Hashable, Sendable {
-    public static let p256X963PublicKeyByteCount = 65
-
-    public let reference: CustodyHandleReference
-    public let publicKeyRaw: Data
-
-    public init(reference: CustodyHandleReference, publicKeyRaw: Data) throws(CustodyError) {
-        guard Self.hasExpectedPublicKeyShape(publicKeyRaw, role: reference.role, tier: reference.tier) else {
-            throw .invalidPublicKey(reference.role)
-        }
-        self.reference = reference
-        self.publicKeyRaw = publicKeyRaw
-    }
-
-    public var role: CustodyRole { reference.role }
-
-    public static func hasExpectedPublicKeyShape(_ publicKeyRaw: Data, role: CustodyRole, tier: CustodyTier) -> Bool {
-        switch tier {
-        case .classicalP256:
-            return hasUncompressedP256X963PublicKeyShape(publicKeyRaw)
-        case .postQuantum, .postQuantumHigh:
-            guard let lengths = tier.postQuantumPublicKeyLengths else { return false }
-            return publicKeyRaw.count == (role == .signing ? lengths.signing : lengths.keyAgreement)
-        }
-    }
-
-    public static func hasUncompressedP256X963PublicKeyShape(_ data: Data) -> Bool {
-        guard data.count == p256X963PublicKeyByteCount, data.first == 0x04 else { return false }
-        return data.dropFirst().contains { $0 != 0 }
-    }
-}
-
-/// The signing and key-agreement bindings of one identity: same handle-set
-/// identifier, same tier, distinct public keys.
-public struct CustodyHandlePair: Hashable, Sendable {
-    public let signing: CustodyPublicBinding
-    public let keyAgreement: CustodyPublicBinding
-
-    public init(signing: CustodyPublicBinding, keyAgreement: CustodyPublicBinding) throws(CustodyError) {
-        guard signing.role == .signing else { throw .privateOperationRoleMismatch(expected: .signing, actual: signing.role) }
-        guard keyAgreement.role == .keyAgreement else { throw .privateOperationRoleMismatch(expected: .keyAgreement, actual: keyAgreement.role) }
-        guard signing.reference.handleSetIdentifier == keyAgreement.reference.handleSetIdentifier,
-              signing.reference.tier == keyAgreement.reference.tier,
-              signing.publicKeyRaw != keyAgreement.publicKeyRaw else {
-            throw .handlePublicKeyBindingMismatch(.keyAgreement)
-        }
-        self.signing = signing
-        self.keyAgreement = keyAgreement
-    }
-
-    public var handleSetIdentifier: String { signing.reference.handleSetIdentifier }
-    public var tier: CustodyTier { signing.reference.tier }
-    public var references: [CustodyHandleReference] { [signing.reference, keyAgreement.reference] }
-}
-
-public struct CustodyInventory: Sendable {
-    public let bindings: [CustodyPublicBinding]
-    public let malformedRowCount: Int
-    public var totalRowCount: Int { bindings.count + malformedRowCount }
-}
-
-/// A custody key reconstructed in the enclave with the caller's context, with
-/// the checks every private operation runs before the enclave is asked.
+/// A custody key reconstructed or created in the enclave under an approval,
+/// with the checks every private operation runs before the enclave is asked.
 public struct LoadedCustodyHandle {
-    public let binding: CustodyPublicBinding
+    public let tier: CustodyTier
+    public let role: CustodyRole
+    /// The public key the handle answers for. For a loaded handle it is the
+    /// one the caller expected, and the enclave key's own public key matched it.
+    public let publicKey: Data
     let key: any EnclaveCustodyKey
 
-    public var reference: CustodyHandleReference { binding.reference }
-    public var role: CustodyRole { binding.role }
+    /// The enclave key's blob, inert off this device. The caller stores it
+    /// inside the sealed key list; it has no row.
+    public var blob: Data { key.dataRepresentation }
 
     /// P-256 ECDSA over a 32-byte SHA-256 digest, self-verified against the
-    /// binding, returned as r and s.
+    /// public key, returned as r and s.
     public func signDigest(_ digest: Data) throws(CustodyError) -> (r: Data, s: Data) {
         guard role == .signing else { throw .privateOperationRoleMismatch(expected: .signing, actual: role) }
-        guard binding.reference.tier == .classicalP256, let rawDigest = RawSHA256Digest(digest) else {
+        guard tier == .classicalP256, let rawDigest = RawSHA256Digest(digest) else {
             throw .privateHandleInaccessible(.signing)
         }
         let raw: Data
         do { raw = try key.signature(for: digest) } catch { throw CustodyError.fromEnclave(error, role: .signing) }
         guard raw.count == 64,
-              let publicKey = try? P256.Signing.PublicKey(x963Representation: binding.publicKeyRaw),
+              let verifier = try? P256.Signing.PublicKey(x963Representation: publicKey),
               let signature = try? P256.Signing.ECDSASignature(rawRepresentation: raw),
-              publicKey.isValidSignature(signature, for: rawDigest) else {
+              verifier.isValidSignature(signature, for: rawDigest) else {
             throw .privateHandleInaccessible(.signing)
         }
         return (Data(raw.prefix(32)), Data(raw.suffix(32)))
     }
 
-    /// ML-DSA over `message`, self-verified against the binding.
+    /// ML-DSA over `message`, self-verified against the public key.
     public func signMessage(_ message: Data) throws(CustodyError) -> Data {
         guard role == .signing else { throw .privateOperationRoleMismatch(expected: .signing, actual: role) }
         let signature: Data
         do { signature = try key.signature(for: message) } catch { throw CustodyError.fromEnclave(error, role: .signing) }
         let valid: Bool
-        switch binding.reference.tier {
-        case .postQuantum: valid = (try? MLDSA65.PublicKey(rawRepresentation: binding.publicKeyRaw))?.isValidSignature(signature, for: message) ?? false
-        case .postQuantumHigh: valid = (try? MLDSA87.PublicKey(rawRepresentation: binding.publicKeyRaw))?.isValidSignature(signature, for: message) ?? false
+        switch tier {
+        case .postQuantum: valid = (try? MLDSA65.PublicKey(rawRepresentation: publicKey))?.isValidSignature(signature, for: message) ?? false
+        case .postQuantumHigh: valid = (try? MLDSA87.PublicKey(rawRepresentation: publicKey))?.isValidSignature(signature, for: message) ?? false
         case .classicalP256: valid = false
         }
         guard valid else { throw .privateHandleInaccessible(.signing) }
@@ -218,8 +123,8 @@ public struct LoadedCustodyHandle {
     /// names this handle's own public key.
     public func sharedSecret(recipientPublicKeyX963: Data, ephemeralPublicKeyX963: Data) throws(CustodyError) -> SensitiveBuffer {
         guard role == .keyAgreement else { throw .privateOperationRoleMismatch(expected: .keyAgreement, actual: role) }
-        guard recipientPublicKeyX963 == binding.publicKeyRaw else { throw .handlePublicKeyBindingMismatch(.keyAgreement) }
-        guard CustodyPublicBinding.hasUncompressedP256X963PublicKeyShape(ephemeralPublicKeyX963) else { throw .invalidPeerPublicKey(.keyAgreement) }
+        guard recipientPublicKeyX963 == publicKey else { throw .handlePublicKeyBindingMismatch(.keyAgreement) }
+        guard CustodyTier.isUncompressedP256Point(ephemeralPublicKeyX963) else { throw .invalidPeerPublicKey(.keyAgreement) }
         let secret: SensitiveBuffer
         do { secret = try key.sharedSecret(withEphemeralPublicKeyX963: ephemeralPublicKeyX963) } catch { throw CustodyError.fromEnclave(error, role: .keyAgreement) }
         guard secret.count == 32, secret.withUnsafeBytes({ $0.contains { $0 != 0 } }) else { throw .privateHandleInaccessible(.keyAgreement) }
@@ -233,164 +138,71 @@ public struct LoadedCustodyHandle {
     }
 }
 
-/// Device-bound custody keys: one row per key under a service per tier and
-/// role, the public key in the row's attribute, the enclave blob as its value.
+/// Device-bound custody keys. The store keeps nothing: a new pair comes back
+/// with its two blobs for the caller to keep inside the sealed key list, and a
+/// handle is loaded from a blob the caller hands in. The tier comes from the
+/// certificate's shape, the role from the operation.
 public struct CustodyKeyStore: Sendable {
-    public static let servicePrefix = "com.cypherair.vault.custody"
-
     private let enclave: any Enclave
-    private let rows: @Sendable (CustodyTier, CustodyRole) -> any RowStore
 
-    public init(enclave: any Enclave, rows: @escaping @Sendable (CustodyTier, CustodyRole) -> any RowStore) {
+    public init(enclave: any Enclave) {
         self.enclave = enclave
-        self.rows = rows
     }
 
-    public static func keychain(enclave: any Enclave) -> CustodyKeyStore {
-        CustodyKeyStore(enclave: enclave) { tier, role in
-            KeychainRowStore(service: "\(servicePrefix).\(tier.rawValue).\(role.rawValue)")
-        }
+    /// Creates both keys of a new device-bound key under the operation's
+    /// biometric approval, with the identity credential of the session that
+    /// gave it. Blocking.
+    public func createPair(tier: CustodyTier, approval: OperationApproval) throws(CustodyError) -> (signing: LoadedCustodyHandle, keyAgreement: LoadedCustodyHandle) {
+        guard approval.kind == .biometrics else { throw .approvalKindMismatch }
+        let signing = try create(tier: tier, role: .signing, approval: approval)
+        let keyAgreement = try create(tier: tier, role: .keyAgreement, approval: approval)
+        return (signing, keyAgreement)
     }
 
-    /// Creates both keys of a new identity under one fresh handle-set
-    /// identifier, with the operation's biometric approval. Failure after the
-    /// first key removes it again. Blocking.
-    public func createPair(tier: CustodyTier, session: UnlockedSession, approval: OperationApproval) throws(CustodyError) -> (signing: LoadedCustodyHandle, keyAgreement: LoadedCustodyHandle) {
-        let identifier = try CustodyHandleReference.generateHandleSetIdentifier()
-        let signingReference = try CustodyHandleReference(handleSetIdentifier: identifier, role: .signing, tier: tier)
-        let keyAgreementReference = try CustodyHandleReference(handleSetIdentifier: identifier, role: .keyAgreement, tier: tier)
-        let signing = try create(signingReference, session: session, context: approval.context)
-        do {
-            let keyAgreement = try create(keyAgreementReference, session: session, context: approval.context)
-            return (signing, keyAgreement)
-        } catch {
-            do { try delete([signingReference, keyAgreementReference]) } catch { throw .cleanupOrRollbackFailed }
-            throw error
-        }
-    }
-
-    /// Reconstructs one key and checks the enclave's answer against the public
-    /// key the caller expects.
-    public func loadHandle(reference: CustodyHandleReference, expectedPublicKeyRaw: Data, session: UnlockedSession, approval: OperationApproval) throws(CustodyError) -> LoadedCustodyHandle {
-        guard CustodyPublicBinding.hasExpectedPublicKeyShape(expectedPublicKeyRaw, role: reference.role, tier: reference.tier) else {
-            throw .invalidPublicKey(reference.role)
-        }
-        let store = rows(reference.tier, reference.role)
-        let blob: Data?
-        do { blob = try store.read(account: reference.handleSetIdentifier) } catch { throw .storage("read failed") }
-        guard let blob else { throw .privateHandleMissing(reference.role) }
+    /// Reconstructs one key from its blob under the operation's biometric
+    /// approval, and refuses it unless the enclave key's own public key is the
+    /// one the caller expects. Blocking.
+    public func loadHandle(
+        role: CustodyRole,
+        tier: CustodyTier,
+        blob: Data,
+        expectedPublicKey: Data,
+        approval: OperationApproval
+    ) throws(CustodyError) -> LoadedCustodyHandle {
+        guard approval.kind == .biometrics else { throw .approvalKindMismatch }
+        guard tier.acceptsPublicKey(expectedPublicKey, role: role) else { throw .invalidPublicKey(role) }
+        let type = tier.keyType(for: role)
         let key: any EnclaveCustodyKey
         do {
-            key = try reconstruct(reference.keyType, blob: blob, session: session, context: approval.context)
+            if type.policy.requiresCredential {
+                key = try approval.session.withIdentityCredential { credential in
+                    try enclave.custodyKey(type: type, from: blob, credential: credential, context: approval.context)
+                }
+            } else {
+                key = try enclave.credentialFreeCustodyKey(type: type, from: blob, context: approval.context)
+            }
         } catch {
-            throw CustodyError.fromEnclave(error, role: reference.role)
+            throw CustodyError.fromEnclave(error, role: role)
         }
-        guard key.publicKeyRaw == expectedPublicKeyRaw else { throw .handlePublicKeyBindingMismatch(reference.role) }
-        return LoadedCustodyHandle(binding: try CustodyPublicBinding(reference: reference, publicKeyRaw: expectedPublicKeyRaw), key: key)
+        guard key.publicKeyRaw == expectedPublicKey else { throw .handlePublicKeyBindingMismatch(role) }
+        return LoadedCustodyHandle(tier: tier, role: role, publicKey: expectedPublicKey, key: key)
     }
 
-    /// Finds the one pair whose advertised public keys match, without any prompt.
-    public func locatePair(tier: CustodyTier, signingPublicKeyRaw: Data, keyAgreementPublicKeyRaw: Data) throws(CustodyError) -> CustodyHandlePair {
-        guard CustodyPublicBinding.hasExpectedPublicKeyShape(signingPublicKeyRaw, role: .signing, tier: tier) else { throw .invalidPublicKey(.signing) }
-        guard CustodyPublicBinding.hasExpectedPublicKeyShape(keyAgreementPublicKeyRaw, role: .keyAgreement, tier: tier) else { throw .invalidPublicKey(.keyAgreement) }
-        var matches: [CustodyHandlePair] = []
-        let groups = Dictionary(grouping: try inventory(tiers: [tier]).bindings, by: \.reference.handleSetIdentifier)
-        for group in groups.values {
-            let signing = group.first { $0.role == .signing }
-            let keyAgreement = group.first { $0.role == .keyAgreement }
-            switch (signing, keyAgreement) {
-            case (.some(let s), .some(let k)):
-                switch (s.publicKeyRaw == signingPublicKeyRaw, k.publicKeyRaw == keyAgreementPublicKeyRaw) {
-                case (true, true): matches.append(try CustodyHandlePair(signing: s, keyAgreement: k))
-                case (true, false): throw .handlePublicKeyBindingMismatch(.keyAgreement)
-                case (false, true): throw .handlePublicKeyBindingMismatch(.signing)
-                case (false, false): continue
-                }
-            case (.some(let s), nil) where s.publicKeyRaw == signingPublicKeyRaw: throw .partialHandlePair
-            case (nil, .some(let k)) where k.publicKeyRaw == keyAgreementPublicKeyRaw: throw .partialHandlePair
-            default: continue
-            }
-        }
-        guard !matches.isEmpty else { throw .privateHandleMissing(.signing) }
-        guard matches.count == 1 else { throw .ambiguousPrivateHandle(.signing) }
-        return matches[0]
-    }
-
-    /// Every row's binding across the given tiers, no prompt, plus how many
-    /// rows no longer decode to a valid binding.
-    public func inventory(tiers: [CustodyTier] = CustodyTier.allCases) throws(CustodyError) -> CustodyInventory {
-        var bindings: [CustodyPublicBinding] = []
-        var malformed = 0
-        for tier in tiers {
-            for role in CustodyRole.allCases {
-                let accounts: [(account: String, attribute: Data?)]
-                do { accounts = try rows(tier, role).accounts() } catch { throw .storage("list failed") }
-                for (account, attribute) in accounts {
-                    guard let attribute,
-                          let reference = try? CustodyHandleReference(handleSetIdentifier: account, role: role, tier: tier),
-                          let binding = try? CustodyPublicBinding(reference: reference, publicKeyRaw: attribute) else {
-                        malformed += 1
-                        continue
-                    }
-                    bindings.append(binding)
-                }
-            }
-        }
-        return CustodyInventory(bindings: bindings, malformedRowCount: malformed)
-    }
-
-    public func deletePair(_ pair: CustodyHandlePair) throws(CustodyError) {
-        try delete(pair.references)
-    }
-
-    /// Removes every custody row of every tier and role. Part of Reset All Local Data.
-    public func deleteAll() throws(CustodyError) {
-        for tier in CustodyTier.allCases {
-            for role in CustodyRole.allCases {
-                let store = rows(tier, role)
-                do {
-                    for (account, _) in try store.accounts() { try store.delete(account: account) }
-                } catch {
-                    throw .cleanupOrRollbackFailed
-                }
-            }
-        }
-    }
-
-    private func create(_ reference: CustodyHandleReference, session: UnlockedSession, context: LAContext) throws(CustodyError) -> LoadedCustodyHandle {
-        let store = rows(reference.tier, reference.role)
-        do {
-            guard try store.read(account: reference.handleSetIdentifier) == nil else { throw CustodyError.ambiguousPrivateHandle(reference.role) }
-        } catch let error as CustodyError {
-            throw error
-        } catch {
-            throw .storage("read failed")
-        }
+    private func create(tier: CustodyTier, role: CustodyRole, approval: OperationApproval) throws(CustodyError) -> LoadedCustodyHandle {
+        let type = tier.keyType(for: role)
         let key: any EnclaveCustodyKey
         do {
-            let type = reference.keyType
-            key = type.policy.requiresCredential
-                ? try session.withIdentityCredential { credential in try enclave.makeCustodyKey(type: type, credential: credential, context: context) }
-                : try enclave.makeCredentialFreeCustodyKey(type: type, context: context)
+            if type.policy.requiresCredential {
+                key = try approval.session.withIdentityCredential { credential in
+                    try enclave.makeCustodyKey(type: type, credential: credential, context: approval.context)
+                }
+            } else {
+                key = try enclave.makeCredentialFreeCustodyKey(type: type, context: approval.context)
+            }
         } catch {
-            throw CustodyError.fromEnclave(error, role: reference.role)
+            throw CustodyError.fromEnclave(error, role: role)
         }
-        let binding = try CustodyPublicBinding(reference: reference, publicKeyRaw: key.publicKeyRaw)
-        do { try store.write(account: reference.handleSetIdentifier, data: key.dataRepresentation, attribute: key.publicKeyRaw) } catch { throw .storage("write failed") }
-        return LoadedCustodyHandle(binding: binding, key: key)
-    }
-
-    private func reconstruct(_ type: CustodyKeyType, blob: Data, session: UnlockedSession, context: LAContext) throws -> any EnclaveCustodyKey {
-        if type.policy.requiresCredential {
-            try session.withIdentityCredential { credential in try enclave.custodyKey(type: type, from: blob, credential: credential, context: context) }
-        } else {
-            try enclave.credentialFreeCustodyKey(type: type, from: blob, context: context)
-        }
-    }
-
-    private func delete(_ references: [CustodyHandleReference]) throws(CustodyError) {
-        for reference in references {
-            do { try rows(reference.tier, reference.role).delete(account: reference.handleSetIdentifier) } catch { throw .storage("delete failed") }
-        }
+        guard tier.acceptsPublicKey(key.publicKeyRaw, role: role) else { throw .invalidPublicKey(role) }
+        return LoadedCustodyHandle(tier: tier, role: role, publicKey: key.publicKeyRaw, key: key)
     }
 }

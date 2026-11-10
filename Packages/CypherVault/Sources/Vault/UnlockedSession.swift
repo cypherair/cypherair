@@ -12,8 +12,8 @@ public final class UnlockedSession: @unchecked Sendable {
         var identityCredential: SensitiveKeyBox
     }
 
-    public let identityWrappingKeyBlob: Data
-    public let identityWrappingPublicKeyX963: Data
+    package let identityWrappingKeyBlob: Data
+    package let identityWrappingPublicKeyX963: Data
     private let enclave: any Enclave
     private let authenticator: any Authenticator
     private let values: OSAllocatedUnfairLock<Values?>
@@ -44,7 +44,7 @@ public final class UnlockedSession: @unchecked Sendable {
     }
 
     /// Runs `body` with the identity credential, for enclave keys the stores own.
-    public func withIdentityCredential<R>(_ body: (borrowing SensitiveBuffer) throws -> R) throws -> R {
+    package func withIdentityCredential<R>(_ body: (borrowing SensitiveBuffer) throws -> R) throws -> R {
         guard let box = values.withLock({ $0?.identityCredential }) else { throw VaultError.locked }
         return try body(box.buffer)
     }
@@ -70,11 +70,11 @@ public final class UnlockedSession: @unchecked Sendable {
             throw error
         }
         context.interactionNotAllowed = true
-        return OperationApproval(kind: kind, context: context)
+        return OperationApproval(kind: kind, context: context, session: self)
     }
 
     /// Seals `plaintext` against the identity wrapping key. Pure software, no prompt.
-    public func sealForIdentity(
+    package func sealForIdentity(
         plaintext: borrowing SensitiveBuffer,
         kind: SealedPayloadKind,
         associatedData: Data
@@ -93,6 +93,13 @@ public final class UnlockedSession: @unchecked Sendable {
         }
     }
 
+    /// Why an identity envelope did not open: it is not one this session's
+    /// identity wrapping key opens, or the vault failed.
+    package enum EnvelopeOpenError: Error {
+        case doesNotOpen
+        case vault(VaultError)
+    }
+
     /// Opens an identity envelope: reconstructs the identity wrapping key with
     /// the approval's context and the identity credential, runs the agreement in
     /// the enclave, then opens in software. Blocking; call off the main actor.
@@ -100,8 +107,8 @@ public final class UnlockedSession: @unchecked Sendable {
         _ envelope: EnclaveSealedEnvelope,
         kind: SealedPayloadKind,
         approval: OperationApproval
-    ) throws(VaultError) -> SensitiveBuffer {
-        guard envelope.sealingKeyBlob == identityWrappingKeyBlob else { throw .sealedRootCorrupt }
+    ) throws(EnvelopeOpenError) -> SensitiveBuffer {
+        guard envelope.sealingKeyBlob == identityWrappingKeyBlob else { throw .doesNotOpen }
         let shared: SharedSecret
         do {
             shared = try withIdentityCredential { credential in
@@ -109,14 +116,14 @@ public final class UnlockedSession: @unchecked Sendable {
                 return try key.sharedSecret(withEphemeralPublicKeyX963: envelope.ephemeralPublicKeyX963)
             }
         } catch let error as VaultError {
-            throw error
+            throw .vault(error)
         } catch {
-            throw VaultError.fromEnclaveOperation(error)
+            throw .vault(VaultError.fromEnclaveOperation(error))
         }
         do {
             return try EnclaveSealedEnvelopeCodec.open(envelope, sharedSecret: shared, expectedKind: kind)
         } catch {
-            throw .internalFailure("identity envelope did not open")
+            throw .doesNotOpen
         }
     }
 

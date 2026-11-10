@@ -11,7 +11,6 @@ public enum StoreError: Error, Equatable, Sendable {
     /// The file was written by another version of the app, under another
     /// schema version. It was not decrypted.
     case otherVersion
-    case invalidFingerprint
     case io(String)
     case vault(VaultError)
     case internalFailure(String)

@@ -5,7 +5,7 @@ import Foundation
 /// data, so a blob opens only as the kind it was sealed as.
 public enum SealedPayloadKind: String, Codable, Equatable, Sendable, CaseIterable {
     case rootSecret = "root-secret"
-    case secretCertificate = "secret-certificate"
+    case secretKeys = "secret-keys"
     case splitCustodyComponent = "split-custody-component"
 }
 

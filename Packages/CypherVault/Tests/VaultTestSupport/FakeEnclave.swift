@@ -55,9 +55,8 @@ public extension InMemoryRowStore {
     /// Flips one byte in the middle of the row's value.
     func corrupt(account: String) {
         guard var data = try? read(account: account), !data.isEmpty else { return }
-        let attribute = (try? accounts())?.first { $0.account == account }?.attribute
         data[data.count / 2] ^= 0xFF
-        try? write(account: account, data: data, attribute: attribute)
+        try? write(account: account, data: data)
     }
 }
 

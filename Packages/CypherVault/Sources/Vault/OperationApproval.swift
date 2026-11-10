@@ -14,15 +14,20 @@ public enum ApprovalKind: Sendable {
 /// enclave calls that consume it can never show a sheet of their own. Ending
 /// the approval, or releasing it, invalidates the context.
 ///
+/// The approval belongs to the session that gave it, and its consumers take
+/// the identity credential from that session.
+///
 /// `@unchecked Sendable` carries the context off the caller's actor to the one
 /// operation that consumes it; the operation uses it on one thread.
 public final class OperationApproval: @unchecked Sendable {
     public let kind: ApprovalKind
     package let context: LAContext
+    package let session: UnlockedSession
 
-    init(kind: ApprovalKind, context: LAContext) {
+    init(kind: ApprovalKind, context: LAContext, session: UnlockedSession) {
         self.kind = kind
         self.context = context
+        self.session = session
     }
 
     public func end() {
