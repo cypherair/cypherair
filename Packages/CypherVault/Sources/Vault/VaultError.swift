@@ -16,6 +16,8 @@ public enum VaultError: Error, Equatable, Sendable {
     case authenticationUnavailable
     /// The session was relocked; its keys are gone.
     case locked
+    /// The approval was used after its operation ended it.
+    case approvalEnded
     case storage(String)
     case internalFailure(String)
 

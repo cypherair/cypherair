@@ -5,21 +5,23 @@ let swiftSettings: [SwiftSetting] = [
     .swiftLanguageMode(.v6),
     .enableUpcomingFeature("InferIsolatedConformances"),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
 ]
 
 let package = Package(
     name: "CypherVault",
-    platforms: [.iOS(.v27), .macOS(.v27), .visionOS(.v27)],
+    platforms: [.iOS("27.2"), .macOS("27.2"), .visionOS("27.2")],
     products: [
         .library(name: "Sealing", targets: ["Sealing"]),
         .library(name: "Vault", targets: ["Vault"]),
         .library(name: "Stores", targets: ["Stores"]),
+        .library(name: "VaultTestSupport", targets: ["VaultTestSupport"]),
     ],
     targets: [
         .target(name: "Sealing", swiftSettings: swiftSettings),
         .target(name: "Vault", dependencies: ["Sealing"], swiftSettings: swiftSettings),
         .target(name: "Stores", dependencies: ["Vault", "Sealing"], swiftSettings: swiftSettings),
-        .target(name: "VaultTestSupport", dependencies: ["Vault", "Sealing"], path: "Tests/VaultTestSupport", swiftSettings: swiftSettings),
+        .target(name: "VaultTestSupport", dependencies: ["Vault", "Sealing", "Stores"], path: "Tests/VaultTestSupport", swiftSettings: swiftSettings),
         .testTarget(name: "SealingTests", dependencies: ["Sealing"], swiftSettings: swiftSettings),
         .testTarget(name: "VaultTests", dependencies: ["Vault", "Sealing", "VaultTestSupport"], swiftSettings: swiftSettings),
         .testTarget(name: "StoresTests", dependencies: ["Stores", "Vault", "Sealing", "VaultTestSupport"], swiftSettings: swiftSettings),

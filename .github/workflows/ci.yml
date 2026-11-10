@@ -94,6 +94,27 @@ jobs:
             -destination 'generic/platform=${{ matrix.platform }}' \
             CODE_SIGNING_ALLOWED=NO
 
+  core:
+    name: Test CypherCore
+    needs: engine-library
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ needs.engine-library.outputs.key }}
+          fail-on-cache-miss: true
+          path: |
+            Packages/CypherEngine/CypherEngineFFI.xcframework
+            Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
+      - name: Check the layers
+        run: scripts/check-layers.sh
+      - name: Test
+        run: swift test --package-path Packages/CypherCore
+
   vault:
     name: Test CypherVault
     runs-on: xcode-27

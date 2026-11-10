@@ -21,7 +21,9 @@ final class VaultTests: XCTestCase {
     }
 
     private func bootstrap(_ passphrase: String = "correct horse") async throws -> UnlockedSession {
-        try await vault.bootstrap(passphrase: .text(passphrase), reason: "test")
+        let new = try await vault.bootstrap(passphrase: .text(passphrase), reason: "test")
+        try new.store()
+        return new.session
     }
 
     private func unlock(_ passphrase: String) async throws -> UnlockedSession {
@@ -77,7 +79,7 @@ final class VaultTests: XCTestCase {
         let before = try await bootstrap("old one")
         let contactsKey = keyBytes(try before.domainKey("contacts"))
         let secret = SensitiveBuffer.text("portable key")
-        let envelope = try before.sealForIdentity(plaintext: secret, kind: .secretCertificate, associatedData: Data("fp".utf8))
+        let envelope = try before.sealForIdentity(plaintext: secret, kind: .secretKeys, associatedData: Data("fp".utf8))
 
         try await vault.changePassphrase(current: .text("old one"), new: .text("new one"), reason: "test")
 
@@ -90,7 +92,7 @@ final class VaultTests: XCTestCase {
         let after = try await unlock("new one")
         XCTAssertEqual(keyBytes(try after.domainKey("contacts")), contactsKey, "root secret must survive a passphrase change")
         XCTAssertEqual(after.identityWrappingKeyBlob, before.identityWrappingKeyBlob, "identity keys never change with the passphrase")
-        let opened = try after.openIdentityEnvelope(envelope, kind: .secretCertificate, context: after.operationContext())
+        let opened = try after.openIdentityEnvelope(envelope, kind: .secretKeys, approval: try await after.approve(.presence, reason: "test"))
         XCTAssertTrue(opened.contentEquals(.text("portable key")))
         XCTAssertEqual(enclave.createdPolicies.count, 3, "a passphrase change creates exactly one new key")
     }
@@ -114,18 +116,78 @@ final class VaultTests: XCTestCase {
         XCTAssertThrowsError(try session.domainKey("contacts")) { XCTAssertEqual($0 as? VaultError, .locked) }
         XCTAssertThrowsError(try session.withIdentityCredential { _ in 0 }) { XCTAssertEqual($0 as? VaultError, .locked) }
         let secret = SensitiveBuffer.text("x")
-        XCTAssertThrowsError(try session.sealForIdentity(plaintext: secret, kind: .secretCertificate, associatedData: Data()))
+        XCTAssertThrowsError(try session.sealForIdentity(plaintext: secret, kind: .secretKeys, associatedData: Data()))
     }
 
     func test_identityEnvelope_needsTheIdentityCredential() async throws {
         let session = try await bootstrap()
         let secret = SensitiveBuffer.text("certificate")
-        let envelope = try session.sealForIdentity(plaintext: secret, kind: .secretCertificate, associatedData: Data("fp".utf8))
-        let opened = try session.openIdentityEnvelope(envelope, kind: .secretCertificate, context: session.operationContext())
+        let envelope = try session.sealForIdentity(plaintext: secret, kind: .secretKeys, associatedData: Data("fp".utf8))
+        let opened = try session.openIdentityEnvelope(envelope, kind: .secretKeys, approval: try await session.approve(.presence, reason: "test"))
         XCTAssertTrue(opened.contentEquals(.text("certificate")))
         // The fake enclave refuses the identity key without the exact credential,
         // exactly as the hardware does; a foreign credential must not open it.
         XCTAssertThrowsError(try enclave.keyAgreementKey(from: session.identityWrappingKeyBlob, credential: .text("not it"), context: LAContext()))
+    }
+
+    func test_approval_asksOnceForItsKind_andThenBarsInteraction() async throws {
+        let session = try await bootstrap()
+        let before = (all: authenticator.prompts, biometric: authenticator.biometricPrompts)
+
+        let presence = try await session.approve(.presence, reason: "test")
+        XCTAssertEqual(authenticator.prompts, before.all + 1)
+        XCTAssertEqual(authenticator.biometricPrompts, before.biometric)
+        XCTAssertEqual(presence.kind, .presence)
+        XCTAssertTrue(presence.context.interactionNotAllowed)
+
+        let biometrics = try await session.approve(.biometrics, reason: "test")
+        XCTAssertEqual(authenticator.prompts, before.all + 2)
+        XCTAssertEqual(authenticator.biometricPrompts, before.biometric + 1)
+        XCTAssertEqual(biometrics.kind, .biometrics)
+        XCTAssertTrue(biometrics.context.interactionNotAllowed)
+    }
+
+    func test_failedApproval_isReportedAsItsOwnCase() async throws {
+        let session = try await bootstrap()
+        for failure in [VaultError.authenticationCancelled, .authenticationFailed, .authenticationUnavailable] {
+            authenticator.failure = failure
+            do {
+                _ = try await session.approve(.presence, reason: "test")
+                XCTFail("approval succeeded while the authenticator failed")
+            } catch {
+                XCTAssertEqual(error, failure)
+            }
+        }
+    }
+
+    func test_lockedSession_givesNoApproval_andShowsNoPrompt() async throws {
+        let session = try await bootstrap()
+        session.relock()
+        let prompts = authenticator.prompts
+        do {
+            _ = try await session.approve(.presence, reason: "test")
+            XCTFail("a locked session gave an approval")
+        } catch {
+            XCTAssertEqual(error, .locked)
+        }
+        XCTAssertEqual(authenticator.prompts, prompts)
+    }
+
+    func test_inMemoryKeychain_deleteEverything_leavesNoRowOfAnyService() throws {
+        let keychain = InMemoryKeychain()
+        try keychain.rows(service: Vault.sealedRootService).write(account: Vault.sealedRootAccount, data: Data([1]))
+        try keychain.rows(service: "com.cypherair.vault.portable-key").write(account: "a", data: Data([2]))
+        try keychain.rows(service: "left.by.an.earlier.version").write(account: "b", data: Data([3]))
+        try keychain.deleteEverything()
+        XCTAssertTrue(keychain.contents.isEmpty)
+    }
+
+    func test_sandboxSession_writesNoRow_andOpensWhatItSeals() async throws {
+        let session = try UnlockedSession.sandbox(enclave: SoftwareEnclave())
+        XCTAssertFalse(try vault.sealedRootExists())
+        let envelope = try session.sealForIdentity(plaintext: .text("secret"), kind: .secretKeys, associatedData: Data())
+        let approval = try await session.approve(.presence, reason: "test")
+        XCTAssertTrue(try session.openIdentityEnvelope(envelope, kind: .secretKeys, approval: approval).contentEquals(.text("secret")))
     }
 
     func test_damagedOrMissingRoot_isReportedAsSuch() async throws {
@@ -143,6 +205,15 @@ final class VaultTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? VaultError, .sealedRootCorrupt)
         }
+    }
+
+    func test_bootstrap_storesNothing_untilTheVaultIsStored() async throws {
+        let new = try await vault.bootstrap(passphrase: .text("correct horse"), reason: "test")
+        XCTAssertFalse(try vault.sealedRootExists())
+        XCTAssertFalse(new.session.isLocked)
+        try new.store()
+        XCTAssertTrue(try vault.sealedRootExists())
+        XCTAssertThrowsError(try new.store()) { XCTAssertEqual($0 as? VaultError, .internalFailure("a sealed root already exists")) }
     }
 
     func test_reset_deletesTheRoot() async throws {

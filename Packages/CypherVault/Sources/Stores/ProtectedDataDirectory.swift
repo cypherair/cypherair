@@ -1,9 +1,10 @@
 import Foundation
 
 /// The directory every domain file lives in. Created with complete file
-/// protection, verified per volume; storage outside the app container is
-/// never a fallback.
-public struct ProtectedDataDirectory: Sendable {
+/// protection, verified per volume, and excluded from device backups: only the
+/// vault that wrote a file can open it, so a copy could only put old state
+/// back. Storage outside the app container is never a fallback.
+public struct ProtectedDataDirectory: DomainFiles {
     public let url: URL
 
     public init(url: URL) throws(StoreError) {
@@ -24,6 +25,15 @@ public struct ProtectedDataDirectory: Sendable {
             throw .fileProtectionVerificationFailed
         }
         guard supported else { throw .fileProtectionUnsupported }
+        var excluded = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do { try excluded.setResourceValues(values) } catch { throw .io("backup exclusion failed") }
+        var readback = url
+        readback.removeAllCachedResourceValues()
+        guard (try? readback.resourceValues(forKeys: [.isExcludedFromBackupKey]))?.isExcludedFromBackup == true else {
+            throw .io("backup exclusion did not stick")
+        }
     }
 
     /// The app's Application Support container, `subdirectory` inside it.
@@ -34,17 +44,52 @@ public struct ProtectedDataDirectory: Sendable {
         return try ProtectedDataDirectory(url: base.appending(path: subdirectory, directoryHint: .isDirectory))
     }
 
-    func fileURL(domain: String) -> URL {
-        url.appending(path: "\(domain).sealed", directoryHint: .notDirectory)
+    func fileURL(_ name: String) -> URL {
+        url.appending(path: "\(name).sealed", directoryHint: .notDirectory)
     }
 
-    func temporaryURL(domain: String) -> URL {
-        url.appending(path: "\(domain).\(UUID().uuidString).tmp", directoryHint: .notDirectory)
+    func temporaryURL(_ name: String) -> URL {
+        url.appending(path: "\(name).\(UUID().uuidString).tmp", directoryHint: .notDirectory)
+    }
+
+    /// The file's bytes, or nil when there is no file. Any other failure to
+    /// read is an error, never "missing".
+    public func read(_ name: String) throws(StoreError) -> Data? {
+        do {
+            return try Data(contentsOf: fileURL(name))
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return nil
+        } catch {
+            throw .io("read failed")
+        }
+    }
+
+    /// Writes the bytes to a temporary file under complete protection and
+    /// renames it over the old file. A crash leaves at most a temporary file,
+    /// which the sweep removes.
+    public func replace(_ name: String, with data: Data) throws(StoreError) {
+        let temporary = temporaryURL(name)
+        do {
+            try data.write(to: temporary, options: [.atomic, .completeFileProtection])
+        } catch {
+            throw .io("temporary write failed")
+        }
+        do {
+            try Self.protect(temporary)
+            _ = try FileManager.default.replaceItemAt(fileURL(name), withItemAt: temporary)
+            try Self.protect(fileURL(name))
+        } catch let error as StoreError {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw .io("replace failed")
+        }
     }
 
     /// Removes every file in the directory: the domain files and whatever an
     /// interrupted save left behind.
-    public func eraseContents() throws(StoreError) {
+    public func eraseAll() throws(StoreError) {
         let names: [String]
         do { names = try FileManager.default.contentsOfDirectory(atPath: url.path) } catch { throw .io("directory listing failed") }
         for name in names {

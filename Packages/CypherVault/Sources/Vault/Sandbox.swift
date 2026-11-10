@@ -181,21 +181,55 @@ struct SoftwareCustodyKey: EnclaveCustodyKey {
 
 /// Rows held in a dictionary. Nothing reaches the Keychain.
 public final class InMemoryRowStore: RowStore, @unchecked Sendable {
-    private let rows = OSAllocatedUnfairLock<[String: (data: Data, attribute: Data?)]>(initialState: [:])
+    private let rows = OSAllocatedUnfairLock<[String: Data]>(initialState: [:])
 
     public init() {}
 
-    public func read(account: String) throws(VaultError) -> Data? { rows.withLock { $0[account]?.data } }
+    public func read(account: String) throws(VaultError) -> Data? { rows.withLock { $0[account] } }
 
-    public func write(account: String, data: Data, attribute: Data?) throws(VaultError) { rows.withLock { $0[account] = (data, attribute) } }
+    public func write(account: String, data: Data) throws(VaultError) { rows.withLock { $0[account] = data } }
 
     public func delete(account: String) throws(VaultError) { rows.withLock { $0[account] = nil } }
 
-    public func accounts() throws(VaultError) -> [(account: String, attribute: Data?)] {
-        rows.withLock { $0.map { ($0.key, $0.value.attribute) }.sorted { $0.0 < $1.0 } }
+    /// Every row's name and value, sorted by name.
+    public var contents: [(account: String, value: Data)] {
+        rows.withLock { $0.map { ($0.key, $0.value) }.sorted { $0.account < $1.account } }
     }
 
     public func removeAll() { rows.withLock { $0.removeAll() } }
+}
+
+/// A Keychain held in memory: one `InMemoryRowStore` per service.
+public final class InMemoryKeychain: Keychain, @unchecked Sendable {
+    private let services = OSAllocatedUnfairLock<[String: InMemoryRowStore]>(initialState: [:])
+
+    public init() {}
+
+    public func rows(service: String) -> any RowStore {
+        store(service: service)
+    }
+
+    public func store(service: String) -> InMemoryRowStore {
+        services.withLock { services in
+            if let existing = services[service] { return existing }
+            let created = InMemoryRowStore()
+            services[service] = created
+            return created
+        }
+    }
+
+    public func deleteEverything() throws(VaultError) {
+        for store in services.withLock({ Array($0.values) }) {
+            store.removeAll()
+        }
+    }
+
+    /// Every row of every service, sorted by service and name.
+    public var contents: [(service: String, account: String, value: Data)] {
+        services.withLock { Array($0) }
+            .flatMap { service, store in store.contents.map { (service, $0.account, $0.value) } }
+            .sorted { ($0.service, $0.account) < ($1.service, $1.account) }
+    }
 }
 
 /// One SHA-256 over the passphrase and salt: no memory-hard work, for a vault
@@ -209,6 +243,28 @@ public struct SandboxStretcher: PassphraseStretcher {
         hasher.update(data: salt)
         let digest = Data(hasher.finalize())
         return SensitiveBuffer(count: digest.count) { $0.copyBytes(from: digest) }
+    }
+}
+
+extension UnlockedSession {
+    /// A session over a fresh random root that no sealed root holds: a software
+    /// identity key, no prompt, nothing stored. For previews, never for user data.
+    public static func sandbox(enclave: SoftwareEnclave) throws(VaultError) -> UnlockedSession {
+        let root = try Vault.randomSecret(count: RootDerivations.rootSecretLength)
+        let identityCredential = RootDerivations.identityCredential(rootSecret: root)
+        let identityKey: any EnclaveKeyAgreementKey
+        do {
+            identityKey = try enclave.makeKeyAgreementKey(policy: .presenceAndPassword, credential: identityCredential, context: LAContext())
+        } catch {
+            throw .internalFailure("sandbox identity key failed")
+        }
+        return UnlockedSession(
+            rootSecret: root,
+            identityWrappingKeyBlob: identityKey.dataRepresentation,
+            identityWrappingPublicKeyX963: identityKey.publicKeyX963,
+            enclave: enclave,
+            authenticator: NoPromptAuthenticator()
+        )
     }
 }
 
