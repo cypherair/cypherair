@@ -19,7 +19,6 @@
 ## 3. Documented exceptions and prohibitions
 
 - **UserDefaults holds nothing security-relevant.** Everything the unlock prompt needs is read from the sealed root's public metadata before any prompt; protected-after-unlock settings must never grow pre-unlock shadow copies.
-- **Self-test reports** are held in process memory, export-only, never persisted; saving one transits the same erased `tmp/` staging every export uses.
 - **Files exported to user-selected locations** are the custody boundary: past export, CypherAir makes no protection claim.
 - **Contacts runtime-only state is a prohibition, not a location:** the search index, screen search/filter values, tag filters, recipient selection, and pending route state must never become persisted.
 - **Temporary artifacts** live under verified-file-protection `tmp/` paths and are swept **once per launch, and never at termination**; the sweep erases only what the running session does not own.
