@@ -46,14 +46,16 @@ Every operation that needs a private key takes a `PrivateKey`. No function has a
 
 | Case | Error |
 |---|---|
-| A bound on hostile input fires, at any stage, also after a key was unwrapped | `LimitsExceeded` |
+| A bound on hostile input fires. In the old container (SEIPDv1) this line applies only before a session key is unwrapped | `LimitsExceeded` |
 | The user cancels at the device. The device refuses or fails | `Cancelled`. `DeviceNotAuthenticated` or `DeviceFailed` |
 | The input does not parse | `Malformed` |
 | The container is one the engine does not open: no authentication (the old tag-9 packet), the withdrawn tag-20 packet, an unknown version, or a cipher or mode that the engine refuses | `Unsupported` |
 | A recipient packet names this key and unwraps to a cipher that the engine refuses. Only the old container keeps its cipher there | `Unsupported` |
 | A recipient packet names this key and does not unwrap | `Tampered` |
 | No recipient packet names this key, and no hidden one unwraps | `NoMatchingKey` |
-| A session key was unwrapped, and the container then fails | `Tampered` |
+| A session key was unwrapped, and the container then fails. In the old container this includes a bound that fires | `Tampered` |
+
+The old container proves that it is genuine only at its end. Until then its content may have been changed. So after the unwrap, nothing that the content decides is reported: every failure there is `Tampered`.
 
 Two accepted limits, both because an RSA unwrap has only a 16-bit check. For a hidden-recipient RSA message meant for someone else, about 1 try in 65,536 is reported as `Tampered` instead of `NoMatchingKey`. And for an RSA packet that names this key, `Unsupported` shows that the unwrap succeeded, which `Tampered` would not show.
 
@@ -64,7 +66,7 @@ Conventions:
 - Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary. A secret argument is `&[u8]`: UniFFI passes it without a copy.
 - Lists of certificates are in the caller's order, and results point into them by position.
 - A signer is *named* by its certificate. A signature is *made* with the certificate's signing key, which is a subkey where there is one.
-- The engine has no state, no logging and no expiry policy of its own. For the times inside a key it reads no clock and draws no random number: the caller gives them (section 2.5).
+- The engine has no state, no logging and no expiry policy of its own. One exception reaches the process: on its first call the engine wraps the panic hook, so that a panic it catches writes nothing to standard error (see Panics). For the times inside a key it reads no clock and draws no random number: the caller gives them (section 2.5).
 
 ```rust
 enum KeyShape {               // the certificate shapes that this app makes
@@ -216,14 +218,16 @@ Notes:
 - **File functions** write beside `output` and rename on success. On a failure or a cancel they erase what they wrote. `erase_file` is the one erase policy, used by the engine and the core.
 - **`DeviceKeyError`** is a rich UniFFI error, not a flat one, and it converts from UniFFI's unexpected-callback error to `Failed`. Without that, an unexpected Swift error becomes a Rust panic.
 - **A wrong device key.** `PrivateKey::device` cannot see whether the device key belongs to the certificate. It is caught elsewhere: the vault compares the public keys when it loads the handle; every signature is verified before release; a wrong shared secret cannot unwrap a session key.
-- **Panics.** The crate keeps `panic = unwind`, so UniFFI can catch a panic inside a dependency. The core maps one to `internalFailure`. A deliberate panic in test-only code pins it.
+- **Panics.** Every exported function runs its body through `error::contained`, which turns a panic anywhere below it into `EngineError::Internal`. Nothing checks that a new exported function does this, so each must. `lib.rs` refuses to build with `panic = "abort"`, and UniFFI's own catch remains as a second net. On its first call, `contained` wraps the process's panic hook: a caught panic writes nothing to standard error, a panic elsewhere still does, and one that cannot unwind aborts without a message. The core maps `Internal` to `internalFailure`. A deliberate panic in test-only code pins it.
 
 ### 2.2 Modules
 
 ```
 engine/src/
   lib.rs        UniFFI setup, the exported types, the one Sequoia policy
-  error.rs      EngineError; the only place where a Sequoia error becomes one
+  error.rs      EngineError, the containment of panics, and the classification of a failed
+                decryption. Elsewhere a Sequoia error is replaced by the error its place
+                implies; no code reads an error's text
   key/          the handle (the only code that branches on custody), DeviceKey, inspect,
                 generate, expiry, revocation and update, backup
   message/      recipients and format, encrypt, decrypt, sign and verify, verdict, header, files
@@ -542,7 +546,7 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 |---|---|---|
 | E1 | When authentication fails, no plaintext is returned | #1046 |
 | E2 | A failed decryption gives exactly the error of the table in section 2. A tampered container is `Tampered`, in both containers, in the first block and in a later one. A recipient packet that names the key and does not unwrap is `Tampered`. A message for someone else is `NoMatchingKey`. The fixtures tamper where no bound can fire | #1046 |
-| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`, also after a key was unwrapped. A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
+| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`. In the new container this holds also after a key was unwrapped. In the old container that case is `Tampered` (section 2). A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
 | E4 | An outgoing message is never compressed, uses AES-256, and uses the new container only if every recipient supports it. The preview equals the message | #1046 |
 | E5 | The quantum-safe flag comes from the message. A cut-off message is an error | #1046 |
 | E6 | An expired or revoked recipient is refused, by position | #1046 |
@@ -596,13 +600,13 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 | Slice | Engine tests | Package tests | Device bench | Where |
 |---|---|---|---|---|
 | Mac, arm64 | Yes | Yes (`swift test`) | — | The Mac and CI |
-| Mac, arm64e | Yes, built with the patched compiler ¹ | Yes (`swift test --arch arm64e`) ² | Yes | The Mac. CI, if a hosted runner can run it |
+| Mac, arm64e | Not yet ¹ | Yes (`swift test --arch arm64e`) ² | Yes | The Mac. CI, if a hosted runner can run it |
 | iPhone, arm64e | — ³ | Yes, on a connected iPhone | Yes | The owner's iPhone |
 | iPhone simulator, Vision Pro simulator | — | Yes ⁴ | — | The Mac and CI |
 | Vision Pro, arm64 and arm64e | — | — | — | Built and linked only. There is no hardware; `CUSTODY.md` §7 accepts this |
 | iPhone, arm64 | — | — | — | Built and linked only ⁵ |
 
-¹ Not yet known: whether the Mac runs a Rust test binary built for arm64e. #1046 tries it and reports.
+¹ An arm64e Rust executable built by the patched compiler runs on the Mac, but a Rust test binary cannot be built for arm64e: the compiler's prebuilt libraries have `std` without `libtest`. Until the compiler adds `library/test`, this slice is covered only by `swift test --arch arm64e`, which the core's package tests (#1062) are the first to run.
 ² `swift test --arch arm64e` links the arm64e slice and passes on the Mac (#1045).
 ³ `cargo test` cannot run on an iPhone. The engine's iPhone slices are tested through the package tests and the bench.
 ⁴ The simulator slices link (#1045). The engine has not yet run on a simulator.
@@ -625,7 +629,7 @@ A few engine tests need 2 GiB of memory or large files. They sit behind a second
 
 - *Where it runs:* on the Mac, by the session that changed the engine. In CI, when the engine changed.
 - *Reuse.* The build compiles OpenSSL once per target. A new worktree starts with a copy of the main checkout's built library, through `.worktreeinclude`, which lists both output paths. If the build proves slow, CI can also publish its build for download; that is for #1052 to decide.
-- *A stale library is found by a machine.* The script stores a hash of the engine's source, its lock file, the compiler pin and itself beside the library. The app build compares that hash with the checkout first, and fails with the command that fixes it.
+- *A stale library is found by a machine.* The script stores beside the library a hash of the engine's sources and the bindings generator, its lock file, the package manifest (which states the deployment targets), the compiler pin and itself, and the list of slices it built. The app build compares that hash with the checkout first, checks that the library has the slice it builds, and fails with the command that fixes it. Xcode lets the check read only the files it declares, so the script writes the list of its inputs to `engine/inputs.xcfilelist`. A piece that adds a source file runs the script and commits the list; the check fails until it does.
 
 **Packaging.** This layout is shown to work on every platform and slice (#1045).
 
