@@ -9,7 +9,7 @@ The structure of CypherAir 2.0. Every piece of the 2.0 plan is built against thi
 | **App** | the Xcode app target | Screens, navigation, the lock surface, the privacy cover, texts, and small platform adapters (clipboard, file pickers) | Nothing |
 | **Core** | `Packages/CypherCore` | Keys, contacts, messages, settings, the lock, the only path to a private key, every stored shape | Observable objects, operations, one error type |
 | **Engine** | `engine/` (Rust), reached through `Packages/CypherEngine` | All OpenPGP | 28 functions, one key-handle object, two callbacks, one error type |
-| **Vault** | `Packages/CypherVault` (kept) | The sealed root, unlock, sealed files, the sealing of secrets, Secure Enclave keys | As today, with the changes in section 3 |
+| **Vault** | `Packages/CypherVault` (kept) | The sealed root, unlock, sealed files, the sealing of secrets, Secure Enclave keys | The interface in section 3 |
 
 The directions are one-way: App → Core → Engine and Vault. What enforces it:
 
@@ -424,6 +424,7 @@ public enum CoreError: Error, Sendable, Equatable {
 - **A `TemporaryFile`** is a file in the app's protected temporary folder, with the name to offer when saving. The name exists only in memory. Lock erases every one.
 - **`PromptTexts`** holds the sentences for the Face ID sheets. The app owns every text, so it hands them to the core once.
 - **Status is computed at unlock.** A key that expires while the app stays unlocked shows as valid until the next unlock. That is accepted: the engine refuses at use. No timer is added for it.
+- **The lists exist before the workspace.** Unlock reads the three files and computes the keys and the contacts from their certificates in one call off the main actor, with `Keys.list(of:)` and `Contacts.list(of:)`. Only then does it publish the phase. A damaged reading keeps a key list that is intact, and `Recovery.recoverableKeys` comes from it.
 - No `CoreError` case carries text, a fingerprint or a path. The app turns each case into one sentence.
 - A passphrase that the user chooses and that `Passphrase.problems` faults is refused with `passphraseTooWeak`, before any prompt. So the rule does not depend on a screen.
 
@@ -486,6 +487,7 @@ struct SettingsPayload {
 
 - Names, expiry dates, shapes and "revoked" are not stored. The engine computes them from the certificate at unlock, so they cannot disagree with it.
 - A store changes its value in memory only after the file was written. If saving fails, nothing changes and the caller gets an error.
+- Each file has one turn that outlives every session. A store holds it while it writes, and unlock and first run hold all three. So a write that began before a lock ends before the next unlock reads the file.
 - At unlock, a file that is missing, damaged or made by another version leads to the `damaged` phase, never to default values. Only keys from a key list that can be read can be backed up there.
 - A device that still holds the data of 1.x lands in the `damaged` phase, with its files named as made by another version. The app says so, and the only way on is a reset. Nothing of 1.x is read, and nothing is rescued.
 
@@ -497,32 +499,28 @@ struct SettingsPayload {
 - *The sealed files stay out of device backups.* Only the vault that wrote a copy could open it, so a copy in a backup could only serve to put old state back.
 - *What still shows:* that the three files exist, their size in steps of 16 KiB, when each last changed, when the vault was made, and when its passphrase last changed. The app cannot hide these times. For a key that the app made, they match no time inside it, because the key carries a stamp that lies a random amount before the real moment (section 2.5). Such a time says only that a key of the user was stamped within one window before it. A key made elsewhere keeps its own times and is outside this.
 
-**The changes to the vault package**
+**The vault interface the core uses**
 
-*1. The vault gives the approval.* As the package stands, its caller builds an authentication context and reaches into the vault's authenticator. The change:
+*1. One approval per operation.* `UnlockedSession.approve(_ kind:, reason:) async throws(VaultError) -> OperationApproval` evaluates a fresh context once: `.presence` for a portable key, with the device passcode as the fallback, or `.biometrics` for a device-bound key. This follows the constraint that the key already has.
 
-- `UnlockedSession` gets the authenticator when the vault creates it, and one new function: `approve(_ kind:, reason:) async throws(VaultError) -> OperationApproval`.
-- The kind is `.presence` for a portable key (the device passcode is the fallback) or `.biometrics` for a device-bound key. This follows the constraint that the key already has.
-- After a successful approval the context disallows interaction, so the Secure Enclave can never show a sheet of its own. The approval invalidates its context when the operation ends.
-- Five public calls take an `LAContext` today. After the changes, three public calls take the `OperationApproval`: the function that opens a sealed value (change 3), `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair`. `UnlockedSession.openIdentityEnvelope` takes it too and becomes visible to the package only. `UnlockedSession.operationContext` goes.
-- An approval holds the session that gave it and works only with that session. So the calls that take an approval take no session.
-- So the core never imports LocalAuthentication, also not for making a device-bound key.
+- After the approval the context disallows interaction, so the Secure Enclave never shows a sheet of its own. The approval invalidates its context when the operation ends.
+- Three public calls take the approval: `SealedSecret.open`, `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair`. An approval holds the session that gave it and works only with that session, so these calls take no session.
+- No public call of the vault takes an `LAContext`. So the core never imports LocalAuthentication, also not for making a device-bound key.
 
-*2. A file made by another version is reported as such,* apart from "damaged". The sealing layer already refuses such a file with an error of its own, and the store folds that error into "damaged". The change keeps the two apart.
+*2. A file made by another version is reported as such,* apart from "damaged". The sealing layer refuses another schema version before it decrypts anything, and `SealedDomain` reports it as `otherVersion`.
 
 *3. All key material lives in the sealed key list. The Keychain holds only the sealed root.*
 
-- `IdentityEnvelopeStore` and its rows go. In their place `Stores` has `SealedSecret` with three functions: `seal(_ secret:, kind:, session:) -> Data`, `check(_ sealed:, kind:, session:)` and `open(_ sealed:, kind:, approval:) -> SensitiveBuffer`. They serve the portable secrets and the classical halves. The core stores the sealed value in the key list.
+- `SealedSecret` in `Stores` has three functions: `seal(_ secret:, kind:, session:) -> Data`, `check(_ sealed:, kind:, session:)` and `open(_ sealed:, kind:, approval:) -> SensitiveBuffer`. They serve the portable secrets and the classical halves. The core stores the sealed value in the key list.
 - `check` never prompts. It decodes the value and checks its kind, and that it is sealed to this vault's identity wrapping key. Step 2 of the private-key path uses it, so a value from another vault fails before the prompt.
-- The authenticated data of such a value is a constant. The key list binds each value to its entry, and the engine refuses a secret that does not belong to the certificate.
-- The payload kind `secret-certificate` becomes `secret-keys`, because that is what it holds now.
-- `CustodyKeyStore` has no rows. `createPair(tier:approval:)` returns the two handles with their blobs. `loadHandle(role:tier:blob:expectedPublicKey:approval:)` rebuilds one key and still compares the Secure Enclave key's own public key with the expected one. The tier comes from the certificate's shape, and the role from the operation. A loaded handle keeps its role, its tier and that public key.
-- The shape checks that `CustodyPublicBinding` held live on `CustodyTier`: `acceptsPublicKey(_:role:)` is the length check of step 2, and `LoadedCustodyHandle.sharedSecret` checks the sender's point with the same code.
-- Gone with the rows: `CustodyHandleReference`, `CustodyPublicBinding`, `CustodyHandlePair`, `CustodyInventory`, `locatePair`, `inventory`, `deletePair`, `deleteAll`, the readable attribute of `RowStore`, and the error cases that exist only for rows (`invalidHandleSetIdentifier`, `ambiguousPrivateHandle`, `partialHandlePair`, `privateHandleMissing`, `cleanupOrRollbackFailed`).
+- The authenticated data of such a value is a constant. The key list binds each value to its entry, and the engine refuses a secret that does not belong to the certificate. The payload kind is `secret-keys`.
+- `CustodyKeyStore` has no rows. `createPair(tier:approval:)` returns the two handles with their blobs. `loadHandle(role:tier:blob:expectedPublicKey:approval:)` rebuilds one key and compares the Secure Enclave key's own public key with the expected one. The tier comes from the certificate's shape, and the role from the operation. A loaded handle keeps its role, its tier and that public key.
+- `CustodyTier.acceptsPublicKey(_:role:)` is the length check of step 2. `LoadedCustodyHandle.sharedSecret` checks the sender's point with the same code.
+- A Keychain row has no readable attribute.
 
 *4. The sealed files are padded and stay out of backups.* `SealedDomain.save` pads the payload to a multiple of 16 KiB before it seals it; the padded form carries the payload's length. `ProtectedDataDirectory` excludes its folder from device backups at every start, and checks that the exclusion stuck, as it does for file protection.
 
-*5. Reset deletes every Keychain item of the app.* One vault function deletes every item of the app in the data-protection Keychain, whatever its service. So a row that an earlier version left goes too. The software composition gets one shared in-memory Keychain behind its row stores, so that a test can plant a row under another service and see it go.
+*5. Reset deletes every Keychain item of the app.* `Keychain.deleteEverything()` deletes every item of the app in the data-protection Keychain, whatever its service. So a row that an earlier version left goes too. The software composition has one shared `InMemoryKeychain` behind its row stores, so that a test can plant a row under another service and see it go.
 
 The core composes the vault and its stores itself, in one file. The software composition keeps the sealed root's row in the shared in-memory Keychain and the sealed files in memory, behind the same interface as `ProtectedDataDirectory`. Previews get a sandbox session that needs no prompt and stores nothing. Swift does not look inside the classical halves. The engine makes that value and checks it.
 
@@ -530,7 +528,9 @@ The core composes the vault and its stores itself, in one file. The software com
 
 - **One place.** The core decides when to lock and does the locking. The app reports three events: the app went away, it came back, the device was locked.
 - **By construction.** At lock, the root view is replaced by the lock surface. Content screens are built from the `Workspace`, and it is gone. A screen that kept an old reference gets `CoreError.locked`.
-- **What lock does:** set the phase to `locked`; erase the session values in the vault; tell running file operations to stop; drop every decoded value; erase the plaintext files that were waiting to be saved. Only the last step can fail. Then the phase is `restartRequired`, and the sweep at the next launch erases the files.
+- **What lock does:** set the phase to `locked`; erase the session values in the vault; tell running file operations to stop; drop the decoded values; erase the plaintext files that were waiting to be saved. Only the last step can fail. Then the phase is `restartRequired`, and the sweep at the next launch erases the files. The settings stay readable on an old reference, because they hold no user content; changing them throws `locked`.
+- **`restartRequired` has a second meaning:** the app could not start, because its protected folder or the Keychain could not be reached.
+- **A lock voids an unlock or a first run in flight.** It does not publish its result: the app stays locked, and a vault that a first run just made stays locked. Going away during one does not count, because that may be its own Face ID sheet.
 - **Running operations.** An engine call cannot be interrupted from outside. So three rules hold. The core always passes a `Progress` to a file function, and it answers "stop" once lock has begun. An operation on text has no `Progress` and runs to its end. A result that arrives after lock is erased and never delivered. Lock applies in the `damaged` phase too, because that phase also holds an open session.
 - **Timing.** The time counts from the moment the app goes away. A setting of 0 locks at once. Otherwise the Mac locks when the time is over, even while the app is away. iPhone, iPad and Vision Pro decide when the app comes back, because a suspended app cannot run a timer. A locked Mac screen locks the app at once.
 - **A Face ID sheet is not "away".** Every approval starts in the core, so the core knows. Going inactive during that time does not count.
@@ -540,6 +540,7 @@ The core composes the vault and its stores itself, in one file. The software com
 
 - **Main actor:** `AppCore`, `Workspace`, the four feature objects and the stores' values in memory.
 - **Off the main actor:** every engine call and every vault call that can block, through one helper. The helper runs them on a thread of its own, not on Swift's shared pool: a backup derivation or a large file blocks for seconds or longer.
+- **Two exceptions, inside the vault.** Unlock and first run stretch the passphrase and use the Secure Enclave on Swift's shared pool, through the vault's own `@concurrent` functions. They read and write the sealed root's Keychain row on the main actor. Both take well under a second; moving them would need a change to the vault.
 - **The engine is synchronous.** Its callbacks run on the thread of the call that triggered them.
 - **One `@unchecked Sendable` type in the core:** `DeviceKeyBridge`. It is used by one operation on one thread.
 
