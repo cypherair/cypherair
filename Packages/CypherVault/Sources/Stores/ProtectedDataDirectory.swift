@@ -1,8 +1,9 @@
 import Foundation
 
 /// The directory every domain file lives in. Created with complete file
-/// protection, verified per volume; storage outside the app container is
-/// never a fallback.
+/// protection, verified per volume, and excluded from device backups: only the
+/// vault that wrote a file can open it, so a copy could only put old state
+/// back. Storage outside the app container is never a fallback.
 public struct ProtectedDataDirectory: DomainFiles {
     public let url: URL
 
@@ -24,6 +25,15 @@ public struct ProtectedDataDirectory: DomainFiles {
             throw .fileProtectionVerificationFailed
         }
         guard supported else { throw .fileProtectionUnsupported }
+        var excluded = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do { try excluded.setResourceValues(values) } catch { throw .io("backup exclusion failed") }
+        var readback = url
+        readback.removeAllCachedResourceValues()
+        guard (try? readback.resourceValues(forKeys: [.isExcludedFromBackupKey]))?.isExcludedFromBackup == true else {
+            throw .io("backup exclusion did not stick")
+        }
     }
 
     /// The app's Application Support container, `subdirectory` inside it.

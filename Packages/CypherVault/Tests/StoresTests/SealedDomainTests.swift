@@ -28,6 +28,16 @@ final class SealedDomainTests: XCTestCase {
         XCTAssertEqual(domain().integrity(key: key), .intact)
     }
 
+    func test_fileSize_movesOnlyInStepsOfThePadding() throws {
+        try domain().save(Contacts(names: []), key: key)
+        let empty = try XCTUnwrap(try files.read("contacts")).count
+        try domain().save(Contacts(names: (0..<100).map { "contact \($0)" }), key: key)
+        XCTAssertEqual(try XCTUnwrap(try files.read("contacts")).count, empty)
+        try domain().save(Contacts(names: [String(repeating: "x", count: SealedDomain<Contacts>.paddingStep)]), key: key)
+        XCTAssertEqual(try XCTUnwrap(try files.read("contacts")).count, empty + SealedDomain<Contacts>.paddingStep)
+        XCTAssertEqual(try domain().load(key: key).names.first?.count, SealedDomain<Contacts>.paddingStep)
+    }
+
     func test_missingAndDamaged_areDistinguished_andNeverDefault() throws {
         XCTAssertEqual(domain().integrity(key: key), .missing)
         XCTAssertThrowsError(try domain().load(key: key)) { XCTAssertEqual($0 as? StoreError, .missing) }
@@ -99,6 +109,12 @@ final class ProtectedDataDirectoryTests: XCTestCase {
         try contacts.save(Contacts(names: ["a"]), key: key)
         let attributes = try FileManager.default.attributesOfItem(atPath: directory.url.appending(path: "contacts.sealed").path)
         XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+    }
+
+    func test_directory_isExcludedFromBackups() throws {
+        var url = directory.url
+        url.removeAllCachedResourceValues()
+        XCTAssertEqual(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
     }
 
     func test_eraseAll_removesEveryFile() throws {
