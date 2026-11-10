@@ -8,12 +8,18 @@ public enum PresenceEvent: Sendable {
 extension AppCore {
     /// Locks when the device locks, or when the app was away for the relock
     /// delay. A delay of zero locks the moment the app goes away; a longer one
-    /// is checked when the app comes back.
+    /// is checked when the app comes back. On the lock screen, both events end
+    /// the unlock attempt, so the next submission shows the presence prompt
+    /// again; going away does so only while no submission runs, because a
+    /// running one may have its own sheet up.
     public func report(_ event: PresenceEvent) {
         switch event {
         case .deviceLocked:
             lock()
         case .wentAway:
+            if case .locked(let unlock) = phase {
+                unlock.endAttempt(whileRunning: false)
+            }
             guard let delay = relockDelay else { return }
             if delay == .zero {
                 lock()
@@ -44,7 +50,9 @@ extension AppCore {
         case .damaged(let recovery):
             phase = .locked(Unlock(core: self, composition: composition))
             recovery.close()
-        case .starting, .firstRun, .locked, .restartRequired:
+        case .locked(let unlock):
+            unlock.endAttempt(whileRunning: true)
+        case .starting, .firstRun, .restartRequired:
             return
         }
     }

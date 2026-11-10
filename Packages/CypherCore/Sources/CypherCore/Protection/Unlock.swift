@@ -1,4 +1,5 @@
 internal import Sealing
+internal import Stores
 internal import Vault
 
 /// The phase of a locked app.
@@ -35,6 +36,7 @@ public final class Unlock {
         } catch {
             if core.lockCount != locks {
                 forget(attempt)
+                throw .cancelled
             }
             throw CoreError(error)
         }
@@ -45,9 +47,13 @@ public final class Unlock {
         await domains.takeAllTurns()
         defer { domains.passAllTurns() }
         let opened: Opened
-        do {
+        do throws(CoreError) {
             let keys = try domains.keys(from: session)
-            opened = await Blocking.run { Opened(domains.read(with: keys)) }
+            do {
+                opened = try await Blocking.run { () throws(StoreError) in Opened(try domains.read(with: keys)) }
+            } catch {
+                throw CoreError(error)
+            }
         } catch {
             session.close()
             throw error
@@ -62,6 +68,13 @@ public final class Unlock {
         case .damaged(let report, let keys, let recoverableKeys):
             core.phase = .damaged(Recovery(core: core, composition: composition, session: session, report: report, keys: keys, recoverableKeys: recoverableKeys))
         }
+    }
+
+    /// Ends the attempt that holds the presence check, so the next submission
+    /// prompts again. A running submission then fails.
+    func endAttempt(whileRunning: Bool) {
+        guard whileRunning || !working, let attempt else { return }
+        forget(attempt)
     }
 
     private func forget(_ attempt: UnlockAttempt) {

@@ -121,6 +121,60 @@ import VaultTestSupport
         _ = try harness.workspace()
     }
 
+    @Test(arguments: [PresenceEvent.wentAway, .deviceLocked])
+    func afterAWrongPassphrase_goingAwayOrADeviceLock_bringsThePromptBack(event: PresenceEvent) async throws {
+        let harness = Harness()
+        try await harness.created().lock()
+        await #expect(throws: CoreError.wrongPassphrase) {
+            try await harness.unlock().submit(passphrase: "not the passphrase")
+        }
+        let prompts = harness.authenticator.prompts
+
+        harness.core.report(event)
+        try await harness.unlock().submit(passphrase: Harness.passphrase)
+
+        _ = try harness.workspace()
+        #expect(harness.authenticator.prompts == prompts + 1)
+    }
+
+    enum OpenPhase: Sendable {
+        case unlocked, damaged
+    }
+
+    @Test(arguments: [(OpenPhase.damaged, PresenceEvent.wentAway), (.damaged, .deviceLocked), (.unlocked, .deviceLocked)])
+    func aReportedEvent_locksAnOpenSession(phase: OpenPhase, event: PresenceEvent) async throws {
+        let harness = Harness()
+        try await harness.created().lock()
+        if phase == .damaged {
+            harness.files.files.corrupt("contacts")
+        }
+        try await harness.unlock().submit(passphrase: Harness.passphrase)
+        let session = switch phase {
+        case .unlocked: try harness.workspace().session
+        case .damaged: try harness.recovery().session
+        }
+
+        harness.core.report(event)
+
+        _ = try harness.unlock()
+        #expect(session.vaultSession.isLocked)
+    }
+
+    @Test func aFileThatCannotBeRead_keepsTheAppLocked_andIsNotDamage() async throws {
+        let harness = Harness()
+        try await harness.created().lock()
+        harness.files.failsReads = true
+
+        await #expect(throws: CoreError.storageFailed) {
+            try await harness.unlock().submit(passphrase: Harness.passphrase)
+        }
+        _ = try harness.unlock()
+
+        harness.files.failsReads = false
+        try await harness.unlock().submit(passphrase: Harness.passphrase)
+        _ = try harness.workspace()
+    }
+
     @Test func anEmptyPassphrase_isWrong_beforeAnyPrompt() async throws {
         let harness = Harness()
         try await harness.created().lock()

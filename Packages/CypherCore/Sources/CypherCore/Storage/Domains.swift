@@ -67,27 +67,30 @@ struct Domains: Sendable {
         case damaged(DamageReport, keys: KeysPayload?)
     }
 
-    /// Reads all three files. Any file that cannot be used makes the whole
-    /// reading damaged: no file ever falls back to a first value. Blocking.
-    func read(with keys: Keys) -> Reading {
-        let keysFile = Self.read(self.keys, key: keys.keys)
-        let contactsFile = Self.read(contacts, key: keys.contacts)
-        let settingsFile = Self.read(settings, key: keys.settings)
+    /// Reads all three files. Any file that is missing, damaged or from another
+    /// version makes the whole reading damaged: no file ever falls back to a
+    /// first value. A file that cannot be read at all throws, because that is
+    /// no fact about the file. Blocking.
+    func read(with keys: Keys) throws(StoreError) -> Reading {
+        let keysFile = try Self.read(self.keys, key: keys.keys)
+        let contactsFile = try Self.read(contacts, key: keys.contacts)
+        let settingsFile = try Self.read(settings, key: keys.settings)
         if let keysPayload = keysFile.payload, let contactsPayload = contactsFile.payload, let settingsPayload = settingsFile.payload {
             return .intact(Payloads(keys: keysPayload, contacts: contactsPayload, settings: settingsPayload))
         }
         return .damaged(DamageReport(keys: keysFile.state, contacts: contactsFile.state, settings: settingsFile.state), keys: keysFile.payload)
     }
 
-    private static func read<Payload>(_ domain: SealedDomain<Payload>, key: SymmetricKey) -> (payload: Payload?, state: FileState) {
+    private static func read<Payload>(_ domain: SealedDomain<Payload>, key: SymmetricKey) throws(StoreError) -> (payload: Payload?, state: FileState) {
         do {
             return (try domain.load(key: key), .intact)
-        } catch .missing {
-            return (nil, .missing)
-        } catch .otherVersion {
-            return (nil, .madeByAnotherVersion)
         } catch {
-            return (nil, .damaged)
+            switch error {
+            case .missing: return (nil, .missing)
+            case .otherVersion: return (nil, .madeByAnotherVersion)
+            case .damaged: return (nil, .damaged)
+            default: throw error
+            }
         }
     }
 }

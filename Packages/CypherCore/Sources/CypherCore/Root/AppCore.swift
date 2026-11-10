@@ -27,7 +27,10 @@ public final class AppCore {
         AppCore(composition: try? Composition.live(prompts: prompts))
     }
 
-    /// Software and memory only, already unlocked: for SwiftUI previews.
+    #if DEBUG
+    /// Software and memory only, already unlocked: for SwiftUI previews. It
+    /// exists in debug builds only, so no shipping path can open a vault whose
+    /// keys die with the process.
     public static func preview() -> AppCore {
         let composition = Composition.software(prompts: PromptTexts(createVault: "Preview", unlock: "Preview"))
         let core = AppCore(composition: composition)
@@ -40,6 +43,7 @@ public final class AppCore {
         }
         return core
     }
+    #endif
 
     /// Decides the first phase: first run when this device holds no vault,
     /// locked when it does. Reads no secret and shows no prompt.
