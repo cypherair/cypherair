@@ -49,18 +49,19 @@ Every operation that needs a private key takes a `PrivateKey`. No function has a
 | A bound on hostile input fires, at any stage, also after a key was unwrapped | `LimitsExceeded` |
 | The user cancels at the device. The device refuses or fails | `Cancelled`. `DeviceNotAuthenticated` or `DeviceFailed` |
 | The input does not parse | `Malformed` |
-| The container has no authentication (the old tag-9 packet) | `Unsupported` |
+| The container is one the engine does not open: no authentication (the old tag-9 packet), the withdrawn tag-20 packet, an unknown version, or a cipher or mode that the engine refuses | `Unsupported` |
+| A recipient packet names this key and unwraps to a cipher that the engine refuses. Only the old container keeps its cipher there | `Unsupported` |
 | A recipient packet names this key and does not unwrap | `Tampered` |
 | No recipient packet names this key, and no hidden one unwraps | `NoMatchingKey` |
 | A session key was unwrapped, and the container then fails | `Tampered` |
 
-One accepted limit: an RSA unwrap has only a 16-bit check. For a hidden-recipient RSA message meant for someone else, about 1 try in 65,536 is reported as `Tampered` instead of `NoMatchingKey`.
+Two accepted limits, both because an RSA unwrap has only a 16-bit check. For a hidden-recipient RSA message meant for someone else, about 1 try in 65,536 is reported as `Tampered` instead of `NoMatchingKey`. And for an RSA packet that names this key, `Unsupported` shows that the unwrap succeeded, which `Tampered` would not show.
 
 ### 2.1 Interface
 
 Conventions:
 
-- Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary.
+- Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary. A secret argument is `&[u8]`: UniFFI passes it without a copy.
 - Lists of certificates are in the caller's order, and results point into them by position.
 - A signer is *named* by its certificate. A signature is *made* with the certificate's signing key, which is a subkey where there is one.
 - The engine has no state, no logging and no expiry policy of its own. For the times inside a key it reads no clock and draws no random number: the caller gives them (section 2.5).
@@ -207,6 +208,7 @@ Notes:
 - **`outgoing_format`** answers from the same code that `encrypt` uses, so the preview cannot disagree with the message.
 - **The quantum-safe flag** is read from the produced or received message, never from the list of recipients.
 - **`verify_signed`** takes a cleartext-signed text and also an inline-signed message, as `gpg --sign` makes. It returns the content.
+- **A signature outside its own time.** A correct signature that is past its own expiry, or dated more than 30 minutes after this device's clock, is `Unverifiable`. `Invalid` means that the signature does not match the content, or that the key may not sign.
 - **Several signatures.** The summary is `Verified` if any signature is verified, and it names that signer. Else it is the first that applies of: `Invalid`, `SignerRevoked`, `SignerExpired`, `UnknownSigner`, `Unverifiable`.
 - **Revocation.** A revocation certificate made by the app gives no reason for the revocation. OpenPGP treats that as final: from then on no signature by the key verifies, whatever its date. It carries the key's creation time (section 2.5). `apply_revocation` serves two features: revoking your own key (with the stored certificate; no private key is needed) and accepting a revocation for a contact.
 - **`import_backup`** also takes a key without passphrase protection. It refuses a file where the primary secret key is missing, as `gpg --export-secret-subkeys` makes, with `Unsupported`: without it there is no expiry change and no revocation. It makes a new revocation certificate for the key.
@@ -546,7 +548,7 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 | E6 | An expired or revoked recipient is refused, by position | #1046 |
 | E7 | An expired or revoked key still decrypts | #1046 |
 | E8 | An expired or revoked key does not sign | #1046 |
-| E9 | Each verdict has its own case: verified, invalid, signer revoked, signer expired, unknown signer, not signed. A single invalid signature is never reported as something milder. One verified and one invalid signature together are `Verified`, with the verified signer | #1046 |
+| E9 | Each verdict has its own case: verified, invalid, signer revoked, signer expired, unknown signer, not signed. A single invalid signature is never reported as something milder. One verified and one invalid signature together are `Verified`, with the verified signer. A correct signature outside its own time is `Unverifiable` | #1046 |
 | E10 | A secret that belongs to another certificate is refused | #1046 |
 | E11 | A name never comes from a User ID without a valid binding | #1046 |
 | E12 | A certificate's shape is reported exactly. A P-256 key and a Curve25519 key never share a shape. A key that matches none of ours has no shape, and still reports its real algorithm and size | #1046 |
