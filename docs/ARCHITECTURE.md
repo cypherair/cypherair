@@ -336,7 +336,7 @@ A fresh draw at every change would be wrong. The previous stamp would cut its ra
 public final class AppCore {                       // @Observable
     public private(set) var phase: Phase
     public static func live(prompts: PromptTexts) -> AppCore   // hardware and Keychain; software and memory on the simulator
-    public static func preview() -> AppCore        // software, memory only, unlocked, with sample data: for SwiftUI previews
+    public static func preview() -> AppCore        // software, memory only, unlocked, with sample data: for SwiftUI previews; debug builds only
     public func start() async
     public func report(_ event: PresenceEvent)     // .wentAway, .cameBack, .deviceLocked
 }
@@ -488,7 +488,7 @@ struct SettingsPayload {
 - Names, expiry dates, shapes and "revoked" are not stored. The engine computes them from the certificate at unlock, so they cannot disagree with it.
 - A store changes its value in memory only after the file was written. If saving fails, nothing changes and the caller gets an error.
 - Each file has one turn that outlives every session. A store holds it while it writes, and unlock and first run hold all three. So a write that began before a lock ends before the next unlock reads the file.
-- At unlock, a file that is missing, damaged or made by another version leads to the `damaged` phase, never to default values. Only keys from a key list that can be read can be backed up there.
+- At unlock, a file that is missing, damaged or made by another version leads to the `damaged` phase, never to default values. Only keys from a key list that can be read can be backed up there. A file that exists but cannot be read is none of these: the unlock fails with `storageFailed`, and the app stays locked.
 - A device that still holds the data of 1.x lands in the `damaged` phase, with its files named as made by another version. The app says so, and the only way on is a reset. Nothing of 1.x is read, and nothing is rescued.
 
 **Nothing readable identifies a key.** Two things can be read without unlocking the app: its Keychain rows, with their names, attributes, dates and public fields, and its files, with their names, sizes and dates. Nothing in them may point at one of the user's keys.
@@ -504,7 +504,7 @@ struct SettingsPayload {
 *1. One approval per operation.* `UnlockedSession.approve(_ kind:, reason:) async throws(VaultError) -> OperationApproval` evaluates a fresh context once: `.presence` for a portable key, with the device passcode as the fallback, or `.biometrics` for a device-bound key. This follows the constraint that the key already has.
 
 - After the approval the context disallows interaction, so the Secure Enclave never shows a sheet of its own. The approval invalidates its context when the operation ends.
-- Three public calls take the approval: `SealedSecret.open`, `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair`. An approval holds the session that gave it and works only with that session, so these calls take no session.
+- Three public calls take the approval: `SealedSecret.open`, `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair`. An approval holds the session that gave it and works only with that session, so these calls take no session. Each refuses an approval that has ended, or whose session is locked, before it does anything.
 - No public call of the vault takes an `LAContext`. So the core never imports LocalAuthentication, also not for making a device-bound key.
 
 *2. A file made by another version is reported as such,* apart from "damaged". The sealing layer refuses another schema version before it decrypts anything, and `SealedDomain` reports it as `otherVersion`.
@@ -522,6 +522,8 @@ struct SettingsPayload {
 
 *5. Reset deletes every Keychain item of the app.* `Keychain.deleteEverything()` deletes every item of the app in the data-protection Keychain, whatever its service. So a row that an earlier version left goes too. The software composition has one shared `InMemoryKeychain` behind its row stores, so that a test can plant a row under another service and see it go.
 
+*6. A new vault is stored after its files.* `Vault.bootstrap` returns a `NewVault`: the session, and the sealed root that nothing stores yet. The core writes the three files, then calls `store()`, which writes the root's row. The root marks a finished first run, so a first run stopped at any point leaves a device that starts over.
+
 The core composes the vault and its stores itself, in one file. The software composition keeps the sealed root's row in the shared in-memory Keychain and the sealed files in memory, behind the same interface as `ProtectedDataDirectory`. Previews get a sandbox session that needs no prompt and stores nothing. Swift does not look inside the classical halves. The engine makes that value and checks it.
 
 ## 4. The lock
@@ -531,6 +533,7 @@ The core composes the vault and its stores itself, in one file. The software com
 - **What lock does:** set the phase to `locked`; erase the session values in the vault; tell running file operations to stop; drop the decoded values; erase the plaintext files that were waiting to be saved. Only the last step can fail. Then the phase is `restartRequired`, and the sweep at the next launch erases the files. The settings stay readable on an old reference, because they hold no user content; changing them throws `locked`.
 - **`restartRequired` has a second meaning:** the app could not start, because its protected folder or the Keychain could not be reached.
 - **A lock voids an unlock or a first run in flight.** It does not publish its result: the app stays locked, and a vault that a first run just made stays locked. Going away during one does not count, because that may be its own Face ID sheet.
+- **The presence check of an unlock does not wait on the lock screen.** After a wrong passphrase the next submission needs no prompt, but only until the device locks or the app goes away while no submission runs. Then the attempt ends, and the next submission shows the prompt again.
 - **Running operations.** An engine call cannot be interrupted from outside. So three rules hold. The core always passes a `Progress` to a file function, and it answers "stop" once lock has begun. An operation on text has no `Progress` and runs to its end. A result that arrives after lock is erased and never delivered. Lock applies in the `damaged` phase too, because that phase also holds an open session.
 - **Timing.** The time counts from the moment the app goes away. A setting of 0 locks at once. Otherwise the Mac locks when the time is over, even while the app is away. iPhone, iPad and Vision Pro decide when the app comes back, because a suspended app cannot run a timer. A locked Mac screen locks the app at once.
 - **A Face ID sheet is not "away".** Every approval starts in the core, so the core knows. Going inactive during that time does not count.
@@ -702,7 +705,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 | #1047 | The six custody modules (brought in, with the three required fixes of section 2.3), `DeviceKey`, the device handle, the two device functions, the software stand-in, and the way a device failure reaches the operation's error (section 2), which changes the handle's inner interface, `decrypt` and `encrypt`. For section 2.5: both generation functions take the stamp, `Expiry` is a period, and `CertificateInfo` reports the newest self-signature |
 | #1048 | Signatures, files, `recognise`, the header functions, `erase_file` |
 | #1049 | Expiry, revocation, update, backup with `backup_s2k` (brought in). For section 2.5: `change_expiry` takes its stamp, and the revocation made at import carries the key's creation time. Then the 1.x engine is removed |
-| #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the five vault changes, `CoreError` with every case, `preview()` |
+| #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the vault changes of section 3, `CoreError` with every case, `preview()` |
 | #1063 | `PrivateKeyAccess`, `DeviceKeyBridge`, the memory guard, everything in `Keys`, the stamp and its draw (section 2.5) |
 | #1064 | Everything in `Contacts` |
 | #1065 | The timing rules of the lock, passphrase change, reset, and what `Recovery` can do |
