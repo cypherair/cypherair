@@ -202,6 +202,42 @@ fn e2_named_packet_with_a_refused_cipher_is_unsupported() {
     }
 }
 
+/// A packet that names the key and unwraps to a refused cipher does not stop
+/// a later packet for the key from being tried: placed first as a decoy, it
+/// cannot block the message.
+#[test]
+fn refused_cipher_in_one_named_packet_does_not_block_the_next() {
+    use openpgp::crypto::SessionKey;
+    use openpgp::packet::pkesk::PKESK3;
+    use openpgp::policy::StandardPolicy;
+    use openpgp::serialize::SerializeInto;
+    use openpgp::types::SymmetricAlgorithm;
+    use sequoia_openpgp as openpgp;
+
+    let alice = keys::new_key(KeyShape::V4Curve25519, "Alice");
+    let cert = sequoia_cert(&alice);
+    let message = messages::encrypted_raw(
+        &[&cert],
+        &messages::literal(PLAINTEXT),
+        SystemTime::now(),
+        false,
+    );
+    let policy = StandardPolicy::new();
+    let valid = cert.with_policy(&policy, None).unwrap();
+    let encryption_key = valid.keys().for_transport_encryption().next().unwrap();
+    #[allow(deprecated)]
+    let decoy = PKESK3::for_recipient(
+        SymmetricAlgorithm::CAST5,
+        &SessionKey::new(16).unwrap(),
+        encryption_key.key(),
+    )
+    .unwrap();
+    let mut with_decoy = openpgp::Packet::from(decoy).to_vec().unwrap();
+    with_decoy.extend_from_slice(&message);
+    let decrypted = decrypt(with_decoy, keys::handle(&alice), vec![]).unwrap();
+    assert_eq!(decrypted.plaintext, PLAINTEXT);
+}
+
 /// E2. Input that does not parse is `Malformed`; OpenPGP that is not an
 /// encrypted message is `WrongKind`.
 #[test]

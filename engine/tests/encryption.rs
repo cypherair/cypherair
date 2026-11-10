@@ -210,3 +210,45 @@ fn e5_other_session_key_packets_make_the_flag_false() {
         EngineError::Malformed
     );
 }
+
+/// A certificate's quantum-safe flag says what a message to it is: `encrypt`
+/// writes a packet for every usable encryption key, so one classical key
+/// beside a post-quantum one makes both false, whichever of them comes first.
+#[test]
+fn certificate_flag_matches_the_message() {
+    use openpgp::cert::{CertBuilder, CipherSuite};
+    use openpgp::types::KeyFlags;
+
+    let mixed = |primary: CipherSuite, extra: CipherSuite| {
+        let (cert, _) = CertBuilder::general_purpose(Some("Mixed <mixed@example.org>"))
+            .set_cipher_suite(primary)
+            .set_profile(openpgp::Profile::RFC9580)
+            .unwrap()
+            .add_subkey(KeyFlags::empty().set_transport_encryption(), None, extra)
+            .generate()
+            .unwrap();
+        keys::split(&cert).0
+    };
+    let cases = [
+        (
+            mixed(CipherSuite::MLDSA65_Ed25519, CipherSuite::Cv25519),
+            false,
+        ),
+        (
+            mixed(CipherSuite::Cv25519, CipherSuite::MLDSA65_Ed25519),
+            false,
+        ),
+        (
+            keys::new_key(KeyShape::V6MlDsa65, "Quinn").certificate,
+            true,
+        ),
+    ];
+    for (certificate, quantum_safe) in cases {
+        let info = cypher_engine::inspect_certificate(certificate.clone()).unwrap();
+        let message = encrypt(PLAINTEXT, vec![certificate], None).unwrap();
+        assert_eq!(
+            (info.quantum_safe, message.quantum_safe),
+            (quantum_safe, quantum_safe)
+        );
+    }
+}
