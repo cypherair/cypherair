@@ -283,6 +283,7 @@ fn composite_keys(
     if mldsa.len() != mldsa_length
         || mlkem.len() != mlkem_length
         || mldsa.iter().all(|byte| *byte == 0)
+        || mlkem.iter().all(|byte| *byte == 0)
         || !mlkem_key_is_canonical(mlkem)
     {
         return Err(EngineError::Internal);
