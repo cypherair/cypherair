@@ -59,6 +59,7 @@ pub fn decrypt(
             progress: Rc::clone(&progress),
             signature: None,
             attempts: 0,
+            offered: 0,
         };
         let failed = |error: openpgp::anyhow::Error| {
             error::failed_decryption(DecryptionFailure::Sequoia(&error), &progress)
@@ -135,6 +136,8 @@ struct Helper<'a> {
     progress: Rc<DecryptionProgress>,
     signature: Option<Signature>,
     attempts: u32,
+    /// How many session-key packets earlier calls were offered.
+    offered: usize,
 }
 
 /// Why the helper stopped trying packets.
@@ -194,6 +197,11 @@ impl DecryptionHelper for Helper<'_> {
     /// keys, then the hidden ones against every encryption key, until one opens
     /// the message, within one budget of attempts.
     ///
+    /// Sequoia calls this for every encrypted container it reaches, and each
+    /// time hands over every session-key packet of the message so far, in
+    /// order. Only the packets no earlier call was offered are tried: those
+    /// before belong to an outer container, and were already tried.
+    ///
     /// If none opens it: a packet that names the key and unwrapped to a cipher
     /// the engine refuses makes the failure `Unsupported`, else one that did
     /// not unwrap makes it `Tampered`. A hidden packet that does not open the
@@ -206,9 +214,11 @@ impl DecryptionHelper for Helper<'_> {
         sym_algo: Option<SymmetricAlgorithm>,
         decrypt: &mut dyn FnMut(Option<SymmetricAlgorithm>, &SessionKey) -> bool,
     ) -> openpgp::Result<Option<Cert>> {
+        let fresh = pkesks.get(self.offered..).unwrap_or_default();
+        self.offered = pkesks.len();
         let mut decryptors = self.key.decryptors(self.now);
         let (named, hidden): (Vec<_>, Vec<_>) =
-            pkesks.iter().partition(|pkesk| recipient(pkesk).is_some());
+            fresh.iter().partition(|pkesk| recipient(pkesk).is_some());
 
         // Packets that name the key and did not open the message: one that
         // unwrapped to a refused cipher, or one that did not unwrap. Neither
