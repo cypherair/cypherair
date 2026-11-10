@@ -44,7 +44,7 @@ inputs() {
     (
         cd "$REPO_ROOT"
         {
-            find engine/src engine/uniffi-bindgen -type f
+            find engine/src engine/uniffi-bindgen -type f \( -name '*.rs' -o -name Cargo.toml \)
             echo engine/Cargo.toml
             echo engine/Cargo.lock
             echo Packages/CypherEngine/Package.swift

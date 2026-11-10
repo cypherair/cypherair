@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
       # The same inputs scripts/build-engine.sh hashes for its stale check.
       - id: key
-        run: echo "key=engine-library-${{ hashFiles('engine/src/**', 'engine/uniffi-bindgen/**', 'engine/Cargo.toml', 'engine/Cargo.lock', 'Packages/CypherEngine/Package.swift', 'third_party/arm64e-stage1-toolchain.pin.json', 'scripts/build-engine.sh') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=engine-library-${{ hashFiles('engine/src/**/*.rs', 'engine/uniffi-bindgen/**/*.rs', 'engine/uniffi-bindgen/Cargo.toml', 'engine/Cargo.toml', 'engine/Cargo.lock', 'Packages/CypherEngine/Package.swift', 'third_party/arm64e-stage1-toolchain.pin.json', 'scripts/build-engine.sh') }}" >> "$GITHUB_OUTPUT"
       - id: cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
