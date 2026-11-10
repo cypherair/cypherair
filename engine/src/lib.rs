@@ -135,8 +135,8 @@ pub struct CertificateInfo {
     pub status: KeyStatus,
     /// `encrypt` accepts this certificate as a recipient now.
     pub can_encrypt: bool,
-    /// A message to this certificate is quantum-safe: its encryption key is a
-    /// post-quantum KEM.
+    /// A message to this certificate is quantum-safe: every key it is
+    /// encrypted to is a post-quantum KEM.
     pub quantum_safe: bool,
     pub has_secret: bool,
 }

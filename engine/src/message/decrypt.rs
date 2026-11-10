@@ -148,10 +148,13 @@ impl VerificationHelper for Helper<'_> {
 }
 
 impl DecryptionHelper for Helper<'_> {
-    /// Tries the session-key packets that name one of the key's encryption
-    /// keys, then the hidden ones against every encryption key. A packet that
-    /// names the key and does not unwrap makes the failure `Tampered`; a
-    /// hidden packet that does not unwrap is someone else's and is skipped.
+    /// Tries every session-key packet that names one of the key's encryption
+    /// keys, then the hidden ones against every encryption key, until one opens
+    /// the message. If none does: a packet that names the key and unwrapped to
+    /// a cipher the engine refuses makes the failure `Unsupported`, else one
+    /// that did not unwrap makes it `Tampered`. A hidden packet that does not
+    /// open the message, also for a refused cipher, is someone else's and is
+    /// skipped.
     fn decrypt(
         &mut self,
         pkesks: &[PKESK],
@@ -163,6 +166,10 @@ impl DecryptionHelper for Helper<'_> {
         let (named, hidden): (Vec<_>, Vec<_>) =
             pkesks.iter().partition(|pkesk| recipient(pkesk).is_some());
 
+        // Packets that name the key and did not open the message: one that
+        // unwrapped to a refused cipher, or one that did not unwrap. Neither
+        // stops the next packet from being tried.
+        let mut named_refused = false;
         let mut named_failed = false;
         for pkesk in named {
             let handle = recipient(pkesk).expect("partitioned on the recipient");
@@ -171,9 +178,7 @@ impl DecryptionHelper for Helper<'_> {
                 .filter(|decryptor| handle.aliases(decryptor.public().key_handle()))
             {
                 match unwrap(pkesk, decryptor.as_mut(), sym_algo) {
-                    Some((algorithm, _)) if refused(algorithm) => {
-                        return self.refuse(EngineError::Unsupported);
-                    }
+                    Some((algorithm, _)) if refused(algorithm) => named_refused = true,
                     Some((algorithm, session_key)) if decrypt(algorithm, &session_key) => {
                         self.progress.unwrapped.set(true);
                         return Ok(None);
@@ -193,7 +198,9 @@ impl DecryptionHelper for Helper<'_> {
                 }
             }
         }
-        self.refuse(if named_failed {
+        self.refuse(if named_refused {
+            EngineError::Unsupported
+        } else if named_failed {
             EngineError::Tampered
         } else {
             EngineError::NoMatchingKey

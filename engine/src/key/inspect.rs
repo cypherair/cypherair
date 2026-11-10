@@ -38,10 +38,16 @@ fn describe(cert: &Cert, now: SystemTime) -> CertificateInfo {
         Some(valid) if valid.alive().is_err() => KeyStatus::Expired,
         Some(_) => KeyStatus::Valid,
     };
-    let encryption = valid
+    let encryption_keys: Vec<Algorithm> = valid
         .as_ref()
-        .and_then(encryption_key)
-        .map(|key| algorithm(key.key()));
+        .map(|valid| {
+            encryption_keys(valid)
+                .iter()
+                .map(|key| algorithm(key.key()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let encryption = encryption_keys.first().copied();
     let (name, email) = valid.as_ref().and_then(owner).unwrap_or((None, None));
 
     CertificateInfo {
@@ -59,25 +65,33 @@ fn describe(cert: &Cert, now: SystemTime) -> CertificateInfo {
             .map(unix_seconds),
         status,
         can_encrypt: valid.as_ref().is_some_and(recipients::accepts),
-        quantum_safe: encryption.is_some_and(|encryption| {
-            matches!(
-                encryption.kind,
-                AlgorithmKind::MlKem768X25519 | AlgorithmKind::MlKem1024X448
-            )
-        }),
+        quantum_safe: !encryption_keys.is_empty()
+            && encryption_keys.iter().all(|encryption| {
+                matches!(
+                    encryption.kind,
+                    AlgorithmKind::MlKem768X25519 | AlgorithmKind::MlKem1024X448
+                )
+            }),
         has_secret: cert.is_tsk(),
     }
 }
 
-/// The key a message to this certificate is encrypted to: the one `encrypt`
-/// would use, else, for an expired or revoked certificate, the one it would
-/// have used.
-fn encryption_key<'a>(
+/// The keys a message to this certificate is encrypted to: those `encrypt`
+/// uses, else, for an expired or revoked certificate, those it would have used.
+/// `encrypt` writes a recipient packet for each of them.
+fn encryption_keys<'a>(
     valid: &'a ValidCert<'a>,
-) -> Option<ValidErasedKeyAmalgamation<'a, openpgp::packet::key::PublicParts>> {
-    recipients::encryption_keys(valid)
-        .next()
-        .or_else(|| valid.keys().supported().for_transport_encryption().next())
+) -> Vec<ValidErasedKeyAmalgamation<'a, openpgp::packet::key::PublicParts>> {
+    let usable: Vec<_> = recipients::encryption_keys(valid).collect();
+    if usable.is_empty() {
+        valid
+            .keys()
+            .supported()
+            .for_transport_encryption()
+            .collect()
+    } else {
+        usable
+    }
 }
 
 /// The name and email of the primary User ID among those with a valid binding
