@@ -1,11 +1,11 @@
 import CryptoKit
 import Foundation
-import XCTest
+import Testing
 @testable import Sealing
 
 /// The envelope's contract: it opens only with the right shared secret, only as
 /// the kind it was sealed as, and only while every public field is intact.
-final class EnclaveSealedEnvelopeTests: XCTestCase {
+struct EnclaveSealedEnvelopeTests {
     /// A software P-256 key standing in for the enclave key: the seal side only
     /// ever sees its public key and blob, and the open side supplies the shared
     /// secret exactly as the vault does with a real enclave key.
@@ -27,29 +27,29 @@ final class EnclaveSealedEnvelopeTests: XCTestCase {
         return opened.withUnsafeBytes { Array($0) }
     }
 
-    func test_roundTrip_survivesEncoding_andCarriesPublicMetadata() throws {
+    @Test func `Round trip survives encoding and carries public metadata`() throws {
         let plaintext = Array("the root secret".utf8)
         let envelope = try seal(plaintext, associatedData: Data("salt and parameters".utf8))
         let encoded = try EnclaveSealedEnvelopeCodec.encode(envelope)
         let decoded = try EnclaveSealedEnvelopeCodec.decode(encoded, expectedKind: .rootSecret)
-        XCTAssertEqual(decoded, envelope)
-        XCTAssertEqual(decoded.associatedData, Data("salt and parameters".utf8))
-        XCTAssertEqual(decoded.sealingKeyBlob, blob)
-        XCTAssertEqual(try open(decoded), plaintext)
+        #expect(decoded == envelope)
+        #expect(decoded.associatedData == Data("salt and parameters".utf8))
+        #expect(decoded.sealingKeyBlob == blob)
+        #expect(try open(decoded) == plaintext)
     }
 
-    func test_wrongKind_isRefusedBeforeAnyCryptography() throws {
+    @Test func `Wrong kind is refused before any cryptography`() throws {
         let envelope = try seal([1, 2, 3], kind: .secretKeys)
         let encoded = try EnclaveSealedEnvelopeCodec.encode(envelope)
-        XCTAssertThrowsError(try EnclaveSealedEnvelopeCodec.decode(encoded, expectedKind: .rootSecret)) { error in
-            XCTAssertEqual(error as? SealingError, .payloadKindMismatch)
+        #expect(throws: SealingError.payloadKindMismatch) {
+            try EnclaveSealedEnvelopeCodec.decode(encoded, expectedKind: .rootSecret)
         }
-        XCTAssertThrowsError(try open(envelope, kind: .splitCustodyComponent)) { error in
-            XCTAssertEqual(error as? SealingError, .payloadKindMismatch)
+        #expect(throws: SealingError.payloadKindMismatch) {
+            try open(envelope, kind: .splitCustodyComponent)
         }
     }
 
-    func test_everyPublicField_isAuthenticated() throws {
+    @Test func `Every public field is authenticated`() throws {
         let envelope = try seal(Array("payload".utf8))
         func flipped(_ data: Data) -> Data { var copy = data; copy[copy.startIndex] ^= 0x01; return copy }
         let variants: [(String, EnclaveSealedEnvelope)] = [
@@ -61,52 +61,59 @@ final class EnclaveSealedEnvelopeTests: XCTestCase {
             ("tag", envelope.with(tag: flipped(envelope.tag))),
         ]
         for (field, variant) in variants {
-            XCTAssertThrowsError(try open(variant), field) { error in
-                XCTAssertEqual(error as? SealingError, .authenticationFailed, field)
+            #expect(throws: SealingError.authenticationFailed, "\(field)") {
+                try open(variant)
             }
         }
         // A different sealing public key changes the derived key and the binding alike.
         let otherKey = P256.KeyAgreement.PrivateKey().publicKey.x963Representation
-        XCTAssertThrowsError(try open(envelope.with(sealingPublicKeyX963: otherKey)))
+        #expect(throws: SealingError.authenticationFailed) {
+            try open(envelope.with(sealingPublicKeyX963: otherKey))
+        }
     }
 
-    func test_anotherEnclaveKey_cannotOpen() throws {
+    @Test func `Another enclave key cannot open`() throws {
         let envelope = try seal([9, 9, 9])
         let other = P256.KeyAgreement.PrivateKey()
         let ephemeral = try P256.KeyAgreement.PublicKey(x963Representation: envelope.ephemeralPublicKeyX963)
         let shared = try other.sharedSecretFromKeyAgreement(with: ephemeral)
-        do {
+        #expect(throws: SealingError.authenticationFailed) {
             _ = try EnclaveSealedEnvelopeCodec.open(envelope, sharedSecret: shared, expectedKind: .rootSecret)
-            XCTFail("another key must not open the envelope")
-        } catch {
-            XCTAssertEqual(error as? SealingError, .authenticationFailed)
         }
     }
 
-    func test_unknownOrMissingField_isRefused() throws {
+    @Test func `Unknown or missing field is refused`() throws {
         let envelope = try seal([1])
         let encoded = try EnclaveSealedEnvelopeCodec.encode(envelope)
-        var object = try XCTUnwrap(try PropertyListSerialization.propertyList(from: encoded, format: nil) as? [String: Any])
+        var object = try #require(try PropertyListSerialization.propertyList(from: encoded, format: nil) as? [String: Any])
         object["extra"] = "x"
         let withExtra = try PropertyListSerialization.data(fromPropertyList: object, format: .binary, options: 0)
-        XCTAssertThrowsError(try EnclaveSealedEnvelopeCodec.decode(withExtra, expectedKind: .rootSecret))
+        #expect(throws: SealingError.malformed("unsupported or missing fields")) {
+            try EnclaveSealedEnvelopeCodec.decode(withExtra, expectedKind: .rootSecret)
+        }
         object.removeValue(forKey: "extra"); object.removeValue(forKey: "tag")
         let missing = try PropertyListSerialization.data(fromPropertyList: object, format: .binary, options: 0)
-        XCTAssertThrowsError(try EnclaveSealedEnvelopeCodec.decode(missing, expectedKind: .rootSecret))
-        XCTAssertThrowsError(try EnclaveSealedEnvelopeCodec.decode(Data("not a plist".utf8), expectedKind: .rootSecret))
+        #expect(throws: SealingError.malformed("unsupported or missing fields")) {
+            try EnclaveSealedEnvelopeCodec.decode(missing, expectedKind: .rootSecret)
+        }
+        #expect(throws: SealingError.malformed("not a property list")) {
+            try EnclaveSealedEnvelopeCodec.decode(Data("not a plist".utf8), expectedKind: .rootSecret)
+        }
     }
 
-    func test_emptyPlaintext_isRefused() {
+    @Test func `Empty plaintext is refused`() {
         let empty = SensitiveBuffer(count: 0) { _ in }
-        XCTAssertThrowsError(try EnclaveSealedEnvelopeCodec.seal(
-            plaintext: empty, kind: .rootSecret, associatedData: Data(),
-            sealingKeyBlob: blob, sealingPublicKeyX963: sealingKey.publicKey.x963Representation
-        ))
+        #expect(throws: SealingError.malformed("empty plaintext")) {
+            try EnclaveSealedEnvelopeCodec.seal(
+                plaintext: empty, kind: .rootSecret, associatedData: Data(),
+                sealingKeyBlob: blob, sealingPublicKeyX963: sealingKey.publicKey.x963Representation
+            )
+        }
     }
 
     /// Pins the derivation labels and the authenticated-data layout. Any change
     /// to either alters the ciphertext of these fixed inputs.
-    func test_knownAnswer_pinsBindingAndDerivation() throws {
+    @Test func `Known answer pins binding and derivation`() throws {
         let staticKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 0x11, count: 32))
         let ephemeral = try P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 0x22, count: 32))
         let plaintext = SensitiveBuffer(count: 8) { $0.copyBytes(from: Array("vector01".utf8)) }
@@ -115,8 +122,8 @@ final class EnclaveSealedEnvelopeTests: XCTestCase {
             sealingKeyBlob: Data("blob".utf8), sealingPublicKeyX963: staticKey.publicKey.x963Representation,
             ephemeralPrivateKey: ephemeral, salt: Data(repeating: 0x33, count: 32), nonce: Data(repeating: 0x44, count: 12)
         )
-        XCTAssertEqual(envelope.ciphertext.map { String(format: "%02x", $0) }.joined(), KnownAnswers.envelopeCiphertext)
-        XCTAssertEqual(envelope.tag.map { String(format: "%02x", $0) }.joined(), KnownAnswers.envelopeTag)
+        #expect(envelope.ciphertext.map { String(format: "%02x", $0) }.joined() == KnownAnswers.envelopeCiphertext)
+        #expect(envelope.tag.map { String(format: "%02x", $0) }.joined() == KnownAnswers.envelopeTag)
     }
 }
 

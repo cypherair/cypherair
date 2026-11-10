@@ -1,21 +1,17 @@
 import Foundation
 import Sealing
 import Stores
+import Testing
 import Vault
 import VaultTestSupport
-import XCTest
 
-final class SealedSecretTests: XCTestCase {
-    private var enclave: FakeEnclave!
-    private var keychain: InMemoryKeychain!
-    private var authenticator: CountingAuthenticator!
-    private var session: UnlockedSession!
+struct SealedSecretTests {
+    let enclave = FakeEnclave()
+    let keychain = InMemoryKeychain()
+    let authenticator = CountingAuthenticator()
+    let session: UnlockedSession
 
-    override func setUp() async throws {
-        try await super.setUp()
-        enclave = FakeEnclave()
-        keychain = InMemoryKeychain()
-        authenticator = CountingAuthenticator()
+    init() async throws {
         let vault = Vault(enclave: enclave, rootRows: keychain.rows(service: Vault.sealedRootService), stretcher: FakeStretcher(), authenticator: authenticator)
         let new = try await vault.bootstrap(passphrase: .text("pass"), reason: "test")
         try new.store()
@@ -26,48 +22,42 @@ final class SealedSecretTests: XCTestCase {
         try await session.approve(.presence, reason: "test")
     }
 
-    /// `open` returns a non-copyable buffer, which the throwing assertion cannot take.
-    private func assertOpenThrows(_ sealed: Data, kind: SealedSecret.Kind, _ expected: StoreError, line: UInt = #line) async throws {
-        let approval = try await approval()
-        do {
-            _ = try SealedSecret.open(sealed, kind: kind, approval: approval)
-            XCTFail("open succeeded", line: line)
-        } catch {
-            XCTAssertEqual(error, expected, line: line)
-        }
+    /// Opens under a fresh approval and drops the value.
+    private func open(_ sealed: Data, kind: SealedSecret.Kind) async throws {
+        _ = try SealedSecret.open(sealed, kind: kind, approval: try await approval())
     }
 
-    func test_eachKind_opensAsSealed_andStoresNothing() async throws {
-        for kind in [SealedSecret.Kind.secretKeys, .classicalHalves] {
-            let sealed = try SealedSecret.seal(.text("secret"), kind: kind, session: session)
-            let opened = try SealedSecret.open(sealed, kind: kind, approval: try await approval())
-            XCTAssertTrue(opened.contentEquals(.text("secret")))
-        }
-        XCTAssertEqual(keychain.contents.map(\.service), [Vault.sealedRootService])
-        XCTAssertEqual(enclave.createdPolicies.count, 2, "sealing creates no enclave key")
+    @Test(arguments: [SealedSecret.Kind.secretKeys, .classicalHalves])
+    func `Each kind opens as sealed and stores nothing`(kind: SealedSecret.Kind) async throws {
+        let sealed = try SealedSecret.seal(.text("secret"), kind: kind, session: session)
+        let opened = try SealedSecret.open(sealed, kind: kind, approval: try await approval())
+        let openedTheSecret = opened.contentEquals(.text("secret"))
+        #expect(openedTheSecret)
+        #expect(keychain.contents.map(\.service) == [Vault.sealedRootService])
+        #expect(enclave.createdPolicies.count == 2, "sealing creates no enclave key")
     }
 
-    func test_aValueOfOneKind_doesNotOpenAsTheOther() async throws {
+    @Test func `A value of one kind does not open as the other`() async throws {
         let secretKeys = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session)
         let halves = try SealedSecret.seal(.text("halves"), kind: .classicalHalves, session: session)
-        try await assertOpenThrows(secretKeys, kind: .classicalHalves, .damaged)
-        try await assertOpenThrows(halves, kind: .secretKeys, .damaged)
+        await #expect(throws: StoreError.damaged) { try await open(secretKeys, kind: .classicalHalves) }
+        await #expect(throws: StoreError.damaged) { try await open(halves, kind: .secretKeys) }
     }
 
-    func test_aDamagedValue_isDamaged() async throws {
+    @Test func `A damaged value is damaged`() async throws {
         var sealed = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session)
         sealed[sealed.count / 2] ^= 0xFF
-        try await assertOpenThrows(sealed, kind: .secretKeys, .damaged)
+        await #expect(throws: StoreError.damaged) { try await open(sealed, kind: .secretKeys) }
     }
 
-    func test_aValueSealedByAnotherVault_isDamaged() async throws {
+    @Test func `A value sealed by another vault is damaged`() async throws {
         let other = try await Vault(enclave: FakeEnclave(), rootRows: InMemoryRowStore(), stretcher: FakeStretcher(), authenticator: CountingAuthenticator())
             .bootstrap(passphrase: .text("pass"), reason: "test").session
         let sealed = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: other)
-        try await assertOpenThrows(sealed, kind: .secretKeys, .damaged)
+        await #expect(throws: StoreError.damaged) { try await open(sealed, kind: .secretKeys) }
     }
 
-    func test_check_refusesWhatCannotOpen_withoutAPrompt() throws {
+    @Test func `Check refuses what cannot open, without a prompt`() throws {
         let other = try UnlockedSession.sandbox(enclave: SoftwareEnclave())
         let refused = [
             (try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: other), SealedSecret.Kind.secretKeys),
@@ -78,33 +68,27 @@ final class SealedSecretTests: XCTestCase {
 
         try SealedSecret.check(try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session), kind: .secretKeys, session: session)
         for (sealed, kind) in refused {
-            XCTAssertThrowsError(try SealedSecret.check(sealed, kind: kind, session: session)) { XCTAssertEqual($0 as? StoreError, .damaged) }
+            #expect(throws: StoreError.damaged) { try SealedSecret.check(sealed, kind: kind, session: session) }
         }
-        XCTAssertEqual(authenticator.prompts, prompts)
+        #expect(authenticator.prompts == prompts)
     }
 
-    func test_anEndedApproval_opensNothing() async throws {
+    @Test func `An ended approval opens nothing`() async throws {
         let sealed = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session)
         let approval = try await approval()
         approval.end()
-        do {
+        #expect(throws: StoreError.vault(.approvalEnded)) {
             _ = try SealedSecret.open(sealed, kind: .secretKeys, approval: approval)
-            XCTFail("an ended approval opened a value")
-        } catch {
-            XCTAssertEqual(error, .vault(.approvalEnded))
         }
     }
 
-    func test_relockedSession_cannotSealOrOpen() async throws {
+    @Test func `A relocked session cannot seal or open`() async throws {
         let sealed = try SealedSecret.seal(.text("secret"), kind: .secretKeys, session: session)
         let approval = try await approval()
         session.relock()
-        XCTAssertThrowsError(try SealedSecret.seal(.text("x"), kind: .secretKeys, session: session)) { XCTAssertEqual($0 as? StoreError, .vault(.locked)) }
-        do {
+        #expect(throws: StoreError.vault(.locked)) { try SealedSecret.seal(.text("x"), kind: .secretKeys, session: session) }
+        #expect(throws: StoreError.vault(.locked)) {
             _ = try SealedSecret.open(sealed, kind: .secretKeys, approval: approval)
-            XCTFail("a relocked session opened a value")
-        } catch {
-            XCTAssertEqual(error, .vault(.locked))
         }
     }
 }
