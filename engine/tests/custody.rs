@@ -18,7 +18,6 @@ use openpgp::packet::pkesk::{PKESK3, PKESK6};
 use openpgp::packet::{PKESK, Packet};
 use openpgp::parse::Parse;
 use openpgp::serialize::SerializeInto;
-use openpgp::types::PublicKeyAlgorithm;
 use sequoia_openpgp as openpgp;
 
 const PORTABLE: [KeyShape; 5] = [
@@ -170,35 +169,47 @@ fn e16_wrong_classical_half_fails_before_the_device_is_asked() {
     }
 }
 
-/// A copy of a P-256 session-key packet whose ephemeral point is moved off
-/// the curve, naming the recipient or hidden.
-fn off_curve(packet: &[u8], named: bool) -> Vec<u8> {
+/// A copy of a session-key packet with its classical point spoiled, naming
+/// the recipient or hidden: a P-256 point moved off the curve, or the
+/// classical point of a composite key set to zeros, which gives no shared
+/// secret.
+fn spoiled(packet: &[u8], named: bool) -> Vec<u8> {
     let Packet::PKESK(pkesk) = Packet::from_bytes(packet).unwrap() else {
         panic!("not a session-key packet")
     };
-    let moved = |esk: &mpi::Ciphertext| {
-        let mpi::Ciphertext::ECDH { e, key } = esk else {
-            panic!("not ECDH")
-        };
-        let mut point = e.value().to_vec();
-        *point.last_mut().unwrap() ^= 0x01;
-        mpi::Ciphertext::ECDH {
-            e: mpi::MPI::new(&point),
-            key: key.clone(),
+    let spoil = |esk: &mpi::Ciphertext| match esk {
+        mpi::Ciphertext::ECDH { e, key } => {
+            let mut point = e.value().to_vec();
+            *point.last_mut().unwrap() ^= 0x01;
+            mpi::Ciphertext::ECDH {
+                e: mpi::MPI::new(&point),
+                key: key.clone(),
+            }
         }
+        mpi::Ciphertext::MLKEM768_X25519 { mlkem, esk, .. } => mpi::Ciphertext::MLKEM768_X25519 {
+            ecdh: Box::new([0; 32]),
+            mlkem: mlkem.clone(),
+            esk: esk.clone(),
+        },
+        mpi::Ciphertext::MLKEM1024_X448 { mlkem, esk, .. } => mpi::Ciphertext::MLKEM1024_X448 {
+            ecdh: Box::new([0; 56]),
+            mlkem: mlkem.clone(),
+            esk: esk.clone(),
+        },
+        _ => panic!("not a device-bound ciphertext"),
     };
     let packet: Packet = match pkesk {
         PKESK::V3(pkesk) => PKESK3::new(
             pkesk.recipient().cloned().filter(|_| named),
-            PublicKeyAlgorithm::ECDH,
-            moved(pkesk.esk()),
+            pkesk.pk_algo(),
+            spoil(pkesk.esk()),
         )
         .unwrap()
         .into(),
         PKESK::V6(pkesk) => PKESK6::new(
             pkesk.recipient().cloned().filter(|_| named),
-            PublicKeyAlgorithm::ECDH,
-            moved(pkesk.esk()),
+            pkesk.pk_algo(),
+            spoil(pkesk.esk()),
         )
         .unwrap()
         .into(),
@@ -208,37 +219,42 @@ fn off_curve(packet: &[u8], named: bool) -> Vec<u8> {
 }
 
 /// E16. The hidden-recipient rule, with a point off the curve: such a packet
-/// is not for the key, and the device is never asked with it. A hidden one in
-/// front of the real packet does not block the message; one that names the
-/// key is `Tampered`.
+/// is not for the key, and the device is never asked with it. In a message
+/// whose recipients are all hidden, one in front of the real packet does not
+/// block the message; one that names the key is `Tampered`. The same holds
+/// for a composite key's classical point that gives no shared secret: the
+/// classical half is tried before the device.
 #[test]
 fn e16_point_off_the_curve_is_not_for_the_key() {
-    for shape in [KeyShape::V4P256, KeyShape::V6P256] {
+    for shape in device::SHAPES {
         let (key, device) = device::device_key(shape, "Alice");
         let handle = device::device_handle(&key, &device);
-        let message = messages::binary(
-            &encrypt(PLAINTEXT, vec![key.certificate.clone()], None)
-                .unwrap()
-                .message,
-        );
-        let packet_end = messages::session_key_packet_ends(&message)[0];
+        let literal = messages::literal(PLAINTEXT);
+        let message =
+            |hidden| messages::encrypted_raw(&[&cert(&key)], &literal, SystemTime::now(), hidden);
 
-        let hidden_in_front = [off_curve(&message[..packet_end], false), message.clone()].concat();
-        let decrypted = decrypt(hidden_in_front, handle.clone(), vec![]).unwrap();
+        let hidden = message(true);
+        let packet_end = messages::session_key_packet_ends(&hidden)[0];
+        let in_front = [spoiled(&hidden[..packet_end], false), hidden.clone()].concat();
+        let before = device.agreements();
+        let decrypted = decrypt(in_front, handle.clone(), vec![]).unwrap();
         assert_eq!(decrypted.plaintext, PLAINTEXT, "{shape:?}");
-        assert_eq!(device.agreements(), 1, "{shape:?}");
+        assert_eq!(device.agreements() - before, 1, "{shape:?}");
 
+        let named = message(false);
+        let packet_end = messages::session_key_packet_ends(&named)[0];
         let named_instead = [
-            off_curve(&message[..packet_end], true),
-            message[packet_end..].to_vec(),
+            spoiled(&named[..packet_end], true),
+            named[packet_end..].to_vec(),
         ]
         .concat();
+        let before = device.agreements();
         assert_eq!(
             decrypt(named_instead, handle, vec![]).unwrap_err(),
             EngineError::Tampered,
             "{shape:?}"
         );
-        assert_eq!(device.agreements(), 1, "{shape:?}");
+        assert_eq!(device.agreements(), before, "{shape:?}");
     }
 }
 
@@ -278,7 +294,8 @@ fn e16_device_failure_stops_decryption() {
 /// E16. A failure of the device is not a failure of the message: in a nested
 /// container, a cancel or failure while the inner packet is unwrapped is
 /// reported as itself, also in the old container, though a session key was
-/// already unwrapped.
+/// already unwrapped. The outer packet is not tried again for the inner
+/// container: a nested message takes two device calls.
 #[test]
 fn e16_device_failure_after_the_unwrap_is_reported_as_itself() {
     for shape in [KeyShape::V4P256, KeyShape::V6P256] {
@@ -288,6 +305,10 @@ fn e16_device_failure_after_the_unwrap_is_reported_as_itself() {
         let inner =
             messages::encrypted_raw(&[&cert(&key)], &messages::literal(PLAINTEXT), now, false);
         let nested = messages::encrypted_raw(&[&cert(&key)], &inner, now, false);
+        let before = device.agreements();
+        let decrypted = decrypt(nested.clone(), handle.clone(), vec![]).unwrap();
+        assert_eq!(decrypted.plaintext, PLAINTEXT, "{shape:?}");
+        assert_eq!(device.agreements() - before, 2, "{shape:?}");
         for (behaviour, error) in REFUSALS {
             device.behave_after(1, behaviour);
             assert_eq!(
@@ -338,8 +359,8 @@ fn e16_device_failure_stops_signing() {
 }
 
 /// A shared secret of the right shape that is wrong unwraps nothing: a packet
-/// that names the key is `Tampered`, a hidden one is someone else's. One of
-/// the wrong shape is a failure of the device.
+/// that names the key is `Tampered`, a hidden one is someone else's. One that
+/// is short, or all zeros, is a failure of the device.
 #[test]
 fn wrong_shared_secret_unwraps_nothing() {
     for shape in device::SHAPES {
@@ -361,12 +382,14 @@ fn wrong_shared_secret_unwraps_nothing() {
             EngineError::NoMatchingKey,
             "{shape:?}"
         );
-        device.behave(Behaviour::AnswerShort);
-        assert_eq!(
-            decrypt(named, handle, vec![]).unwrap_err(),
-            EngineError::DeviceFailed,
-            "{shape:?}"
-        );
+        for behaviour in [Behaviour::AnswerShort, Behaviour::AnswerZeros] {
+            device.behave(behaviour);
+            assert_eq!(
+                decrypt(named.clone(), handle.clone(), vec![]).unwrap_err(),
+                EngineError::DeviceFailed,
+                "{shape:?} {behaviour:?}"
+            );
+        }
     }
 }
 

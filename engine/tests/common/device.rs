@@ -39,6 +39,8 @@ pub enum Behaviour {
     AnswerWrongly,
     /// An answer one byte short.
     AnswerShort,
+    /// An answer of the right length, all zeros.
+    AnswerZeros,
 }
 
 pub struct SoftwareDevice {
@@ -185,6 +187,7 @@ fn spoil(mut answer: Vec<u8>, behaviour: Behaviour) -> Vec<u8> {
         Behaviour::AnswerShort => {
             answer.pop();
         }
+        Behaviour::AnswerZeros => answer.fill(0),
         _ => {}
     }
     answer
