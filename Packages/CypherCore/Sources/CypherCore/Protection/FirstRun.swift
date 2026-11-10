@@ -16,12 +16,14 @@ public final class FirstRun {
 
     /// Creates the vault from `passphrase` behind one presence prompt and
     /// writes the first values of the three files. Then the app is unlocked.
-    /// A passphrase with a problem is refused before any prompt.
+    /// A passphrase with a problem is refused before any prompt. A device lock
+    /// while this runs leaves the new vault locked.
     public func create(passphrase: String) async throws(CoreError) {
-        guard isCurrent, !working else { throw .cancelled }
+        guard let core, isCurrent, !working else { throw .cancelled }
         guard Passphrase.problems(in: passphrase).isEmpty else { throw .passphraseTooWeak }
         working = true
         defer { working = false }
+        let locks = core.lockCount
 
         let vault = composition.vault
         let session: OpenSession
@@ -31,10 +33,16 @@ public final class FirstRun {
             throw CoreError(error)
         }
         let domains = composition.domains
+        await domains.takeAllTurns()
+        defer { domains.passAllTurns() }
+        let contents: WorkspaceContents
         do throws(CoreError) {
             let keys = try domains.keys(from: session)
             do {
-                try await Blocking.run { () throws(StoreError) in try domains.write(.firstValues, with: keys) }
+                contents = try await Blocking.run { () throws(StoreError) in
+                    try domains.write(.firstValues, with: keys)
+                    return WorkspaceContents(.firstValues)
+                }
             } catch {
                 throw CoreError(error)
             }
@@ -45,11 +53,16 @@ public final class FirstRun {
             try? await Blocking.run { () throws(VaultError) in try vault.reset() }
             throw error
         }
-        guard let core, isCurrent else {
+        guard isCurrent else {
             session.close()
             throw .cancelled
         }
-        core.phase = .unlocked(Workspace(core: core, session: session, domains: domains, payloads: .firstValues))
+        guard core.lockCount == locks else {
+            session.close()
+            core.phase = .locked(Unlock(core: core, composition: composition))
+            throw .cancelled
+        }
+        core.phase = .unlocked(Workspace(core: core, composition: composition, session: session, contents: contents))
     }
 
     private var isCurrent: Bool {

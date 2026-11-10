@@ -12,6 +12,9 @@ public final class AppCore {
 
     @ObservationIgnored let composition: Composition?
     @ObservationIgnored var awaySince: ContinuousClock.Instant?
+    /// Counts every lock request, also in a phase that has nothing to lock.
+    /// An unlock or a first run compares it before it publishes its result.
+    @ObservationIgnored var lockCount = 0
     @ObservationIgnored private var started = false
 
     init(composition: Composition?) {
@@ -31,7 +34,7 @@ public final class AppCore {
         core.started = true
         do {
             let session = OpenSession(vaultSession: try UnlockedSession.sandbox(enclave: SoftwareEnclave()))
-            core.phase = .unlocked(Workspace(core: core, session: session, domains: composition.domains, payloads: .firstValues))
+            core.phase = .unlocked(Workspace(core: core, composition: composition, session: session, contents: WorkspaceContents(.firstValues)))
         } catch {
             core.phase = .restartRequired
         }
@@ -65,7 +68,9 @@ public enum Phase: Sendable {
     /// A sealed file is missing, damaged or from another version. The session
     /// is open, and lock applies here too.
     case damaged(Recovery)
-    /// Lock could not erase what it must. Only a restart recovers.
+    /// Only a restart can go on: lock could not erase what it must, or the app
+    /// could not start, because its protected folder or the Keychain could not
+    /// be reached.
     case restartRequired
 }
 

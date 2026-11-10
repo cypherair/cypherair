@@ -3,7 +3,9 @@ internal import Vault
 
 /// The vault's unlocked session as the core holds it, shared by everything one
 /// unlock opened. Closing it erases the session values; every later call
-/// through it throws `locked`. Long file operations read `isOpen` to stop.
+/// through it throws `locked`. A file operation's progress callback runs on
+/// the helper's thread and cannot read `isOpen`; it reads
+/// `vaultSession.isLocked`, which any thread may read.
 @MainActor
 final class OpenSession {
     let vaultSession: UnlockedSession

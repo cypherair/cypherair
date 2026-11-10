@@ -2,9 +2,17 @@
 @MainActor
 public final class Messages {
     let session: OpenSession
+    let composition: Composition
+    let keys: Keys
+    let contacts: Contacts
+    weak var core: AppCore?
 
-    init(session: OpenSession) {
+    init(session: OpenSession, composition: Composition, core: AppCore?, keys: Keys, contacts: Contacts) {
         self.session = session
+        self.composition = composition
+        self.core = core
+        self.keys = keys
+        self.contacts = contacts
     }
 }
 

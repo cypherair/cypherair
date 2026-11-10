@@ -60,7 +60,9 @@ import VaultTestSupport
             contacts: file == .contacts ? state : .intact,
             settings: file == .settings ? state : .intact
         )
-        #expect(try harness.recovery().report == expected)
+        let recovery = try harness.recovery()
+        #expect(recovery.report == expected)
+        #expect((recovery.keys != nil) == (file != .keys), "an intact key list stays for the backup")
     }
 
     @Test("C3: a save that fails changes nothing in memory")

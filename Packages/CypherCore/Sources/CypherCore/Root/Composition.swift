@@ -14,6 +14,7 @@ struct Composition: Sendable {
     let custody: CustodyKeyStore
     let prompts: PromptTexts
 
+    @MainActor
     init(
         enclave: any Enclave,
         keychain: any Keychain,
@@ -35,14 +36,17 @@ struct Composition: Sendable {
         self.prompts = prompts
     }
 
+    @MainActor
     static func live(prompts: PromptTexts) throws(StoreError) -> Composition {
         #if targetEnvironment(simulator)
         software(prompts: prompts)
         #else
-        Composition(
+        let directory = try ProtectedDataDirectory.applicationSupport()
+        directory.sweepTemporaries()
+        return Composition(
             enclave: HardwareEnclave(),
             keychain: SystemKeychain(),
-            files: try ProtectedDataDirectory.applicationSupport(),
+            files: directory,
             stretcher: EngineStretcher(),
             authenticator: SystemAuthenticator(),
             prompts: prompts
@@ -51,6 +55,7 @@ struct Composition: Sendable {
     }
 
     /// Never for user data: nothing outlives the process.
+    @MainActor
     static func software(
         prompts: PromptTexts,
         enclave: any Enclave = SoftwareEnclave(),

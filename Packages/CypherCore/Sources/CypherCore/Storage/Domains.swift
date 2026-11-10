@@ -1,7 +1,10 @@
 internal import CryptoKit
 internal import Stores
 
-/// The three sealed files.
+/// The three sealed files, and one turn for each that outlives every session:
+/// a store holds a file's turn while it writes, and unlock and first run hold
+/// all three while they read or write. So a write that began before a lock
+/// ends before the next unlock reads the file.
 struct Domains: Sendable {
     /// Versions 1 and 2 belong to 1.x. The vault refuses a file of another
     /// version before it decrypts it.
@@ -10,11 +13,29 @@ struct Domains: Sendable {
     let keys: SealedDomain<KeysPayload>
     let contacts: SealedDomain<ContactsPayload>
     let settings: SealedDomain<SettingsPayload>
+    let turns: (keys: Turn, contacts: Turn, settings: Turn)
 
+    @MainActor
     init(files: any DomainFiles) {
         keys = SealedDomain(domain: "keys", schemaVersion: Self.schemaVersion, files: files)
         contacts = SealedDomain(domain: "contacts", schemaVersion: Self.schemaVersion, files: files)
         settings = SealedDomain(domain: "settings", schemaVersion: Self.schemaVersion, files: files)
+        turns = (Turn(), Turn(), Turn())
+    }
+
+    /// Takes the three turns, always in the same order.
+    @MainActor
+    func takeAllTurns() async {
+        await turns.keys.take()
+        await turns.contacts.take()
+        await turns.settings.take()
+    }
+
+    @MainActor
+    func passAllTurns() {
+        turns.settings.pass()
+        turns.contacts.pass()
+        turns.keys.pass()
     }
 
     struct Keys: Sendable {
@@ -41,7 +62,9 @@ struct Domains: Sendable {
 
     enum Reading: Sendable {
         case intact(Payloads)
-        case damaged(DamageReport)
+        /// The key list, when it is intact, so that its portable keys can
+        /// still be backed up.
+        case damaged(DamageReport, keys: KeysPayload?)
     }
 
     /// Reads all three files. Any file that cannot be used makes the whole
@@ -53,7 +76,7 @@ struct Domains: Sendable {
         if let keysPayload = keysFile.payload, let contactsPayload = contactsFile.payload, let settingsPayload = settingsFile.payload {
             return .intact(Payloads(keys: keysPayload, contacts: contactsPayload, settings: settingsPayload))
         }
-        return .damaged(DamageReport(keys: keysFile.state, contacts: contactsFile.state, settings: settingsFile.state))
+        return .damaged(DamageReport(keys: keysFile.state, contacts: contactsFile.state, settings: settingsFile.state), keys: keysFile.payload)
     }
 
     private static func read<Payload>(_ domain: SealedDomain<Payload>, key: SymmetricKey) -> (payload: Payload?, state: FileState) {

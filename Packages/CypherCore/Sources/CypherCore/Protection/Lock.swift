@@ -30,8 +30,11 @@ extension AppCore {
     }
 
     /// Sets the phase to `locked`, then erases the session values in the vault
-    /// and drops every decoded value. Applies in the damaged phase too.
+    /// and drops the decoded values. Applies in the damaged phase too. In the
+    /// locked and first-run phases it voids an unlock or a first run in flight.
+    /// Going away during one does not count: that may be its own Face ID sheet.
     func lock() {
+        lockCount += 1
         awaySince = nil
         guard let composition else { return }
         switch phase {

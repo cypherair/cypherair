@@ -88,6 +88,39 @@ import VaultTestSupport
         #expect(harness.authenticator.prompts == prompts + 1)
     }
 
+    @Test func aDeviceLockDuringAnUnlock_keepsTheAppLocked_andTheNextSubmissionPromptsAgain() async throws {
+        let harness = Harness()
+        try await harness.created().lock()
+        let core = harness.core
+        harness.authenticator.duringPrompt = { core.report(.deviceLocked) }
+
+        await #expect(throws: CoreError.cancelled) {
+            try await harness.unlock().submit(passphrase: Harness.passphrase)
+        }
+        _ = try harness.unlock()
+
+        harness.authenticator.duringPrompt = nil
+        let prompts = harness.authenticator.prompts
+        try await harness.unlock().submit(passphrase: Harness.passphrase)
+        _ = try harness.workspace()
+        #expect(harness.authenticator.prompts == prompts + 1)
+    }
+
+    @Test func aDeviceLockDuringAFirstRun_leavesTheNewVaultLocked() async throws {
+        let harness = Harness()
+        await harness.core.start()
+        let core = harness.core
+        harness.authenticator.duringPrompt = { core.report(.deviceLocked) }
+
+        await #expect(throws: CoreError.cancelled) {
+            try await harness.firstRun().create(passphrase: Harness.passphrase)
+        }
+
+        harness.authenticator.duringPrompt = nil
+        try await harness.unlock().submit(passphrase: Harness.passphrase)
+        _ = try harness.workspace()
+    }
+
     @Test func anEmptyPassphrase_isWrong_beforeAnyPrompt() async throws {
         let harness = Harness()
         try await harness.created().lock()

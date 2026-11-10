@@ -3,12 +3,21 @@
 @MainActor
 public final class Recovery {
     public let report: DamageReport
+    /// The keys of the key list when it is intact; empty when it is not.
+    public let recoverableKeys: [Key]
 
+    let keys: KeysPayload?
     let session: OpenSession
+    let composition: Composition
+    weak var core: AppCore?
 
-    init(report: DamageReport, session: OpenSession) {
-        self.report = report
+    init(core: AppCore, composition: Composition, session: OpenSession, report: DamageReport, keys: KeysPayload?, recoverableKeys: [Key]) {
+        self.core = core
+        self.composition = composition
         self.session = session
+        self.report = report
+        self.keys = keys
+        self.recoverableKeys = recoverableKeys
     }
 
     func close() {
