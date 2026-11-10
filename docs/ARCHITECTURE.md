@@ -407,7 +407,7 @@ public enum InputKind: Sendable { case encryptedMessage, signedMessage, detached
 
 public enum CoreError: Error, Sendable, Equatable {
     case locked, cancelled, restartRequired
-    case authenticationFailed, authenticationUnavailable, wrongPassphrase
+    case authenticationFailed, authenticationUnavailable, wrongPassphrase, passphraseTooWeak
     case notOpenPGP, wrongKindOfData, unsupported, tooComplex
     case tampered, noMatchingKey
     case keyExpired, keyRevoked, keyUnusable, tooSoon, recipientUnusable(Recipient)
@@ -425,6 +425,7 @@ public enum CoreError: Error, Sendable, Equatable {
 - **`PromptTexts`** holds the sentences for the Face ID sheets. The app owns every text, so it hands them to the core once.
 - **Status is computed at unlock.** A key that expires while the app stays unlocked shows as valid until the next unlock. That is accepted: the engine refuses at use. No timer is added for it.
 - No `CoreError` case carries text, a fingerprint or a path. The app turns each case into one sentence.
+- A passphrase that the user chooses and that `Passphrase.problems` faults is refused with `passphraseTooWeak`, before any prompt. So the rule does not depend on a screen.
 
 *This serves all three UI directions of #1042.* They need the same things: recognise an input, run one operation per kind, and say who signed. "Open and Write" calls `recognise` first. "Tools" calls the operations directly. "People first" uses the signer that every result carries.
 
@@ -491,7 +492,7 @@ struct SettingsPayload {
 **Nothing readable identifies a key.** Two things can be read without unlocking the app: its Keychain rows, with their names, attributes, dates and public fields, and its files, with their names, sizes and dates. Nothing in them may point at one of the user's keys.
 
 - *The Keychain holds one row, the sealed root.* Its dates say when the vault was made and when the passphrase last changed. A row per key would carry the date of that key, and a key's creation time is public.
-- *All key material is inside the sealed key list:* a portable key's sealed secret, a device-bound key's two Secure Enclave key blobs, and a post-quantum key's sealed classical halves. No name, no public key and no date of a key exists outside it.
+- *All key material is inside the sealed key list:* a portable key's sealed secret, a device-bound key's two Secure Enclave key blobs, and a post-quantum key's sealed classical halves. No name, no public key and no per-key date exists outside it.
 - *Every sealed file is padded* to a multiple of 16 KiB before it is sealed. So a file's size does not confirm a guess about which keys or contacts it holds.
 - *The sealed files stay out of device backups.* Only the vault that wrote a copy could open it, so a copy in a backup could only serve to put old state back.
 - *What still shows:* that the three files exist, their size in steps of 16 KiB, when each last changed, when the vault was made, and when its passphrase last changed. The app cannot hide these times. For a key that the app made, they match no time inside it, because the key carries a stamp that lies a random amount before the real moment (section 2.5). Such a time says only that a key of the user was stamped within one window before it. A key made elsewhere keeps its own times and is outside this.
@@ -504,23 +505,26 @@ struct SettingsPayload {
 - The kind is `.presence` for a portable key (the device passcode is the fallback) or `.biometrics` for a device-bound key. This follows the constraint that the key already has.
 - After a successful approval the context disallows interaction, so the Secure Enclave can never show a sheet of its own. The approval invalidates its context when the operation ends.
 - Five public calls take an `LAContext` today. After the changes, three public calls take the `OperationApproval`: the function that opens a sealed value (change 3), `CustodyKeyStore.loadHandle` and `CustodyKeyStore.createPair`. `UnlockedSession.openIdentityEnvelope` takes it too and becomes visible to the package only. `UnlockedSession.operationContext` goes.
+- An approval holds the session that gave it and works only with that session. So the calls that take an approval take no session.
 - So the core never imports LocalAuthentication, also not for making a device-bound key.
 
 *2. A file made by another version is reported as such,* apart from "damaged". The sealing layer already refuses such a file with an error of its own, and the store folds that error into "damaged". The change keeps the two apart.
 
 *3. All key material lives in the sealed key list. The Keychain holds only the sealed root.*
 
-- `IdentityEnvelopeStore` and its rows go. In their place `Stores` has one public pair of functions: `seal(_ secret:, kind:, session:) -> Data` and `open(_ sealed:, kind:, approval:) -> SensitiveBuffer`. They serve the portable secrets and the classical halves. The core stores the sealed value in the key list.
+- `IdentityEnvelopeStore` and its rows go. In their place `Stores` has `SealedSecret` with three functions: `seal(_ secret:, kind:, session:) -> Data`, `check(_ sealed:, kind:, session:)` and `open(_ sealed:, kind:, approval:) -> SensitiveBuffer`. They serve the portable secrets and the classical halves. The core stores the sealed value in the key list.
+- `check` never prompts. It decodes the value and checks its kind, and that it is sealed to this vault's identity wrapping key. Step 2 of the private-key path uses it, so a value from another vault fails before the prompt.
 - The authenticated data of such a value is a constant. The key list binds each value to its entry, and the engine refuses a secret that does not belong to the certificate.
 - The payload kind `secret-certificate` becomes `secret-keys`, because that is what it holds now.
-- `CustodyKeyStore` has no rows. `createPair(tier:session:approval:)` returns the two handles with their blobs. `loadHandle(role:tier:blob:expectedPublicKey:approval:)` rebuilds one key and still compares the Secure Enclave key's own public key with the expected one. The tier comes from the certificate's shape, and the role from the operation. A loaded handle keeps its role, its tier and that public key.
+- `CustodyKeyStore` has no rows. `createPair(tier:approval:)` returns the two handles with their blobs. `loadHandle(role:tier:blob:expectedPublicKey:approval:)` rebuilds one key and still compares the Secure Enclave key's own public key with the expected one. The tier comes from the certificate's shape, and the role from the operation. A loaded handle keeps its role, its tier and that public key.
+- The shape checks that `CustodyPublicBinding` held live on `CustodyTier`: `acceptsPublicKey(_:role:)` is the length check of step 2, and `LoadedCustodyHandle.sharedSecret` checks the sender's point with the same code.
 - Gone with the rows: `CustodyHandleReference`, `CustodyPublicBinding`, `CustodyHandlePair`, `CustodyInventory`, `locatePair`, `inventory`, `deletePair`, `deleteAll`, the readable attribute of `RowStore`, and the error cases that exist only for rows (`invalidHandleSetIdentifier`, `ambiguousPrivateHandle`, `partialHandlePair`, `privateHandleMissing`, `cleanupOrRollbackFailed`).
 
-*4. The sealed files are padded and stay out of backups.* `SealedDomain.save` pads the payload to a multiple of 16 KiB before it seals it; the padded form carries the payload's length. `ProtectedDataDirectory` excludes its folder from device backups.
+*4. The sealed files are padded and stay out of backups.* `SealedDomain.save` pads the payload to a multiple of 16 KiB before it seals it; the padded form carries the payload's length. `ProtectedDataDirectory` excludes its folder from device backups at every start, and checks that the exclusion stuck, as it does for file protection.
 
 *5. Reset deletes every Keychain item of the app.* One vault function deletes every item of the app in the data-protection Keychain, whatever its service. So a row that an earlier version left goes too. The software composition gets one shared in-memory Keychain behind its row stores, so that a test can plant a row under another service and see it go.
 
-Not changed: the core composes the vault and its stores itself, in one file, with the constructors the package already has. Swift does not look inside the classical halves. The engine makes that value and checks it.
+The core composes the vault and its stores itself, in one file. The software composition keeps the sealed root's row in the shared in-memory Keychain and the sealed files in memory, behind the same interface as `ProtectedDataDirectory`. Previews get a sandbox session that needs no prompt and stores nothing. Swift does not look inside the classical halves. The engine makes that value and checks it.
 
 ## 4. The lock
 
