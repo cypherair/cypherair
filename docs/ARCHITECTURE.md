@@ -38,6 +38,8 @@ A new Rust crate on `sequoia-openpgp` with the OpenSSL backend, exposed through 
 
 Every operation that needs a private key takes a `PrivateKey`. No function has a variant per custody.
 
+**A failure of the device takes its own way.** Sequoia turns a decryptor's error into "did not unwrap", and it reports a signer's error as one failure among others. So the handle unwraps a session key itself and answers one of three things: unwrapped, not this key, or an error. An error stops the operation. A signer's failure crosses Sequoia as a typed error, the way a bound does. `error.rs` turns both into `Cancelled`, `DeviceNotAuthenticated` or `DeviceFailed`. No operation looks at the custody to do this.
+
 **The certificate is the authority.** A portable handle is built from the *public certificate* and the *secret key packets* that the vault unsealed. The secret holds the primary key and the subkeys alone, without User IDs or signatures. The engine joins the two and refuses a secret key that is not a key of the certificate. An expiry change or a revocation changes only the certificate. So the secret is sealed once and never sealed again.
 
 **No text in errors.** `EngineError` is a `Copy` type, so it cannot hold a string. Where an error must point at a recipient, it carries the position in the list the caller passed, never a fingerprint.
@@ -46,24 +48,27 @@ Every operation that needs a private key takes a `PrivateKey`. No function has a
 
 | Case | Error |
 |---|---|
-| A bound on hostile input fires, at any stage, also after a key was unwrapped | `LimitsExceeded` |
+| A bound on hostile input fires. In the old container (SEIPDv1) this line applies only before a session key is unwrapped | `LimitsExceeded` |
 | The user cancels at the device. The device refuses or fails | `Cancelled`. `DeviceNotAuthenticated` or `DeviceFailed` |
 | The input does not parse | `Malformed` |
-| The container has no authentication (the old tag-9 packet) | `Unsupported` |
+| The message is one the engine does not open: a container without authentication (the old tag-9 packet), the withdrawn tag-20 packet, an unknown version of the container or of a session-key packet, or a cipher or mode that the engine refuses | `Unsupported` |
+| A recipient packet names this key and unwraps to a cipher that the engine refuses. Only the old container keeps its cipher there | `Unsupported` |
 | A recipient packet names this key and does not unwrap | `Tampered` |
 | No recipient packet names this key, and no hidden one unwraps | `NoMatchingKey` |
-| A session key was unwrapped, and the container then fails | `Tampered` |
+| A session key was unwrapped, and the container then fails. In the old container this includes a bound that fires | `Tampered` |
 
-One accepted limit: an RSA unwrap has only a 16-bit check. For a hidden-recipient RSA message meant for someone else, about 1 try in 65,536 is reported as `Tampered` instead of `NoMatchingKey`.
+The old container proves that it is genuine only at its end. Until then its content may have been changed. So after the unwrap, nothing that the content decides is reported: every failure of the message there is `Tampered`.
+
+Two accepted limits, both because an RSA unwrap has only a 16-bit check. For a hidden-recipient RSA message meant for someone else, about 1 try in 65,536 is reported as `Tampered` instead of `NoMatchingKey`. And for an RSA packet that names this key, `Unsupported` shows that the unwrap succeeded, which `Tampered` would not show.
 
 ### 2.1 Interface
 
 Conventions:
 
-- Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary.
+- Bytes are `Vec<u8>`, paths are `String`, times are Unix seconds. Every input may be armored or binary. Stored certificates are binary. A secret argument is `&[u8]`: UniFFI passes it without a copy.
 - Lists of certificates are in the caller's order, and results point into them by position.
 - A signer is *named* by its certificate. A signature is *made* with the certificate's signing key, which is a subkey where there is one.
-- The engine has no state, no logging and no expiry policy of its own. For the times inside a key it reads no clock and draws no random number: the caller gives them (section 2.5).
+- The engine has no state, no logging and no expiry policy of its own. For the times inside a key it reads no clock and draws no random number: the caller gives them (section 2.5). Its one piece of state is a panic hook, set at the first call, that keeps a caught panic off standard error.
 
 ```rust
 enum KeyShape {               // the certificate shapes that this app makes
@@ -207,21 +212,25 @@ Notes:
 - **`outgoing_format`** answers from the same code that `encrypt` uses, so the preview cannot disagree with the message.
 - **The quantum-safe flag** is read from the produced or received message, never from the list of recipients.
 - **`verify_signed`** takes a cleartext-signed text and also an inline-signed message, as `gpg --sign` makes. It returns the content.
+- **A signature outside its own time.** A correct signature that is past its own expiry, or dated more than 30 minutes after this device's clock, is `Unverifiable`. `Invalid` means that the signature does not match the content, or that the key may not sign.
 - **Several signatures.** The summary is `Verified` if any signature is verified, and it names that signer. Else it is the first that applies of: `Invalid`, `SignerRevoked`, `SignerExpired`, `UnknownSigner`, `Unverifiable`.
 - **Revocation.** A revocation certificate made by the app states the reason "no reason specified". OpenPGP treats that as final: from then on no signature by the key verifies, whatever its date. It carries the key's creation time (section 2.5). `apply_revocation` serves two features: revoking your own key (with the stored certificate; no private key is needed) and accepting a revocation for a contact.
 - **`import_backup`** also takes a key without passphrase protection. It refuses a file where the primary secret key is missing, as `gpg --export-secret-subkeys` makes, with `Unsupported`: without it there is no expiry change and no revocation. It makes a new revocation certificate for the key.
-- **Key material has bounds too.** Every certificate, revocation or backup that the engine parses is limited in size and in packet count. The numbers are set in #1046.
+- **Key material has bounds too.** Every certificate, revocation or backup that the engine parses is limited to 1 MiB and to 1,024 packets. Beyond that it is `LimitsExceeded`.
+- **Certifications by other people** are dropped when a certificate is read. The app has no web of trust, so it does not read them, does not keep them and does not pass them on. They do not count towards the 1,024 packets, so a key that many people have certified can still be added. A certificate of more than 1 MiB is still refused; that takes thousands of certifications, or a large photo.
 - **File functions** write beside `output` and rename on success. On a failure or a cancel they erase what they wrote. `erase_file` is the one erase policy, used by the engine and the core.
 - **`DeviceKeyError`** is a rich UniFFI error, not a flat one, and it converts from UniFFI's unexpected-callback error to `Failed`. Without that, an unexpected Swift error becomes a Rust panic.
 - **A wrong device key.** `PrivateKey::device` cannot see whether the device key belongs to the certificate. It is caught elsewhere: the vault compares the public keys when it loads the handle; every signature is verified before release; a wrong shared secret cannot unwrap a session key.
-- **Panics.** The crate keeps `panic = unwind`, so UniFFI can catch a panic inside a dependency. The core maps one to `internalFailure`. A deliberate panic in test-only code pins it.
+- **Panics.** Every exported function runs its body through one function in `error.rs`, which catches a panic and returns `Internal`. Nothing checks that a new function does this, so a review keeps it. The crate refuses to build with `panic = abort`. The core maps `Internal` to `internalFailure`. A deliberate panic in test-only code pins it.
 
 ### 2.2 Modules
 
 ```
 engine/src/
   lib.rs        UniFFI setup, the exported types, the one Sequoia policy
-  error.rs      EngineError; the only place where a Sequoia error becomes one
+  error.rs      EngineError, the containment of panics, and the classification of a failed
+                decryption. Elsewhere a Sequoia error is replaced by the error its place
+                implies; no code reads an error's text
   key/          the handle (the only code that branches on custody), DeviceKey, inspect,
                 generate, expiry, revocation and update, backup
   message/      recipients and format, encrypt, decrypt, sign and verify, verdict, header, files
@@ -540,20 +549,20 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 |---|---|---|
 | E1 | When authentication fails, no plaintext is returned | #1046 |
 | E2 | A failed decryption gives exactly the error of the table in section 2. A tampered container is `Tampered`, in both containers, in the first block and in a later one. A recipient packet that names the key and does not unwrap is `Tampered`. A message for someone else is `NoMatchingKey`. The fixtures tamper where no bound can fire | #1046 |
-| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`, also after a key was unwrapped. A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
+| E3 | Hostile input is refused, each kind with one error. Too many packets, too deep nesting, too much expansion: `LimitsExceeded`. In the new container this holds also after a key was unwrapped. In the old container that case is `Tampered` (section 2). A container without authentication: `Unsupported`. A certificate, revocation or backup beyond its bounds: `LimitsExceeded`. A panic inside a dependency becomes an internal failure and does not crash the app; a deliberate panic in test-only code shows it | #1046, and each piece for its own inputs |
 | E4 | An outgoing message is never compressed, uses AES-256, and uses the new container only if every recipient supports it. The preview equals the message | #1046 |
 | E5 | The quantum-safe flag comes from the message. A cut-off message is an error | #1046 |
 | E6 | An expired or revoked recipient is refused, by position | #1046 |
 | E7 | An expired or revoked key still decrypts | #1046 |
 | E8 | An expired or revoked key does not sign | #1046 |
-| E9 | Each verdict has its own case: verified, invalid, signer revoked, signer expired, unknown signer, not signed. A single invalid signature is never reported as something milder. One verified and one invalid signature together are `Verified`, with the verified signer | #1046 |
+| E9 | Each verdict has its own case: verified, invalid, signer revoked, signer expired, unknown signer, not signed. A single invalid signature is never reported as something milder. One verified and one invalid signature together are `Verified`, with the verified signer. A correct signature outside its own time is `Unverifiable` | #1046 |
 | E10 | A secret that belongs to another certificate is refused | #1046 |
 | E11 | A name never comes from a User ID without a valid binding | #1046 |
 | E12 | A certificate's shape is reported exactly. A P-256 key and a Curve25519 key never share a shape. A key that matches none of ours has no shape, and still reports its real algorithm and size | #1046 |
 | E13 | The unlock stretch gives its pinned answer and refuses parameters out of range | #1046 |
 | E14 | No error carries text (a compile-time check that `EngineError` is `Copy`) | #1046 |
 | E15 | Every operation runs through the same function for every kind of custody. Each later piece adds its functions to this one test | #1047 |
-| E16 | Custody fails closed: a device signature is verified before release; a wrong classical half fails before the device is asked; the hidden-recipient rule, with a point off the curve; a cancel stays a cancel. The combiner gives the answer of the RFC's vector | #1047 |
+| E16 | Custody fails closed: a device signature is verified before release; a wrong classical half fails before the device is asked; the hidden-recipient rule, with a point off the curve; a cancel or a failure of the device stops the operation and is reported as itself: in decryption for a packet that names the key and for a hidden one, and in signing. The combiner gives the answer of the RFC's vector | #1047 |
 | E17 | A file is written only on success | #1048 |
 | E18 | An expiry change takes effect, also right after generation | #1049 |
 | E19 | A revocation revokes only its own key. An update must be the same key and never removes a revocation | #1049 |
@@ -594,13 +603,13 @@ Not changed: the core composes the vault and its stores itself, in one file, wit
 | Slice | Engine tests | Package tests | Device bench | Where |
 |---|---|---|---|---|
 | Mac, arm64 | Yes | Yes (`swift test`) | — | The Mac and CI |
-| Mac, arm64e | Yes, built with the patched compiler ¹ | Yes (`swift test --arch arm64e`) ² | Yes | The Mac. CI, if a hosted runner can run it |
+| Mac, arm64e | Not yet ¹ | Yes (`swift test --arch arm64e`) ² | Yes | The Mac. CI, if a hosted runner can run it |
 | iPhone, arm64e | — ³ | Yes, on a connected iPhone | Yes | The owner's iPhone |
 | iPhone simulator, Vision Pro simulator | — | Yes ⁴ | — | The Mac and CI |
 | Vision Pro, arm64 and arm64e | — | — | — | Built and linked only. There is no hardware; `CUSTODY.md` §7 accepts this |
 | iPhone, arm64 | — | — | — | Built and linked only ⁵ |
 
-¹ Not yet known: whether the Mac runs a Rust test binary built for arm64e. #1046 tries it and reports.
+¹ An arm64e Rust executable built by the patched compiler runs on the Mac, but a Rust test binary cannot be built for arm64e: the compiler's prebuilt libraries have `std` without `libtest`. Until the compiler adds `library/test`, this slice is covered only by `swift test --arch arm64e`, which the core's package tests (#1062) are the first to run.
 ² `swift test --arch arm64e` links the arm64e slice and passes on the Mac (#1045).
 ³ `cargo test` cannot run on an iPhone. The engine's iPhone slices are tested through the package tests and the bench.
 ⁴ The simulator slices link (#1045). The engine has not yet run on a simulator.
@@ -623,7 +632,7 @@ A few engine tests need 2 GiB of memory or large files. They sit behind a second
 
 - *Where it runs:* on the Mac, by the session that changed the engine. In CI, when the engine changed.
 - *Reuse.* The build compiles OpenSSL once per target. A new worktree starts with a copy of the main checkout's built library, through `.worktreeinclude`, which lists both output paths. If the build proves slow, CI can also publish its build for download; that is for #1052 to decide.
-- *A stale library is found by a machine.* The script stores a hash of the engine's source, its lock file, the compiler pin and itself beside the library. The app build compares that hash with the checkout first, and fails with the command that fixes it.
+- *A stale library is found by a machine.* The script stores beside the library a hash of the engine's sources and the bindings generator, its lock file, the package manifest (which states the deployment targets), the compiler pin and itself, and the list of slices it built. The app build compares that hash with the checkout first, checks that the library has the slice it builds, and fails with the command that fixes it. Xcode lets the check read only the files it declares, so the script writes the list of its inputs to `engine/inputs.xcfilelist`. A piece that adds a source file runs the script and commits the list; the check fails until it does.
 
 **Packaging.** This layout is shown to work on every platform and slice (#1045).
 
@@ -685,7 +694,7 @@ The engine lands in four pieces and the core in five. The device bench (#1067) i
 | Piece | Adds |
 |---|---|
 | #1046 | The crate, the portable handle, the first eight functions of the table, the bounded walk and the unlock stretch (brought in), the harness and fixtures, the build script and the engine package |
-| #1047 | The six custody modules (brought in, with the three required fixes of section 2.3), `DeviceKey`, the device handle, the two device functions, the software stand-in. For section 2.5: both generation functions take the stamp, `Expiry` is a period, and `CertificateInfo` reports the newest self-signature |
+| #1047 | The six custody modules (brought in, with the three required fixes of section 2.3), `DeviceKey`, the device handle, the two device functions, the software stand-in, and the way a device failure reaches the operation's error (section 2), which changes the handle's inner interface, `decrypt` and `encrypt`. For section 2.5: both generation functions take the stamp, `Expiry` is a period, and `CertificateInfo` reports the newest self-signature |
 | #1048 | Signatures, files, `recognise`, the header functions, `erase_file` |
 | #1049 | Expiry, revocation, update, backup with `backup_s2k` (brought in). For section 2.5: `change_expiry` takes its stamp, and the revocation made at import carries the key's creation time. Then the 1.x engine is removed |
 | #1062 | The core package, `AppCore` and its phases, first run, unlock, `lock()`, damage detection, the store and the payloads, settings, the five vault changes, `CoreError` with every case, `preview()` |

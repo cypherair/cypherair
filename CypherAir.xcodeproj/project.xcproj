@@ -14,6 +14,10 @@
   "packages": [
     {
       "kind": "local",
+      "path": "Packages/CypherEngine",
+    },
+    {
+      "kind": "local",
       "path": "Packages/CypherVault",
     },
   ],
@@ -39,12 +43,33 @@
       "product": "Products/CypherAir.app",
       "product-type": "application",
       "build-phases": [
+        {
+          "kind": "script",
+          "name": "Check engine library",
+          "input-paths": [
+            "$(SRCROOT)/engine/src",
+            "$(SRCROOT)/engine/uniffi-bindgen",
+            "$(SRCROOT)/engine/inputs.xcfilelist",
+            "$(SRCROOT)/Packages/CypherEngine/CypherEngineFFI.xcframework/source-hash",
+            "$(SRCROOT)/Packages/CypherEngine/CypherEngineFFI.xcframework/slices",
+            "$(SRCROOT)/Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift",
+          ],
+          "input-file-list-paths": [
+            "$(SRCROOT)/engine/inputs.xcfilelist",
+          ],
+          "run-on-every-build": true,
+          "shell": "/bin/sh",
+          "script": "\"${SRCROOT}/scripts/build-engine.sh\" --check\n",
+        },
         "compile-sources",
         "frameworks",
         "resources",
       ],
       "package-product-members": [
         {
+          "product-name": "CypherEngine",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "product-name": "Stores",
           "build-phase": { "build-phase": "frameworks" },
         }, {

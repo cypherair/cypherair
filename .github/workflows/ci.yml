@@ -17,8 +17,58 @@ env:
   DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
 
 jobs:
+  engine:
+    name: Test the engine
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust, gpg and sq
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable
+          brew install gnupg sequoia-sq
+          gpg --version | head -1
+          sq version
+      - name: Test
+        env:
+          CYPHERAIR_REQUIRE_GPG: "1"
+          CYPHERAIR_REQUIRE_SQ: "1"
+        run: cargo +stable test --locked --manifest-path engine/Cargo.toml -- --include-ignored
+
+  engine-library:
+    name: Build the engine library
+    runs-on: xcode-27
+    timeout-minutes: 90
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The same inputs scripts/build-engine.sh hashes for its stale check.
+      - id: key
+        run: echo "key=engine-library-${{ hashFiles('engine/src/**/*.rs', 'engine/uniffi-bindgen/**/*.rs', 'engine/uniffi-bindgen/Cargo.toml', 'engine/Cargo.toml', 'engine/Cargo.lock', 'Packages/CypherEngine/Package.swift', 'third_party/arm64e-stage1-toolchain.pin.json', 'scripts/build-engine.sh') }}" >> "$GITHUB_OUTPUT"
+      - id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.key.outputs.key }}
+          path: |
+            Packages/CypherEngine/CypherEngineFFI.xcframework
+            Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
+      - name: Build all eight slices
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable
+          command -v zstd >/dev/null || brew install zstd
+          scripts/build-engine.sh
+
   app:
     name: Build app (${{ matrix.platform }})
+    needs: engine-library
     runs-on: xcode-27
     timeout-minutes: 30
     strategy:
@@ -29,6 +79,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ needs.engine-library.outputs.key }}
+          fail-on-cache-miss: true
+          path: |
+            Packages/CypherEngine/CypherEngineFFI.xcframework
+            Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
       - name: Build
         run: |
           xcodebuild build \
