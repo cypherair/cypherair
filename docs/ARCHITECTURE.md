@@ -639,8 +639,8 @@ A few engine tests need 2 GiB of memory or large files. They sit behind a second
 
 **Build.** One script, `scripts/build-engine.sh`, builds the library for the eight targets of today: iPhone, Mac and Vision Pro, each for arm64 and arm64e, and the two simulators. Stock Rust builds the arm64 slices. The pinned patched compiler builds the three arm64e slices. The script builds one target after another, makes the XCFramework and generates the Swift bindings. It writes both straight into `Packages/CypherEngine/`. Neither is committed. It can also build a list of targets, for a quick loop.
 
-- *Where it runs:* on the Mac, by the session that changed the engine. In CI, when the engine changed.
-- *Reuse.* The build compiles OpenSSL once per target. A new worktree starts with a copy of the main checkout's built library, through `.worktreeinclude`, which lists both output paths. If the build proves slow, CI can also publish its build for download; that is for #1052 to decide.
+- *Where it runs:* on the Mac, by the session that changed the engine. In CI, when the engine or the workflow changed; otherwise the build job restores the library from the Actions cache. Either way it passes the library to the run's other jobs as an artifact.
+- *Reuse.* The build compiles OpenSSL once per target. A new worktree starts with a copy of the main checkout's built library, through `.worktreeinclude`, which lists both output paths.
 - *A stale library is found by a machine.* The script stores beside the library a hash of the engine's sources and the bindings generator, its lock file, the package manifest (which states the deployment targets), the compiler pin and itself, and the list of slices it built. The app build compares that hash with the checkout first, checks that the library has the slice it builds, and fails with the command that fixes it. Xcode lets the check read only the files it declares, so the script writes the list of its inputs to `engine/inputs.xcfilelist`. A piece that adds a source file runs the script and commits the list; the check fails until it does.
 
 **Packaging.** This layout is shown to work on every platform and slice (#1045).

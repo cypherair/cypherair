@@ -42,15 +42,13 @@ jobs:
     name: Build the engine library
     runs-on: xcode-27
     timeout-minutes: 90
-    outputs:
-      key: ${{ steps.key.outputs.key }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The same inputs scripts/build-engine.sh hashes for its stale check.
+      # The inputs scripts/build-engine.sh hashes for its stale check, and this file.
       - id: key
-        run: echo "key=engine-library-${{ hashFiles('engine/src/**/*.rs', 'engine/uniffi-bindgen/**/*.rs', 'engine/uniffi-bindgen/Cargo.toml', 'engine/Cargo.toml', 'engine/Cargo.lock', 'Packages/CypherEngine/Package.swift', 'third_party/arm64e-stage1-toolchain.pin.json', 'scripts/build-engine.sh') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=engine-library-${{ hashFiles('engine/src/**/*.rs', 'engine/uniffi-bindgen/**/*.rs', 'engine/uniffi-bindgen/Cargo.toml', 'engine/Cargo.toml', 'engine/Cargo.lock', 'Packages/CypherEngine/Package.swift', 'third_party/arm64e-stage1-toolchain.pin.json', 'scripts/build-engine.sh', '.github/workflows/ci.yml') }}" >> "$GITHUB_OUTPUT"
       - id: cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -65,6 +63,14 @@ jobs:
           rustup toolchain install stable
           command -v zstd >/dev/null || brew install zstd
           scripts/build-engine.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: engine-library
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            Packages/CypherEngine/CypherEngineFFI.xcframework
+            Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
 
   app:
     name: Build app (${{ matrix.platform }})
@@ -79,13 +85,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          key: ${{ needs.engine-library.outputs.key }}
-          fail-on-cache-miss: true
-          path: |
-            Packages/CypherEngine/CypherEngineFFI.xcframework
-            Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
+          name: engine-library
+          path: Packages/CypherEngine
       - name: Build
         run: |
           xcodebuild build \
@@ -103,13 +106,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          key: ${{ needs.engine-library.outputs.key }}
-          fail-on-cache-miss: true
-          path: |
-            Packages/CypherEngine/CypherEngineFFI.xcframework
-            Packages/CypherEngine/Sources/CypherEngine/cypher_engine.swift
+          name: engine-library
+          path: Packages/CypherEngine
       - name: Check the layers
         run: scripts/check-layers.sh
       - name: Test
