@@ -37,16 +37,12 @@ CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the curves t
 - **The interop target for PQ artifacts is the Sequoia lineage** (`sq` at RFC 9980-capable releases). Device-Bound Modern (v6) likewise makes no GnuPG claim; Device-Bound Legacy (v4) is the GnuPG-oriented device-bound family.
 - **v6 interop is tested only against `sq`**, which is built on Sequoia like the engine: no RFC 9580 implementation outside Sequoia is exercised.
 
-## 7. Accepted risk
-
-- **Vision Pro and iPad are not tested on their own hardware**: the project has no Vision Pro, and [ARCHITECTURE.md](ARCHITECTURE.md) §6 tests on an iPhone and a Mac. This is accepted, also for the device-bound families, on the strength of the Secure Enclave interface that both share with the tested platforms.
-
-## 8. Not built yet
+## 7. Not built yet
 
 Rules for pieces that are not built yet. Each names the piece that builds it: a piece of [ARCHITECTURE.md](ARCHITECTURE.md) §9, or a screens piece by its issue.
 
 - **#1049, #1063.** The export boundary must refuse anything but software custody before touching any secret.
-- **#1063, #1053.** All four device-bound families must be offered wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risk: §7).
+- **#1063, #1053.** All four device-bound families must be offered wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard.
 - **#1063.** Material that is missing or has the wrong form must block the operation **without ever showing a biometric sheet**.
 - **#1053.** The UI must never offer a backup flow for device-bound keys.
 - **#1053, #1059.** No text may imply that a key can be imported into the enclave or converted into Secure Enclave custody, or that the PQ families are GnuPG-compatible.
