@@ -4,9 +4,10 @@ import LocalAuthentication
 import Sealing
 import os
 
-// The sandbox composition: a vault that never touches hardware, the Keychain,
-// or Argon2id. Every value lives in memory and dies with the process. It exists
-// for the tutorial sandbox and for test hosts, never for user data.
+// Stand-ins for the hardware: an enclave, Keychain rows and presence that live
+// in memory and die with the process, a stretcher without Argon2id, and a
+// session that needs no prompt. They serve the simulator, previews and tests,
+// never user data.
 
 /// Software keys standing in for the enclave. Blobs carry the key material and
 /// a hash of the credential the key was created under, so a wrong credential is

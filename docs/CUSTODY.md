@@ -2,29 +2,28 @@
 
 ## 1. The custody model
 
-Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model. The design separates OpenPGP **configuration** (version/algorithms/format), private-key **custody** (software secret keys vs enclave operations), and **operation capability** (what a key can do right now, or an explicit unsupported state) — validity is decided by *family*, never by suite alone. All four device-bound families are exposed wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risks: §7).
+Secure Enclave custody is a **custody model, not an algorithm suite**: long-term private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for the post-quantum ones. It sits alongside, and never replaces, the portable software-key model.
 
 ## 2. Custody promises
 
-- **Private material is never exportable in any operable form.** The export boundary refuses anything but software custody before touching any secret, and the UI never offers a backup flow for device-bound keys.
-- **Import into the enclave is not an operation**, and **existing private keys are never converted into Secure Enclave custody**; the product must not imply otherwise.
-- **An enclave key blob, a public key, or a copy of the sealed key list is never a recoverable private-key backup** — treating one as such is a stop-and-review condition.
-- **Never weaken portable software-key behavior to make custody integration easier** — the second stop-and-review condition.
+- **Private material is never exportable in any operable form.**
+- **Import into the enclave is not an operation**, and **existing private keys are never converted into Secure Enclave custody**.
+- **An enclave key blob, a public key, or a copy of the sealed key list is never a recoverable private-key backup.**
 - **Rust owns all OpenPGP semantics**; the enclave performs only the private primitive through narrow callbacks that never carry secret-key material (§5).
 - **Device-bound keys always require biometrics**, fixed at creation, with no passcode fallback. Keys survive a change of the enrolled biometric set, and biometric-set invalidation must **never** be offered as a user option — for a non-exportable key it is permanent key loss.
 - **Device-bound keys also require the passphrase.** Every enclave custody key is created with the identity credential as its application password, so a borrowed biometric alone cannot use one — with the single exception of the ML-KEM half (§4), which the enclave cannot decapsulate under the option. A passphrase change never touches custody keys, and there is no mode or policy switch that could.
 
 ## 3. Operation routing
 
-- **Check before authentication.** Checking a key's stored material never prompts, because it is part of the key list. Material that is missing or has the wrong form blocks the operation **without ever showing a biometric sheet**. A blob that does not match its certificate fails closed when it is loaded.
+- **Check before authentication.** Checking a key's stored material never prompts, because it is part of the key list. A blob that does not match its certificate fails closed when it is loaded.
 - **One approval per operation.** A single authenticated window covers the enclave-handle load and, for split custody, the classical-component unwrap; the operation context carries the identity credential silently.
 - **Roles are distinct handles.** Signing and key agreement route by required role; wrong-role or wrong-public-binding requests fail closed. A Secure Enclave route never falls back to software material.
 
 ## 4. Split custody
 
-CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classical curves, so a whole RFC 9980 composite key cannot be enclave-resident. Device-Bound Post-Quantum therefore splits custody: the PQ components are generated in and never leave the enclave; the classical components are sealed against the identity wrapping key with their own payload kind and stored with the key inside the sealed key list, so a software-custody consumer handed one fails closed rather than opening it. **The custody invariant:** every composite signature and decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt, and is never independently reachable through any export or backup path. Split custody needs both halves: an intact enclave handle pair says nothing about the sealed component.
+CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the curves that RFC 9980 pairs them with, so a whole composite key cannot be enclave-resident. Device-Bound Post-Quantum therefore splits custody: the PQ components are generated in and never leave the enclave; the classical components are sealed against the identity wrapping key with their own payload kind and stored with the key inside the sealed key list, so a software-custody consumer handed one fails closed rather than opening it. **The custody invariant:** every composite signature and decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt, and is never independently reachable through any export or backup path. Split custody needs both halves: an intact enclave handle pair says nothing about the sealed component.
 
-**The ML-KEM exception.** The enclave cannot decapsulate with an ML-KEM key created under the application-password option ([SECURITY.md](SECURITY.md) §10), so the ML-KEM half is the one enclave key created without it, under the biometric constraint alone. The passphrase still gates every composite decryption, because the classical half is sealed against the identity wrapping key, which demands it. The ML-DSA half carries the password like every other enclave key.
+**The ML-KEM exception.** The enclave cannot decapsulate with an ML-KEM key created under the application-password option ([SECURITY.md](SECURITY.md) §9), so the ML-KEM half is the one enclave key created without it, under the biometric constraint alone. The passphrase still gates every composite decryption, because the classical half is sealed against the identity wrapping key, which demands it. The ML-DSA half carries the password like every other enclave key.
 
 ## 5. Structural red lines
 
@@ -34,12 +33,20 @@ CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the classica
 
 ## 6. Interop position
 
-- **The PQ families make no GnuPG claim, and product copy must never imply one.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only. Portable Legacy remains the GnuPG-compatibility story.
+- **The PQ families make no GnuPG claim.** GnuPG follows LibrePGP, whose post-quantum wire format is different and encryption-only. Portable Legacy remains the GnuPG-compatibility story.
 - **The interop target for PQ artifacts is the Sequoia lineage** (`sq` at RFC 9980-capable releases). Device-Bound Modern (v6) likewise makes no GnuPG claim; Device-Bound Legacy (v4) is the GnuPG-oriented device-bound family.
+- **v6 interop is tested only against `sq`**, which is built on Sequoia like the engine: no RFC 9580 implementation outside Sequoia is exercised.
 
-## 7. Evidence rules
+## 7. Accepted risk
 
-- **Evidence and diagnostic output never carry** plaintext, private-key material, shared secrets, session keys, KEKs, Keychain row names, enclave key blobs, stable fingerprints, or temporary capability paths — only pass/fail, scenario labels, sanitized failure categories, algorithm/curve identifiers, packet versions and tags, counts, and the gpg version string.
-- **Coverage honesty.** v6 third-party AEAD interop is verified by composition only — no non-Sequoia RFC 9580 implementation is exercised.
-- **A platform-specific custody claim requires that platform's own capture**; the shared CryptoKit substrate justifies exposure, not claims.
-- **Accepted risks:** visionOS is exposed without dedicated evidence — no Vision Pro hardware; based on the shared substrate. iPad capture is deferred and not required for release.
+- **Vision Pro and iPad are not tested on their own hardware**: the project has no Vision Pro, and [ARCHITECTURE.md](ARCHITECTURE.md) §6 tests on an iPhone and a Mac. This is accepted, also for the device-bound families, on the strength of the Secure Enclave interface that both share with the tested platforms.
+
+## 8. Not built yet
+
+Rules for pieces that are not built yet. Each names the piece that builds it: a piece of [ARCHITECTURE.md](ARCHITECTURE.md) §9, or a screens piece by its issue.
+
+- **#1049, #1063.** The export boundary must refuse anything but software custody before touching any secret.
+- **#1063, #1053.** All four device-bound families must be offered wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risk: §7).
+- **#1063.** Material that is missing or has the wrong form must block the operation **without ever showing a biometric sheet**.
+- **#1053.** The UI must never offer a backup flow for device-bound keys.
+- **#1053, #1059.** No text may imply that a key can be imported into the enclave or converted into Secure Enclave custody, or that the PQ families are GnuPG-compatible.

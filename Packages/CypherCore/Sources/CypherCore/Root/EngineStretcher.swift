@@ -18,7 +18,7 @@ struct EngineStretcher: PassphraseStretcher {
             parallelism: parameters.parallelism
         )
         // Moves the bytes into a buffer that erases itself, and erases this
-        // copy. UniFFI's own transit copy is out of reach (SECURITY.md §9).
+        // copy. UniFFI's own transit copy is out of reach (SECURITY.md §8).
         return SensitiveBuffer(consuming: &output)
     }
 }

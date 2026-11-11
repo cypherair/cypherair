@@ -657,7 +657,7 @@ Packages/CypherEngine/
 - The package states the platforms as the app's exact deployment target, `27.2`. With `.v27` the linker warns for every object file. The core and the vault package use the same versions.
 - The package repeats the project's Swift settings: Swift 6 mode, `InferIsolatedConformances`, `NonisolatedNonsendingByDefault`, `MemberImportVisibility`. Strict memory safety stays off for the bindings; the generated code does not pass it.
 - The committed workspace setting `iOSPackagesShouldBuildARM64e` is required, for Vision Pro too. Without it the iPhone device build fails.
-- The app's arm64e.x1 slice takes the arm64e objects of the library, as it does for the vault package.
+- The app's arm64e.x1 slice takes the arm64e objects of the library. The Swift packages are compiled for arm64e.x1 themselves.
 
 ## 8. Layout and parallel work
 
