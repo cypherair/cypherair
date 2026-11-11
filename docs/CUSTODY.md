@@ -39,15 +39,14 @@ CryptoKit's Secure Enclave implements ML-KEM and ML-DSA but none of the curves t
 
 ## 7. Accepted risk
 
-- **Vision Pro is not tested on hardware**, because the project has none. This is accepted, also for the device-bound families, on the strength of the Secure Enclave interface that visionOS shares with the tested platforms.
-- **iPad is not tested on its own hardware before a release.**
+- **Vision Pro and iPad are not tested on their own hardware**: the project has no Vision Pro, and [ARCHITECTURE.md](ARCHITECTURE.md) §6 tests on an iPhone and a Mac. This is accepted, also for the device-bound families, on the strength of the Secure Enclave interface that both share with the tested platforms.
 
 ## 8. Not built yet
 
 Rules for pieces that are not built yet. Each names the piece that builds it: a piece of [ARCHITECTURE.md](ARCHITECTURE.md) §9, or a screens piece by its issue.
 
 - **#1049, #1063.** The export boundary must refuse anything but software custody before touching any secret.
-- **#1063.** All four device-bound families must be offered wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risk: §7).
+- **#1063, #1053.** All four device-bound families must be offered wherever Secure Enclave hardware is present, gated on `SecureEnclave.isAvailable` alone, with no per-platform guard (accepted risk: §7).
 - **#1063.** Material that is missing or has the wrong form must block the operation **without ever showing a biometric sheet**.
 - **#1053.** The UI must never offer a backup flow for device-bound keys.
 - **#1053, #1059.** No text may imply that a key can be imported into the enclave or converted into Secure Enclave custody, or that the PQ families are GnuPG-compatible.

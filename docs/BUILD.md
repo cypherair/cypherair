@@ -2,7 +2,7 @@
 
 ## 1. Stable release
 
-**Build numbers.** `CURRENT_PROJECT_VERSION` encodes `MARKETING_VERSION` (`1.5.5` → `15500`). For macOS App Store uploads the build number must be strictly higher than the highest macOS build previously uploaded, *even when the marketing version increases* — an Apple-side fact no gate here can see.
+**Build numbers.** `CURRENT_PROJECT_VERSION` encodes `MARKETING_VERSION` (`2.0` → `20000`). For macOS App Store uploads the build number must be strictly higher than the highest macOS build previously uploaded, *even when the marketing version increases* — an Apple-side fact no gate here can see.
 
 ## 3. arm64e toolchain contract
 
@@ -17,7 +17,7 @@
 gh attestation verify ASSET -R cypherair/rust --signer-workflow WORKFLOW --source-digest COMMIT
 ```
 
-with the pin's `release.signerWorkflow` and `release.commitSha`. The pin holds each asset's SHA-256 and byte size, taken from a real download rather than an API-reported digest, and `scripts/build-engine.sh` refuses an asset that does not match them.
+with the pin's `release.signerWorkflow` and `release.commitSha`. The pin holds the SHA-256 and byte size of each asset that passed this check, and `scripts/build-engine.sh` refuses an asset that does not match them.
 
 ## 4. Owned carry chains
 
