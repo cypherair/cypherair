@@ -63,20 +63,6 @@ public struct SensitiveBuffer: ~Copyable {
         try body(storage)
     }
 
-    /// Constant-time equality, for tests and for verifying a derived value.
-    public borrowing func contentEquals(_ other: borrowing SensitiveBuffer) -> Bool {
-        guard count == other.count else { return false }
-        return withUnsafeBytes { mine in
-            other.withUnsafeBytes { theirs in
-                var difference: UInt8 = 0
-                for index in 0..<mine.count {
-                    difference |= mine[index] ^ theirs[index]
-                }
-                return difference == 0
-            }
-        }
-    }
-
     deinit {
         sensitiveErase(storage)
         storage.deallocate()

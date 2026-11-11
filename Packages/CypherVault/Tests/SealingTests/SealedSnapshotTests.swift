@@ -6,7 +6,7 @@ import Testing
 struct SealedSnapshotTests {
     private let key = SymmetricKey(size: .bits256)
 
-    @Test func `Domain and schema are bound`() throws {
+    @Test func `Domain and schema are bound, and a renamed file fails authentication`() throws {
         let snapshot = try SealedSnapshotCodec.seal(plaintext: Data("x".utf8), domain: "contacts", schemaVersion: 1, key: key)
         #expect(throws: SealingError.bindingMismatch) {
             try SealedSnapshotCodec.open(snapshot, domain: "settings", schemaVersion: 1, key: key)

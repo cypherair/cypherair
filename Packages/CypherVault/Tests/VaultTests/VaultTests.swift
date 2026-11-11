@@ -57,7 +57,7 @@ struct VaultTests {
         #expect(authenticator.prompts == promptsAfterBootstrap + 1)
     }
 
-    @Test func `Cancelled or failed presence never touches the root`() async throws {
+    @Test func `A cancelled presence at unlock is reported as cancelled`() async throws {
         _ = try await bootstrap()
         authenticator.failure = .authenticationCancelled
         await #expect(throws: VaultError.authenticationCancelled) {
