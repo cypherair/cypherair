@@ -615,7 +615,7 @@ The core composes the vault and its stores itself, in one file. The software com
 | Mac, arm64e | Not yet ¹ | Yes (`swift test --arch arm64e`) ² | Yes | The Mac. CI, if a hosted runner can run it |
 | iPhone, arm64e | — ³ | Yes, on a connected iPhone | Yes | The owner's iPhone |
 | iPhone simulator, Vision Pro simulator | — | Yes ⁴ | — | The Mac and CI |
-| Vision Pro, arm64 and arm64e | — | — | — | Built and linked only. There is no hardware; `CUSTODY.md` §7 accepts this |
+| Vision Pro, arm64 and arm64e | — | — | — | Built and linked only. There is no hardware |
 | iPhone, arm64 | — | — | — | Built and linked only ⁵ |
 
 ¹ An arm64e Rust executable built by the patched compiler runs on the Mac, but a Rust test binary cannot be built for arm64e: the compiler's prebuilt libraries have `std` without `libtest`. Until the compiler adds `library/test`, this slice is covered only by `swift test --arch arm64e`, which the core's package tests (#1062) are the first to run.
