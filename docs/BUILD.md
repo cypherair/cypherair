@@ -21,7 +21,7 @@ with the pin's `release.signerWorkflow` and `release.commitSha`. The pin holds t
 
 ## 4. Owned carry chains
 
-`engine/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions — the entire reason the chain exists. `Cargo.lock`, never prose, is the truth for the current heads; the branches stay downstream until equivalent arm64e support lands upstream.
+`engine/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork, whose submodule points at the `cypherair/openssl` fork. That fork carries what upstream lacks for arm64e. It has the Apple arm64e target definitions, and pointer authentication in OpenSSL's armv8 assembly: `AARCH64_SIGN_LINK_REGISTER` and `AARCH64_VALIDATE_LINK_REGISTER` defined as `pacibsp` and `autibsp`, those macros in every function that saves `x30`, and signed Poly1305 callbacks. `Cargo.lock`, never prose, is the truth for the current heads; the branches stay downstream until upstream has all of it.
 
 ## 5. FFI artifact shape
 
