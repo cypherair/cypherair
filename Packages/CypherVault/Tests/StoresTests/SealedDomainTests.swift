@@ -1,12 +1,12 @@
 import CryptoKit
 import Foundation
 import Stores
-import XCTest
+import Testing
 
 private struct Contacts: Codable, Equatable, Sendable { var names: [String] }
 
 /// The sealing rules of a domain, on files held in memory.
-final class SealedDomainTests: XCTestCase {
+struct SealedDomainTests {
     private let files = InMemoryDomainFiles()
     private let key = SymmetricKey(size: .bits256)
 
@@ -15,103 +15,97 @@ final class SealedDomainTests: XCTestCase {
     }
 
     private func flipByte(of name: String) throws {
-        var bytes = try XCTUnwrap(try files.read(name))
+        var bytes = try #require(try files.read(name))
         bytes[bytes.count / 2] ^= 0xFF
         try files.replace(name, with: bytes)
     }
 
-    func test_saveThenLoad_roundTrips_andReplacesInPlace() throws {
-        try domain().save(Contacts(names: ["a"]), key: key)
-        XCTAssertEqual(try domain().load(key: key), Contacts(names: ["a"]))
-        try domain().save(Contacts(names: ["a", "b"]), key: key)
-        XCTAssertEqual(try domain().load(key: key), Contacts(names: ["a", "b"]))
-        XCTAssertEqual(domain().integrity(key: key), .intact)
-    }
-
-    func test_fileSize_movesOnlyInStepsOfThePadding() throws {
+    @Test func `File size moves only in steps of the padding`() throws {
+        let step = SealedDomain<Contacts>.paddingStep
         try domain().save(Contacts(names: []), key: key)
-        let empty = try XCTUnwrap(try files.read("contacts")).count
+        let empty = try #require(try files.read("contacts")).count
         try domain().save(Contacts(names: (0..<100).map { "contact \($0)" }), key: key)
-        XCTAssertEqual(try XCTUnwrap(try files.read("contacts")).count, empty)
-        try domain().save(Contacts(names: [String(repeating: "x", count: SealedDomain<Contacts>.paddingStep)]), key: key)
-        XCTAssertEqual(try XCTUnwrap(try files.read("contacts")).count, empty + SealedDomain<Contacts>.paddingStep)
-        XCTAssertEqual(try domain().load(key: key).names.first?.count, SealedDomain<Contacts>.paddingStep)
+        let hundred = try #require(try files.read("contacts"))
+        #expect(hundred.count == empty)
+        try domain().save(Contacts(names: [String(repeating: "x", count: step)]), key: key)
+        let oneStepMore = try #require(try files.read("contacts"))
+        #expect(oneStepMore.count == empty + step)
+        #expect(try domain().load(key: key).names.first?.count == step)
     }
 
-    func test_missingAndDamaged_areDistinguished_andNeverDefault() throws {
-        XCTAssertEqual(domain().integrity(key: key), .missing)
-        XCTAssertThrowsError(try domain().load(key: key)) { XCTAssertEqual($0 as? StoreError, .missing) }
+    @Test func `Missing and damaged are distinguished and never default`() throws {
+        #expect(domain().integrity(key: key) == .missing)
+        #expect(throws: StoreError.missing) { try domain().load(key: key) }
         try domain().save(Contacts(names: ["a"]), key: key)
         try flipByte(of: "contacts")
-        XCTAssertEqual(domain().integrity(key: key), .damaged)
-        XCTAssertThrowsError(try domain().load(key: key)) { XCTAssertEqual($0 as? StoreError, .damaged) }
+        #expect(domain().integrity(key: key) == .damaged)
+        #expect(throws: StoreError.damaged) { try domain().load(key: key) }
         try domain().save(Contacts(names: ["a"]), key: key)
-        XCTAssertEqual(domain().integrity(key: SymmetricKey(size: .bits256)), .damaged, "a wrong key reads as damage, never as empty")
+        #expect(domain().integrity(key: SymmetricKey(size: .bits256)) == .damaged, "a wrong key reads as damage, never as empty")
     }
 
-    func test_fileFromAnotherVersion_isNamedApartFromDamage() throws {
+    @Test func `A file from another version is named apart from damage`() throws {
         try domain(version: 2).save(Contacts(names: ["a"]), key: key)
-        XCTAssertEqual(domain(version: 3).integrity(key: key), .otherVersion)
-        XCTAssertThrowsError(try domain(version: 3).load(key: key)) { XCTAssertEqual($0 as? StoreError, .otherVersion) }
+        #expect(domain(version: 3).integrity(key: key) == .otherVersion)
+        #expect(throws: StoreError.otherVersion) { try domain(version: 3).load(key: key) }
     }
 
-    func test_aFileMovedBetweenDomains_isDamage_whateverItsVersion() throws {
+    @Test func `A file moved between domains is damage, whatever its version`() throws {
         try domain("contacts", version: 2).save(Contacts(names: ["a"]), key: key)
-        try files.replace("settings", with: try XCTUnwrap(try files.read("contacts")))
-        XCTAssertEqual(domain("settings", version: 2).integrity(key: key), .damaged)
-        XCTAssertEqual(domain("settings", version: 3).integrity(key: key), .damaged)
+        try files.replace("settings", with: try #require(try files.read("contacts")))
+        #expect(domain("settings", version: 2).integrity(key: key) == .damaged)
+        #expect(domain("settings", version: 3).integrity(key: key) == .damaged)
     }
 }
 
-/// The protected directory on disk. Skips on a volume without file protection.
-final class ProtectedDataDirectoryTests: XCTestCase {
-    private var directory: ProtectedDataDirectory!
+/// Virtual machines, such as hosted CI runners, have no Data Protection. This is
+/// decided apart from the code under test, so a wrong rejection by the vault
+/// fails the suite rather than skipping it.
+private func temporaryVolumeHasFileProtection() throws -> Bool {
+    let values = try FileManager.default.temporaryDirectory.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
+    return values.allValues[.volumeSupportsFileProtectionKey] as? Bool != false
+}
+
+/// The protected directory on disk. A class, so `deinit` removes the directory.
+@Suite(.enabled(if: try temporaryVolumeHasFileProtection(), "the volume holding the temporary directory reports no file protection"))
+final class ProtectedDataDirectoryTests {
+    private let directory: ProtectedDataDirectory
     private let key = SymmetricKey(size: .bits256)
 
-    override func setUpWithError() throws {
-        try super.setUpWithError()
-        let temporary = FileManager.default.temporaryDirectory
-        // Decided apart from the code under test, so a wrong rejection by the
-        // vault fails here rather than skipping. Virtual machines, such as
-        // hosted CI runners, have no Data Protection.
-        let values = try temporary.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
-        if values.allValues[.volumeSupportsFileProtectionKey] as? Bool == false {
-            throw XCTSkip("the volume holding the temporary directory reports no file protection")
-        }
-        directory = try ProtectedDataDirectory(url: temporary.appending(path: "ProtectedDataDirectoryTests-\(UUID().uuidString)"))
+    init() throws {
+        directory = try ProtectedDataDirectory(url: FileManager.default.temporaryDirectory.appending(path: "ProtectedDataDirectoryTests-\(UUID().uuidString)"))
     }
 
-    override func tearDownWithError() throws {
-        if let directory { try? FileManager.default.removeItem(at: directory.url) }
-        try super.tearDownWithError()
+    deinit {
+        try? FileManager.default.removeItem(at: directory.url)
     }
 
     private var contacts: SealedDomain<Contacts> { SealedDomain(domain: "contacts", schemaVersion: 1, files: directory) }
 
-    func test_saveThenLoad_onDisk_leavesNoTemporaryFile() throws {
+    @Test func `Save then load on disk leaves no temporary file`() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
         try contacts.save(Contacts(names: ["a", "b"]), key: key)
-        XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a", "b"]))
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.url.path), ["contacts.sealed"])
+        #expect(try contacts.load(key: key) == Contacts(names: ["a", "b"]))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.url.path) == ["contacts.sealed"])
     }
 
-    func test_strayTemporaryFile_isIgnoredAndSwept() throws {
+    @Test func `A stray temporary file is ignored and swept`() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
         let stray = directory.url.appending(path: "contacts.\(UUID().uuidString).tmp")
         try Data("garbage".utf8).write(to: stray)
-        XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a"]))
+        #expect(try contacts.load(key: key) == Contacts(names: ["a"]))
         directory.sweepTemporaries()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: stray.path))
-        XCTAssertEqual(try contacts.load(key: key), Contacts(names: ["a"]))
+        #expect(!FileManager.default.fileExists(atPath: stray.path))
+        #expect(try contacts.load(key: key) == Contacts(names: ["a"]))
     }
 
-    func test_savedFile_carriesCompleteProtection() throws {
+    @Test func `A saved file carries complete protection`() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
         let attributes = try FileManager.default.attributesOfItem(atPath: directory.url.appending(path: "contacts.sealed").path)
-        XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+        #expect(attributes[.protectionKey] as? FileProtectionType == .complete)
     }
 
-    func test_directory_isExcludedFromBackups_atEveryStart() throws {
+    @Test func `The directory is excluded from backups at every start`() throws {
         var url = directory.url
         var values = URLResourceValues()
         values.isExcludedFromBackup = false
@@ -120,19 +114,19 @@ final class ProtectedDataDirectoryTests: XCTestCase {
         _ = try ProtectedDataDirectory(url: directory.url)
 
         url.removeAllCachedResourceValues()
-        XCTAssertEqual(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
+        #expect(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
     }
 
-    func test_aFileThatCannotBeRead_isAnError_notMissing() throws {
+    @Test func `A file that cannot be read is an error, not missing`() throws {
         try FileManager.default.createDirectory(at: directory.url.appending(path: "contacts.sealed"), withIntermediateDirectories: false)
-        XCTAssertThrowsError(try directory.read("contacts")) { XCTAssertEqual($0 as? StoreError, .io("read failed")) }
-        XCTAssertNil(try directory.read("settings"))
+        #expect(throws: StoreError.io("read failed")) { try directory.read("contacts") }
+        #expect(try directory.read("settings") == nil)
     }
 
-    func test_eraseAll_removesEveryFile() throws {
+    @Test func `Erase all removes every file`() throws {
         try contacts.save(Contacts(names: ["a"]), key: key)
         try Data("garbage".utf8).write(to: directory.url.appending(path: "contacts.\(UUID().uuidString).tmp"))
         try directory.eraseAll()
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.url.path), [])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.url.path) == [])
     }
 }

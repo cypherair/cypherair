@@ -31,6 +31,8 @@
     { "path": "CypherAirMacOS.entitlements" },
     { "path": "AppIcon.icon", "target-membership": [ "CypherAir/resources" ] },
     { "path": "CypherAir-Info.plist" },
+    { "path": "Packages/CypherCore" },
+    { "path": "Packages/CypherVault" },
     { "kind": "folder", "path": "App", "target-membership": [ "CypherAir" ] },
     {
       "kind": "group",
