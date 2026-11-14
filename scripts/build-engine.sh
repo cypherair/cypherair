@@ -9,8 +9,8 @@
 #
 # Stock Rust builds the arm64 slices. The arm64e slices are built by stable
 # Cargo with RUSTC pointed at the pinned stage1 compiler
-# (third_party/arm64e-stage1-toolchain.pin.json; docs/BUILD.md section 3),
-# which this script downloads and checks against the pin.
+# (third_party/arm64e-stage1-toolchain.pin.json; docs/BUILD.md, "arm64e
+# toolchain contract"), which this script downloads and checks against the pin.
 
 set -euo pipefail
 
@@ -172,8 +172,8 @@ verify_asset() {
 }
 
 # The deployment targets, from the engine package's manifest, which states the
-# app's exact versions (docs/BUILD.md section 7). Not from the project: Xcode
-# cannot resolve it while the library is missing.
+# app's exact versions (docs/BUILD.md, "Swift packages"). Not from the project:
+# Xcode cannot resolve it while the library is missing.
 read_deployment_targets() {
     platform() { sed -n "s/.*\.$1(\"\([0-9.]*\)\").*/\1/p" "$PACKAGE/Package.swift" | head -n 1; }
     MACOS_VERSION="$(platform macOS)"
