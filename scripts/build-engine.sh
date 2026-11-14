@@ -9,8 +9,8 @@
 #
 # Stock Rust builds the arm64 slices. The arm64e slices are built by stable
 # Cargo with RUSTC pointed at the pinned stage1 compiler
-# (third_party/arm64e-stage1-toolchain.pin.json; docs/BUILD.md section 3),
-# which this script downloads and checks against the pin.
+# (third_party/arm64e-stage1-toolchain.pin.json; docs/BUILD.md, "arm64e
+# toolchain contract"), which this script downloads and checks against the pin.
 
 set -euo pipefail
 
@@ -132,33 +132,30 @@ print(value)
 PY
 }
 
-# Download the pinned stage1 compiler for this host into the target directory,
-# once per pinned release, check every asset against the pin, and set
-# ARM64E_RUSTC. Called as a plain command, never inside $(...), so that a failed
-# check stops the script: bash 3.2 does not carry `set -e` into a substitution.
+# Download the pinned stage1 compiler, which runs on Apple silicon only, into
+# the target directory once per pinned release, check it against the pin, and
+# set ARM64E_RUSTC. Called as a plain command, never inside $(...), so that a
+# failed check stops the script: bash 3.2 does not carry `set -e` into a
+# substitution.
 use_stage1_rustc() {
-    local tag repository host base root download asset url
+    local tag repository asset root download url
     tag="$(pin release tag)"
     repository="$(pin repository)"
-    host="$(rustc +stable -vV | sed -n 's/^host: //p')"
-    base="rust-stage1-for-arm64e-$host"
+    asset=rust-stage1-for-arm64e-aarch64-apple-darwin.tar.zst
     root="$CARGO_TARGET_DIR/arm64e-stage1/$tag"
     download="$root/download"
     if [ ! -x "$root/toolchain/stage1-arm64e-patch/bin/rustc" ]; then
-        mkdir -p "$download"
-        for asset in "$base.tar.zst" "$base.sha256" "$base.json"; do
-            if ! verify_asset "$download/$asset" "$asset" 2>/dev/null; then
-                url="https://github.com/$repository/releases/download/$tag/$asset"
-                echo "Downloading $url"
-                curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-                    --output "$download/$asset" "$url"
-                verify_asset "$download/$asset" "$asset"
-            fi
-        done
+        if ! verify_asset "$download/$asset" "$asset" 2>/dev/null; then
+            mkdir -p "$download"
+            url="https://github.com/$repository/releases/download/$tag/$asset"
+            echo "Downloading $url"
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+                --output "$download/$asset" "$url"
+            verify_asset "$download/$asset" "$asset"
+        fi
         rm -rf "$root/toolchain"
         mkdir -p "$root/toolchain"
-        (cd "$download" && shasum -a 256 -c "$base.sha256")
-        zstd -d -c "$download/$base.tar.zst" | bsdtar -xf - -C "$root/toolchain"
+        zstd -d -c "$download/$asset" | bsdtar -xf - -C "$root/toolchain"
     fi
     ARM64E_RUSTC="$root/toolchain/stage1-arm64e-patch/bin/rustc"
     [ -x "$ARM64E_RUSTC" ] || { echo "error: the stage1 compiler is missing: $ARM64E_RUSTC" >&2; exit 1; }
@@ -175,8 +172,8 @@ verify_asset() {
 }
 
 # The deployment targets, from the engine package's manifest, which states the
-# app's exact versions (docs/BUILD.md section 7). Not from the project: Xcode
-# cannot resolve it while the library is missing.
+# app's exact versions (docs/BUILD.md, "Swift packages"). Not from the project:
+# Xcode cannot resolve it while the library is missing.
 read_deployment_targets() {
     platform() { sed -n "s/.*\.$1(\"\([0-9.]*\)\").*/\1/p" "$PACKAGE/Package.swift" | head -n 1; }
     MACOS_VERSION="$(platform macOS)"
