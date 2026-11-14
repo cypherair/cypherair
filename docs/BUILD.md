@@ -10,14 +10,15 @@
 - **`UIRequiredDeviceCapabilities` is declared (`arm64`) in `CypherAir-Info.plist`** because Xcode injects it only while every architecture in `ARCHS` is arm64 or arm64e; the arm64e.x1 slice silences the injection, and App Store Connect rejects a 64-bit iOS binary without the key.
 - **`arm64e` builds use stable Cargo with `RUSTC` pointed at the pinned stage1 compiler and its prebuilt std payloads — never nightly Cargo, never `-Zbuild-std`.** The repo has no `rust-toolchain.toml`; every ordinary validation names its toolchain (`cargo +stable`).
 - **App-side Rust or UniFFI changes never require a new stage1 prerelease** — only a change to the Rust compiler fork itself does. The opposite assumption costs a publication cycle.
+- **The engine's tests for `arm64e` run with `--lib --tests`.** The stage1 compiler ships no `rustdoc`, and stock `rustdoc` has no arm64e std, so the doc-tests cannot build for that target.
 
-**Re-pin rule.** A stage1 release is pinned only when the compiler fork's reviewed workflow built it from the reviewed commit. Each asset's build attestation shows this:
+**Re-pin rule.** A stage1 release is pinned only when the compiler fork's reviewed workflow built it from the reviewed commit. The asset's build attestation shows this:
 
 ```
 gh attestation verify ASSET -R cypherair/rust --signer-workflow WORKFLOW --source-digest COMMIT
 ```
 
-with the pin's `release.signerWorkflow` and `release.commitSha`. The pin holds the SHA-256 and byte size of each asset that passed this check, and `scripts/build-engine.sh` refuses an asset that does not match them.
+with the pin's `release.signerWorkflow` and `release.commitSha`. The pin holds the SHA-256 and byte size of the asset that passed this check, and `scripts/build-engine.sh` refuses an asset that does not match them.
 
 ## 4. Owned carry chains
 

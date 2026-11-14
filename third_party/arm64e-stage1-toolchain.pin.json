@@ -3,41 +3,21 @@
   "dependencyName": "rust-arm64e-stage1-toolchain",
   "repository": "cypherair/rust",
   "release": {
-    "tag": "rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
-    "url": "https://github.com/cypherair/rust/releases/tag/rust-stage1-arm64e-toolchain-20260810T072951Z-717ad05-r31366067106-a1",
+    "tag": "rust-stage1-arm64e-toolchain-20261114T063215Z-1518ca8-r43561411721-a1",
+    "url": "https://github.com/cypherair/rust/releases/tag/rust-stage1-arm64e-toolchain-20261114T063215Z-1518ca8-r43561411721-a1",
     "channel": "prerelease",
     "isImmutable": true,
     "isPrerelease": true,
     "sourceRef": "refs/heads/rust-stable-with-arm64e",
-    "commitSha": "717ad05317a0a5321bfe3c86b6f4377f0a7804bb",
-    "publishedAt": "2026-08-10T10:40:43Z",
+    "commitSha": "1518ca8d3ab829a008a9c51d8f947cfd0670bc75",
+    "publishedAt": "2026-11-14T06:32:28Z",
     "signerWorkflow": "cypherair/rust/.github/workflows/arm64e-stage1-prerelease.yml",
-    "runId": "31366067106"
+    "runId": "43561411721"
   },
   "assets": {
     "rust-stage1-for-arm64e-aarch64-apple-darwin.tar.zst": {
-      "sha256": "7f141055fb46afd08b3b19a56c3cf77141ab775d2970b9b26f7b9e1c4f99778f",
-      "size": 271790700
-    },
-    "rust-stage1-for-arm64e-aarch64-apple-darwin.sha256": {
-      "sha256": "8c05ddf2675812f6182fead991c1a07ae19463c194b4602e58f22ad7660ae2cb",
-      "size": 118
-    },
-    "rust-stage1-for-arm64e-aarch64-apple-darwin.json": {
-      "sha256": "f8bf706606f1676f61a4881e3aacbb4e542a2de7f0e636f6f9b71c98840d2205",
-      "size": 3939
-    },
-    "rust-stage1-for-arm64e-x86_64-apple-darwin.tar.zst": {
-      "sha256": "df7f884db5732d3111cd0ec1dce3f5a842b13351bf84057e3eb457b17ddcbc16",
-      "size": 277981968
-    },
-    "rust-stage1-for-arm64e-x86_64-apple-darwin.sha256": {
-      "sha256": "d13e9afcb39a67393b72a0f4403950c96fd1509bcacdffb921b37a4a1a72af68",
-      "size": 117
-    },
-    "rust-stage1-for-arm64e-x86_64-apple-darwin.json": {
-      "sha256": "ac0d26630d537ba3f20088dc1f2b109af512d474e05ad273bddc7c3e45e4431b",
-      "size": 3932
+      "sha256": "1c3f42bc7f5449074f50aee9099ad6fc201bc7298680f34b598b52fd0390c281",
+      "size": 258161764
     }
   }
 }
